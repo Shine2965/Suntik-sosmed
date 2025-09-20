@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>Shine Shop - Top Up</title>
+<style>
+body {
+  margin: 0; padding: 0;
+  font-family: 'Segoe UI', sans-serif;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  min-height: 100vh;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: flex-start;
+  padding: 30px 15px;
+}
+h1 { color: #fff; text-shadow: 0 3px 8px rgba(0,0,0,0.4); }
+
+/* Card style */
+.card {
+  background: rgba(255,255,255,0.15);
+  border-radius: 18px;
+  padding: 25px;
+  max-width: 750px;
+  width: 100%;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+  margin-top: 25px;
+  color: #fff;
+  text-align: center;
+}
+label { font-weight: 600; display:block; margin-top:10px; }
+select, input {
+  width: 100%; padding: 12px;
+  border-radius: 12px; border: none;
+  margin-top: 6px; font-size: 15px;
+  outline: none; background: rgba(255,255,255,0.9);
+}
+button {
+  margin-top: 15px; padding: 12px 20px;
+  border: none; border-radius: 12px;
+  font-size: 15px; font-weight: bold;
+  cursor: pointer; color: #fff;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  transition: 0.2s; box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+button:hover { transform: scale(1.05); }
+button[disabled] { background:#aaa; }
+
+/* Payment Page */
+#paymentPage { display: none; text-align: center; }
+#totalAmount {
+  font-size: 20px; font-weight: bold;
+  margin: 10px 0; color: #ffeb3b;
+  text-shadow: 0 2px 6px rgba(0,0,0,0.5);
+}
+canvas { margin: 15px auto; display: block; }
+#otherPay { margin-top:15px; font-size:16px; }
+
+/* Custom Payment Option */
+.payment-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit,minmax(150px,1fr));
+  gap: 12px;
+  margin: 15px 0;
+}
+.pay-option {
+  background: rgba(255,255,255,0.2);
+  border-radius: 12px;
+  padding: 10px;
+  cursor: pointer;
+  transition: 0.2s;
+  display: flex; flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid transparent;
+}
+.pay-option img {
+  width: 40px; height: 40px; margin-bottom: 8px;
+}
+.pay-option span { font-size: 14px; font-weight: 600; }
+.pay-option:hover { background: rgba(255,255,255,0.35); }
+input[name="payMethod"] { display: none; }
+input[name="payMethod"]:checked + .pay-option {
+  border-color: #ffeb3b;
+  background: rgba(255,255,255,0.4);
+}
+
+/* Maintenance */
+#maintenancePage { display:none; text-align:center; }
+#countdown {
+  font-size: 26px; font-weight:bold;
+  color:#ffeb3b; margin-top:15px;
+  text-shadow:0 2px 6px rgba(0,0,0,0.5);
+}
+</style>
+</head>
+<body>
+
+<h1> Shine Shop </h1>
+
+<!-- Halaman Maintenance -->
+<div class="card" id="maintenancePage">
+  <h2> Maintenance Sedang Berlangsung </h2>
+  <p>Kami sedang melakukan Update dan perbaikan sistem.<br>Harap tunggu sampai maintenance selesai.</p>
+  <div id="countdown">00:00:00</div>
+</div>
+
+<!-- Halaman Pembelian -->
+<div class="card" id="purchasePage">
+  <h2>Pilih Produk</h2>
+  <label for="game">Pilih Kategori:</label>
+  <select id="game" onchange="loadProducts()">
+    <option value="">-- Pilih Kategori --</option>
+    <option value="Layanan-Promo">Layanan Promo</option>
+    <option value="Transfer-Dana">Transfer Dana</option>
+    <option value="ff">Free Fire</option>
+    <option value="ml">Mobile Legends</option>
+    <option value="Efootball">Efootball</option>
+    <option value="roblox">Roblox</option>
+    <option value="pulsaXL">Pulsa XL</option>
+  </select>
+
+  <label for="product">Pilih Produk:</label>
+  <select id="product"><option value="">-- Pilih Produk --</option></select>
+
+  <label for="username">ID Game:</label>
+  <input type="text" id="username" placeholder="Masukkan ID Game" required>
+
+  <button id="purchaseBtn" onclick="goToPayment()" disabled> Purchase Now</button>
+</div>
+
+<!-- Halaman Pembayaran -->
+<div class="card" id="paymentPage">
+  <h2> Pilih Metode Pembayaran</h2>
+  <p id="productInfo"></p>
+  <p id="totalAmount"></p>
+
+  <!-- Custom Payment Options -->
+  <div class="payment-options">
+    <label>
+      <input type="radio" name="payMethod" value="qris" checked onchange="showPaymentMethod()">
+      <div class="pay-option">
+        <img src="https://i.ibb.co.com/FLWKBPSh/Screenshot-2025-09-20-12-29-17-459-com-android-chrome-edit.jpg">
+        <span>QRIS</span>
+      </div>
+    </label>
+    <label>
+      <input type="radio" name="payMethod" value="dana" onchange="showPaymentMethod()">
+      <div class="pay-option">
+        <img src="https://i.ibb.co.com/HpxWwvvC/images.jpg">
+        <span>DANA</span>
+      </div>
+    </label>
+    <label>
+      <input type="radio" name="payMethod" value="gopay" onchange="showPaymentMethod()">
+      <div class="pay-option">
+        <img src="https://i.ibb.co.com/DH9RjHQs/download.png">
+        <span>GoPay</span>
+      </div>
+    </label>
+  </div>
+
+  <!-- QRIS -->
+  <canvas id="qrisCanvas"></canvas>
+
+  <!-- E-wallet info -->
+  <div id="otherPay"></div>
+
+  <button onclick="confirmPayment()"> Konfirmasi Pembayaran</button>
+  <br><br>
+  <button onclick="backToPurchase()"> Kembali</button>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
+<script>
+let products = {
+	//Layanan Promo
+	"Layanan-Promo": [
+	{ name: "Jasa Bug Wa",price: 1000},
+	{ name: "Murid Bug Wa (Rp 8000/Bulan)",price: 8000}
+	],
+	//Transfer E wallet
+	"Transfer-Dana": [
+	{ name:"Dana Rp 1.000",price: 1400},
+	{ name:"Dana Rp 2.000",price: 2400},
+	{ name:"Dana Rp 3.000",price: 3400},
+	{ name:"Dana Rp 4.000",price: 4400},
+	{ name:"Dana Rp 5.000",price: 5400},
+	{ name:"Dana Rp 10.000",price: 10400},
+	{ name:"Dana Rp 15.000",price: 15400},
+	{ name:"Dana Rp 20.000",price: 20400},
+	{ name:"Dana Rp 25.000",price: 25400},
+	{ name:"Dana Rp 30.000",price: 30400},
+	{ name:"Dana Rp 40.000",price: 40500},
+	{ name:"Dana Rp 50.000",price: 50500}
+	],
+	//free fire
+ "ff": [
+    {name:"5 Diamond FF",price:1000},
+    {name:"12 Diamond FF",price:2800},
+    {name:"50 Diamond FF",price:7500},
+    {name:"70 Diamond FF",price:9200},
+    {name:"100 Diamond FF",price:15000},
+    {name:"140 Diamond FF",price:18500},
+    {name:"210 Diamond FF",price:27500},
+    {name:"Membership Mingguan 50 DM",price:28000},
+    {name:"300 Diamond FF",price:39000}
+  ],
+  
+  //Mobile Legend
+  "ml": [
+    {name:"3 Diamond ML",price:1500},
+    {name:"5 Diamond ML",price:1800},
+    {name:"12 Diamond ML",price:4000},
+    {name:"19 Diamond ML",price:6000},
+    {name:"28 Diamond ML",price:8500},
+    {name:"36 Diamond ML",price:10500},
+    {name:"56 Diamond ML",price:16000},
+    {name:"100 Diamond ML",price:27500},
+    {name:"1x Weekly Diamond Pass",price:28000},
+    {name:"170 Diamond ML",price:45000},
+    {name:"2x Weekly Diamond Pass",price:57000},
+    {name:"257 Diamond ML",price:67500},
+    {name:"301 Diamond ML",price:79000},
+    {name:"408 Diamond ML",price:107000}
+  ],
+  
+  // Delta Force
+  "dfgarena": [
+    {name:"18 Delta Coins",price:6000},
+    {name:"32 Delta Coins",price:8200},
+    {name:"60 Delta Coins",price:16000},
+    {name:"300 Delta Coins",price:72000}
+  ],
+  
+  //Roblox 
+  "roblox5d": [
+    {name:"100 Robux",price:15000},
+    {name:"200 Robux",price:30000},
+    {name:"800 Robux",price:108000},
+    {name:"1700 Robux",price:230000}
+  ],
+  //Efootball
+  "Efootball": [
+  { name:"5.000 IDR",price: 5000},
+  { name:"10.000 IDR",price: 10000},
+  { name:"16.000 IDR",price: 15000},
+  { name:"20.000 IDR",price: 19000},
+  { name:"35.000 IDR",price: 33000},
+  { name:"49.000 IDR",price: 45000},
+  { name:"100.000 IDR",price: 92000}
+  ],
+  
+  //Pulsa XL
+  "pulsaXL": [
+    {name:"Pulsa 25.000",price:26000},
+    {name:"Pulsa 50.000",price:51000}
+  ]
+};
+
+let trxId, productName, user, totalPay;
+
+/* === Maintenance Config === */
+// atur kapan maintenance selesai
+const maintenanceEnd = new Date("2025-09-20T17:15:00").getTime(); // format: YYYY-MM-DDTHH:mm:ss
+
+function checkMaintenance(){
+  let now = new Date().getTime();
+  if(now < maintenanceEnd){
+    // masih maintenance
+    document.getElementById("maintenancePage").style.display="block";
+    document.getElementById("purchasePage").style.display="none";
+    document.getElementById("paymentPage").style.display="none";
+    startCountdown();
+  } else {
+    // maintenance selesai
+    document.getElementById("purchasePage").style.display="block";
+    document.getElementById("maintenancePage").style.display="none";
+  }
+}
+
+function startCountdown(){
+  let x = setInterval(function(){
+    let now = new Date().getTime();
+    let distance = maintenanceEnd - now;
+    if(distance <= 0){
+      clearInterval(x);
+      checkMaintenance(); // cek ulang
+    } else {
+      let h = Math.floor((distance % (1000*60*60*24))/(1000*60*60));
+      let m = Math.floor((distance % (1000*60*60))/(1000*60));
+      let s = Math.floor((distance % (1000*60))/1000);
+      document.getElementById("countdown").innerHTML =
+        (h<10?"0"+h:h)+":"+(m<10?"0"+m:m)+":"+(s<10?"0"+s:s);
+    }
+  },1000);
+}
+
+// jalankan saat halaman dimuat
+window.onload = checkMaintenance;
+
+/* Fungsi Normal */
+function loadProducts(){
+  const game=document.getElementById("game").value;
+  const productSelect=document.getElementById("product");
+  productSelect.innerHTML='<option value="">-- Pilih Produk --</option>';
+  if(products[game]){
+    products[game].forEach(p=>{
+      let option=document.createElement("option");
+      option.value=`${p.name}|${p.price}`;
+      option.textContent=`${p.name} - Rp ${p.price.toLocaleString("id-ID")}`;
+      productSelect.appendChild(option);
+    });
+  }
+}
+document.getElementById("product").addEventListener("change",function(){
+  document.getElementById("purchaseBtn").disabled=!this.value;
+});
+
+function goToPayment(){
+  const productData=document.getElementById("product").value.split("|");
+  user=document.getElementById("username").value.trim();
+  if(productData.length<2 || !user)return alert("Lengkapi data!");
+  const price=parseInt(productData[1]);
+  trxId="SS-"+Math.floor(100000+Math.random()*900000);
+  productName=productData[0];
+  const adminFee=Math.ceil(price*0.007);
+  totalPay=price+adminFee;
+
+  document.getElementById("productInfo").textContent=`${productName} untuk ${user}`;
+  document.getElementById("totalAmount").textContent=`Total transfer (incl. admin 0,7%): Rp ${totalPay.toLocaleString("id-ID")} | ID: ${trxId}`;
+
+  showPaymentMethod();
+
+  document.getElementById("purchasePage").style.display="none";
+  document.getElementById("paymentPage").style.display="block";
+}
+
+// CRC16
+function crc16ccitt(str){
+  let crc=0xFFFF;
+  for(let c of str){
+    crc^=c.charCodeAt(0)<<8;
+    for(let i=0;i<8;i++){
+      if(crc&0x8000)crc=(crc<<1)^0x1021; else crc<<=1;
+      crc&=0xFFFF;
+    }
+  }
+  return crc.toString(16).toUpperCase().padStart(4,"0");
+}
+
+// Base QRIS EMV (dummy)
+const baseQris="00020101021226670016COM.NOBUBANK.WWW01189360050300000879140214526036770909650303UMI51440014ID.CO.QRIS.WWW0215ID20243611417480303UMI5204541153033605802ID5920SHINE SHOP OK19967206008SURABAYA61056011162070703A01";
+
+function generateQris(amount){
+  const amt=amount.toFixed(2);
+  let emv=baseQris+"54"+amt.length.toString().padStart(2,"0")+amt+"6304";
+  return emv+crc16ccitt(emv);
+}
+
+function showPaymentMethod(){
+  const method=document.querySelector('input[name="payMethod"]:checked').value;
+  const qrisCanvas=document.getElementById("qrisCanvas");
+  const otherPay=document.getElementById("otherPay");
+
+  qrisCanvas.style.display="none";
+  otherPay.innerHTML="";
+
+  if(method==="qris"){
+    qrisCanvas.style.display="block";
+    QRCode.toCanvas(qrisCanvas,generateQris(totalPay),{width:250},err=>{
+      if(err)console.error(err);
+    });
+  }else if(method==="dana"){
+    otherPay.innerHTML=`Transfer ke Dana<br><b>087776759211 a/n Alvino Jeremy</b>`;
+  }else if(method==="gopay"){
+    otherPay.innerHTML=`Transfer ke Gopay<br><b>087776759211 a/n Alvino Jeremy</b>`;
+  }
+}
+
+function confirmPayment(){
+  const method=document.querySelector('input[name="payMethod"]:checked').value;
+  const msg=`ID: ${trxId}%0AProduk: ${productName}%0AUser: ${user}%0AMetode: ${method.toUpperCase()}%0ATotal: Rp ${totalPay.toLocaleString("id-ID")}`;
+  window.open(`https://wa.me/6289518103883?text=${msg}`,"_blank");
+}
+
+function backToPurchase(){
+  document.getElementById("paymentPage").style.display="none";
+  document.getElementById("purchasePage").style.display="block";
+}
+</script>
+</body>
+</html>
