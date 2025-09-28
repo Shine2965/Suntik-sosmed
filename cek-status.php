@@ -10,7 +10,6 @@ if (!$order_id) {
     exit;
 }
 
-// === KONFIGURASI API ===
 $api_url = "https://ordersosmed.id/api-1/status";
 $api_id = "11313";
 $api_key = "509a318e2a7225c109810cd1d130a5fa310b9e935c60b0ae90d5af688dd71e84";
@@ -32,23 +31,28 @@ $httpcode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
 $error = curl_error($ch);
 curl_close($ch);
 
+// Debug
 if ($error) {
     echo json_encode(["response" => false, "error" => "Curl error: $error"]);
     exit;
 }
 
-if (!$response) {
-    echo json_encode(["response" => false, "error" => "Tidak ada respon dari API"]);
+if ($httpcode !== 200) {
+    echo json_encode([
+        "response" => false,
+        "error" => "HTTP Code: $httpcode",
+        "raw" => $response
+    ]);
     exit;
 }
 
+// Coba parse JSON
 $json = json_decode($response, true);
 if ($json === null) {
     echo json_encode([
         "response" => false,
         "error" => "Respon bukan JSON",
-        "raw" => $response,
-        "httpcode" => $httpcode
+        "raw" => $response   // <--- tampilkan isi asli dari API
     ]);
     exit;
 }
