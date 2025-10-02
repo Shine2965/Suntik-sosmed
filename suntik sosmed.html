@@ -13,7 +13,7 @@
     }
     .container {
       max-width: 600px;
-      margin: 60px auto 40px; /* biar ga ketutup navbar */
+      margin: 40px auto;
       padding: 20px;
     }
     .card {
@@ -54,65 +54,44 @@
     }
     .btn:hover { opacity: 0.85; }
 
-    /* ==== NAVBAR HAMBURGER ==== */
+    /* Hamburger Menu */
     .navbar {
       background: #1c1c1c;
       padding: 10px 20px;
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      z-index: 1000;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
+      position: relative;
     }
-    .navbar h1 {
-      margin: 0;
-      font-size: 20px;
-      color: #00e1ff;
-    }
-    .hamburger {
-      font-size: 26px;
+    .menu-toggle {
+      font-size: 28px;
       cursor: pointer;
-      user-select: none;
+      color: #fff;
     }
-    .nav-links {
+    .menu {
       display: none;
       flex-direction: column;
+      margin-top: 10px;
       background: #222;
-      position: absolute;
-      top: 50px;
-      right: 20px;
       border-radius: 10px;
       overflow: hidden;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
     }
-    .nav-links a {
-      padding: 12px 20px;
-      text-decoration: none;
+    .menu a {
       color: #fff;
-      background: #222;
-      transition: background 0.3s;
-      display: block;
+      padding: 12px;
+      text-decoration: none;
+      border-bottom: 1px solid #333;
+      text-align: center;
     }
-    .nav-links a:hover {
-      background: #333;
-    }
-    .nav-active {
-      display: flex;
-    }
+    .menu a:last-child { border-bottom: none; }
+    .menu a:hover { background: #0072ff; }
+    .menu.show { display: flex; }
   </style>
 </head>
 <body>
-
   <!-- Navbar -->
   <div class="navbar">
-    <h1>Shine Shop</h1>
-    <div class="hamburger" onclick="toggleMenu()">☰</div>
-    <div class="nav-links" id="navLinks">
+    <span class="menu-toggle" onclick="toggleMenu()">☰</span>
+    <div id="menu" class="menu">
       <a href="index.html">🏠 Home</a>
-      <a href="riwayat.html">📑 Riwayat Transaksi</a>
+      <a href="riwayat.html">📜 Riwayat Transaksi</a>
       <a href="kontaksmm.html">💬 Customer Service</a>
     </div>
   </div>
@@ -125,25 +104,29 @@
       <h2>🚧 Website dalam Perbaikan 🚧</h2>
       <p>Halo, selamat datang di <b>Shine Shop</b> 🙂</p>
       <p>Saat ini website sedang dalam tahap <b>maintenance</b> dan akan segera kembali online.</p>
-      <h3>⏳ Estimasi Selesai:</h3>
-      <p id="countdown">Memuat...</p>
+      <div id="countdownWrapper">
+        <h3>⏳ Estimasi Selesai:</h3>
+        <p id="countdown">Memuat...</p>
+      </div>
       <p>Butuh bantuan segera?</p>
       <a href="https://wa.me/6289518103883" target="_blank" class="btn">📱 WhatsApp Admin</a>
-    </div>
-	    <!-- Suara Notifikasi -->
+	</div>
+	  
+  <!-- Suara Notifikasi -->
   <audio id="dingSound">
     <source src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg" type="audio/ogg">
     <source src="https://actions.google.com/sounds/v1/alarms/beep_short.mp3" type="audio/mpeg">
   </audio>
 
   <script>
-  // Fungsi toggle menu
+  // Hamburger menu
   function toggleMenu() {
-    document.getElementById("navLinks").classList.toggle("nav-active");
+    document.getElementById("menu").classList.toggle("show");
   }
 
   // Atur tanggal & waktu selesai (Tahun, Bulan-0, Tanggal, Jam, Menit, Detik)
-  const targetDate = new Date(2025, 10, 2, 15, 40, 0);
+  // Contoh: 5 Oktober 2025 jam 12:00
+  const targetDate = new Date(2025, 9, 5, 12, 0, 0);
 
   function goToStep(step) {
     const maintenance = document.getElementById("maintenance");
@@ -165,8 +148,12 @@
     const distance = targetDate - now;
 
     if (distance < 0) {
+      // Sembunyikan countdown setelah selesai
+      document.getElementById("countdownWrapper").style.display = "none";
       document.getElementById("countdown").innerHTML = "✅ Website sudah bisa diakses!";
+      // Bunyi notifikasi
       document.getElementById("dingSound").play();
+      // Setelah 2 detik otomatis masuk ke halaman pemesanan
       setTimeout(()=>{ goToStep(1); },2000);
       return;
     }
@@ -182,7 +169,6 @@
 
   setInterval(updateCountdown, 1000);
   updateCountdown();
-
   <!-- Form Pemesanan -->
   <div id="step1" class="card hidden">
     <h2>Buat Pesanan</h2>
@@ -565,6 +551,7 @@ function filterOptions(selectId,searchId){
 </script>
 </body>
 </html>
+
 
 
 
