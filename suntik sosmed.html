@@ -1,92 +1,136 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Shine Shop - SMM</title>
-  <meta name="google-adsense-account" content="ca-pub-9912622413153708">
-
-  <!-- QR Code library -->
-  <script src="https://unpkg.com/qr-code-styling@1.5.0/lib/qr-code-styling.js"></script>
-
   <style>
-    body {margin:0;font-family:Arial,sans-serif;background:#f8f8f8;}
-    header {background:#222;color:#fff;padding:10px 20px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;}
-    header h1 {font-size:18px;margin:0;}
-    nav ul {list-style:none;margin:0;padding:0;display:flex;}
-    nav ul li {margin:0 10px;}
-    nav ul li a {color:#fff;text-decoration:none;}
-    .hamburger {cursor:pointer;display:none;flex-direction:column;}
-    .hamburger div {width:25px;height:3px;background:#fff;margin:4px 0;transition:.4s;}
-    @media(max-width:768px){
-      nav ul {display:none;flex-direction:column;background:#333;position:absolute;top:50px;right:0;width:200px;}
-      nav ul.active {display:flex;}
-      .hamburger {display:flex;}
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      background: #111;
+      color: #fff;
     }
-    .container {padding:20px;}
-    .card {background:#fff;border-radius:8px;padding:20px;margin-bottom:20px;box-shadow:0 2px 5px rgba(0,0,0,.1);}
-    label {display:block;margin-top:10px;font-weight:bold;}
-    input, select {width:100%;padding:8px;margin-top:5px;border:1px solid #ccc;border-radius:4px;}
-    button {margin-top:15px;padding:10px 15px;border:none;border-radius:6px;
-      background:linear-gradient(45deg,#00c6ff,#0072ff);color:#fff;cursor:pointer;}
-    button:hover {opacity:.9;}
-    .hidden {display:none;}
-    .center {text-align:center;}
-    .qr-box {display:flex;justify-content:center;margin-top:15px;}
+    .container {
+      max-width: 600px;
+      margin: 40px auto;
+      padding: 20px;
+    }
+    .card {
+      background: #1c1c1c;
+      padding: 20px;
+      margin: 15px 0;
+      border-radius: 15px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+      text-align: center;
+      opacity: 1;
+      transition: opacity 1s ease;
+    }
+    .hidden { display: none; }
+    .fade-out { opacity: 0 !important; }
+    .fade-in { opacity: 1 !important; }
+    .center { text-align: center; }
+    .gear {
+      font-size: 60px;
+      animation: spin 3s linear infinite;
+      display: inline-block;
+      margin-bottom: 10px;
+      color: #00e1ff;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .btn {
+      display: inline-block;
+      padding: 12px 18px;
+      margin-top: 15px;
+      border-radius: 10px;
+      text-decoration: none;
+      background: linear-gradient(45deg, #0072ff, #00c6ff);
+      color: white;
+      font-weight: bold;
+      transition: 0.3s;
+    }
+    .btn:hover { opacity: 0.85; }
   </style>
 </head>
 <body>
+  <div class="container">
 
-<header>
-  <h1>Shine Shop - SMM</h1>
-  <div class="hamburger" id="hamburger" onclick="toggleMenu()">
-    <div></div><div></div><div></div>
+    <!-- Halaman Maintenance -->
+    <div id="maintenance" class="card fade-in">
+      <div class="gear">⚙️</div>
+      <h2>🚧 Website dalam Perbaikan 🚧</h2>
+      <p>Halo, selamat datang di <b>Shine Shop</b> 🙂</p>
+      <p>Saat ini website sedang dalam tahap <b>maintenance</b> dan akan segera kembali online.</p>
+      <h3>⏳ Estimasi Selesai:</h3>
+      <p id="countdown">Memuat...</p>
+      <p>Butuh bantuan segera?</p>
+      <a href="https://wa.me/6289518103883" target="_blank" class="btn">📱 WhatsApp Admin</a>
+    </div>
+
+    <!-- Halaman Pemesanan -->
+    <div id="step1" class="card hidden fade-in">
+      <h2>🛒 Buat Pesanan</h2>
+      <p>Form pemesanan akan muncul di sini...</p>
+    </div>
+
   </div>
-  <nav>
-    <ul id="menu">
-      <li><a href="#" onclick="goToStep(0)">Home</a></li>
-      <li><a href="#" onclick="goToStep(1)">Buat Pesanan</a></li>
-      <li><a href="#" onclick="goToStep(2)">Pembayaran</a></li>
-    </ul>
-  </nav>
-</header>
 
-<div class="container">
+  <!-- Suara Notifikasi -->
+  <audio id="dingSound">
+    <source src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg" type="audio/ogg">
+    <source src="https://actions.google.com/sounds/v1/alarms/beep_short.mp3" type="audio/mpeg">
+  </audio>
 
-   <script>
- <div class="container">
+  <script>
+  // Atur tanggal & waktu selesai (Tahun, Bulan-0, Tanggal, Jam, Menit, Detik)
+  // Contoh: 5 Oktober 2025 jam 12:00
+  const targetDate = new Date(2025, 9, 5, 12, 0, 0);
 
-   <script>
-// Atur tanggal & waktu selesai (Tahun, Bulan-0, Tanggal, Jam, Menit, Detik)
-// Contoh: 5 Oktober 2025 jam 12:00
-const targetDate = new Date(2025, 9, 5, 12, 0, 0);
+  function goToStep(step) {
+    const maintenance = document.getElementById("maintenance");
+    const step1 = document.getElementById("step1");
 
-function updateCountdown() {
-  const now = new Date().getTime();
-  const distance = targetDate - now;
-
-  if (distance < 0) {
-    document.getElementById("countdown").innerHTML = "✅ Website sudah bisa diakses!";
-    // Setelah 1 detik otomatis pindah ke halaman pemesanan
-    setTimeout(()=>{ goToStep(1); },1000);
-    return;
+    maintenance.classList.add("fade-out");
+    setTimeout(() => {
+      maintenance.classList.add("hidden");
+      if(step === 1) {
+        step1.classList.remove("hidden");
+        step1.classList.remove("fade-out");
+        step1.classList.add("fade-in");
+      }
+    }, 1000);
   }
 
-  const days = Math.floor(distance / (1000*60*60*24));
-  const hours = Math.floor((distance % (1000*60*60*24)) / (1000*60*60));
-  const minutes = Math.floor((distance % (1000*60*60)) / (1000*60));
-  const seconds = Math.floor((distance % (1000*60)) / 1000);
+  function updateCountdown() {
+    const now = new Date().getTime();
+    const distance = targetDate - now;
 
-  document.getElementById("countdown").innerHTML =
-    `${days} hari ${hours} jam ${minutes} menit ${seconds} detik`;
-}
-setInterval(updateCountdown,1000);
-   </script>
-	<!-- Countdown -->
-  <div id="countdownBox" class="card center">
-    <h2>🚀 Website akan segera dibuka</h2>
-    <p id="countdown">Memuat...</p>
-  </div>
+    if (distance < 0) {
+      document.getElementById("countdown").innerHTML = "✅ Website sudah bisa diakses!";
+      // Bunyi notifikasi
+      document.getElementById("dingSound").play();
+      // Setelah 2 detik otomatis masuk ke halaman pemesanan
+      setTimeout(()=>{ goToStep(1); },2000);
+      return;
+    }
+
+    const days = Math.floor(distance / (1000*60*60*24));
+    const hours = Math.floor((distance % (1000*60*60*24)) / (1000*60*60));
+    const minutes = Math.floor((distance % (1000*60*60)) / (1000*60));
+    const seconds = Math.floor((distance % (1000*60)) / 1000);
+
+    document.getElementById("countdown").innerHTML =
+      `${days} hari ${hours} jam ${minutes} menit ${seconds} detik`;
+  }
+
+  setInterval(updateCountdown, 1000);
+  updateCountdown();
+  </script>
+</body>
+</html>
   <!-- Form Pemesanan -->
   <div id="step1" class="card hidden">
     <h2>Buat Pesanan</h2>
@@ -469,6 +513,7 @@ function filterOptions(selectId,searchId){
 </script>
 </body>
 </html>
+
 
 
 
