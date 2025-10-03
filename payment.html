@@ -8,33 +8,28 @@
   <style>
     body {
       font-family: Arial, sans-serif;
-      background: linear-gradient(-45deg, #0f2027, #203a43, #2c5364, #1c1c1c);
-      background-size: 400% 400%;
-      animation: gradientBG 15s ease infinite;
+      background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
       color: white;
       margin: 0;
       padding: 0;
+      text-align: center;
+      min-height: 100vh;
       display: flex;
+      flex-direction: column;
       justify-content: center;
       align-items: center;
-      min-height: 100vh;
     }
-    @keyframes gradientBG {
-      0% {background-position:0% 50%;}
-      50% {background-position:100% 50%;}
-      100% {background-position:0% 50%;}
-    }
-    .card {
-      background: rgba(0,0,0,0.6);
-      padding: 25px 30px;
+    .container {
+      background: rgba(255, 255, 255, 0.1);
+      padding: 20px 30px;
       border-radius: 16px;
-      box-shadow: 0 8px 25px rgba(0,0,0,0.6);
+      box-shadow: 0 8px 20px rgba(0,0,0,0.5);
       animation: fadeIn 1s ease-in-out;
       max-width: 420px;
-      width: 100%;
-      text-align: center;
     }
-    h2 { margin-bottom: 10px; }
+    h2 {
+      margin-bottom: 10px;
+    }
     canvas {
       margin: 20px 0;
       background: white;
@@ -59,7 +54,9 @@
       box-shadow: 0 5px 12px rgba(0,0,0,0.3);
       transition: transform 0.2s ease;
     }
-    .btn-wa:hover { transform: scale(1.05); }
+    .btn-wa:hover {
+      transform: scale(1.05);
+    }
     @keyframes fadeIn {
       from { opacity: 0; transform: translateY(20px); }
       to { opacity: 1; transform: translateY(0); }
@@ -67,16 +64,16 @@
   </style>
 </head>
 <body>
-  <div class="card">
+  <div class="container">
     <h2>Pembayaran QRIS</h2>
-    <p>Silakan scan QR untuk membayar</p>
+    <p>Silakan scan QR di bawah untuk membayar</p>
     <canvas id="qrisCanvas"></canvas>
     <div class="details" id="orderDetails"></div>
     <a id="waLink" class="btn-wa" target="_blank">Konfirmasi via WhatsApp</a>
   </div>
 
   <script>
-    // 🔹 CRC16-CCITT (False) untuk Tag 63
+    // CRC16-CCITT (false) untuk Tag 63
     function crc16ccitt(str) {
       let crc = 0xFFFF;
       for (let i = 0; i < str.length; i++) {
@@ -92,8 +89,8 @@
       return crc.toString(16).toUpperCase().padStart(4, '0');
     }
 
-    // 🔹 Build EMV dengan Tag 54 = Amount
-    function buildEmvPayload(amount, baseBefore54) {
+    // Build EMV payload dengan Tag 54 = amount (integer Rupiah)
+    function buildEmvPayloadWith54(amount, baseBefore54) {
       const amtInt = parseInt(amount, 10);
       const amtStr = String(amtInt);
       const len = String(amtStr.length).padStart(2, '0');
@@ -103,29 +100,30 @@
       return payloadForCrc + crc;
     }
 
-    // 🔹 Ambil parameter dari query string
+    // Ambil parameter dari query string
     const urlParams = new URLSearchParams(window.location.search);
-    const kategori = urlParams.get("kategori");
-    const layanan = urlParams.get("layanan");
-    const jumlah = urlParams.get("jumlah");
-    const target = urlParams.get("target");
-    const total = urlParams.get("total");
-    const idLayanan = urlParams.get("id"); // ✅ ID Layanan ikut ditampilkan
+    const kategori = urlParams.get("kategori") || "-";
+    const layanan = urlParams.get("layanan") || "-";
+    const idLayanan = urlParams.get("id") || "-";
+    const jumlah = urlParams.get("jumlah") || "-";
+    const target = urlParams.get("target") || "-";
+    const harga = urlParams.get("harga") || "-";
+    const total = urlParams.get("total") || "0";
     const idTransaksi = "TX" + Date.now();
     const tanggalJam = new Date().toLocaleString("id-ID");
 
-    // 🔹 Base Payload (tanpa Tag 54 & Tag 63)
+    // Base payload tanpa Tag54 & Tag63
     const baseTemplate = "00020101021226670016COM.NOBUBANK.WWW01189360050300000879140214526036770909650303UMI51440014ID.CO.QRIS.WWW0215ID20243611417480303UMI5204541153033605802ID5920SHINE SHOP OK19967206008SURABAYA61056011162070703A01";
 
-    // 🔹 Build payload final
-    const payload = buildEmvPayload(total, baseTemplate);
+    // Bangun payload EMV final
+    const payload = buildEmvPayloadWith54(total, baseTemplate);
 
-    // 🔹 Generate QR
+    // Generate QR
     QRCode.toCanvas(document.getElementById("qrisCanvas"), payload, { width: 240 }, function (error) {
       if (error) console.error(error);
     });
 
-    // 🔹 Tampilkan detail order
+    // Tampilkan detail order
     document.getElementById("orderDetails").innerHTML = `
       <strong>ID Transaksi:</strong> ${idTransaksi}<br>
       <strong>ID Layanan:</strong> ${idLayanan}<br>
@@ -137,8 +135,24 @@
       <strong>Total:</strong> Rp ${Number(total).toLocaleString("id-ID")}
     `;
 
-    // 🔹 Format pesan WhatsApp (tambahkan ID Layanan)
-    const waMessage = `Halo admin saya sudah melakukan pembayaran%0A%0AId Transaksi: ${idTransaksi}%0AId Layanan: ${idLayanan}%0ATanggal & Jam: ${tanggalJam}%0A%0AKategori: ${kategori}%0ALayanan: ${layanan}%0AJumlah: ${jumlah}%0ATarget/Link: ${target}%0AHarga: Rp ${Number(total).toLocaleString("id-ID")}%0A%0AMohon dicek dan segera diproses. Terima kasih 🙏`;
+    // Format pesan WhatsApp rapi & encode biar gak kepotong
+    const waMessageRaw = `
+Halo admin saya sudah melakukan pembayaran
+
+Id Transaksi : ${idTransaksi}
+Id Layanan  : ${idLayanan}
+Tanggal & Jam : ${tanggalJam}
+
+Kategori : ${kategori}
+Layanan  : ${layanan}
+Jumlah   : ${jumlah}
+Target/Link : ${target}
+Harga    : Rp ${Number(total).toLocaleString("id-ID")}
+
+Mohon dicek dan segera diproses. Terima kasih 🙏
+    `;
+
+    const waMessage = encodeURIComponent(waMessageRaw.trim());
     document.getElementById("waLink").href = `https://wa.me/6289518103883?text=${waMessage}`;
   </script>
 </body>
