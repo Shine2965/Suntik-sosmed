@@ -4,16 +4,20 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Pembayaran QRIS - Shine Shop</title>
-  <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
   <style>
     body {
       font-family: Arial, sans-serif;
       background: linear-gradient(-45deg, #0f2027, #203a43, #2c5364, #1c1c1c);
       background-size: 400% 400%;
-      animation: gradientBG 12s ease infinite;
-      color: #fff;
-      text-align: center;
-      padding: 20px;
+      animation: gradientBG 15s ease infinite;
+      color: white;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
     }
     @keyframes gradientBG {
       0% {background-position:0% 50%;}
@@ -21,108 +25,121 @@
       100% {background-position:0% 50%;}
     }
     .card {
-      max-width: 500px;
-      margin: auto;
-      background: rgba(0,0,0,0.7);
-      padding: 20px;
-      border-radius: 12px;
-      box-shadow: 0 6px 20px rgba(0,0,0,0.5);
+      background: rgba(0,0,0,0.6);
+      padding: 25px 30px;
+      border-radius: 16px;
+      box-shadow: 0 8px 25px rgba(0,0,0,0.6);
+      animation: fadeIn 1s ease-in-out;
+      max-width: 420px;
+      width: 100%;
+      text-align: center;
     }
-    #qrisCanvas {
-      margin: 20px auto;
-      display: block;
-      background: #fff;
+    h2 { margin-bottom: 10px; }
+    canvas {
+      margin: 20px 0;
+      background: white;
       padding: 10px;
-      border-radius: 8px;
+      border-radius: 12px;
     }
-    button {
-      background: linear-gradient(90deg, #4CAF50, #45a049);
-      color: white;
-      padding: 12px 20px;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 16px;
+    .details {
+      text-align: left;
+      font-size: 14px;
+      margin: 15px 0;
+      line-height: 1.6;
+    }
+    .btn-wa {
+      display: inline-block;
       margin-top: 15px;
+      padding: 12px 20px;
+      border-radius: 30px;
+      background: linear-gradient(45deg, #25D366, #128C7E);
+      color: white;
+      text-decoration: none;
+      font-weight: bold;
+      box-shadow: 0 5px 12px rgba(0,0,0,0.3);
+      transition: transform 0.2s ease;
     }
-    button:hover { opacity: 0.9; }
+    .btn-wa:hover { transform: scale(1.05); }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
   </style>
 </head>
 <body>
   <div class="card">
     <h2>Pembayaran QRIS</h2>
-    <p><b>ID Transaksi:</b> <span id="trx"></span></p>
-    <p><b>ID Layanan:</b> <span id="id"></span></p>
-    <p><b>Kategori:</b> <span id="kategori"></span></p>
-    <p><b>Layanan:</b> <span id="layanan"></span></p>
-    <p><b>Jumlah:</b> <span id="jumlah"></span></p>
-    <p><b>Target/Link:</b> <span id="target"></span></p>
-    <p><b>Total:</b> Rp<span id="total"></span></p>
-
+    <p>Silakan scan QR untuk membayar</p>
     <canvas id="qrisCanvas"></canvas>
-    <p>Silakan scan QRIS ini untuk melakukan pembayaran</p>
-
-    <button onclick="konfirmasiWA()">Konfirmasi Pembayaran via WhatsApp</button>
+    <div class="details" id="orderDetails"></div>
+    <a id="waLink" class="btn-wa" target="_blank">Konfirmasi via WhatsApp</a>
   </div>
 
   <script>
-    function getQueryParam(param) {
-      const urlParams = new URLSearchParams(window.location.search);
-      return urlParams.get(param);
+    // 🔹 CRC16-CCITT (False) untuk Tag 63
+    function crc16ccitt(str) {
+      let crc = 0xFFFF;
+      for (let i = 0; i < str.length; i++) {
+        crc ^= (str.charCodeAt(i) << 8);
+        for (let j = 0; j < 8; j++) {
+          if ((crc & 0x8000) !== 0) {
+            crc = ((crc << 1) ^ 0x1021) & 0xFFFF;
+          } else {
+            crc = (crc << 1) & 0xFFFF;
+          }
+        }
+      }
+      return crc.toString(16).toUpperCase().padStart(4, '0');
     }
 
-    // Ambil data dari query string
-    const trx = getQueryParam("trx");
-    const id = getQueryParam("id");
-    const kategori = getQueryParam("kategori");
-    const layanan = getQueryParam("layanan");
-    const jumlah = getQueryParam("jumlah");
-    const target = getQueryParam("target");
-    const total = getQueryParam("total");
-
-    document.getElementById("trx").textContent = trx;
-    document.getElementById("id").textContent = id;
-    document.getElementById("kategori").textContent = kategori;
-    document.getElementById("layanan").textContent = layanan;
-    document.getElementById("jumlah").textContent = jumlah;
-    document.getElementById("target").textContent = target;
-    document.getElementById("total").textContent = total;
-
-    // Buat QRIS EMV Tag 54 (amount)
-    function generateEMV(amount) {
-      return `00020101021226670016COM.NOBUBANK.WWW01189360050300000879140214526036770909650303UMI51440014ID.CO.QRIS.WWW0215ID20243611417480303UMI5204541153033605802ID5920SHINE SHOP OK19967206008SURABAYA61056011162070703A015402${amount}6304ABCD`;
+    // 🔹 Build EMV dengan Tag 54 = Amount
+    function buildEmvPayload(amount, baseBefore54) {
+      const amtInt = parseInt(amount, 10);
+      const amtStr = String(amtInt);
+      const len = String(amtStr.length).padStart(2, '0');
+      const tag54 = '54' + len + amtStr;
+      const payloadForCrc = baseBefore54 + tag54 + '6304';
+      const crc = crc16ccitt(payloadForCrc);
+      return payloadForCrc + crc;
     }
 
-    const emv = generateEMV(total);
+    // 🔹 Ambil parameter dari query string
+    const urlParams = new URLSearchParams(window.location.search);
+    const kategori = urlParams.get("kategori");
+    const layanan = urlParams.get("layanan");
+    const jumlah = urlParams.get("jumlah");
+    const target = urlParams.get("target");
+    const total = urlParams.get("total");
+    const idLayanan = urlParams.get("id"); // ✅ ID Layanan ikut ditampilkan
+    const idTransaksi = "TX" + Date.now();
+    const tanggalJam = new Date().toLocaleString("id-ID");
 
-    // Generate QR Code
-    QRCode.toCanvas(document.getElementById("qrisCanvas"), emv, { width: 250 }, function (error) {
+    // 🔹 Base Payload (tanpa Tag 54 & Tag 63)
+    const baseTemplate = "00020101021226670016COM.NOBUBANK.WWW01189360050300000879140214526036770909650303UMI51440014ID.CO.QRIS.WWW0215ID20243611417480303UMI5204541153033605802ID5920SHINE SHOP OK19967206008SURABAYA61056011162070703A01";
+
+    // 🔹 Build payload final
+    const payload = buildEmvPayload(total, baseTemplate);
+
+    // 🔹 Generate QR
+    QRCode.toCanvas(document.getElementById("qrisCanvas"), payload, { width: 240 }, function (error) {
       if (error) console.error(error);
     });
 
-    // Tombol konfirmasi WA
-    function konfirmasiWA() {
-      const now = new Date();
-      const tanggalJam = now.toLocaleString("id-ID");
+    // 🔹 Tampilkan detail order
+    document.getElementById("orderDetails").innerHTML = `
+      <strong>ID Transaksi:</strong> ${idTransaksi}<br>
+      <strong>ID Layanan:</strong> ${idLayanan}<br>
+      <strong>Tanggal:</strong> ${tanggalJam}<br>
+      <strong>Kategori:</strong> ${kategori}<br>
+      <strong>Layanan:</strong> ${layanan}<br>
+      <strong>Jumlah:</strong> ${jumlah}<br>
+      <strong>Target/Link:</strong> ${target}<br>
+      <strong>Total:</strong> Rp ${Number(total).toLocaleString("id-ID")}
+    `;
 
-      const pesan = 
-`Halo admin saya sudah melakukan pembayaran
-
-Id Transaksi : ${trx}
-Id Layanan : ${id}
-Tanggal & Jam : ${tanggalJam}
-Kategori : ${kategori}
-Layanan : ${layanan}
-Jumlah : ${jumlah}
-Target/Link : ${target}
-Harga : Rp${total}
-
-Mohon dicek dan segera diproses, terima kasih.`;
-
-      const waURL = `https://wa.me/6289518103883?text=${encodeURIComponent(pesan)}`;
-      window.open(waURL, "_blank");
-    }
+    // 🔹 Format pesan WhatsApp (tambahkan ID Layanan)
+    const waMessage = `Halo admin saya sudah melakukan pembayaran%0A%0AId Transaksi: ${idTransaksi}%0AId Layanan: ${idLayanan}%0ATanggal & Jam: ${tanggalJam}%0A%0AKategori: ${kategori}%0ALayanan: ${layanan}%0AJumlah: ${jumlah}%0ATarget/Link: ${target}%0AHarga: Rp ${Number(total).toLocaleString("id-ID")}%0A%0AMohon dicek dan segera diproses. Terima kasih 🙏`;
+    document.getElementById("waLink").href = `https://wa.me/6289518103883?text=${waMessage}`;
   </script>
 </body>
 </html>
-
