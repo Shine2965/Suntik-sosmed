@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Pembayaran QRIS - Shine Shop</title>
   <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
   <style>
@@ -42,19 +42,30 @@
       margin: 15px 0;
       line-height: 1.6;
     }
-    .btn-wa {
+    input[type="file"] {
+      margin-top: 10px;
+      background: white;
+      color: #333;
+      padding: 8px;
+      border-radius: 6px;
+      width: 100%;
+      max-width: 320px;
+    }
+    .btn-confirm {
       display: inline-block;
       margin-top: 15px;
       padding: 12px 20px;
       border-radius: 30px;
-      background: linear-gradient(45deg, #25D366, #128C7E);
+      background: linear-gradient(45deg, #00c6ff, #0072ff);
       color: white;
       text-decoration: none;
       font-weight: bold;
       box-shadow: 0 5px 12px rgba(0,0,0,0.3);
       transition: transform 0.2s ease;
+      cursor: pointer;
+      border: none;
     }
-    .btn-wa:hover {
+    .btn-confirm:hover {
       transform: scale(1.05);
     }
     @keyframes fadeIn {
@@ -69,27 +80,28 @@
     <p>Silakan scan QR di bawah untuk membayar</p>
     <canvas id="qrisCanvas"></canvas>
     <div class="details" id="orderDetails"></div>
-    <a id="waLink" class="btn-wa" target="_blank">Konfirmasi via WhatsApp</a>
+    
+    <input type="file" id="buktiInput" accept="image/*" />
+    <button class="btn-confirm" id="confirmBtn">Konfirmasi Pembayaran</button>
   </div>
 
   <script>
-    // CRC16-CCITT (false) untuk Tag 63
+    // === KONFIGURASI BOT TELEGRAM ===
+    const botToken = "7430992455:AAGb4_f2Mywv79QRoFxDXh9FIg0rUY0pcm4";  // 🔹 Ganti dengan token bot kamu
+    const chatId = "6845141887";      // 🔹 Ganti dengan chat ID admin kamu
+
+    // === FUNGSI CRC ===
     function crc16ccitt(str) {
       let crc = 0xFFFF;
       for (let i = 0; i < str.length; i++) {
         crc ^= (str.charCodeAt(i) << 8);
         for (let j = 0; j < 8; j++) {
-          if ((crc & 0x8000) !== 0) {
-            crc = ((crc << 1) ^ 0x1021) & 0xFFFF;
-          } else {
-            crc = (crc << 1) & 0xFFFF;
-          }
+          crc = (crc & 0x8000) ? ((crc << 1) ^ 0x1021) & 0xFFFF : (crc << 1) & 0xFFFF;
         }
       }
       return crc.toString(16).toUpperCase().padStart(4, '0');
     }
 
-    // Build EMV payload dengan Tag 54 = amount (integer Rupiah)
     function buildEmvPayloadWith54(amount, baseBefore54) {
       const amtInt = parseInt(amount, 10);
       const amtStr = String(amtInt);
@@ -100,30 +112,25 @@
       return payloadForCrc + crc;
     }
 
-    // Ambil parameter dari query string
+    // === AMBIL PARAMETER ORDER ===
     const urlParams = new URLSearchParams(window.location.search);
     const kategori = urlParams.get("kategori") || "-";
     const layanan = urlParams.get("layanan") || "-";
     const idLayanan = urlParams.get("id") || "-";
     const jumlah = urlParams.get("jumlah") || "-";
     const target = urlParams.get("target") || "-";
-    const harga = urlParams.get("harga") || "-";
     const total = urlParams.get("total") || "0";
     const idTransaksi = "TX" + Date.now();
     const tanggalJam = new Date().toLocaleString("id-ID");
 
-    // Base payload tanpa Tag54 & Tag63
+    // === BANGUN QR PAYLOAD ===
     const baseTemplate = "00020101021226670016COM.NOBUBANK.WWW01189360050300000879140214526036770909650303UMI51440014ID.CO.QRIS.WWW0215ID20243611417480303UMI5204541153033605802ID5920SHINE SHOP OK19967206008SURABAYA61056011162070703A01";
-
-    // Bangun payload EMV final
     const payload = buildEmvPayloadWith54(total, baseTemplate);
 
-    // Generate QR
-    QRCode.toCanvas(document.getElementById("qrisCanvas"), payload, { width: 240 }, function (error) {
-      if (error) console.error(error);
-    });
+    // === GENERATE QR ===
+    QRCode.toCanvas(document.getElementById("qrisCanvas"), payload, { width: 240 });
 
-    // Tampilkan detail order
+    // === TAMPILKAN DETAIL PESANAN ===
     document.getElementById("orderDetails").innerHTML = `
       <strong>ID Transaksi:</strong> ${idTransaksi}<br>
       <strong>ID Layanan:</strong> ${idLayanan}<br>
@@ -135,27 +142,62 @@
       <strong>Total:</strong> Rp ${Number(total).toLocaleString("id-ID")}
     `;
 
-    // Format pesan WhatsApp rapi & encode biar gak kepotong
-    const waMessageRaw = `
-Halo admin saya sudah melakukan pembayaran
+    // === EVENT KONFIRMASI ===
+    document.getElementById("confirmBtn").addEventListener("click", async () => {
+      const fileInput = document.getElementById("buktiInput");
+      const file = fileInput.files[0];
 
-Id Transaksi : ${idTransaksi}
-Id Layanan  : ${idLayanan}
-Tanggal & Jam : ${tanggalJam}
+      if (!file) {
+        alert("Harap unggah bukti transfer terlebih dahulu!");
+        return;
+      }
 
-Kategori : ${kategori}
-Layanan  : ${layanan}
-Jumlah   : ${jumlah}
-Target/Link : ${target}
-Harga    : Rp ${Number(total).toLocaleString("id-ID")}
+      // Kirim pesan teks ke Telegram
+      const pesan = `
+💳 *KONFIRMASI PEMBAYARAN BARU*
 
-Mohon dicek dan segera diproses. Terima kasih 🙏
-    `;
+🧾 *ID Transaksi:* ${idTransaksi}
+🆔 *ID Layanan:* ${idLayanan}
+📅 *Tanggal:* ${tanggalJam}
 
-    const waMessage = encodeURIComponent(waMessageRaw.trim());
-    document.getElementById("waLink").href = `https://wa.me/6289518103883?text=${waMessage}`;
+📂 *Kategori:* ${kategori}
+⚙️ *Layanan:* ${layanan}
+🔢 *Jumlah:* ${jumlah}
+🎯 *Target:* ${target}
+💰 *Total:* Rp ${Number(total).toLocaleString("id-ID")}
+
+📸 Bukti transfer dikirim berikut.
+      `;
+
+      try {
+        // 1️⃣ Kirim pesan teks
+        await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ chat_id: chatId, text: pesan, parse_mode: "Markdown" })
+        });
+
+        // 2️⃣ Kirim foto bukti transfer
+        const formData = new FormData();
+        formData.append("chat_id", chatId);
+        formData.append("photo", file);
+        formData.append("caption", `Bukti transfer untuk transaksi ${idTransaksi}`);
+
+        const res = await fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, {
+          method: "POST",
+          body: formData
+        });
+
+        if (res.ok) {
+          alert("✅ Konfirmasi dan bukti transfer berhasil dikirim ke admin!");
+        } else {
+          alert("⚠️ Gagal mengirim foto ke Telegram.");
+        }
+      } catch (err) {
+        console.error(err);
+        alert("❌ Terjadi kesalahan saat mengirim data.");
+      }
+    });
   </script>
 </body>
 </html>
-
-
