@@ -7,7 +7,7 @@
   <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
   <style>
     body {
-      font-family: Arial, sans-serif;
+      font-family: "Poppins", Arial, sans-serif;
       background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
       color: white;
       margin: 0;
@@ -19,29 +19,36 @@
       justify-content: center;
       align-items: center;
     }
+
     .container {
-      background: rgba(255, 255, 255, 0.1);
-      padding: 20px 30px;
+      background: rgba(255, 255, 255, 0.08);
+      padding: 25px 30px;
       border-radius: 16px;
-      box-shadow: 0 8px 20px rgba(0,0,0,0.5);
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
       animation: fadeIn 1s ease-in-out;
       max-width: 420px;
+      backdrop-filter: blur(6px);
     }
+
     h2 {
       margin-bottom: 10px;
+      letter-spacing: 1px;
     }
+
     canvas {
       margin: 20px 0;
       background: white;
       padding: 10px;
       border-radius: 12px;
     }
+
     .details {
       text-align: left;
       font-size: 14px;
       margin: 15px 0;
       line-height: 1.6;
     }
+
     input[type="file"] {
       margin-top: 10px;
       background: white;
@@ -50,7 +57,9 @@
       border-radius: 6px;
       width: 100%;
       max-width: 320px;
+      border: none;
     }
+
     .btn-confirm {
       display: inline-block;
       margin-top: 15px;
@@ -60,59 +69,117 @@
       color: white;
       text-decoration: none;
       font-weight: bold;
-      box-shadow: 0 5px 12px rgba(0,0,0,0.3);
+      box-shadow: 0 5px 12px rgba(0, 0, 0, 0.3);
       transition: transform 0.2s ease;
       cursor: pointer;
       border: none;
     }
+
     .btn-confirm:hover {
       transform: scale(1.05);
     }
+
+    /* === Loading Overlay === */
+    #loadingOverlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(15, 32, 39, 0.9);
+      color: white;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 999;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.4s ease, visibility 0.4s ease;
+    }
+
+    #loadingOverlay.active {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .spinner {
+      border: 5px solid rgba(255, 255, 255, 0.3);
+      border-top: 5px solid #00c6ff;
+      border-radius: 50%;
+      width: 60px;
+      height: 60px;
+      animation: spin 1s linear infinite;
+      margin-bottom: 15px;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
     @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(20px); }
-      to { opacity: 1; transform: translateY(0); }
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
     }
   </style>
 </head>
+
 <body>
   <div class="container">
     <h2>Pembayaran QRIS</h2>
     <p>Silakan scan QR di bawah untuk membayar</p>
     <canvas id="qrisCanvas"></canvas>
     <div class="details" id="orderDetails"></div>
-    
+
     <input type="file" id="buktiInput" accept="image/*" />
     <button class="btn-confirm" id="confirmBtn">Konfirmasi Pembayaran</button>
   </div>
 
+  <!-- Loading Overlay -->
+  <div id="loadingOverlay">
+    <div class="spinner"></div>
+    <p>Mengirim data, mohon tunggu...</p>
+  </div>
+
   <script>
     // === KONFIGURASI BOT TELEGRAM ===
-    const botToken = "7430992455:AAGb4_f2Mywv79QRoFxDXh9FIg0rUY0pcm4";  // 🔹 Ganti dengan token bot kamu
-    const chatId = "6845141887";      // 🔹 Ganti dengan chat ID admin kamu
+    const botToken = "7430992455:AAGb4_f2Mywv79QRoFxDXh9FIg0rUY0pcm4"; // 🔹 Ganti dengan token bot kamu
+    const chatId = "6845141887"; // 🔹 Ganti dengan chat ID admin kamu
 
     // === FUNGSI CRC ===
     function crc16ccitt(str) {
-      let crc = 0xFFFF;
+      let crc = 0xffff;
       for (let i = 0; i < str.length; i++) {
-        crc ^= (str.charCodeAt(i) << 8);
+        crc ^= str.charCodeAt(i) << 8;
         for (let j = 0; j < 8; j++) {
-          crc = (crc & 0x8000) ? ((crc << 1) ^ 0x1021) & 0xFFFF : (crc << 1) & 0xFFFF;
+          crc =
+            crc & 0x8000
+              ? ((crc << 1) ^ 0x1021) & 0xffff
+              : (crc << 1) & 0xffff;
         }
       }
-      return crc.toString(16).toUpperCase().padStart(4, '0');
+      return crc.toString(16).toUpperCase().padStart(4, "0");
     }
 
     function buildEmvPayloadWith54(amount, baseBefore54) {
       const amtInt = parseInt(amount, 10);
       const amtStr = String(amtInt);
-      const len = String(amtStr.length).padStart(2, '0');
-      const tag54 = '54' + len + amtStr;
-      const payloadForCrc = baseBefore54 + tag54 + '6304';
+      const len = String(amtStr.length).padStart(2, "0");
+      const tag54 = "54" + len + amtStr;
+      const payloadForCrc = baseBefore54 + tag54 + "6304";
       const crc = crc16ccitt(payloadForCrc);
       return payloadForCrc + crc;
     }
 
-    // === AMBIL PARAMETER ORDER ===
+    // === PARAMETER PESANAN ===
     const urlParams = new URLSearchParams(window.location.search);
     const kategori = urlParams.get("kategori") || "-";
     const layanan = urlParams.get("layanan") || "-";
@@ -123,14 +190,13 @@
     const idTransaksi = "TX" + Date.now();
     const tanggalJam = new Date().toLocaleString("id-ID");
 
-    // === BANGUN QR PAYLOAD ===
-    const baseTemplate = "00020101021226670016COM.NOBUBANK.WWW01189360050300000879140214526036770909650303UMI51440014ID.CO.QRIS.WWW0215ID20243611417480303UMI5204541153033605802ID5920SHINE SHOP OK19967206008SURABAYA61056011162070703A01";
+    // === QR PAYLOAD ===
+    const baseTemplate =
+      "00020101021226670016COM.NOBUBANK.WWW01189360050300000879140214526036770909650303UMI51440014ID.CO.QRIS.WWW0215ID20243611417480303UMI5204541153033605802ID5920SHINE SHOP OK19967206008SURABAYA61056011162070703A01";
     const payload = buildEmvPayloadWith54(total, baseTemplate);
-
-    // === GENERATE QR ===
     QRCode.toCanvas(document.getElementById("qrisCanvas"), payload, { width: 240 });
 
-    // === TAMPILKAN DETAIL PESANAN ===
+    // === TAMPILKAN DETAIL ===
     document.getElementById("orderDetails").innerHTML = `
       <strong>ID Transaksi:</strong> ${idTransaksi}<br>
       <strong>ID Layanan:</strong> ${idLayanan}<br>
@@ -143,16 +209,14 @@
     `;
 
     // === EVENT KONFIRMASI ===
+    const loadingOverlay = document.getElementById("loadingOverlay");
+
     document.getElementById("confirmBtn").addEventListener("click", async () => {
-      const fileInput = document.getElementById("buktiInput");
-      const file = fileInput.files[0];
+      const file = document.getElementById("buktiInput").files[0];
+      if (!file) return alert("Harap unggah bukti transfer terlebih dahulu!");
 
-      if (!file) {
-        alert("Harap unggah bukti transfer terlebih dahulu!");
-        return;
-      }
+      loadingOverlay.classList.add("active");
 
-      // Kirim pesan teks ke Telegram
       const pesan = `
 💳 *KONFIRMASI PEMBAYARAN BARU*
 
@@ -170,14 +234,12 @@
       `;
 
       try {
-        // 1️⃣ Kirim pesan teks
         await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ chat_id: chatId, text: pesan, parse_mode: "Markdown" })
+          body: JSON.stringify({ chat_id: chatId, text: pesan, parse_mode: "Markdown" }),
         });
 
-        // 2️⃣ Kirim foto bukti transfer
         const formData = new FormData();
         formData.append("chat_id", chatId);
         formData.append("photo", file);
@@ -185,17 +247,19 @@
 
         const res = await fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, {
           method: "POST",
-          body: formData
+          body: formData,
         });
 
         if (res.ok) {
-          alert("✅ Konfirmasi dan bukti transfer berhasil dikirim ke admin!");
+          loadingOverlay.innerHTML = `<div class="spinner"></div><p>✅ Pembayaran berhasil dikirim!<br>Mengarahkan ke dashboard...</p>`;
+          setTimeout(() => (window.location.href = "dashboardsmm.html"), 1800);
         } else {
-          alert("⚠️ Gagal mengirim foto ke Telegram.");
+          loadingOverlay.classList.remove("active");
+          alert("⚠️ Gagal mengirim bukti transfer ke Telegram.");
         }
       } catch (err) {
-        console.error(err);
-        alert("❌ Terjadi kesalahan saat mengirim data.");
+        loadingOverlay.classList.remove("active");
+        alert("❌ Terjadi kesalahan saat mengirim data ke bot.");
       }
     });
   </script>
