@@ -1,11 +1,10 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Pembayaran QRIS - Shine Shop</title>
   <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <style>
     body {
       font-family: "Poppins", Arial, sans-serif;
@@ -74,6 +73,7 @@
       transition: transform 0.2s ease;
       cursor: pointer;
       border: none;
+      width: 100%;
     }
 
     .btn-confirm:hover {
@@ -83,6 +83,56 @@
     @keyframes fadeIn {
       from { opacity: 0; transform: translateY(20px); }
       to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Popup umum */
+    .popup {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0, 0, 0, 0.75);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 999;
+    }
+
+    .popup-content {
+      background: #161b22;
+      padding: 25px 30px;
+      border-radius: 14px;
+      max-width: 400px;
+      color: #fff;
+      text-align: center;
+      box-shadow: 0 5px 20px rgba(0, 0, 0, 0.4);
+      animation: pop 0.4s ease;
+    }
+
+    @keyframes pop {
+      from { transform: scale(0.8); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+
+    /* Spinner di tengah popup */
+    .spinner {
+      width: 60px;
+      height: 60px;
+      border: 6px solid rgba(255, 255, 255, 0.2);
+      border-top: 6px solid #00c6ff;
+      border-radius: 50%;
+      margin: 0 auto 15px auto;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .info-text {
+      margin-top: 10px;
+      font-size: 13px;
+      color: #cfcfcf;
+      text-align: center;
     }
   </style>
 </head>
@@ -98,10 +148,24 @@
     <button class="btn-confirm" id="confirmBtn">Konfirmasi Pembayaran</button>
   </div>
 
+  <!-- Popup Loading -->
+  <div class="popup" id="popupLoading">
+    <div class="popup-content">
+      <div class="spinner"></div>
+      <h3>Mengirimkan data ke Admin...</h3>
+      <p class="info-text">Mohon tunggu beberapa saat.</p>
+    </div>
+  </div>
+
+  <!-- Popup Sukses -->
+  <div class="popup" id="popupSuccess">
+    <div class="popup-content" id="popupSuccessContent"></div>
+  </div>
+
   <script>
     // === KONFIGURASI BOT TELEGRAM ===
-    const botToken = "7430992455:AAGb4_f2Mywv79QRoFxDXh9FIg0rUY0pcm4"; // Ganti dengan token bot kamu
-    const chatId = "6845141887"; // Ganti dengan chat ID admin kamu
+    const botToken = "7430992455:AAEbBWWfV9peNcN5m8mfAImCkbT2CowFnbg"; // Ganti dengan token bot kamu
+    const chatId = "6845141887"; // Ganti dengan chat ID admin
 
     // === FUNGSI CRC ===
     function crc16ccitt(str) {
@@ -109,9 +173,10 @@
       for (let i = 0; i < str.length; i++) {
         crc ^= str.charCodeAt(i) << 8;
         for (let j = 0; j < 8; j++) {
-          crc = crc & 0x8000
-            ? ((crc << 1) ^ 0x1021) & 0xffff
-            : (crc << 1) & 0xffff;
+          crc =
+            crc & 0x8000
+              ? ((crc << 1) ^ 0x1021) & 0xffff
+              : (crc << 1) & 0xffff;
         }
       }
       return crc.toString(16).toUpperCase().padStart(4, "0");
@@ -145,7 +210,7 @@
     QRCode.toCanvas(document.getElementById("qrisCanvas"), payload, { width: 240 });
 
     // === TAMPILKAN DETAIL ===
-    document.getElementById("orderDetails").innerHTML = `
+    const detailHTML = `
       <strong>ID Transaksi:</strong> ${idTransaksi}<br>
       <strong>ID Layanan:</strong> ${idLayanan}<br>
       <strong>Tanggal:</strong> ${tanggalJam}<br>
@@ -155,96 +220,67 @@
       <strong>Target/Link:</strong> ${target}<br>
       <strong>Total:</strong> Rp ${Number(total).toLocaleString("id-ID")}
     `;
+    document.getElementById("orderDetails").innerHTML = detailHTML;
 
     // === EVENT KONFIRMASI ===
     document.getElementById("confirmBtn").addEventListener("click", async () => {
       const file = document.getElementById("buktiInput").files[0];
       if (!file) {
-        Swal.fire({
-          icon: "warning",
-          title: "Bukti Transfer Belum Dipilih!",
-          text: "Silakan upload bukti transfer terlebih dahulu.",
-          confirmButtonColor: "#3085d6",
-        });
+        alert("Silakan upload bukti transfer terlebih dahulu!");
         return;
       }
 
-      Swal.fire({
-        title: "Mengirim data...",
-        text: "Mohon tunggu sebentar.",
-        allowOutsideClick: false,
-        didOpen: () => {
-          Swal.showLoading();
-        },
-      });
+      // Tampilkan popup loading
+      document.getElementById("popupLoading").style.display = "flex";
 
       const pesan = `
 💳 *KONFIRMASI PEMBAYARAN BARU*
-
+━━━━━━━━━━━━━━━━━━━━━━━
 🧾 *ID Transaksi:* ${idTransaksi}
 🆔 *ID Layanan:* ${idLayanan}
 📅 *Tanggal:* ${tanggalJam}
+
 📂 *Kategori:* ${kategori}
 ⚙️ *Layanan:* ${layanan}
 🔢 *Jumlah:* ${jumlah}
 🎯 *Target:* ${target}
 💰 *Total:* Rp ${Number(total).toLocaleString("id-ID")}
-📸 Bukti transfer dikirim berikut.
+━━━━━━━━━━━━━━━━━━━━━━━
+📸 *Bukti transfer dikirim berikut.*
       `;
 
       try {
-        await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ chat_id: chatId, text: pesan, parse_mode: "Markdown" }),
-        });
-
         const formData = new FormData();
         formData.append("chat_id", chatId);
+        formData.append("caption", pesan);
         formData.append("photo", file);
-        formData.append("caption", `Bukti transfer untuk transaksi ${idTransaksi}`);
+        formData.append("parse_mode", "Markdown");
 
         const res = await fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, {
           method: "POST",
           body: formData,
         });
 
-        if (res.ok) {
-          Swal.fire({
-            icon: "success",
-            title: "Pembayaran Berhasil Dikirim!",
-            html: `
-              <div style='text-align:left; font-size:14px;'>
-                <b>ID Transaksi:</b> ${idTransaksi}<br>
-                <b>ID Layanan:</b> ${idLayanan}<br>
-                <b>Kategori:</b> ${kategori}<br>
-                <b>Layanan:</b> ${layanan}<br>
-                <b>Jumlah:</b> ${jumlah}<br>
-                <b>Target:</b> ${target}<br>
-                <b>Total:</b> Rp ${Number(total).toLocaleString("id-ID")}
-              </div>
-              <br><i>Kamu akan diarahkan ke dashboard...</i>
-            `,
-            showConfirmButton: false,
-            timer: 4000,
-            background: "#161b22",
-            color: "#fff",
-          });
+        document.getElementById("popupLoading").style.display = "none";
 
-          setTimeout(() => (window.location.href = "dashboardsmm.html"), 4000);
+        if (res.ok) {
+          const popupSuccess = document.getElementById("popupSuccess");
+          const popupSuccessContent = document.getElementById("popupSuccessContent");
+
+          popupSuccessContent.innerHTML = `
+            <h3>✅ Pembayaran Berhasil Dikirim!</h3>
+            <div style="text-align:left;margin-top:10px;">${detailHTML}</div>
+            <p class="info-text" style="margin-top:15px;">Transaksi akan diproses admin paling lama 24 jam.</p>
+          `;
+          popupSuccess.style.display = "flex";
+
+          setTimeout(() => (window.location.href = "dashboardsmm.html"), 3000);
         } else {
-          Swal.fire({
-            icon: "error",
-            title: "Gagal Mengirim Bukti!",
-            text: "Terjadi kesalahan saat mengirim ke Telegram.",
-          });
+          alert("Gagal mengirim data ke Admin. Coba lagi.");
         }
       } catch (err) {
-        Swal.fire({
-          icon: "error",
-          title: "Kesalahan Sistem!",
-          text: "Terjadi kesalahan saat mengirim data ke bot.",
-        });
+        document.getElementById("popupLoading").style.display = "none";
+        alert("Terjadi kesalahan saat mengirim data ke Admin.");
       }
     });
   </script>
