@@ -19,29 +19,29 @@
 </style>
 </head>
 <body>
-  <div id="blockedCard" class="card" style="display:none"></div>
-  <div id="mainCard" class="card">
-    <h2 style="margin:0 0 6px 0">Pembayaran QRIS</h2>
-    <p>Silakan scan QR di bawah untuk membayar</p>
-    <canvas id="qrisCanvas" width="240" height="240"></canvas>
-    <div class="details" id="orderDetails"></div>
-    <input type="file" id="buktiInput" accept="image/*" />
-    <button id="confirmBtn" class="btn">Konfirmasi Pembayaran</button>
-    <div class="muted">Setelah konfirmasi, admin akan memproses paling lama 24 jam.</div>
-  </div>
+<div id="blockedCard" class="card" style="display:none"></div>
+<div id="mainCard" class="card">
+  <h2 style="margin:0 0 6px 0">Pembayaran QRIS</h2>
+  <p>Silakan scan QR di bawah untuk membayar</p>
+  <canvas id="qrisCanvas" width="240" height="240"></canvas>
+  <div class="details" id="orderDetails"></div>
+  <input type="file" id="buktiInput" accept="image/*" />
+  <button id="confirmBtn" class="btn">Konfirmasi Pembayaran</button>
+  <div class="muted">Setelah konfirmasi, admin akan memproses paling lama 24 jam.</div>
+</div>
 
 <script>
 /* === KONFIGURASI === */
 const botToken = "7430992455:AAEbBWWfV9peNcN5m8mfAImCkbT2CowFnbg";
 const chatId   = "6845141887";
 
-/* === DAFTAR BLACKLIST === */
+/* === BLACKLIST === */
 const blacklistData = {
   permanent: [
-    { ip: "0.0.0.0", reason: "mengirimkan bukti transfer palsu", added: "2025-10-09T12:00:00+07:00" }
+    { ip: "203.0.113.10", reason: "mengirimkan bukti transfer palsu", added: "2025-10-09T12:00:00+07:00" }
   ],
   temporary: [
-    { ip: "114.5.110.197", duration: "30 menit", reason: "mengirimkan bukti transfer palsu", added: "2025-10-12T19:00:00+07:00" }
+    { ip: "114.5.110.197", duration: "10 menit", reason: "mengirimkan bukti transfer palsu", added: "2025-10-12T20:27:00+07:00" }
   ]
 };
 
@@ -96,7 +96,7 @@ function checkBlacklist(ip){
   return {blocked:false};
 }
 
-/* === POPUP BLACKLIST DENGAN COUNTDOWN === */
+/* === POPUP BLACKLIST COUNTDOWN === */
 function showBlocked(info){
   const blockedCard = document.getElementById("blockedCard");
   document.getElementById("mainCard").style.display = "none";
@@ -150,18 +150,19 @@ function showBlocked(info){
 function initOrderUI(){
   const url = new URL(window.location.href);
   const p = url.searchParams;
-  const kategori = p.get("kategori")||"-";
-  const layanan = p.get("layanan")||"-";
-  const idLayanan = p.get("id_layanan")||"-";
-  const id = p.get("id")||"-";
-  const jumlah = p.get("jumlah")||"-";
-  const target = p.get("target")||"-";
-  const total = p.get("total")||"0";
-  const idTransaksi = "TX"+Date.now();
+
+  const trxID     = p.get("trx") || "-";
+  const kategori  = p.get("kategori") || "-";
+  const layanan   = p.get("layanan") || "-";
+  const idLayanan = p.get("id") || "-";
+  const jumlah    = p.get("jumlah") || "-";
+  const total     = p.get("total") || "0";
+  const target    = p.get("target") || "-";
+
   const tanggal = new Date().toLocaleString("id-ID",{timeZone:"Asia/Jakarta"});
 
   const det = `
-    <strong>ID Transaksi:</strong> ${idTransaksi}<br>
+    <strong>ID Transaksi:</strong> ${trxID}<br>
     <strong>ID Layanan:</strong> ${idLayanan}<br>
     <strong>Tanggal:</strong> ${tanggal}<br>
     <strong>Kategori:</strong> ${kategori}<br>
@@ -187,7 +188,7 @@ function initOrderUI(){
     const tgl = new Date().toLocaleString("id-ID",{timeZone:"Asia/Jakarta"});
 
     let caption = `💳 KONFIRMASI PEMBAYARAN BARU
-📰 ID Transaksi: ${idTransaksi}
+📰 ID Transaksi: ${trxID}
 🆔 ID Layanan: ${idLayanan}
 🗓️ Tanggal: ${tgl} WIB
 📂 Kategori: ${kategori}
