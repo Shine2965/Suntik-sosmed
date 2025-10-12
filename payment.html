@@ -1,357 +1,224 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Pembayaran QRIS - Shine Shop</title>
-  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
-  <style>
-    body {
-      font-family: 'Poppins', Arial, sans-serif;
-      background: linear-gradient(135deg,#0f2027,#203a43,#2c5364);
-      color:#fff;margin:0;
-      min-height:100vh;display:flex;align-items:center;justify-content:center;
-    }
-    .container{background:rgba(255,255,255,0.08);padding:24px;border-radius:14px;max-width:480px;width:100%;box-shadow:0 8px 20px rgba(0,0,0,0.5)}
-    canvas{background:#fff;padding:10px;border-radius:12px;display:block;margin:16px auto}
-    .details{font-size:14px;text-align:left;margin:10px 0;line-height:1.6}
-    input[type=file]{width:100%;max-width:360px;padding:8px;border-radius:6px;background:#fff;color:#222;border:none}
-    .btn{width:100%;margin-top:14px;padding:12px;border-radius:30px;background:linear-gradient(45deg,#00c6ff,#0072ff);border:none;color:#fff;font-weight:700;cursor:pointer}
-    .btn[disabled]{opacity:.6;cursor:not-allowed}
-    .small{font-size:12px;color:#cfcfcf;margin-top:8px}
-  </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Pembayaran QRIS - Shine Shop</title>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
+<style>
+  body{font-family:'Poppins',Arial,sans-serif;background:linear-gradient(135deg,#0f2027,#203a43,#2c5364);color:#fff;margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center}
+  .card{background:rgba(255,255,255,0.08);padding:22px;border-radius:14px;max-width:480px;width:100%;box-shadow:0 8px 20px rgba(0,0,0,0.45)}
+  canvas{background:#fff;padding:10px;border-radius:12px;display:block;margin:16px auto}
+  .details{font-size:14px;text-align:left;margin:10px 0;line-height:1.6;color:#fff}
+  input[type=file]{width:100%;max-width:360px;padding:8px;border-radius:6px;background:#fff;color:#222;border:none}
+  .btn{width:100%;margin-top:14px;padding:12px;border-radius:30px;background:linear-gradient(45deg,#00c6ff,#0072ff);border:none;color:#fff;font-weight:700;cursor:pointer}
+  .btn[disabled]{opacity:.6;cursor:not-allowed}
+  .warning-box{background:#b91c1c;padding:16px;border-radius:10px;text-align:center;}
+  .muted{color:#d0d7de;font-size:13px;margin-top:8px}
+</style>
 </head>
 <body>
-  <div class="container" id="blockedCard" style="display:none"></div>
-
-  <div class="container" id="mainCard">
+  <div id="blockedCard" class="card" style="display:none"></div>
+  <div id="mainCard" class="card">
     <h2 style="margin:0 0 6px 0">Pembayaran QRIS</h2>
-    <p style="margin:0 0 12px 0">Silakan scan QR di bawah untuk membayar</p>
-
+    <p>Silakan scan QR di bawah untuk membayar</p>
     <canvas id="qrisCanvas" width="240" height="240"></canvas>
-
     <div class="details" id="orderDetails"></div>
-
     <input type="file" id="buktiInput" accept="image/*" />
-    <button class="btn" id="confirmBtn">Konfirmasi Pembayaran</button>
-    <div class="small">Setelah konfirmasi, admin akan memproses paling lama 24 jam.</div>
+    <button id="confirmBtn" class="btn">Konfirmasi Pembayaran</button>
+    <div class="muted">Setelah konfirmasi, admin akan memproses paling lama 24 jam.</div>
   </div>
 
 <script>
-/* ================== CONFIG — GANTI DENGAN MILIKMU ================== */
-const botToken = "7430992455:AAEbBWWfV9peNcN5m8mfAImCkbT2CowFnbg";     // <-- ganti
-const chatId   = "6845141887";       // <-- ganti
-/* ================================================================= */
+/* === KONFIGURASI === */
+const botToken = "7430992455:AAEbBWWfV9peNcN5m8mfAImCkbT2CowFnbg";
+const chatId   = "6845141887";
 
-/* ================== BLACKLIST DATA (TERTANAM DI HTML) ==================
- Format:
-  - permanent: { ip, reason, added }
-  - temporary: { ip, duration, reason, added }
-  - added: ISO 8601 with +07:00 (WIB), ex: "2025-10-09T12:00:00+07:00"
-  - duration: "10 menit", "1 jam", "2 hari"
-====================================================================== */
+/* === DAFTAR BLACKLIST === */
 const blacklistData = {
   permanent: [
-    { ip: "203.0.113.10", reason: "mengirimkan bukti transfer palsu", added: "2025-10-09T12:00:00+07:00" }
+    { ip: "0.0.0.0", reason: "mengirimkan bukti transfer palsu", added: "2025-10-09T12:00:00+07:00" }
   ],
   temporary: [
-    { ip: "203.0.113.55", duration: "1 jam", reason: "percobaan spam", added: "2025-10-09T12:00:00+07:00" },
-    { ip: "203.0.113.66", duration: "1 hari", reason: "transaksi mencurigakan", added: "2025-10-09T12:00:00+07:00" },
-    { ip: "114.5.110.197", duration: "10 menit", reason: "percobaan otomatis", added: "2025-10-12T17:30:00+07:00" }
+    { ip: "114.5.110.197", duration: "30 menit", reason: "mengirimkan bukti transfer palsu", added: "2025-10-12T19:00:00+07:00" }
   ]
 };
-/* ==================================================================== */
 
-/* --------- helper parse duration (supports menit/jam/hari) --------- */
+/* === UTILITAS === */
 function parseDurationToMs(text){
   if(!text) return 0;
-  const s = String(text).trim().toLowerCase();
-  // ambil angka (bisa lebih dari satu digit)
-  const m = s.match(/(\d+)\s*(menit|mnt|min|jam|h|hari|d)/i);
-  if(!m) return 0;
-  const v = parseInt(m[1],10);
-  const unit = (m[2]||"").toLowerCase();
-  if(unit.startsWith("menit") || unit === "mnt" || unit === "min") return v * 60 * 1000;
-  if(unit.startsWith("jam") || unit === "h") return v * 60 * 60 * 1000;
-  if(unit.startsWith("hari") || unit === "d") return v * 24 * 60 * 60 * 1000;
+  const s = text.toLowerCase().replace(/\s+/g, '');
+  const num = parseInt(s);
+  if(s.includes('menit')) return num * 60 * 1000;
+  if(s.includes('jam')) return num * 60 * 60 * 1000;
+  if(s.includes('hari')) return num * 24 * 60 * 60 * 1000;
   return 0;
 }
 
-/* get current time in ms for Asia/Jakarta (WIB) */
-function nowWIBms(){
-  // new Date() is local; easiest approach: get UTC ms then add 7 hours
-  const now = new Date();
-  return now.getTime() + (7*60*60*1000) - (now.getTimezoneOffset()*60*1000);
-}
-
-/* get public IP */
 async function getUserIP(){
-  try {
-    const r = await fetch("https://api.ipify.org?format=json");
-    const j = await r.json();
-    return j.ip || null;
-  } catch(e){
-    console.warn("ip error", e);
-    return null;
-  }
+  try{
+    const res = await fetch("https://api.ipify.org?format=json");
+    const j = await res.json();
+    return j.ip;
+  }catch(e){ return null; }
 }
 
-/* get location detail via ipwho.is (returns district, city, region, country) */
-async function getUserLocationDetails(){
-  try {
-    const r = await fetch("https://ipwho.is/");
-    const j = await r.json();
-    // ipwho.is returns keys: city, region, country, district (maybe), etc.
-    return {
-      success: !!j.success,
-      raw: j,
-      district: j.district || j.city_district || j.subdivision || "",
-      city: j.city || "",
-      region: j.region || j.region_code || "",
-      country: j.country || ""
-    };
-  } catch(e){
-    console.warn("loc error", e);
-    return { success:false, raw:null, district:"", city:"", region:"", country:"" };
-  }
+async function getUserLocation(){
+  try{
+    const res = await fetch("https://ipwho.is/");
+    const j = await res.json();
+    if(j && j.success !== false){
+      return `${j.district || j.subdivision || ''}, ${j.city || ''}, ${j.region || ''}, ${j.country || ''}`.replace(/(^,|,$)/g, '');
+    }
+  }catch(e){ return ""; }
+  return "";
 }
 
-/* check blacklist for IP: returns { blocked:Boolean, type:'permanent'|'temporary'|null, reason, remainingMs (if temp) } */
-function checkBlacklistForIp(ip){
-  if(!ip) return { blocked:false };
-  // permanent
-  for(const p of (blacklistData.permanent||[])){
-    if(p.ip === ip) return { blocked:true, type:'permanent', reason:p.reason, added:p.added };
+function checkBlacklist(ip){
+  if(!ip) return {blocked:false};
+  const now = new Date().getTime();
+
+  for(const b of blacklistData.permanent){
+    if(b.ip === ip) return {blocked:true, type:"permanent", reason:b.reason};
   }
-  // temporary
-  for(const t of (blacklistData.temporary||[])){
-    if(t.ip === ip){
-      // parse added (ISO with +07:00 ideally)
-      const addedMs = Date.parse(t.added);
-      const durMs = parseDurationToMs(t.duration);
-      if(isNaN(addedMs) || durMs <= 0){
-        // invalid entry -> treat as blocked (conservative)
-        return { blocked:true, type:'temporary', reason:t.reason, remainingMs:null };
-      }
-      const expireMs = addedMs + durMs;
-      const now = nowWIBms();
-      if(now < expireMs){
-        return { blocked:true, type:'temporary', reason:t.reason, remainingMs: expireMs - now, durationText: t.duration, added: t.added };
-      } else {
-        // expired -> not blocked
-        return { blocked:false, expired:true };
+
+  for(const b of blacklistData.temporary){
+    if(b.ip === ip){
+      const added = new Date(b.added).getTime();
+      const dur = parseDurationToMs(b.duration);
+      if(now < added + dur){
+        const remaining = added + dur - now;
+        return {blocked:true, type:"temporary", reason:b.reason, duration:b.duration, remaining};
       }
     }
   }
-  return { blocked:false };
+  return {blocked:false};
 }
 
-/* show popup larangan */
-function showBlockedPopup(info){
-  const title = "🚫 Akses Diblokir";
-  let html = `<div style="text-align:left">Maaf, anda dilarang melakukan transaksi karena <b>${info.reason}</b>.<br>`;
-  if(info.type === 'permanent'){
-    html += `<small>Status: <b>Permanen</b></small>`;
-  } else if(info.type === 'temporary'){
-    // format remaining nicely
-    const ms = info.remainingMs;
-    if(ms && ms > 0){
-      const hours = Math.floor(ms / (1000*60*60));
-      const mins  = Math.ceil((ms % (1000*60*60))/(1000*60));
-      let rem = "";
-      if(hours>0) rem = `${hours} jam ${mins} menit`;
-      else rem = `${mins} menit`;
-      html += `<br><small>Durasi: <b>${info.durationText||'temporary'}</b> (sisa ${rem})</small>`;
-    }
-  }
-  html += `</div>`;
-  // disable UI
-  document.getElementById("confirmBtn").disabled = true;
-  // show modal
-  Swal.fire({ icon: 'error', title, html, allowOutsideClick:false, confirmButtonText: "Tutup" });
-}
+/* === POPUP BLACKLIST DENGAN COUNTDOWN === */
+function showBlocked(info){
+  const blockedCard = document.getElementById("blockedCard");
+  document.getElementById("mainCard").style.display = "none";
+  blockedCard.style.display = "block";
 
-/* if temporary will auto re-enable when expired (set timeout) */
-function scheduleReenable(info){
-  if(info.type !== 'temporary' || !info.remainingMs || info.remainingMs<=0) return;
-  setTimeout(async ()=>{
-    // re-check and if expired -> enable button and show notice
-    const ip = await getUserIP();
-    const newInfo = checkBlacklistForIp(ip);
-    if(!newInfo.blocked){
-      document.getElementById("confirmBtn").disabled = false;
-      Swal.fire({ icon:'info', title: 'Blokir Berakhir', text: 'Masa blokir Anda sudah berakhir — Anda dapat melakukan konfirmasi pembayaran sekarang.' });
-      // optionally show QR/enable UI (we already left main UI visible if not blocked)
-    } else {
-      // still blocked (maybe server time drift) — schedule again if remainingMs present
-      if(newInfo.remainingMs) scheduleReenable(newInfo);
-    }
-  }, info.remainingMs + 2000); // buffer 2s
-}
-
-/* Run firewall on load */
-(async function(){
-  // prepare order UI now (even before firewall finishes)
-  initOrderUI();
-
-  const ip = await getUserIP();
-  if(!ip){
-    // IP unavailable -> allow access
-    return;
-  }
-  const info = checkBlacklistForIp(ip);
-  if(info.blocked){
-    // hide main card and show blocked card (but per request we want popup)
-    // show popup larangan
-    showBlockedPopup(info);
-    // hide QR etc
-    document.getElementById("mainCard").style.display = "none";
-    document.getElementById("blockedCard").style.display = "block";
-    document.getElementById("blockedCard").innerHTML = `<div style="text-align:center;padding:18px;background:rgba(0,0,0,0.2);border-radius:8px">
-      <h3 style="margin:0 0 8px 0">Akses Diblokir</h3>
-      <p style="margin:0">${info.reason}</p>
-      <p style="margin-top:8px;color:#eee">${info.type==='permanent' ? 'Blokir Permanen' : ('Sisa: ' + (info.remainingMs ? Math.ceil(info.remainingMs/60000)+' menit' : '—'))}</p>
-    </div>`;
-    // schedule re-enable if temporary
-    if(info.type === 'temporary' && info.remainingMs) scheduleReenable(info);
-    return;
+  if(info.type === "permanent"){
+    const msg = `Maaf, Anda dilarang melakukan transaksi karena <b>${info.reason}</b>.<br><small>Status: <b>Permanen</b></small>`;
+    blockedCard.innerHTML = `<div class="warning-box">${msg}</div>`;
+    Swal.fire({icon:"error",title:"🚫 Akses Diblokir",html:msg});
   } else {
-    // not blocked: ensure UI visible (already init)
+    let remainingMs = info.remaining;
+    const msgBox = document.createElement("div");
+    msgBox.className = "warning-box";
+    blockedCard.appendChild(msgBox);
+
+    function updateCountdown(){
+      if(remainingMs <= 0){
+        msgBox.innerHTML = `Blokir sementara telah berakhir. Silakan refresh halaman.`;
+        clearInterval(interval);
+        return;
+      }
+      const sec = Math.floor((remainingMs/1000)%60);
+      const min = Math.floor((remainingMs/1000/60)%60);
+      const hour = Math.floor((remainingMs/1000/60/60));
+      msgBox.innerHTML = `Maaf, Anda dilarang melakukan transaksi karena <b>${info.reason}</b>.<br><small>Durasi: ${info.duration} (sisa ${hour} jam ${min} menit ${sec} detik)</small>`;
+      remainingMs -= 1000;
+    }
+
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 1000);
+
+    Swal.fire({icon:"error",title:"🚫 Akses Diblokir",html:msgBox.innerHTML, didOpen:()=>{
+      setInterval(()=>{Swal.getHtmlContainer().innerHTML = msgBox.innerHTML},1000);
+    }});
   }
+}
+
+/* === INISIALISASI === */
+(async function(){
+  const ip = await getUserIP();
+  const info = checkBlacklist(ip);
+  if(info.blocked){
+    showBlocked(info);
+    return;
+  }
+
+  initOrderUI();
 })();
 
-/* -------------- ORDER UI & QR + Confirmation logic -------------- */
+/* === QRIS & KONFIRMASI === */
 function initOrderUI(){
-  // Build QR & order details
-  const urlParams = new URLSearchParams(window.location.search);
-  const kategori = urlParams.get("kategori") || "-";
-  const layanan  = urlParams.get("layanan")  || "-";
-  const idLayanan= urlParams.get("id")      || "-";
-  const jumlah   = urlParams.get("jumlah")  || "-";
-  const target   = urlParams.get("target")  || "-";
-  const total    = urlParams.get("total")   || "0";
+  const url = new URL(window.location.href);
+  const p = url.searchParams;
+  const kategori = p.get("kategori")||"-";
+  const layanan = p.get("layanan")||"-";
+  const idLayanan = p.get("id_layanan")||"-";
+  const id = p.get("id")||"-";
+  const jumlah = p.get("jumlah")||"-";
+  const target = p.get("target")||"-";
+  const total = p.get("total")||"0";
   const idTransaksi = "TX"+Date.now();
+  const tanggal = new Date().toLocaleString("id-ID",{timeZone:"Asia/Jakarta"});
 
-  const tanggalJam = new Date().toLocaleString("id-ID", { timeZone: "Asia/Jakarta", hour12:false });
-
-  const detailHTML = `
+  const det = `
     <strong>ID Transaksi:</strong> ${idTransaksi}<br>
     <strong>ID Layanan:</strong> ${idLayanan}<br>
-    <strong>Tanggal:</strong> ${tanggalJam} WIB<br>
+    <strong>Tanggal:</strong> ${tanggal}<br>
     <strong>Kategori:</strong> ${kategori}<br>
     <strong>Layanan:</strong> ${layanan}<br>
     <strong>Jumlah:</strong> ${jumlah}<br>
-    <strong>Target/Link:</strong> ${target}<br>
-    <strong>Total:</strong> Rp ${Number(total).toLocaleString('id-ID')}
+    <strong>Target:</strong> ${target}<br>
+    <strong>Total:</strong> Rp ${Number(total).toLocaleString("id-ID")}
   `;
-  document.getElementById("orderDetails").innerHTML = detailHTML;
+  document.getElementById("orderDetails").innerHTML = det;
 
-  // generate QR (EMV payload builder)
-  function crc16ccitt(str){ let crc=0xFFFF; for(let i=0;i<str.length;i++){ crc ^= (str.charCodeAt(i)<<8); for(let j=0;j<8;j++){ crc = (crc & 0x8000) ? ((crc<<1)^0x1021)&0xFFFF : (crc<<1)&0xFFFF; } } return crc.toString(16).toUpperCase().padStart(4,'0'); }
-  function buildEmvPayloadWith54(amount, baseBefore54){ const amtInt = parseInt(amount||0,10); const amtStr = String(amtInt); const len = String(amtStr.length).padStart(2,'0'); const tag54='54'+len+amtStr; const payloadForCrc = baseBefore54 + tag54 + '6304'; const crc = crc16ccitt(payloadForCrc); return payloadForCrc + crc; }
-  const baseTemplate = "00020101021226670016COM.NOBUBANK.WWW01189360050300000879140214526036770909650303UMI51440014ID.CO.QRIS.WWW0215ID20243611417480303UMI5204541153033605802ID5920SHINE SHOP OK19967206008SURABAYA61056011162070703A01";
-  const payload = buildEmvPayloadWith54(total, baseTemplate);
-  QRCode.toCanvas(document.getElementById("qrisCanvas"), payload, { width: 240 });
+  // QR generation
+  function crc16(s){let crc=0xFFFF;for(let i=0;i<s.length;i++){crc^=s.charCodeAt(i)<<8;for(let j=0;j<8;j++){crc=(crc&0x8000)?((crc<<1)^0x1021)&0xFFFF:(crc<<1)&0xFFFF;}}return crc.toString(16).toUpperCase().padStart(4,'0');}
+  function buildQR(amount){const amt=parseInt(amount||0,10);const str=String(amt);const len=String(str.length).padStart(2,"0");const tag54="54"+len+str;const base="00020101021226670016COM.NOBUBANK.WWW01189360050300000879140214526036770909650303UMI51440014ID.CO.QRIS.WWW0215ID20243611417480303UMI5204541153033605802ID5920SHINE SHOP OK19967206008SURABAYA61056011162070703A01";const data=base+tag54+"6304";return data+crc16(data);}
+  QRCode.toCanvas(document.getElementById("qrisCanvas"), buildQR(total), {width:240});
 
-  // confirm button event
-  document.getElementById("confirmBtn").addEventListener("click", async () => {
-    const fileEl = document.getElementById("buktiInput");
-    const file = fileEl.files[0];
-    if(!file){
-      Swal.fire({ icon:'warning', title:'Bukti belum dipilih', text:'Silakan unggah foto bukti transfer.' });
-      return;
-    }
+  document.getElementById("confirmBtn").addEventListener("click", async()=>{
+    const file = document.getElementById("buktiInput").files[0];
+    if(!file){ Swal.fire({icon:"warning",title:"Bukti belum dipilih"}); return; }
 
-    // show spinner popup
-    Swal.fire({ title:'Mengirimkan data ke Admin', html:'Mohon tunggu...', allowOutsideClick:false, didOpen:()=>Swal.showLoading() });
-
-    // get IP & location details
+    Swal.fire({title:"Mengirimkan data ke Admin...",allowOutsideClick:false,didOpen:()=>Swal.showLoading()});
     const ip = await getUserIP();
-    const loc = await getUserLocationDetails(); // {district,city,region,country}
-    const tanggalJamLocal = new Date().toLocaleString('id-ID', { timeZone:'Asia/Jakarta', hour12:false });
+    const lokasi = await getUserLocation();
+    const tgl = new Date().toLocaleString("id-ID",{timeZone:"Asia/Jakarta"});
 
-    // build caption (plain text). include location & IP only here.
-    const captionParts = [
-      "💳 KONFIRMASI PEMBAYARAN BARU",
-      "📰 ID Transaksi: " + idTransaksi,
-      "🗓 Tanggal: " + tanggalJamLocal + " WIB",
-      "📂 Kategori: " + kategori,
-      "⚙️ Layanan: " + layanan,
-      "🔢 Jumlah: " + jumlah,
-      "🎯 Target: " + target,
-      "💰 Total: Rp " + Number(total).toLocaleString('id-ID')
-    ];
+    let caption = `💳 KONFIRMASI PEMBAYARAN BARU
+📰 ID Transaksi: ${idTransaksi}
+🆔 ID Layanan: ${idLayanan}
+🗓️ Tanggal: ${tgl} WIB
+📂 Kategori: ${kategori}
+⚙️ Layanan: ${layanan}
+🔢 Jumlah: ${jumlah}
+🎯 Target: ${target}
+💰 Total: Rp ${Number(total).toLocaleString("id-ID")}
+🌐 IP Pengguna: ${ip||'-'}
+📍 Lokasi Perkiraan: ${lokasi||'-'}
 
-    if(ip) captionParts.push("🌐 IP Pengguna: " + ip);
-    // include location details (district/kecamatan if available)
-    if(loc){
-      const locParts = [];
-      if(loc.district) locParts.push("Kecamatan: " + loc.district);
-      if(loc.city) locParts.push("Kota: " + loc.city);
-      if(loc.region) locParts.push("Provinsi: " + loc.region);
-      if(loc.country) locParts.push("Negara: " + loc.country);
-      if(locParts.length) captionParts.push("📍 Lokasi perkiraan: " + locParts.join(" / "));
-    }
+Transaksi akan diproses admin paling lama 24 jam.`;
 
-    captionParts.push("");
-    captionParts.push("Transaksi akan diproses admin paling lama 24 jam.");
+    const form = new FormData();
+    form.append("chat_id", chatId);
+    form.append("photo", file);
+    form.append("caption", caption);
 
-    let caption = captionParts.join("\n");
-    if(caption.length > 1000) caption = caption.slice(0,1000) + "\n\n[...dipotong...]";
-
-    // send photo + caption to telegram
-    try {
-      const form = new FormData();
-      form.append("chat_id", chatId);
-      form.append("photo", file);
-      form.append("caption", caption);
-
-      const res = await fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, { method:'POST', body: form });
-      const json = await res.json();
-      if(!json || !json.ok){
-        Swal.close();
-        const detail = json?.description || ('HTTP ' + (res.status || 'error'));
-        await Swal.fire({ icon:'error', title:'Gagal mengirim', text: detail });
-        return;
-      }
-
-      // success -> show success popup (no IP/location)
-      await Swal.fire({ icon:'success', title:'Data Berhasil Dikirim!', showConfirmButton:false, timer:1100 });
-
-      // then show detail popup without IP/location
-      await Swal.fire({
-        icon:'info',
-        title:'Detail Transaksi',
-        html:`<div style="text-align:left">
-                <b>ID Transaksi:</b> ${idTransaksi}<br>
-                <b>Kategori:</b> ${kategori}<br>
-                <b>Layanan:</b> ${layanan}<br>
-                <b>Jumlah:</b> ${jumlah}<br>
-                <b>Target:</b> ${target}<br>
-                <b>Total:</b> Rp ${Number(total).toLocaleString('id-ID')}<br><br>
-                <i>Transaksi akan diproses admin paling lama 24 jam.</i>
-              </div>`,
-        confirmButtonText:'OK'
-      });
-
-      // redirect to dashboard
-      window.location.href = 'dashboardsmm.html';
-    } catch(err){
+    try{
+      const r = await fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`,{method:"POST",body:form});
+      const j = await r.json();
+      if(!j.ok) throw new Error(j.description||"Gagal kirim");
       Swal.close();
-      console.error(err);
-      Swal.fire({ icon:'error', title:'Kesalahan jaringan', text: err.message || 'Network error' });
+      await Swal.fire({icon:"success",title:"Data Berhasil Dikirim!",timer:1000,showConfirmButton:false});
+      await Swal.fire({icon:"info",title:"Detail Transaksi",html:det});
+      window.location.href="dashboardsmm.html";
+    }catch(e){
+      Swal.close();
+      Swal.fire({icon:"error",title:"Gagal",text:e.message});
     }
   });
 }
-/* ----------------- end initOrderUI ----------------- */
 </script>
 </body>
 </html>
-
-
-
-
-
-
-
