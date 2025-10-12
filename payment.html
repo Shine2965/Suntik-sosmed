@@ -2,23 +2,78 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
   <title>Pembayaran QRIS - Shine Shop</title>
-  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
   <style>
-    body{font-family:Poppins,Arial,sans-serif;background:linear-gradient(135deg,#0f2027,#203a43,#2c5364);color:#fff;margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center}
-    .container{background:rgba(255,255,255,0.08);padding:24px;border-radius:14px;max-width:420px;width:100%;box-shadow:0 8px 20px rgba(0,0,0,.5)}
-    canvas{background:#fff;padding:10px;border-radius:12px;display:block;margin:16px auto}
-    .details{font-size:14px;text-align:left;margin:10px 0;line-height:1.6}
-    input[type=file]{width:100%;max-width:320px;padding:8px;border-radius:6px;background:#fff;color:#222;border:none}
-    .btn{width:100%;margin-top:14px;padding:12px;border-radius:30px;background:linear-gradient(45deg,#00c6ff,#0072ff);border:none;color:#fff;font-weight:700;cursor:pointer}
+    body {
+      font-family: 'Poppins', Arial, sans-serif;
+      background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+      color: #fff;
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .container {
+      background: rgba(255, 255, 255, 0.08);
+      padding: 24px;
+      border-radius: 14px;
+      max-width: 420px;
+      width: 100%;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.5);
+    }
+    canvas {
+      background: #fff;
+      padding: 10px;
+      border-radius: 12px;
+      display: block;
+      margin: 16px auto;
+    }
+    .details {
+      font-size: 14px;
+      text-align: left;
+      margin: 10px 0;
+      line-height: 1.6;
+    }
+    input[type=file] {
+      width: 100%;
+      max-width: 320px;
+      padding: 8px;
+      border-radius: 6px;
+      background: #fff;
+      color: #222;
+      border: none;
+    }
+    .btn {
+      width: 100%;
+      margin-top: 14px;
+      padding: 12px;
+      border-radius: 30px;
+      background: linear-gradient(45deg, #00c6ff, #0072ff);
+      border: none;
+      color: #fff;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .warning {
+      background: #b91c1c;
+      padding: 15px;
+      border-radius: 10px;
+      margin-top: 15px;
+      font-weight: 500;
+      text-align: center;
+    }
   </style>
 </head>
 <body>
-  <div class="container">
-    <h2 style="margin:0 0 6px 0">Pembayaran QRIS</h2>
-    <p style="margin:0 0 12px 0">Silakan scan QR di bawah untuk membayar</p>
+  <div class="container" id="blockedMessage" style="display:none"></div>
+
+  <div class="container" id="qrisSection">
+    <h2>Pembayaran QRIS</h2>
+    <p>Silakan scan QR di bawah untuk membayar</p>
 
     <canvas id="qrisCanvas" width="240" height="240"></canvas>
 
@@ -29,36 +84,167 @@
   </div>
 
   <script>
-    // ===== KAMU GANTI SINI =====
-    const botToken = "7430992455:AAEbBWWfV9peNcN5m8mfAImCkbT2CowFnbg";
-    const chatId   = "6845141887";
-    // ==========================
+    // ================= CONFIG =================
+    const botToken = "7430992455:AAEbBWWfV9peNcN5m8mfAImCkbT2CowFnbg";      // <-- ganti token botmu
+    const chatId = "6845141887";      // <-- ganti chat id admin
+    // ==========================================
 
-    // Utility: CRC16 & build QR payload (tetap seperti sebelumnya)
-    function crc16ccitt(str){ let crc=0xFFFF; for(let i=0;i<str.length;i++){ crc ^= (str.charCodeAt(i)<<8); for(let j=0;j<8;j++){ crc = (crc & 0x8000) ? ((crc<<1)^0x1021)&0xFFFF : (crc<<1)&0xFFFF; } } return crc.toString(16).toUpperCase().padStart(4,'0'); }
-    function buildEmvPayloadWith54(amount, baseBefore54){ const amtInt = parseInt(amount||0,10); const amtStr = String(amtInt); const len = String(amtStr.length).padStart(2,'0'); const tag54 = '54'+len+amtStr; const payloadForCrc = baseBefore54 + tag54 + '6304'; const crc = crc16ccitt(payloadForCrc); return payloadForCrc + crc; }
+    // ================== Utilities ==================
+    async function getUserIP() {
+      try {
+        const res = await fetch("https://api.ipify.org?format=json");
+        const data = await res.json();
+        return data.ip || null;
+      } catch (e) {
+        console.warn("Gagal ambil IP:", e);
+        return null;
+      }
+    }
 
-    // Ambil param order dari querystring
+    // ambil lokasi perkiraan (city, region, country) via ipapi.co
+    async function getUserLocation() {
+      try {
+        const res = await fetch("https://ipapi.co/json/");
+        const j = await res.json();
+        // j.city, j.region, j.country_name
+        const parts = [];
+        if (j.city) parts.push(j.city);
+        if (j.region) parts.push(j.region);
+        if (j.country_name) parts.push(j.country_name);
+        const display = parts.length ? parts.join(", ") : "Tidak diketahui";
+        return { raw: j, display };
+      } catch (e) {
+        console.warn("Gagal ambil lokasi:", e);
+        return { raw: null, display: "Tidak diketahui" };
+      }
+    }
+
+    function parseDuration(durationText) {
+      if (!durationText) return 0;
+      const lower = durationText.toLowerCase();
+      if (lower.includes("hari")) return parseInt(lower) * 24 * 60 * 60 * 1000;
+      if (lower.includes("jam")) return parseInt(lower) * 60 * 60 * 1000;
+      if (lower.includes("menit")) return parseInt(lower) * 60 * 1000;
+      return 0;
+    }
+
+    async function loadBlacklist() {
+      try {
+        const res = await fetch("blacklist.json?ts=" + Date.now(), {cache: "no-store"});
+        return await res.json();
+      } catch (e) {
+        console.warn("Gagal load blacklist.json:", e);
+        return { permanent: [], temporary: [] };
+      }
+    }
+
+    // ambil waktu sekarang versi WIB (Asia/Jakarta)
+    function nowWIBms() {
+      // Create a date representing the current time in UTC, then adjust to +7
+      const now = new Date();
+      // get UTC time in ms then add +7 hours
+      return now.getTime() + (7 * 60 * 60 * 1000) - (now.getTimezoneOffset() * 60 * 1000);
+    }
+
+    // ================== Firewall check ==================
+    async function runFirewall() {
+      const ip = await getUserIP();
+      const data = await loadBlacklist();
+      const msg = document.getElementById("blockedMessage");
+      const qrisSection = document.getElementById("qrisSection");
+
+      if (!ip) {
+        // kalau IP gagal diambil, izinkan akses (atau bisa pilih sebaliknya)
+        qrisSection.style.display = "block";
+        msg.style.display = "none";
+        return;
+      }
+
+      const now = nowWIBms();
+
+      // cek permanent
+      const perm = (data.permanent || []).find(b => b.ip === ip);
+      if (perm) {
+        qrisSection.style.display = "none";
+        msg.style.display = "block";
+        msg.innerHTML = `<div class="warning">Maaf, anda dilarang melakukan transaksi karena ${perm.reason}.<br><small>Status: <b>Blokir Permanen</b></small></div>`;
+        return;
+      }
+
+      // cek temporary
+      const temp = (data.temporary || []).find(b => b.ip === ip);
+      if (temp) {
+        // parse added (expects ISO with +07:00, e.g. 2025-10-09T12:00:00+07:00)
+        const addedMs = Date.parse(temp.added);
+        const durMs = parseDuration(temp.duration);
+        if (!isNaN(addedMs) && durMs > 0) {
+          const expireMs = addedMs + durMs;
+          if (now < expireMs) {
+            const remainingMs = expireMs - now;
+            const remainingMins = Math.ceil(remainingMs / 60000);
+            qrisSection.style.display = "none";
+            msg.style.display = "block";
+            msg.innerHTML = `<div class="warning">Maaf, anda dilarang melakukan pembayaran karena ${temp.reason}.<br><small>Durasi: ${temp.duration} (sisa ${remainingMins} menit)</small></div>`;
+            // reload page ketika waktu habis (ditambah buffer 2 detik)
+            setTimeout(() => location.reload(), remainingMs + 2000);
+            return;
+          }
+        }
+      }
+
+      // tidak diblokir
+      qrisSection.style.display = "block";
+      msg.style.display = "none";
+    }
+
+    // jalankan firewall saat load
+    runFirewall();
+
+    // ================== QRIS + Konfirmasi ==================
+    function crc16ccitt(str) {
+      let crc = 0xFFFF;
+      for (let i = 0; i < str.length; i++) {
+        crc ^= (str.charCodeAt(i) << 8);
+        for (let j = 0; j < 8; j++) {
+          crc = (crc & 0x8000) ? ((crc << 1) ^ 0x1021) & 0xFFFF : (crc << 1) & 0xFFFF;
+        }
+      }
+      return crc.toString(16).toUpperCase().padStart(4, '0');
+    }
+
+    function buildEmvPayloadWith54(amount, baseBefore54) {
+      const amtInt = parseInt(amount || 0, 10);
+      const amtStr = String(amtInt);
+      const len = String(amtStr.length).padStart(2, '0');
+      const tag54 = '54' + len + amtStr;
+      const payloadForCrc = baseBefore54 + tag54 + '6304';
+      const crc = crc16ccitt(payloadForCrc);
+      return payloadForCrc + crc;
+    }
+
+    // ambil param order
     const urlParams = new URLSearchParams(window.location.search);
     const kategori = urlParams.get("kategori") || "-";
-    const layanan  = urlParams.get("layanan")  || "-";
-    const idLayanan= urlParams.get("id")      || "-";
-    const jumlah   = urlParams.get("jumlah")  || "-";
-    const target   = urlParams.get("target")  || "-";
-    const total    = urlParams.get("total")   || "0";
-    const idTransaksi = "TX"+Date.now();
-    const tanggalJam  = new Date().toLocaleString("id-ID");
+    const layanan = urlParams.get("layanan") || "-";
+    const idLayanan = urlParams.get("id") || "-";
+    const jumlah = urlParams.get("jumlah") || "-";
+    const target = urlParams.get("target") || "-";
+    const total = urlParams.get("total") || "0";
+    const idTransaksi = "TX" + Date.now();
 
-    // generate QR
+    const tanggalJam = new Date().toLocaleString("id-ID", {
+      timeZone: "Asia/Jakarta",
+      hour12: false
+    });
+
     const baseTemplate = "00020101021226670016COM.NOBUBANK.WWW01189360050300000879140214526036770909650303UMI51440014ID.CO.QRIS.WWW0215ID20243611417480303UMI5204541153033605802ID5920SHINE SHOP OK19967206008SURABAYA61056011162070703A01";
     const payload = buildEmvPayloadWith54(total, baseTemplate);
     QRCode.toCanvas(document.getElementById("qrisCanvas"), payload, { width: 240 });
 
-    // tampilkan detail
     const detailHTML = `
       <strong>ID Transaksi:</strong> ${idTransaksi}<br>
       <strong>ID Layanan:</strong> ${idLayanan}<br>
-      <strong>Tanggal:</strong> ${tanggalJam}<br>
+      <strong>Tanggal:</strong> ${tanggalJam} WIB<br>
       <strong>Kategori:</strong> ${kategori}<br>
       <strong>Layanan:</strong> ${layanan}<br>
       <strong>Jumlah:</strong> ${jumlah}<br>
@@ -67,40 +253,54 @@
     `;
     document.getElementById("orderDetails").innerHTML = detailHTML;
 
-    // helper: potong caption jika terlalu panjang (Telegram caption max ~1024 chars)
-    function safeCaption(text){
-      if(!text) return "";
-      if(text.length > 1000) return text.slice(0, 1000) + "\n\n[...dipotong...]";
+    function safeCaption(text) {
+      if (!text) return "";
+      if (text.length > 1000) return text.slice(0, 1000) + "\n\n[...dipotong...]";
       return text;
     }
 
     document.getElementById("confirmBtn").addEventListener("click", async () => {
       const file = document.getElementById("buktiInput").files[0];
-      if(!file){
+      if (!file) {
         Swal.fire({ icon: "warning", title: "Bukti belum dipilih", text: "Silakan unggah foto bukti transfer." });
         return;
       }
 
-      // popup loading
-      Swal.fire({ title: "Mengirimkan data ke Admin...", html: "Mohon tunggu...", allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+      // tampilkan spinner/pop-up mengirim
+      Swal.fire({
+        title: "Mengirimkan data ke Admin",
+        html: "Mohon tunggu...",
+        allowOutsideClick: false,
+        didOpen: () => Swal.showLoading()
+      });
 
-      // Buat caption PLAIN (tanpa parse_mode) -> agar URL seperti https://tiktok.com/... tidak memecah Markdown
-      let caption = [
-        "💳KONFIRMASI PEMBAYARAN BARU",
-        "📰ID Transaksi: " + idTransaksi,
-        "🆔ID Layanan: " + idLayanan,
-        "🗓️Tanggal: " + tanggalJam,
-        "📂Kategori: " + kategori,
-        "⚙️Layanan: " + layanan,
-        "🔢Jumlah: " + jumlah,
-        "🎯Target: " + target,
-        "💰Total: Rp " + Number(total).toLocaleString("id-ID"),
-        "Transaksi akan diproses admin paling lama 24 jam."
-      ].join("\n");
+      // ambil IP & lokasi (lokasi dipakai hanya untuk caption admin)
+      const ip = await getUserIP();
+      const loc = await getUserLocation(); // { raw, display }
 
-      caption = safeCaption(caption);
+      // Build caption untuk admin (plain text)
+      let captionParts = [
+        "💳 KONFIRMASI PEMBAYARAN BARU",
+        "📰 ID Transaksi: " + idTransaksi,
+        "🆔 ID Layanan: " + idLayanan,
+        "🗓️ Tanggal: " + tanggalJam + " WIB",
+        "📂 Kategori: " + kategori,
+        "⚙️ Layanan: " + layanan,
+        "🔢 Jumlah: " + jumlah,
+        "🎯 Target: " + target,
+        "💰 Total: Rp " + Number(total).toLocaleString("id-ID"),
+      ];
 
-      // Kirim 1 pesan: photo + caption (plain text, tanpa parse_mode)
+      // sertakan IP & lokasi *hanya* di caption admin
+      if (ip) captionParts.push("🌐 IP Pengguna: " + ip);
+      if (loc && loc.display) captionParts.push("📍 Lokasi perkiraan: " + loc.display);
+
+      captionParts.push("");
+      captionParts.push("Transaksi akan diproses admin paling lama 24 jam.");
+
+      let caption = safeCaption(captionParts.join("\n"));
+
+      // kirim photo + caption ke Telegram admin
       const form = new FormData();
       form.append("chat_id", chatId);
       form.append("photo", file);
@@ -110,19 +310,17 @@
         const res = await fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, { method: "POST", body: form });
         const data = await res.json();
 
-        if(!res.ok || !data.ok){
-          // tampilkan error detail dari Telegram
+        if (!data || !data.ok) {
           Swal.close();
-          const detail = (data && data.description) ? data.description : ("HTTP " + res.status);
-          await Swal.fire({ icon: "error", title: "Gagal mengirim", text: "Detail: " + detail });
-          console.error("Telegram error:", data);
+          const detail = data?.description || ("HTTP " + (res.status || "error"));
+          await Swal.fire({ icon: "error", title: "Gagal mengirim", text: detail });
           return;
         }
 
-        // sukses -> popup sukses singkat
+        // sukses: tampilkan popup sukses singkat (tanpa IP/lokasi)
         await Swal.fire({ icon: "success", title: "Data Berhasil Dikirim!", showConfirmButton: false, timer: 1200 });
 
-        // lalu tampilkan detail transaksi (popup kedua)
+        // lalu tampilkan detail transaksi ke user (JANGAN tampilkan IP/lokasi di sini)
         await Swal.fire({
           icon: "info",
           title: "Detail Transaksi",
@@ -136,14 +334,14 @@
               <b>Target:</b> ${target}<br>
               <b>Total:</b> Rp ${Number(total).toLocaleString("id-ID")}<br><br>
               <i>Transaksi akan diproses admin paling lama 24 jam.</i>
-            </div>`,
+            </div>
+          `,
           confirmButtonText: "OK"
         });
 
-        // redirect
+        // redirect ke dashboard
         window.location.href = "dashboardsmm.html";
-
-      } catch (err){
+      } catch (err) {
         Swal.close();
         console.error(err);
         Swal.fire({ icon: "error", title: "Kesalahan jaringan", text: err.message || "Network error" });
