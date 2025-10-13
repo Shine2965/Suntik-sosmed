@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>🌐 Global Chat - Shine Shop</title>
+<style>
+  body {
+    background: #0f172a;
+    color: #f1f5f9;
+    font-family: 'Inter', Arial, sans-serif;
+    margin: 0;
+  }
+  .container {
+    max-width: 800px;
+    margin: 40px auto;
+    background: #1e293b;
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 4px 25px rgba(0,0,0,0.5);
+  }
+  h1 { text-align: center; margin-bottom: 6px; }
+  .desc { text-align: center; color: #94a3b8; margin-bottom: 20px; font-size: 14px; }
+  form { display: flex; flex-direction: column; gap: 10px; }
+  input, textarea {
+    border: none;
+    border-radius: 8px;
+    padding: 10px;
+    background: #334155;
+    color: #f8fafc;
+  }
+  button {
+    border: none;
+    background: linear-gradient(90deg,#3b82f6,#9333ea);
+    color: white;
+    font-weight: bold;
+    padding: 10px;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  .messages {
+    margin-top: 20px;
+    max-height: 400px;
+    overflow-y: auto;
+    background: #0f172a;
+    border-radius: 8px;
+    padding: 10px;
+  }
+  .msg {
+    background: #1e293b;
+    margin-bottom: 10px;
+    padding: 10px;
+    border-radius: 8px;
+  }
+  .meta {
+    font-size: 12px;
+    color: #94a3b8;
+    margin-bottom: 4px;
+  }
+</style>
+</head>
+<body>
+  <div class="container">
+    <h1>🌐 Global Chat - Shine Shop</h1>
+    <p class="desc">Kirim dan lihat pesan dari semua orang secara langsung.<br>
+    (Chat disimpan di Discord channel ID: <code>1426926633939505292</code>)</p>
+
+    <form id="chatForm">
+      <input id="name" placeholder="Nama Anda (opsional)">
+      <textarea id="message" placeholder="Tulis pesan di sini..." required></textarea>
+      <button id="send">Kirim</button>
+    </form>
+
+    <div class="messages" id="messages"></div>
+  </div>
+
+<script>
+  const API_URL = '/api/discord';
+  const form = document.getElementById('chatForm');
+  const nameInput = document.getElementById('name');
+  const msgInput = document.getElementById('message');
+  const sendBtn = document.getElementById('send');
+  const messagesEl = document.getElementById('messages');
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const name = nameInput.value.trim() || 'Anon';
+    const content = msgInput.value.trim();
+    if (!content) return;
+
+    sendBtn.disabled = true;
+    try {
+      await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: name, content })
+      });
+      msgInput.value = '';
+    } catch (err) {
+      alert('Gagal kirim pesan: ' + err.message);
+    } finally {
+      sendBtn.disabled = false;
+    }
+  });
+
+  async function loadMessages() {
+    try {
+      const res = await fetch(API_URL);
+      if (!res.ok) throw new Error('Gagal ambil pesan');
+      const data = await res.json();
+      messagesEl.innerHTML = '';
+      data.forEach(m => {
+        const div = document.createElement('div');
+        div.className = 'msg';
+        div.innerHTML = `
+          <div class="meta">${m.username} • ${new Date(m.timestamp).toLocaleString()}</div>
+          <div>${m.content}</div>`;
+        messagesEl.appendChild(div);
+      });
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  loadMessages();
+  setInterval(loadMessages, 4000);
+</script>
+</body>
+</html>
