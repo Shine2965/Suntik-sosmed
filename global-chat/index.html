@@ -63,7 +63,7 @@
   <div class="container">
     <h1>🌐 Global Chat - Shine Shop</h1>
     <p class="desc">Kirim dan lihat pesan dari semua orang secara langsung.<br>
-    (Chat disimpan di Discord channel ID: <code>1426926633939505292</code>)</p>
+    (Pesan tersimpan di Discord channel ID: <code>1426926633939505292</code>)</p>
 
     <form id="chatForm">
       <input id="name" placeholder="Nama Anda (opsional)">
@@ -84,20 +84,22 @@
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const name = nameInput.value.trim() || 'Anon';
+    const username = nameInput.value.trim() || 'Anon';
     const content = msgInput.value.trim();
     if (!content) return;
 
     sendBtn.disabled = true;
     try {
-      await fetch(API_URL, {
+      const res = await fetch(API_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: name, content })
+        body: JSON.stringify({ username, content })
       });
+      if (!res.ok) throw new Error('Gagal kirim: ' + res.status);
       msgInput.value = '';
+      await loadMessages(); // refresh tampilan setelah kirim
     } catch (err) {
-      alert('Gagal kirim pesan: ' + err.message);
+      alert(err.message);
     } finally {
       sendBtn.disabled = false;
     }
@@ -123,7 +125,7 @@
   }
 
   loadMessages();
-  setInterval(loadMessages, 4000);
+  setInterval(loadMessages, 5000);
 </script>
 </body>
 </html>
