@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Testimoni Shine Shop (Vercel)</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { background: #0f172a; color: #f1f5f9; font-family: Arial, sans-serif; margin:0; padding:22px; }
+    .wrap { max-width:980px; margin:0 auto; }
+    h1 { text-align:center; color:#38bdf8; margin-bottom:8px; }
+    form { background:#111827; padding:16px; border-radius:10px; box-shadow:0 6px 18px rgba(2,6,23,0.6); }
+    input, textarea, button { width:100%; padding:10px; margin-top:10px; border-radius:8px; border: none; font-size:14px; }
+    textarea{ min-height:90px; resize:vertical; }
+    .stars{ display:flex; gap:6px; justify-content:center; margin-top:10px; }
+    .star{ font-size:26px; cursor:pointer; color:#475569; transition:0.15s; }
+    .star.selected{ color:#facc15; transform:scale(1.15); }
+    .top-row{ display:flex; gap:16px; margin-top:18px; align-items:center; justify-content:space-between; flex-wrap:wrap; }
+    .panel{ background:#0b1220; padding:12px; border-radius:10px; flex:1; min-width:260px; }
+    #msg{ text-align:center; margin-top:8px; }
+    #list{ margin-top:18px; }
+    .item{ background:#0b1220; padding:12px; border-radius:8px; margin-bottom:10px; }
+    .rating{ color:#facc15; font-weight:600; }
+    canvas{ background:#0b1220; border-radius:8px; padding:8px; }
+    footer{ text-align:center; color:#94a3b8; margin-top:18px; font-size:13px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>🌟 Testimoni Shine Shop</h1>
+
+    <form id="formTesti">
+      <input id="nama" placeholder="Nama (boleh singkatan)" required />
+      <textarea id="pesan" placeholder="Tulis testimoni Anda..." required></textarea>
+
+      <div class="stars" id="ratingStars">
+        <span class="star" data-val="1">★</span>
+        <span class="star" data-val="2">★</span>
+        <span class="star" data-val="3">★</span>
+        <span class="star" data-val="4">★</span>
+        <span class="star" data-val="5">★</span>
+      </div>
+
+      <button type="submit" id="sendBtn">Kirim Testimoni</button>
+      <div id="msg"></div>
+    </form>
+
+    <div class="top-row">
+      <div class="panel">
+        <div id="avgRating">Rata-rata rating: 0.0 ⭐</div>
+        <canvas id="chart" width="400" height="220"></canvas>
+      </div>
+      <div class="panel" style="max-width:420px;">
+        <h3 style="margin-top:0;color:#60a5fa">Semua Testimoni</h3>
+        <div id="list"><em>Memuat...</em></div>
+      </div>
+    </div>
+
+    <footer>Deploy: Vercel API (serverless). Token disimpan di serverless function.</footer>
+  </div>
+
+<script>
+const apiBase = '/api/testimoni'; // relative to deployed site
+let selected = 0;
+const stars = document.querySelectorAll('.star');
+stars.forEach(s=>{
+  s.addEventListener('click', ()=>{
+    selected = Number(s.dataset.val);
+    stars.forEach(x=>x.classList.toggle('selected', Number(x.dataset.val) <= selected));
+  });
+});
+
+document.getElementById('formTesti').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const nama = document.getElementById('nama').value.trim();
+  const pesan = document.getElementById('pesan').value.trim();
+  if (!nama || !pesan) return alert('Nama dan pesan wajib diisi.');
+  if (!selected) return alert('Pilih rating (1-5).');
+
+  const payload = { nama, rating: selected, testimoni: pesan };
+
+  const btn = document.getElementById('sendBtn');
+  btn.disabled = true; btn.innerText = 'Mengirim...';
+
+  try {
+    const res = await fetch(apiBase, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const j = await res.json();
+    if (res.ok && j.status === 'success') {
+      document.getElementById('msg').innerText = '✅ Testimoni terkirim!';
+      // optimistic refresh
+      loadAll();
+      document.getElementById('formTesti').reset();
+      selected = 0;
+      stars.forEach(x=>x.classList.remove('selected'));
+    } else {
+      document.getElementById('msg').innerText = '⚠️ Gagal: ' + (j.error || 'Unknown');
+    }
+  } catch(err) {
+    document.getElementById('msg').innerText = '❌ ' + err.message;
+  } finally {
+    btn.disabled = false; btn.innerText = 'Kirim Testimoni';
+    setTimeout(()=>document.getElementById('msg').innerText='', 3000);
+  }
+});
+
+let chart;
+async function loadAll(){
+  try {
+    const res = await fetch(apiBase);
+    const arr = await res.json();
+    renderList(arr);
+    renderAvg(arr);
+    renderChart(arr);
+  } catch(err) {
+    console.error(err);
+    document.getElementById('list').innerHTML = '<em>Gagal memuat testimoni.</em>';
+  }
+}
+
+function renderList(arr){
+  const list = document.getElementById('list');
+  if (!arr.length) { list.innerHTML = '<em>Belum ada testimoni.</em>'; return; }
+  // show newest first
+  list.innerHTML = '';
+  [...arr].reverse().forEach(it=>{
+    const el = document.createElement('div');
+    el.className = 'item';
+    const stars = '★'.repeat(it.rating) + '☆'.repeat(5 - it.rating);
+    const ts = new Date(it.timestamp).toLocaleString();
+    el.innerHTML = `<strong>${escapeHtml(it.nama)}</strong> <div class="rating">${stars}</div><div style="margin-top:6px;">${escapeHtml(it.testimoni)}</div><div style="margin-top:8px;font-size:12px;color:#94a3b8">${ts}</div>`;
+    list.appendChild(el);
+  });
+}
+
+function renderAvg(arr){
+  if (!arr.length) {
+    document.getElementById('avgRating').innerText = 'Rata-rata rating: 0.0 ⭐';
+    return;
+  }
+  const total = arr.reduce((s,v)=>s+Number(v.rating),0);
+  const avg = (total/arr.length).toFixed(1);
+  document.getElementById('avgRating').innerText = `Rata-rata rating: ${avg} ⭐`;
+}
+
+function renderChart(arr){
+  const counts = [0,0,0,0,0];
+  arr.forEach(it=>{
+    const r = Number(it.rating);
+    if (r>=1 && r<=5) counts[r-1]++;
+  });
+  const ctx = document.getElementById('chart').getContext('2d');
+  if (chart) chart.destroy();
+  chart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: ['1 ⭐','2 ⭐','3 ⭐','4 ⭐','5 ⭐'],
+      datasets: [{ label:'Jumlah rating', data: counts }]
+    },
+    options: { indexAxis: 'y', scales: { x: { beginAtZero: true } }, plugins: { legend:{display:false} } }
+  });
+}
+
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+// initial load
+loadAll();
+</script>
+</body>
+</html>
