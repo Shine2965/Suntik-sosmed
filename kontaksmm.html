@@ -164,7 +164,14 @@ button:hover {
     <div class="icon-header"><i class="fa-solid fa-headset"></i></div>
     <h2>Customer Service</h2>
     <div id="messages" class="messages"></div>
+
+    <!-- Input teks -->
     <input type="text" id="message" placeholder="Tulis pesan..." />
+
+    <!-- Input file (gambar) -->
+    <input type="file" id="imageInput" accept="image/*" style="margin-top:8px;" />
+
+    <!-- Tombol kirim -->
     <button onclick="sendMessage()">Kirim</button>
   </div>
 </div>
@@ -216,34 +223,74 @@ function showToast(message, success = true) {
 
 function sendMessage() {
   const msgInput = document.getElementById("message");
+  const imgInput = document.getElementById("imageInput");
   const msg = msgInput.value.trim();
-  if (msg === "") return;
+  const imageFile = imgInput.files[0];
 
-  // tampilkan pesan customer di layar
+  if (!msg && !imageFile) {
+    showToast("⚠️ Ketik pesan atau pilih gambar dulu!", false);
+    return;
+  }
+
   const messagesDiv = document.getElementById("messages");
-  const div = document.createElement("div");
-  div.classList.add("message", "customer");
-  div.textContent = msg;
-  messagesDiv.appendChild(div);
+
+  // tampilkan pesan teks (jika ada)
+  if (msg) {
+    const textDiv = document.createElement("div");
+    textDiv.classList.add("message", "customer");
+    textDiv.textContent = msg;
+    messagesDiv.appendChild(textDiv);
+  }
+
+  // tampilkan gambar (jika ada)
+  if (imageFile) {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const img = document.createElement("img");
+      img.src = e.target.result;
+      img.style.maxWidth = "70%";
+      img.style.borderRadius = "8px";
+      img.style.marginTop = "6px";
+      img.classList.add("message", "customer");
+      messagesDiv.appendChild(img);
+    };
+    reader.readAsDataURL(imageFile);
+  }
+
   messagesDiv.scrollTop = messagesDiv.scrollHeight;
   msgInput.value = "";
+  imgInput.value = "";
 
-  const text = `💬 Pesan Baru dari Customer:
+  // kirim ke telegram
+  if (imageFile) {
+    const formData = new FormData();
+    formData.append("chat_id", telegramChatId);
+    formData.append("caption", `📸 Foto dari Customer:\n👤 ${customerName}\n📧 ${customerEmail}\n📝 ${msg || "(Tanpa teks)"}`);
+    formData.append("photo", imageFile);
+
+    fetch(`https://api.telegram.org/bot${telegramBotToken}/sendPhoto`, {
+      method: "POST",
+      body: formData
+    })
+    .then(() => showToast("✅ Gambar berhasil dikirim!", true))
+    .catch(() => showToast("❌ Gagal mengirim gambar!", false));
+  } else {
+    const text = `💬 Pesan Baru dari Customer:
 👤 Nama: ${customerName}
 📧 Gmail: ${customerEmail}
 📝 Pesan: ${msg}`;
 
-  fetch(`https://api.telegram.org/bot${telegramBotToken}/sendMessage`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      chat_id: telegramChatId,
-      text: text
+    fetch(`https://api.telegram.org/bot${telegramBotToken}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: telegramChatId,
+        text: text
+      })
     })
-  })
-  .then(res => res.json())
-  .then(() => showToast("✅ Pesan berhasil dikirim!", true))
-  .catch(() => showToast("❌ Gagal mengirim pesan!", false));
+    .then(() => showToast("✅ Pesan berhasil dikirim!", true))
+    .catch(() => showToast("❌ Gagal mengirim pesan!", false));
+  }
 }
 </script>
 
