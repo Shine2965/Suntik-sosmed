@@ -83,7 +83,6 @@
       font-weight: 600;
     }
 
-    /* Tombol melayang */
     .floating-btn {
       position: fixed;
       bottom: 20px;
@@ -100,7 +99,6 @@
     }
     .floating-btn:hover { transform: scale(1.1); }
 
-    /* Animasi loading */
     .loading-overlay {
       position: fixed;
       inset: 0;
@@ -163,7 +161,6 @@
     <h2>Testimoni Pengguna</h2>
   </div>
 
-  <!-- Tombol melayang ke Telegram -->
   <a href="https://t.me/ShineShopStoreofficial" target="_blank" class="floating-btn" title="Kunjungi Channel Telegram">💬</a>
 
   <script>
@@ -174,7 +171,6 @@
     const loading = document.getElementById("loading");
 
     let selectedRating = 0;
-    let semuaTestimoni = [];
 
     document.querySelectorAll(".star").forEach(star => {
       star.addEventListener("click", () => {
@@ -186,36 +182,37 @@
       });
     });
 
-    // Tampilkan testimoni dari JSON
     async function loadTestimoni() {
       try {
         const res = await fetch("testimoni.json");
-        semuaTestimoni = await res.json();
-        renderTestimoni();
-        updateRataRata();
+        const data = await res.json();
+        renderTestimoni(data);
+        hitungRataRata(data);
       } catch (err) {
         console.error("Gagal memuat testimoni.json:", err);
       }
     }
 
-    function renderTestimoni() {
+    function renderTestimoni(data) {
       testimoniList.innerHTML = '<div class="rating-avg" id="ratingAvg">⭐ Rata-rata rating: -</div><h2>Testimoni Pengguna</h2>';
-      semuaTestimoni.forEach(t => {
+      data.forEach(t => {
         const div = document.createElement("div");
         div.className = "testi";
-        div.innerHTML = `<strong>${t.nama}</strong><br>
-        <span style="color:gold;">${"⭐".repeat(t.rating)}</span>
-        <p>${t.pesan}</p>`;
+        div.innerHTML = `
+          <strong>${t.nama}</strong><br>
+          <span style="color:gold;">${"⭐".repeat(t.rating)}</span>
+          <p>${t.pesan}</p>
+        `;
         testimoniList.appendChild(div);
       });
-      updateRataRata();
     }
 
-    function updateRataRata() {
-      if (semuaTestimoni.length === 0) return;
-      const total = semuaTestimoni.reduce((sum, t) => sum + t.rating, 0);
-      const avg = (total / semuaTestimoni.length).toFixed(1);
-      ratingAvg.textContent = `⭐ Rata-rata rating: ${avg} / 5 (${semuaTestimoni.length} ulasan)`;
+    function hitungRataRata(data) {
+      if (!data || data.length === 0) return;
+      const total = data.reduce((sum, t) => sum + t.rating, 0);
+      const avg = (total / data.length).toFixed(1);
+      const stars = "⭐".repeat(Math.round(avg)) + "☆".repeat(5 - Math.round(avg));
+      document.getElementById("ratingAvg").textContent = `${stars} (${avg}/5 dari ${data.length} ulasan)`;
     }
 
     document.getElementById("testiForm").addEventListener("submit", async (e) => {
@@ -246,9 +243,6 @@
             body: JSON.stringify({ chat_id: chatId, text: caption })
           });
         }
-
-        semuaTestimoni.push({ nama, rating: selectedRating, pesan });
-        renderTestimoni();
 
         Swal.fire({ icon: "success", title: "Testimoni berhasil dikirim!", background: "#1e293b", color: "#f8fafc" });
         e.target.reset();
