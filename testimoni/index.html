@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Form Testimoni</title>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <style>
+    body {
+      font-family: 'Poppins', sans-serif;
+      background: linear-gradient(135deg, #0f172a, #1e293b);
+      color: #f8fafc;
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .container {
+      background: #1e293b;
+      padding: 25px;
+      border-radius: 20px;
+      box-shadow: 0 0 20px rgba(99, 102, 241, 0.4);
+      width: 350px;
+      margin-top: 50px;
+    }
+    h2 {
+      text-align: center;
+      color: #a78bfa;
+    }
+    label { font-weight: 600; }
+    input, textarea, button {
+      width: 100%;
+      margin-top: 8px;
+      margin-bottom: 16px;
+      padding: 10px;
+      border-radius: 10px;
+      border: none;
+      font-size: 14px;
+    }
+    textarea { resize: none; height: 80px; }
+    button {
+      background: linear-gradient(90deg, #6366f1, #8b5cf6);
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+      transition: 0.3s;
+    }
+    button:hover { opacity: 0.8; }
+    .rating {
+      display: flex;
+      justify-content: center;
+      gap: 5px;
+      margin-bottom: 15px;
+    }
+    .star {
+      font-size: 25px;
+      cursor: pointer;
+      color: #555;
+      transition: 0.2s;
+    }
+    .star.selected { color: gold; transform: scale(1.2); }
+
+    .testimoni-list {
+      margin-top: 40px;
+      max-width: 500px;
+      width: 100%;
+    }
+    .testi {
+      background: #1e293b;
+      border-radius: 12px;
+      padding: 15px;
+      margin-bottom: 10px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.2);
+    }
+    .rating-avg {
+      text-align: center;
+      background: #334155;
+      padding: 10px;
+      border-radius: 12px;
+      color: #fbbf24;
+      margin-bottom: 10px;
+      font-weight: 600;
+    }
+
+    /* Tombol melayang */
+    .floating-btn {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: linear-gradient(90deg, #6366f1, #8b5cf6);
+      color: white;
+      padding: 15px 18px;
+      border-radius: 50%;
+      font-size: 22px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+      cursor: pointer;
+      transition: 0.3s;
+      text-decoration: none;
+    }
+    .floating-btn:hover { transform: scale(1.1); }
+
+    /* Animasi loading */
+    .loading-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15,23,42,0.8);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      color: #fff;
+      font-size: 18px;
+      z-index: 999;
+      display: none;
+      flex-direction: column;
+    }
+    .spinner {
+      border: 4px solid rgba(255,255,255,0.3);
+      border-top: 4px solid #6366f1;
+      border-radius: 50%;
+      width: 50px;
+      height: 50px;
+      animation: spin 1s linear infinite;
+      margin-bottom: 10px;
+    }
+    @keyframes spin { 100% { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+  <div class="loading-overlay" id="loading">
+    <div class="spinner"></div>
+    <div>Mengirim testimoni...</div>
+  </div>
+
+  <div class="container">
+    <h2>Form Testimoni</h2>
+    <form id="testiForm">
+      <label>Nama:</label>
+      <input type="text" id="nama" placeholder="Masukkan nama" required>
+
+      <label>Testimoni:</label>
+      <textarea id="pesan" placeholder="Tulis testimoni Anda..." required></textarea>
+
+      <label>Rating:</label>
+      <div class="rating" id="rating">
+        <span class="star" data-value="1">★</span>
+        <span class="star" data-value="2">★</span>
+        <span class="star" data-value="3">★</span>
+        <span class="star" data-value="4">★</span>
+        <span class="star" data-value="5">★</span>
+      </div>
+
+      <label>Upload Foto (Opsional):</label>
+      <input type="file" id="foto" accept="image/*">
+
+      <button type="submit">Kirim Testimoni</button>
+    </form>
+  </div>
+
+  <div class="testimoni-list" id="testimoniList">
+    <div class="rating-avg" id="ratingAvg">⭐ Rata-rata rating: -</div>
+    <h2>Testimoni Pengguna</h2>
+  </div>
+
+  <!-- Tombol melayang ke Telegram -->
+  <a href="https://t.me/ShineShopStoreofficial" target="_blank" class="floating-btn" title="Kunjungi Channel Telegram">💬</a>
+
+  <script>
+    const botToken = "8401312586:AAGivV7zgVWlFTKpCroRGC6sTEZxLbqG_ug";
+    const chatId = "-1002112920606";
+    const testimoniList = document.getElementById("testimoniList");
+    const ratingAvg = document.getElementById("ratingAvg");
+    const loading = document.getElementById("loading");
+
+    let selectedRating = 0;
+    let semuaTestimoni = [];
+
+    document.querySelectorAll(".star").forEach(star => {
+      star.addEventListener("click", () => {
+        selectedRating = parseInt(star.getAttribute("data-value"));
+        document.querySelectorAll(".star").forEach(s => s.classList.remove("selected"));
+        for (let i = 0; i < selectedRating; i++) {
+          document.querySelectorAll(".star")[i].classList.add("selected");
+        }
+      });
+    });
+
+    // Tampilkan testimoni dari JSON
+    async function loadTestimoni() {
+      try {
+        const res = await fetch("testimoni.json");
+        semuaTestimoni = await res.json();
+        renderTestimoni();
+        updateRataRata();
+      } catch (err) {
+        console.error("Gagal memuat testimoni.json:", err);
+      }
+    }
+
+    function renderTestimoni() {
+      testimoniList.innerHTML = '<div class="rating-avg" id="ratingAvg">⭐ Rata-rata rating: -</div><h2>Testimoni Pengguna</h2>';
+      semuaTestimoni.forEach(t => {
+        const div = document.createElement("div");
+        div.className = "testi";
+        div.innerHTML = `<strong>${t.nama}</strong><br>
+        <span style="color:gold;">${"⭐".repeat(t.rating)}</span>
+        <p>${t.pesan}</p>`;
+        testimoniList.appendChild(div);
+      });
+      updateRataRata();
+    }
+
+    function updateRataRata() {
+      if (semuaTestimoni.length === 0) return;
+      const total = semuaTestimoni.reduce((sum, t) => sum + t.rating, 0);
+      const avg = (total / semuaTestimoni.length).toFixed(1);
+      ratingAvg.textContent = `⭐ Rata-rata rating: ${avg} / 5 (${semuaTestimoni.length} ulasan)`;
+    }
+
+    document.getElementById("testiForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const nama = document.getElementById("nama").value.trim();
+      const pesan = document.getElementById("pesan").value.trim();
+      const foto = document.getElementById("foto").files[0];
+
+      if (!selectedRating) {
+        Swal.fire({ icon: "warning", title: "Pilih rating terlebih dahulu!" });
+        return;
+      }
+
+      const caption = `⭐ Testimoni Baru!\n\n👤 Nama: ${nama}\n🌟 Rating: ${selectedRating} / 5\n💬 Pesan: ${pesan}`;
+      loading.style.display = "flex";
+
+      try {
+        if (foto) {
+          const formData = new FormData();
+          formData.append("chat_id", chatId);
+          formData.append("caption", caption);
+          formData.append("photo", foto);
+          await fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, { method: "POST", body: formData });
+        } else {
+          await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ chat_id: chatId, text: caption })
+          });
+        }
+
+        semuaTestimoni.push({ nama, rating: selectedRating, pesan });
+        renderTestimoni();
+
+        Swal.fire({ icon: "success", title: "Testimoni berhasil dikirim!", background: "#1e293b", color: "#f8fafc" });
+        e.target.reset();
+        document.querySelectorAll(".star").forEach(s => s.classList.remove("selected"));
+        selectedRating = 0;
+      } catch (err) {
+        Swal.fire({ icon: "error", title: "Gagal mengirim testimoni", text: err.message });
+      } finally {
+        loading.style.display = "none";
+      }
+    });
+
+    loadTestimoni();
+  </script>
+</body>
+</html>
