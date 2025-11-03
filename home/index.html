@@ -78,7 +78,6 @@
       background: linear-gradient(135deg, #15803d, #16a34a);
     }
 
-    /* Playlist */
     .playlist {
       margin-top: 25px;
       background: rgba(255,255,255,0.05);
@@ -99,16 +98,13 @@
       cursor: pointer;
       transition: background 0.3s ease;
     }
-    .song:hover {
-      background: rgba(255,255,255,0.1);
-    }
+    .song:hover {background: rgba(255,255,255,0.1);}
     .song.active {
       background: linear-gradient(90deg, var(--accent), #0ea5e9);
       color: white;
       font-weight: bold;
     }
 
-    /* Tombol musik */
     .music-controls {
       margin-top: 15px;
       display: flex;
@@ -124,11 +120,8 @@
       cursor: pointer;
       transition: background 0.3s ease;
     }
-    .music-btn:hover {
-      background: #475569;
-    }
+    .music-btn:hover {background: #475569;}
 
-    /* Notifikasi lagu */
     .song-notif {
       position: fixed;
       bottom: 20px;
@@ -148,7 +141,6 @@
       opacity: 1;
       transform: translateY(0);
     }
-    /* Popup login */
     .popup {
       position: fixed;
       top: 0;left: 0;width: 100%;height: 100%;
@@ -182,18 +174,10 @@
       color: white;
       cursor: pointer;
     }
-    .btn-submit:hover {
-      background: linear-gradient(135deg,#0284c7,#4f46e5);
-    }
+    .btn-submit:hover {background: linear-gradient(135deg,#0284c7,#4f46e5);}
   </style>
 </head>
 <body>
-  <script>
-  // 🔧 Mode Maintenance
-  const isMaintenance = false;
-  if (isMaintenance) window.location.href = "/maintenance/";
-  </script>
-
   <div class="container">
     <img src="logo.png" alt="Logo Toko" class="logo">
     <h1>Navigasi</h1>
@@ -207,7 +191,6 @@
       <button class="nav-btn" onclick="window.location.href='/testimoni/'">🌟 Testimoni</button>
     </nav>
 
-    <!-- Login Admin Sekarang di atas playlist -->
     <button class="login-admin" onclick="openLogin()">🔐 Login Admin</button>
 
     <div class="playlist">
@@ -221,7 +204,6 @@
     </div>
   </div>
 
-  <!-- Popup login -->
   <div class="popup" id="loginPopup">
     <div class="popup-content">
       <h2>Login Admin Panel</h2>
@@ -231,81 +213,74 @@
     </div>
   </div>
 
-  <!-- Notifikasi lagu -->
   <div id="songNotif" class="song-notif"></div>
 
   <script>
-    function openLogin() {
-      document.getElementById('loginPopup').style.display = 'flex';
-    }
-
-    function login() {
-      const user = document.getElementById('username').value.trim();
-      const pass = document.getElementById('password').value.trim();
-      if (user === "Alvino" && pass === "Alvino11") {
-        localStorage.setItem("adminName", user);
-        window.location.href = "/admin/";
-      } else {
-        alert("Username atau password salah!");
-      }
+    function openLogin(){document.getElementById('loginPopup').style.display='flex';}
+    function login(){
+      const user=document.getElementById('username').value.trim();
+      const pass=document.getElementById('password').value.trim();
+      if(user==="Alvino"&&pass==="Alvino11"){localStorage.setItem("adminName",user);window.location.href="/admin/";}
+      else{alert("Username atau password salah!");}
     }
 
     // 🎧 Playlist musik
-    const playlist = [
-      { name: "Once Again - Kim Min Seung", file: "/mp3/once again.mp3" },
-      { name: "Not You - Alan Walker", file: "/mp3/Not You.mp3" }
+    const playlist=[
+      {name:"Once Again - Kim Min Seung",file:"/mp3/once again.mp3"},
+      {name:"Not You - Alan Walker",file:"/mp3/Not You.mp3"}
     ];
 
-    let currentSong = 0;
-    const audio = new Audio();
-    audio.volume = 1;
+    let currentSong=0;
+    const audio=new Audio();
+    audio.volume=1;
 
-    function renderPlaylist() {
-      const container = document.getElementById("playlistContainer");
-      container.innerHTML = "";
-      playlist.forEach((song, index) => {
-        const div = document.createElement("div");
+    function renderPlaylist(){
+      const container=document.getElementById("playlistContainer");
+      container.innerHTML="";
+      playlist.forEach((song,index)=>{
+        const div=document.createElement("div");
         div.classList.add("song");
-        div.textContent = song.name;
-        if (index === currentSong) div.classList.add("active");
-        div.onclick = () => playSong(index);
+        div.textContent=song.name;
+        if(index===currentSong)div.classList.add("active");
+        div.onclick=()=>playSong(index);
         container.appendChild(div);
       });
     }
 
-    function showNotif(text) {
-      const notif = document.getElementById("songNotif");
-      notif.textContent = text;
+    function showNotif(text){
+      const notif=document.getElementById("songNotif");
+      notif.textContent=text;
       notif.classList.add("show");
-      setTimeout(() => notif.classList.remove("show"), 3000);
+      setTimeout(()=>notif.classList.remove("show"),3000);
     }
 
-    function playSong(index) {
-      currentSong = index;
-      audio.src = playlist[index].file;
-      audio.play();
-      renderPlaylist();
-      showNotif(`🎵 Sekarang memutar: ${playlist[index].name}`);
+    function playSong(index){
+      currentSong=index;
+      audio.src=playlist[index].file;
+      audio.play().then(()=>{
+        renderPlaylist();
+        showNotif(`🎵 Sekarang memutar: ${playlist[index].name}`);
+      }).catch(()=>{
+        // jika autoplay ditolak, tunggu interaksi pengguna
+        document.body.addEventListener("click",()=>audio.play(),{once:true});
+      });
     }
 
-    function togglePlay() {
-      if (audio.paused) {
-        audio.play();
-        showNotif(`▶️ Memutar: ${playlist[currentSong].name}`);
-      } else {
-        audio.pause();
-        showNotif(`⏸️ Dijeda: ${playlist[currentSong].name}`);
-      }
+    function togglePlay(){
+      if(audio.paused){audio.play();showNotif(`▶️ Memutar: ${playlist[currentSong].name}`);}
+      else{audio.pause();showNotif(`⏸️ Dijeda: ${playlist[currentSong].name}`);}
     }
 
-    function nextSong() {
-      currentSong = (currentSong + 1) % playlist.length;
+    function nextSong(){
+      currentSong=(currentSong+1)%playlist.length;
       playSong(currentSong);
     }
 
-    audio.addEventListener("ended", nextSong);
-    window.addEventListener("load", () => {
+    audio.addEventListener("ended",nextSong);
+
+    window.addEventListener("load",()=>{
       renderPlaylist();
+      // coba autoplay
       playSong(currentSong);
     });
   </script>
