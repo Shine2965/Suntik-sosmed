@@ -1,15 +1,15 @@
 <!-- File: index.html -->
 <!DOCTYPE html>
 <html lang="id">
-<head> 
+<head>
   <meta name="google-adsense-account" content="ca-pub-9912622413153708">
   <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9912622413153708"
      crossorigin="anonymous"></script>
- <meta charset="utf-8" />
+  <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Shine Shop - Top Up & Suntik Sosmed</title>
   <style>
-    :root{--bg:#0f172a;--accent:#7c3aed;--muted:#94a3b8}
+    :root{--bg:#0f172a;--accent:#6366f1;--muted:#94a3b8}
     *{box-sizing:border-box}
     body{
       margin:0;
@@ -20,7 +20,7 @@
       display:flex;
       align-items:center;
       justify-content:center;
-      padding:24px
+      padding:24px;
     }
     .container{
       width:100%;
@@ -29,7 +29,7 @@
       border-radius:16px;
       padding:28px;
       box-shadow:0 8px 30px rgba(2,6,23,0.6);
-      text-align:center
+      text-align:center;
     }
     .logo{
       width:120px;
@@ -51,7 +51,7 @@
     }
     nav{display:flex;flex-direction:column;gap:12px}
     .nav-btn {
-      background: linear-gradient(135deg, #0ea5e9, #6366f1);
+      background: linear-gradient(135deg, #0ea5e9, var(--accent));
       color: white;
       border: none;
       padding: 10px 20px;
@@ -79,42 +79,54 @@
       background: linear-gradient(135deg, #15803d, #16a34a);
     }
 
-    /* Popup login */
-    .popup {
-      position: fixed;
-      top: 0; left: 0;
-      width: 100%; height: 100%;
-      background: rgba(0,0,0,0.6);
-      display: none;
-      align-items: center;
-      justify-content: center;
+    /* Playlist */
+    .playlist {
+      margin-top: 25px;
+      background: rgba(255,255,255,0.05);
+      border-radius: 10px;
+      padding: 10px;
+      text-align: left;
     }
-    .popup-content {
-      background: #1e293b;
-      padding: 25px;
-      border-radius: 12px;
+    .playlist h3 {
       text-align: center;
-      width: 90%;
-      max-width: 360px;
+      color: #cbd5e1;
+      font-size: 18px;
+      margin-bottom: 10px;
     }
-    input {
-      width: 90%;
-      padding: 8px;
-      margin: 8px 0;
-      border: none;
-      border-radius: 6px;
-    }
-    .btn-submit {
-      background: #4f46e5;
-      color: white;
-      padding: 8px 16px;
-      border: none;
-      border-radius: 6px;
+    .song {
+      padding: 10px;
+      border-radius: 8px;
+      margin: 5px 0;
       cursor: pointer;
-      margin-top: 10px;
+      transition: background 0.3s ease;
     }
-    .btn-submit:hover {
-      background: #4338ca;
+    .song:hover {
+      background: rgba(255,255,255,0.1);
+    }
+    .song.active {
+      background: linear-gradient(90deg, var(--accent), #0ea5e9);
+      color: white;
+      font-weight: bold;
+    }
+
+    /* Tombol musik */
+    .music-controls {
+      margin-top: 15px;
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+    }
+    .music-btn {
+      background: #334155;
+      color: white;
+      border: none;
+      padding: 8px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.3s ease;
+    }
+    .music-btn:hover {
+      background: #475569;
     }
 
     /* Notifikasi lagu */
@@ -141,16 +153,15 @@
 </head>
 <body>
   <script>
-  // 🔧 Toggle Maintenance ON/OFF
-  const isMaintenance = false; // ubah ke true jika mau matikan website
-  if (isMaintenance) {
-    window.location.href = "/maintenance/";
-  }
+  // 🔧 Mode Maintenance
+  const isMaintenance = false;
+  if (isMaintenance) window.location.href = "/maintenance/";
   </script>
 
   <div class="container">
     <img src="logo.png" alt="Logo Toko" class="logo">
     <h1>Navigasi</h1>
+
     <nav>
       <button class="nav-btn" onclick="window.location.href='/topupgame/'">💎 Top up game</button>
       <button class="nav-btn" onclick="window.location.href='/dashboard/'">🚀 Suntik sosmed</button>
@@ -159,6 +170,16 @@
       <button class="nav-btn" onclick="window.location.href='/informasi/'">🔔 Informasi</button>
       <button class="nav-btn" onclick="window.location.href='/testimoni/'">🌟 Testimoni</button>
     </nav>
+
+    <div class="playlist">
+      <h3>🎶 Playlist Lagu</h3>
+      <div id="playlistContainer"></div>
+    </div>
+
+    <div class="music-controls">
+      <button class="music-btn" onclick="togglePlay()">⏯️ Play / Pause lagu</button>
+      <button class="music-btn" onclick="nextSong()">⏭️ Next lagu</button>
+    </div>
 
     <button class="login-admin" onclick="openLogin()">🔐 Login Admin</button>
   </div>
@@ -184,10 +205,7 @@
     function login() {
       const user = document.getElementById('username').value.trim();
       const pass = document.getElementById('password').value.trim();
-      const adminUser = "Alvino";
-      const adminPass = "Alvino11";
-
-      if (user === adminUser && pass === adminPass) {
+      if (user === "Alvino" && pass === "Alvino11") {
         localStorage.setItem("adminName", user);
         window.location.href = "/admin/";
       } else {
@@ -195,41 +213,64 @@
       }
     }
 
-    // 🎵 Playlist dan pemutar musik otomatis
+    // 🎧 Playlist musik
     const playlist = [
       { name: "Once Again - Kim Min Seung", file: "/mp3/once again.mp3" },
       { name: "Not You - Alan Walker", file: "/mp3/Not You.mp3" }
+     
     ];
 
     let currentSong = 0;
     const audio = new Audio();
     audio.volume = 1;
-    audio.autoplay = true;
 
-    function playSong(index) {
-      currentSong = index;
-      audio.src = playlist[index].file;
-      audio.play().catch(() => console.log("Autoplay diblokir oleh browser"));
-      showNotif(`🎵 Memutar: ${playlist[index].name}`);
+    function renderPlaylist() {
+      const container = document.getElementById("playlistContainer");
+      container.innerHTML = "";
+      playlist.forEach((song, index) => {
+        const div = document.createElement("div");
+        div.classList.add("song");
+        div.textContent = song.name;
+        if (index === currentSong) div.classList.add("active");
+        div.onclick = () => playSong(index);
+        container.appendChild(div);
+      });
     }
 
     function showNotif(text) {
       const notif = document.getElementById("songNotif");
       notif.textContent = text;
       notif.classList.add("show");
-      setTimeout(() => notif.classList.remove("show"), 4000);
+      setTimeout(() => notif.classList.remove("show"), 3000);
     }
 
-    // 🔁 Saat lagu selesai → otomatis lanjut ke lagu berikutnya
-    audio.addEventListener("ended", () => {
-      currentSong++;
-      if (currentSong >= playlist.length) {
-        currentSong = 0; // kembali ke awal playlist
-      }
-      playSong(currentSong);
-    });
+    function playSong(index) {
+      currentSong = index;
+      audio.src = playlist[index].file;
+      audio.play();
+      renderPlaylist();
+      showNotif(`🎵 Sekarang memutar: ${playlist[index].name}`);
+    }
 
-    // 🚀 Mulai saat halaman dimuat
+    function togglePlay() {
+      if (audio.paused) {
+        audio.play();
+        showNotif(`▶️ Memutar: ${playlist[currentSong].name}`);
+      } else {
+        audio.pause();
+        showNotif(`⏸️ Dijeda: ${playlist[currentSong].name}`);
+      }
+    }
+
+    function nextSong() {
+      currentSong = (currentSong + 1) % playlist.length;
+      playSong(currentSong);
+    }
+
+    // Otomatis lanjut ke lagu berikutnya saat selesai
+    audio.addEventListener("ended", nextSong);
+
+    // Mulai otomatis saat halaman dimuat
     window.addEventListener("load", () => {
       playSong(currentSong);
     });
