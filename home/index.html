@@ -117,23 +117,25 @@
       background: #4338ca;
     }
 
-    /* Kontrol musik */
-    .music-controls {
-      margin-top: 20px;
-      display: flex;
-      justify-content: center;
-      gap: 10px;
-    }
-    .music-btn {
-      background: #334155;
+    /* Notifikasi lagu */
+    .song-notif {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: rgba(15,23,42,0.9);
       color: white;
-      border: none;
-      padding: 8px 12px;
-      border-radius: 8px;
-      cursor: pointer;
+      padding: 10px 18px;
+      border-radius: 10px;
+      font-size: 14px;
+      box-shadow: 0 0 15px rgba(0,0,0,0.3);
+      opacity: 0;
+      transform: translateY(20px);
+      transition: all 0.5s ease;
+      z-index: 100;
     }
-    .music-btn:hover {
-      background: #475569;
+    .song-notif.show {
+      opacity: 1;
+      transform: translateY(0);
     }
   </style>
 </head>
@@ -158,11 +160,6 @@
       <button class="nav-btn" onclick="window.location.href='/testimoni/'">🌟 Testimoni</button>
     </nav>
 
-    <div class="music-controls">
-      <button class="music-btn" onclick="toggleMusic()">⏯️ Play / Pause lagu</button>
-      <button class="music-btn" onclick="nextSong()">⏭️ Next lagu</button>
-    </div>
-
     <button class="login-admin" onclick="openLogin()">🔐 Login Admin</button>
   </div>
 
@@ -175,6 +172,9 @@
       <button class="btn-submit" onclick="login()">Masuk</button>
     </div>
   </div>
+
+  <!-- Notifikasi lagu -->
+  <div id="songNotif" class="song-notif"></div>
 
   <script>
     function openLogin() {
@@ -195,36 +195,44 @@
       }
     }
 
-    // 🎵 Pemutar musik otomatis
+    // 🎵 Playlist dan pemutar musik otomatis
     const playlist = [
-      "/mp3/once again.mp3",
-      "/mp3/Not You.mp3"
-      
+      { name: "Once Again - Kim Min Seung", file: "/mp3/once again.mp3" },
+      { name: "Not You - Alan Walker", file: "/mp3/Not You.mp3" }
     ];
-    let currentSong = Math.floor(Math.random() * playlist.length);
-    const audio = new Audio(playlist[currentSong]);
-    audio.volume = 2;
-    audio.autoplay = true;
-    audio.loop = false;
 
-    audio.addEventListener("ended", nextSong);
-    window.addEventListener("load", () => {
+    let currentSong = 0;
+    const audio = new Audio();
+    audio.volume = 1;
+    audio.autoplay = true;
+
+    function playSong(index) {
+      currentSong = index;
+      audio.src = playlist[index].file;
       audio.play().catch(() => console.log("Autoplay diblokir oleh browser"));
+      showNotif(`🎵 Memutar: ${playlist[index].name}`);
+    }
+
+    function showNotif(text) {
+      const notif = document.getElementById("songNotif");
+      notif.textContent = text;
+      notif.classList.add("show");
+      setTimeout(() => notif.classList.remove("show"), 4000);
+    }
+
+    // 🔁 Saat lagu selesai → otomatis lanjut ke lagu berikutnya
+    audio.addEventListener("ended", () => {
+      currentSong++;
+      if (currentSong >= playlist.length) {
+        currentSong = 0; // kembali ke awal playlist
+      }
+      playSong(currentSong);
     });
 
-    function toggleMusic() {
-      if (audio.paused) {
-        audio.play();
-      } else {
-        audio.pause();
-      }
-    }
-
-    function nextSong() {
-      currentSong = (currentSong + 1) % playlist.length;
-      audio.src = playlist[currentSong];
-      audio.play();
-    }
+    // 🚀 Mulai saat halaman dimuat
+    window.addEventListener("load", () => {
+      playSong(currentSong);
+    });
   </script>
 </body>
-  </html>
+</html>
