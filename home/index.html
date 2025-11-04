@@ -1,4 +1,4 @@
-<!-- File: index.html (Nuansa Natal 🎄) -->
+<!-- File: index.html (Shine Shop Christmas Edition - Fixed Autoplay & Loop) -->
 <!DOCTYPE html>
 <html lang="id">
 <head>
@@ -224,7 +224,7 @@
   <div class="notification" id="notif"></div>
 
 <script>
-  // Efek salju acak
+  // Efek salju
   function createSnowflakes() {
     for (let i = 0; i < 20; i++) {
       const snowflake = document.createElement('div');
@@ -238,6 +238,7 @@
   }
   setInterval(createSnowflakes, 1000);
 
+  // Login
   function openLogin() {
     document.getElementById('loginPopup').style.display = 'flex';
   }
@@ -252,9 +253,10 @@
     }
   }
 
+  // Playlist
   const songs = [
     { title: "Jingle Bells - Lagu Natal", file: "/mp3/JingleBells.mp3" }
-     ];
+      ];
 
   const playlistDiv = document.getElementById("playlist");
   songs.forEach((song, index) => {
@@ -266,9 +268,9 @@
   });
 
   let current = 0;
-  const audio = new Audio(songs[current].file);
-  audio.volume = 2;
-  let isLoop = true;
+  const audio = new Audio();
+  audio.volume = 0.8;
+  let isLoop = false;
 
   function showNotif(text) {
     const notif = document.getElementById('notif');
@@ -283,18 +285,28 @@
       s.classList.toggle("active", i === current);
     });
     audio.src = songs[current].file;
-    audio.play();
-    showNotif(`▶️ Memutar: ${songs[current].title}`);
+    audio.play().then(() => {
+      showNotif(`▶️ Memutar: ${songs[current].title}`);
+    }).catch(() => {
+      console.log("Autoplay diblokir oleh browser.");
+    });
   }
 
   function toggleMusic() {
-    if (audio.paused) { audio.play(); showNotif("🎵 Musik Diputar"); }
-    else { audio.pause(); showNotif("⏸️ Musik Dijeda"); }
+    if (audio.paused) {
+      audio.play();
+      showNotif("🎵 Musik Diputar");
+    } else {
+      audio.pause();
+      showNotif("⏸️ Musik Dijeda");
+    }
   }
 
   function nextSong() {
     current++;
-    if (current >= songs.length) current = 0;
+    if (current >= songs.length) {
+      current = 0; // balik ke awal playlist
+    }
     playSong(current);
   }
 
@@ -305,10 +317,14 @@
   }
 
   audio.addEventListener("ended", () => {
-    if (!isLoop) nextSong();
+    if (isLoop) {
+      playSong(current);
+    } else {
+      nextSong();
+    }
   });
 
-  // Auto start lagu pertama
+  // Auto mulai lagu pertama saat halaman terbuka
   window.addEventListener("load", () => {
     playSong(current);
   });
