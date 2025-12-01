@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pencairan Saldo</title>
+    <style>
+        body {
+            background: #0f172a;
+            color: white;
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+        .container {
+            max-width: 480px;
+            margin: auto;
+            background: #1e293b;
+            padding: 20px;
+            border-radius: 12px;
+        }
+        input, select, button {
+            width: 100%;
+        }
+        .saldo-box {
+            background: #0f172a;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            text-align: center;
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+        .nominal-box {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-top: 15px;
+        }
+        .nominal-btn {
+            background: #334155;
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+            cursor: pointer;
+            border: 1px solid #475569;
+        }
+        .nominal-btn.active {
+            background: #10b981;
+            border-color: #10b981;
+        }
+
+        select, input, button {
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 12px;
+            border: none;
+            background: #334155;
+            color: white;
+        }
+
+        button {
+            background: #10b981;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Pencairan Saldo</h2>
+
+    <div class="saldo-box">
+        Saldo: <span id="saldo_display">Memuat...</span>
+    </div>
+
+    <label>Pilih Nominal Pencairan</label>
+    <div class="nominal-box">
+        <div class="nominal-btn" onclick="setNominal(10000)">10.000</div>
+        <div class="nominal-btn" onclick="setNominal(20000)">20.000</div>
+        <div class="nominal-btn" onclick="setNominal(30000)">30.000</div>
+        <div class="nominal-btn" onclick="setNominal(50000)">50.000</div>
+        <div class="nominal-btn" onclick="setNominal(100000)">100.000</div>
+    </div>
+
+    <input type="hidden" id="selected_nominal">
+
+    <label>Nama Lengkap</label>
+    <input type="text" id="nama" placeholder="Nama Anda">
+
+    <label>Nomor Rekening / Dana / Gopay</label>
+    <input type="text" id="rekening" placeholder="Nomor rekening">
+
+    <label>Metode Pencairan</label>
+    <select id="metode">
+        <option value="dana">Dana (Biaya admin Rp 1.000)</option>
+        <option value="gopay">Gopay (Biaya admin Rp 2.000)</option>
+        <option value="bank">Transfer Bank (Biaya admin Rp 5.000)</option>
+    </select>
+
+    <button onclick="kirimPencairan()">Konfirmasi Pencairan</button>
+</div>
+
+<script>
+const TELEGRAM_API_KEY = "30992455:AAEbBWWfV9peNcN5m8mfAImCkbT2CowFnbg";
+const TELEGRAM_CHAT_ID = "6845141887";
+
+let saldo = 0;
+let nominal = 0;
+
+// Fetch saldo dari server
+async function loadSaldo() {
+    try {
+        const res = await fetch("/credentials");
+        const data = await res.json();
+        saldo = Number(atob(data.saldo));
+        document.getElementById("saldo_display").innerText = "Rp " + saldo.toLocaleString("id-ID");
+    } catch (err) {
+        alert("Gagal memuat saldo.");
+    }
+}
+loadSaldo();
+
+function setNominal(n) {
+    nominal = n;
+    document.getElementById("selected_nominal").value = n;
+    document.querySelectorAll(".nominal-btn").forEach(btn => btn.classList.remove("active"));
+    event.target.classList.add("active");
+}
+
+function biayaAdmin(m) {
+    if (m === "dana") return 1000;
+    if (m === "gopay") return 2000;
+    if (m === "bank") return 5000;
+    return 0;
+}
+
+// Cooldown 24 jam
+let lastTime = localStorage.getItem("last_withdraw_time");
+if (lastTime) {
+    let diff = Date.now() - Number(lastTime);
+    if (diff < 86400000) {
+        let jam = Math.ceil((86400000 - diff) / 3600000);
+        alert("Anda hanya dapat menarik saldo setiap 24 jam.\nTunggu " + jam + " jam lagi.");
+    }
+}
+
+async function kirimPencairan() {
+    let metode = document.getElementById("metode").value;
+    let nama = document.getElementById("nama").value.trim();
+    let rekening = document.getElementById("rekening").value.trim();
+
+    if (nominal === 0) {
+        alert("Pilih nominal pencairan terlebih dahulu!");
+        return;
+    }
+
+    if (!nama || !rekening) {
+        alert("Semua data wajib diisi!");
+        return;
+    }
+
+    let biaya = biayaAdmin(metode);
+    let total = nominal + biaya;
+
+    if (saldo < total) {
+        alert("Saldo tidak cukup!\nTotal yang dibutuhkan: Rp " + total.toLocaleString("id-ID"));
+        return;
+    }
+
+    let tanggal = new Date().toLocaleString("id-ID");
+    let message =
+`Pencairan Saldo Baru!
+
+Nama: ${nama}
+Rekening: ${rekening}
+Nominal: Rp ${nominal.toLocaleString("id-ID")}
+Biaya Admin: Rp ${biaya.toLocaleString("id-ID")}
+Total: Rp ${total.toLocaleString("id-ID")}
+Metode: ${metode.toUpperCase()}
+Tanggal: ${tanggal}`;
+
+    // Kirim ke Telegram
+    await fetch(`https://api.telegram.org/bot${TELEGRAM_API_KEY}/sendMessage`, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+            chat_id: TELEGRAM_CHAT_ID,
+            text: message
+        })
+    });
+
+    // Set cooldown
+    localStorage.setItem("last_withdraw_time", Date.now());
+
+    alert("Berhasil melakukan pencairan! Mohon tunggu maksimal 24 jam.");
+}
+</script>
+
+</body>
+</html><!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pencairan Saldo</title>
+    <style>
+        body {
+            background: #0f172a;
+            color: white;
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+        .container {
+            max-width: 480px;
+            margin: auto;
+            background: #1e293b;
+            padding: 20px;
+            border-radius: 12px;
+        }
+        input, select, button {
+            width: 100%;
+        }
+        .saldo-box {
+            background: #0f172a;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            text-align: center;
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+        .nominal-box {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-top: 15px;
+        }
+        .nominal-btn {
+            background: #334155;
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+            cursor: pointer;
+            border: 1px solid #475569;
+        }
+        .nominal-btn.active {
+            background: #10b981;
+            border-color: #10b981;
+        }
+
+        select, input, button {
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 12px;
+            border: none;
+            background: #334155;
+            color: white;
+        }
+
+        button {
+            background: #10b981;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Pencairan Saldo</h2>
+
+    <div class="saldo-box">
+        Saldo: <span id="saldo_display">Memuat...</span>
+    </div>
+
+    <label>Pilih Nominal Pencairan</label>
+    <div class="nominal-box">
+        <div class="nominal-btn" onclick="setNominal(10000)">10.000</div>
+        <div class="nominal-btn" onclick="setNominal(20000)">20.000</div>
+        <div class="nominal-btn" onclick="setNominal(30000)">30.000</div>
+        <div class="nominal-btn" onclick="setNominal(50000)">50.000</div>
+        <div class="nominal-btn" onclick="setNominal(100000)">100.000</div>
+    </div>
+
+    <input type="hidden" id="selected_nominal">
+
+    <label>Nama Lengkap</label>
+    <input type="text" id="nama" placeholder="Nama Anda">
+
+    <label>Nomor Rekening / Dana / Gopay</label>
+    <input type="text" id="rekening" placeholder="Nomor rekening">
+
+    <label>Metode Pencairan</label>
+    <select id="metode">
+        <option value="dana">Dana (Biaya admin Rp 1.000)</option>
+        <option value="gopay">Gopay (Biaya admin Rp 2.000)</option>
+        <option value="bank BCA">Transfer Bank (Biaya admin Rp 5.000)</option>
+    </select>
+
+    <button onclick="kirimPencairan()">Konfirmasi Pencairan</button>
+</div>
+
+<script>
+const TELEGRAM_API_KEY = "30992455:AAEbBWWfV9peNcN5m8mfAImCkbT2CowFnbg";
+const TELEGRAM_CHAT_ID = "6845141887";
+
+let saldo = 0;
+let nominal = 0;
+
+// Fetch saldo dari server
+async function loadSaldo() {
+    try {
+        const res = await fetch("/credentials");
+        const data = await res.json();
+        saldo = Number(atob(data.saldo));
+        document.getElementById("saldo_display").innerText = "Rp " + saldo.toLocaleString("id-ID");
+    } catch (err) {
+        alert("Gagal memuat saldo.");
+    }
+}
+loadSaldo();
+
+function setNominal(n) {
+    nominal = n;
+    document.getElementById("selected_nominal").value = n;
+    document.querySelectorAll(".nominal-btn").forEach(btn => btn.classList.remove("active"));
+    event.target.classList.add("active");
+}
+
+function biayaAdmin(m) {
+    if (m === "dana") return 1000;
+    if (m === "gopay") return 2000;
+    if (m === "bank BCA") return 5000;
+    return 0;
+}
+
+// Cooldown 24 jam
+let lastTime = localStorage.getItem("last_withdraw_time");
+if (lastTime) {
+    let diff = Date.now() - Number(lastTime);
+    if (diff < 86400000) {
+        let jam = Math.ceil((86400000 - diff) / 3600000);
+        alert("Anda hanya dapat menarik saldo setiap 24 jam.\nTunggu " + jam + " jam lagi.");
+    }
+}
+
+async function kirimPencairan() {
+    let metode = document.getElementById("metode").value;
+    let nama = document.getElementById("nama").value.trim();
+    let rekening = document.getElementById("rekening").value.trim();
+
+    if (nominal === 0) {
+        alert("Pilih nominal pencairan terlebih dahulu!");
+        return;
+    }
+
+    if (!nama || !rekening) {
+        alert("Semua data wajib diisi!");
+        return;
+    }
+
+    let biaya = biayaAdmin(metode);
+    let total = nominal + biaya;
+
+    if (saldo < total) {
+        alert("Saldo tidak cukup!\nTotal yang dibutuhkan: Rp " + total.toLocaleString("id-ID"));
+        return;
+    }
+
+    let tanggal = new Date().toLocaleString("id-ID");
+    let message =
+`Pencairan Saldo Baru!
+
+Nama: ${nama}
+Rekening: ${rekening}
+Nominal: Rp ${nominal.toLocaleString("id-ID")}
+Biaya Admin: Rp ${biaya.toLocaleString("id-ID")}
+Total: Rp ${total.toLocaleString("id-ID")}
+Metode: ${metode.toUpperCase()}
+Tanggal: ${tanggal}`;
+
+    // Kirim ke Telegram
+    await fetch(`https://api.telegram.org/bot${TELEGRAM_API_KEY}/sendMessage`, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+            chat_id: TELEGRAM_CHAT_ID,
+            text: message
+        })
+    });
+
+    // Set cooldown
+    localStorage.setItem("last_withdraw_time", Date.now());
+
+    alert("Berhasil melakukan pencairan! Mohon tunggu maksimal 24 jam.");
+}
+</script>
+
+</body>
+</html>
