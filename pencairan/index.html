@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Dashboard — Pencairan Saldo</title>
 
-    <!-- FONT GOOGLE -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
 
@@ -17,7 +16,6 @@
             color: white;
         }
 
-        /* HEADER */
         .header {
             background: rgba(255,255,255,0.05);
             backdrop-filter: blur(10px);
@@ -29,12 +27,10 @@
             border-bottom: 1px solid rgba(255,255,255,0.1);
         }
 
-        /* Running Text */
         .marquee {
             width: 100%;
             overflow: hidden;
             white-space: nowrap;
-            box-sizing: border-box;
             background: #0f172a;
             padding: 10px 0;
             font-size: 18px;
@@ -70,7 +66,6 @@
             font-size: 16px;
             background: rgba(255,255,255,0.1);
             color: white;
-            outline: none;
         }
 
         .saldo-box {
@@ -81,7 +76,6 @@
             text-align: center;
             font-size: 22px;
             font-weight: 700;
-            border: 1px solid rgba(255,255,255,0.2);
         }
 
         .nominal-box {
@@ -98,8 +92,8 @@
             text-align: center;
             cursor: pointer;
             border: 1px solid rgba(255,255,255,0.15);
-            transition: 0.2s;
             font-weight: 600;
+            transition: 0.2s;
         }
 
         .nominal-btn:hover {
@@ -111,7 +105,6 @@
             background: #10b981;
             color: #000;
             border-color: #10b981;
-            font-weight: bold;
             transform: scale(1.07);
         }
 
@@ -139,7 +132,7 @@
 <div class="header">Admin Dashboard</div>
 
 <div class="marquee">
-    <span>Selamat datang {username} — Semoga harimu menyenangkan!</span>
+    <span id="marquee_text">Memuat...</span>
 </div>
 
 <div class="container">
@@ -170,99 +163,38 @@
     <select id="metode">
         <option value="dana">Dana (Admin Rp 1.000)</option>
         <option value="gopay">Gopay (Admin Rp 2.000)</option>
-        <option value="bank BCA">Bank BCA(Admin Rp 5.000)</option>
+        <option value="bank BCA">Bank BCA (Admin Rp 5.000)</option>
     </select>
 
     <button onclick="kirimPencairan()">Konfirmasi Pencairan</button>
 </div>
 
 <script>
-const TELEGRAM_API_KEY = "30992455:AAEbBWWfV9peNcN5m8mfAImCkbT2CowFnbg";
-const TELEGRAM_CHAT_ID = "6845141887";
-
 let saldo = 0;
 let nominal = 0;
 
-// Load saldo from /home/data.json
+// Ambil saldo + username dari data.json
 async function loadSaldo() {
     try {
         const res = await fetch("/home/data.json");
         const data = await res.json();
+
         saldo = Number(data.saldo);
-        document.getElementById("saldo_display").innerText = 
+        const username = data.username || "Pengguna";
+
+        // update saldo
+        document.getElementById("saldo_display").innerText =
             "Rp " + saldo.toLocaleString("id-ID");
+
+        // update running text
+        document.getElementById("marquee_text").innerText =
+            "Selamat datang " + username + " — Semoga harimu menyenangkan! ✨";
+
     } catch (err) {
-        alert("Gagal memuat saldo.");
+        alert("Gagal memuat data.");
     }
 }
 loadSaldo();
-
-function setNominal(n) {
-    nominal = n;
-    document.getElementById("selected_nominal").value = n;
-    document.querySelectorAll(".nominal-btn").forEach(btn =>
-        btn.classList.remove("active")
-    );
-    event.target.classList.add("active");
-}
-
-function biayaAdmin(m) {
-    if (m === "dana") return 1000;
-    if (m === "gopay") return 2000;
-    if (m === "bank BCA") return 5000;
-    return 0;
-}
-
-// Cooldown 24 jam
-let lastTime = localStorage.getItem("last_withdraw_time");
-if (lastTime) {
-    let diff = Date.now() - Number(lastTime);
-    if (diff < 86400000) {
-        let jam = Math.ceil((86400000 - diff) / 3600000);
-        alert("Anda hanya dapat menarik saldo setiap 24 jam.\nTunggu " + jam + " jam lagi.");
-    }
-}
-
-async function kirimPencairan() {
-    let metode = document.getElementById("metode").value;
-    let nama = document.getElementById("nama").value.trim();
-    let rekening = document.getElementById("rekening").value.trim();
-
-    if (nominal === 0) return alert("Pilih nominal!");
-    if (!nama || !rekening) return alert("Isi semua data!");
-
-    let biaya = biayaAdmin(metode);
-    let total = nominal + biaya;
-
-    if (saldo < total)
-        return alert("Saldo tidak cukup!\nTotal: Rp " + total.toLocaleString("id-ID"));
-
-    let tanggal = new Date().toLocaleString("id-ID");
-
-    let message = 
-`Pencairan Saldo Baru!
-
-Nama: ${nama}
-Rekening: ${rekening}
-Nominal: Rp ${nominal.toLocaleString("id-ID")}
-Biaya Admin: Rp ${biaya.toLocaleString("id-ID")}
-Total: Rp ${total.toLocaleString("id-ID")}
-Metode: ${metode.toUpperCase()}
-Tanggal: ${tanggal}`;
-
-    await fetch(`https://api.telegram.org/bot${TELEGRAM_API_KEY}/sendMessage`, {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({
-            chat_id: TELEGRAM_CHAT_ID,
-            text: message
-        })
-    });
-
-    localStorage.setItem("last_withdraw_time", Date.now());
-
-    alert("Pencairan berhasil! Tunggu max 24 jam.");
-}
 </script>
 
 </body>
