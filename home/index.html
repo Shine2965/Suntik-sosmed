@@ -216,8 +216,8 @@ const songs=[
   {title:"Jingle Bells - Lagu Natal", file:"/mp3/JingleBells.mp3"},
   {title:"Dari Pulau Dan Benua - Lagu Natal", file:"/mp3/DariPulauDanBenuanatal.mp3"}
 ];
-let current=0, loop=false;
 
+let current=0, loop=false;
 const audio=new Audio();
 const playlist=document.getElementById("playlist");
 
@@ -229,16 +229,6 @@ songs.forEach((s,i)=>{
   playlist.appendChild(div);
 });
 
-function showNotif(t){
-  const n=document.getElementById('notif');
-  n.style.animation='none';
-  void n.offsetWidth;
-  n.textContent=t;
-  n.style.display='block';
-  n.style.animation='fadeInOut 4s ease';
-  setTimeout(()=>n.style.display='none',4500);
-}
-
 function playSong(i){
   current=i;
   document.querySelectorAll('.song').forEach((e,id)=>e.classList.toggle('active',id===current));
@@ -247,21 +237,18 @@ function playSong(i){
 }
 
 function toggleMusic(){ audio.paused?audio.play():audio.pause(); }
-function nextSong(){ current=(current+1)%songs.length; playSong(current);} 
+function nextSong(){ current=(current+1)%songs.length; playSong(current); }
 function toggleLoop(){ loop=!loop; audio.loop=loop; }
 
-audio.addEventListener("ended",()=>{ loop?playSong(current):nextSong();});
+/* 🔐 LOGIN ADMIN – NON ENCRYPT */
+let adminData = { username:"", password:"", saldo:0 };
 
-/* 🔐 LOGIN ADMIN (credentials.json) */
-let adminData={};
-const b64=(x)=>{try{return atob(x);}catch{return"";}};
-
-fetch("/credentials.json")
-  .then(r=>r.json())
-  .then(d=>{
-    adminData.username=b64(d.username);
-    adminData.password=b64(d.password);
-    adminData.saldo=b64(d.saldo);
+fetch("/data.json")
+  .then(r => r.json())
+  .then(data => {
+    adminData.username = data.username;
+    adminData.password = data.password;
+    adminData.saldo = data.saldo;
   });
 
 function openLogin(){ document.getElementById('loginPopup').style.display='flex'; }
@@ -272,7 +259,7 @@ function login(){
   const p=document.getElementById('password').value.trim();
 
   if(u===adminData.username && p===adminData.password){
-    alert("Login berhasil! Saldo: " + adminData.saldo);
+    alert("Login berhasil! Saldo: Rp " + adminData.saldo);
     location.href="/admin/";
   } else {
     alert("❌ Username atau password salah!");
