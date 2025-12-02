@@ -111,6 +111,11 @@
       border: none;
       border-radius: 6px;
       color: white;
+      cursor: pointer;
+    }
+    .btn-submit[disabled] {
+      opacity: 0.6;
+      cursor: not-allowed;
     }
     .btn-close {
       background: #ef4444;
@@ -119,6 +124,7 @@
       border-radius: 6px;
       color: white;
       margin-left: 10px;
+      cursor: pointer;
     }
 
     .snowflake {
@@ -128,6 +134,7 @@
       font-size: 1.2em;
       user-select: none;
       animation: fall linear infinite;
+      pointer-events: none;
     }
     @keyframes fall {
       0% { transform: translateY(0); }
@@ -180,17 +187,21 @@
 
 <div id="notif"></div>
 
-<div class="popup" id="loginPopup">
+<div class="popup" id="loginPopup" aria-hidden="true">
   <div class="popup-content">
     <h2>Login Admin Panel</h2>
-    <input type="text" id="username" placeholder="Username">
-    <input type="password" id="password" placeholder="Password">
-    <button class="btn-submit" onclick="login()">Masuk</button>
-    <button class="btn-close" onclick="closeLogin()">Tutup</button>
+    <input type="text" id="username" placeholder="Username" autocomplete="off">
+    <input type="password" id="password" placeholder="Password" autocomplete="off">
+    <div style="display:flex;justify-content:center;gap:8px;margin-top:8px;">
+      <button id="btnLogin" class="btn-submit" onclick="login()" disabled>Masuk</button>
+      <button class="btn-close" onclick="closeLogin()">Tutup</button>
+    </div>
+    <p id="loginMsg" style="margin-top:8px;color:#fca5a5;display:none;"></p>
   </div>
 </div>
 
 <script>
+/* ❄️ SALJU ❄️ */
 function createSnowflakes(){
   for(let i=0;i<10;i++){
     const s=document.createElement('div');
@@ -204,55 +215,142 @@ function createSnowflakes(){
 }
 setInterval(createSnowflakes,3000);
 
-const songs=[
+/* 🎵 PLAYLIST 🎵 */
+const songs = [
   {title:"Jingle Bells - Lagu Natal", file:"/mp3/JingleBells.mp3"},
   {title:"Dari Pulau Dan Benua - Lagu Natal", file:"/mp3/DariPulauDanBenuanatal.mp3"}
 ];
 
-let current=0, loop=false;
-const audio=new Audio();
-const playlist=document.getElementById("playlist");
+let current = 0;
+let loopMode = false;
+const audio = new Audio();
+const playlistEl = document.getElementById("playlist");
 
-songs.forEach((s,i)=>{
-  const div=document.createElement("div");
-  div.className="song";
-  div.textContent=s.title;
-  div.onclick=()=>playSong(i);
-  playlist.appendChild(div);
+songs.forEach((s, i) => {
+  const div = document.createElement("div");
+  div.className = "song";
+  div.textContent = s.title;
+  div.onclick = () => playSong(i);
+  playlistEl.appendChild(div);
 });
 
 function playSong(i){
-  current=i;
-  document.querySelectorAll('.song').forEach((e,id)=>e.classList.toggle('active',id===current));
-  audio.src=songs[current].file;
-  audio.play();
+  current = i;
+  document.querySelectorAll('.song').forEach((e,id)=>e.classList.toggle('active', id===current));
+  audio.src = songs[current].file;
+  audio.play().catch(()=> {
+    // autoplay mungkin diblokir, tapi tidak fatal
+    showNotif("Autoplay diblokir — klik Play untuk memulai.");
+  });
+  showNotif("▶️ Memutar: " + songs[current].title);
 }
 
-function toggleMusic(){ audio.paused?audio.play():audio.pause(); }
-function nextSong(){ current=(current+1)%songs.length; playSong(current); }
-function toggleLoop(){ loop=!loop; audio.loop=loop; }
+function toggleMusic(){
+  if (!audio.src) {
+    playSong(current);
+    return;
+  }
+  if (audio.paused) {
+    audio.play().catch(()=> showNotif("Autoplay diblokir — klik Play untuk memulai."));
+    showNotif("🎵 Musik Diputar");
+  } else {
+    audio.pause();
+    showNotif("⏸️ Musik Dijeda");
+  }
+}
+function nextSong(){ current = (current + 1) % songs.length; playSong(current); }
+function toggleLoop(){ loopMode = !loopMode; audio.loop = loopMode; showNotif(loopMode ? "🔁 Mode Loop Aktif" : "➡️ Mode Loop Nonaktif"); }
 
-function openLogin(){ document.getElementById("loginPopup").style.display="flex"; }
-function closeLogin(){ document.getElementById("loginPopup").style.display="none"; }
+audio.addEventListener("ended", () => {
+  if (!audio.loop) nextSong();
+});
 
+/* Notifikasi kecil */
+function showNotif(text){
+  const n = document.getElementById('notif');
+  n.textContent = text;
+  n.style.display = 'block';
+  // restart animation by reflow
+  n.style.animation = 'none';
+  void n.offsetWidth;
+  n.style.animation = '';
+  setTimeout(()=> n.style.display = 'none', 3500);
+}
+
+/* LOGIN (multi-admin from /home/data.json) */
 let adminData = [];
+let dataLoaded = false;
+const btnLogin = document.getElementById("btnLogin");
+const loginMsg = document.getElementById("loginMsg");
 
+// Load data.json from /home/data.json
 fetch("/home/data.json")
-  .then(res => res.json())
-  .then(data => adminData = data.admins)
-  .catch(() => alert("Gagal memuat /home/data.json"));
+  .then(res => {
+    if (!res.ok) throw new Error("HTTP status " + res.status);
+    return res.json();
+  })
+  .then(data => {
+    // Expect { "admins": [...] } or a single admin object fallback
+    if (Array.isArray(data.admins)) {
+      adminData = data.admins;
+    } else if (Array.isArray(data)) {
+      adminData = data;
+    } else if (data && data.admins === undefined && data.username) {
+      // legacy single-admin saved as object
+      adminData = [data];
+    } else {
+      adminData = [];
+    }
+    dataLoaded = true;
+    btnLogin.disabled = false;
+    loginMsg.style.display = 'none';
+  })
+  .catch(err => {
+    console.error("Gagal memuat /home/data.json", err);
+    loginMsg.textContent = "Gagal memuat data admin.";
+    loginMsg.style.display = "block";
+    // keep button disabled
+    btnLogin.disabled = true;
+  });
 
-function login() {
+// UI open/close login
+function openLogin(){
+  document.getElementById("loginPopup").style.display = "flex";
+  document.getElementById("loginPopup").setAttribute("aria-hidden", "false");
+}
+function closeLogin(){
+  document.getElementById("loginPopup").style.display = "none";
+  document.getElementById("loginPopup").setAttribute("aria-hidden", "true");
+  document.getElementById('username').value = '';
+  document.getElementById('password').value = '';
+}
+
+// Login handler
+function login(){
+  if (!dataLoaded) {
+    showNotif("Tunggu, data admin masih dimuat...");
+    return;
+  }
+
   const user = document.getElementById('username').value.trim();
   const pass = document.getElementById('password').value.trim();
+
+  if (!user || !pass) {
+    showNotif("Isi username & password.");
+    return;
+  }
 
   const admin = adminData.find(a => a.username === user && a.password === pass);
 
   if (admin) {
-    alert("Login berhasil!\nSaldo: " + admin.saldo);
-    window.location.href = "/admin/";
+    // simpan username ke localStorage agar dashboard bisa baca
+    try { localStorage.setItem("adminUsername", admin.username); } catch(e){/*ignore*/}
+
+    showNotif("Login berhasil! Saldo: " + admin.saldo);
+    // redirect ke dashboard (tunggu 600ms agar notif terlihat)
+    setTimeout(()=> window.location.href = "/admin/", 600);
   } else {
-    alert("❌ Username atau password salah!");
+    showNotif("❌ Username atau password salah!");
   }
 }
 </script>
