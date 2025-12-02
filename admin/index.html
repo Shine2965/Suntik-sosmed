@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Admin Dashboard - Shine Shop</title>
 
-<!-- Google Font -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
 
@@ -54,15 +53,8 @@
         border: 1px solid rgba(255,255,255,0.1);
     }
 
-    h1 {
-        text-align: center;
-        font-weight: 700;
-        letter-spacing: 1px;
-    }
-
-    h3 {
-        margin-top: 25px;
-    }
+    h1 { text-align: center; font-weight: 700; letter-spacing: 1px; }
+    h3 { margin-top: 25px; }
 
     .saldo-box {
         background: rgba(255,255,255,0.1);
@@ -99,7 +91,6 @@
 </head>
 <body>
 
-<!-- Running text -->
 <div class="marquee">
     <span id="running_text">Memuat data...</span>
 </div>
@@ -114,30 +105,47 @@
 </div>
 
 <script>
-// Ambil data dari /home/data.json (non encrypt)
-async function loadData() {
+/* =========================
+   Load Admin Data dan Saldo
+   ========================= */
+let currentAdminUsername = localStorage.getItem("adminUsername") || null;
+
+async function loadAdminData() {
     try {
         const res = await fetch("/home/data.json");
         const data = await res.json();
 
-        const saldo = Number(data.saldo);
-        const username = data.username || "Pengguna";
+        // Jika multi-admin, cari yang login
+        let admin = null;
+        if (Array.isArray(data.admins)) {
+            admin = data.admins.find(a => a.username === currentAdminUsername);
+        } else {
+            admin = data; // fallback jika data bukan array
+        }
+
+        if (!admin) {
+            document.getElementById("saldo_display").innerText = "Admin tidak ditemukan!";
+            document.getElementById("running_text").innerText = "Silakan login kembali.";
+            return;
+        }
 
         // Update saldo
+        const saldoNum = Number(admin.saldo.replace(/[^0-9]/g,''));
         document.getElementById("saldo_display").innerText =
-            "Rp " + saldo.toLocaleString("id-ID");
+            "Rp " + saldoNum.toLocaleString("id-ID");
 
-        // Update running text
+        // Update marquee
         document.getElementById("running_text").innerText =
-            `Selamat datang ${username} — semoga harimu menyenangkan! ✨`;
+            `Selamat datang ${admin.username} — semoga harimu menyenangkan! ✨`;
 
     } catch (err) {
+        console.error(err);
         document.getElementById("saldo_display").innerText = "Gagal memuat saldo";
         document.getElementById("running_text").innerText = "Gagal memuat data pengguna";
     }
 }
 
-loadData();
+loadAdminData();
 </script>
 
 </body>
