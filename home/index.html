@@ -240,27 +240,24 @@ function toggleMusic(){ audio.paused?audio.play():audio.pause(); }
 function nextSong(){ current=(current+1)%songs.length; playSong(current); }
 function toggleLoop(){ loop=!loop; audio.loop=loop; }
 
-/* 🔐 LOGIN ADMIN – NON ENCRYPT */
-let adminData = { username:"", password:"", saldo:0 };
+let adminData = [];
 
-fetch("/home/data.json")
-  .then(r => r.json())
-  .then(data => {
-    adminData.username = data.username;
-    adminData.password = data.password;
-    adminData.saldo = data.saldo;
-  });
+// Load credentials.json
+fetch("/data.json")
+  .then(res => res.json())
+  .then(data => adminData = data.admins)
+  .catch(() => alert("Gagal memuat credentials.json"));
 
-function openLogin(){ document.getElementById('loginPopup').style.display='flex'; }
-function closeLogin(){ document.getElementById('loginPopup').style.display='none'; }
+function login() {
+  const user = document.getElementById('username').value.trim();
+  const pass = document.getElementById('password').value.trim();
 
-function login(){
-  const u=document.getElementById('username').value.trim();
-  const p=document.getElementById('password').value.trim();
+  // Cari admin yang cocok
+  const admin = adminData.find(a => a.username === user && a.password === pass);
 
-  if(u===adminData.username && p===adminData.password){
-    alert("Login berhasil! Saldo: Rp " + adminData.saldo);
-    location.href="/admin/";
+  if (admin) {
+    alert("Login berhasil!\nSaldo: " + admin.saldo);
+    window.location.href = "/admin/";
   } else {
     alert("❌ Username atau password salah!");
   }
