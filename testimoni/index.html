@@ -124,18 +124,8 @@
     @keyframes spin { 100% { transform: rotate(360deg); } }
   </style>
 </head>
-<body><script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9912622413153708"
-     crossorigin="anonymous"></script>
-<!-- P -->
-<ins class="adsbygoogle"
-     style="display:block"
-     data-ad-client="ca-pub-9912622413153708"
-     data-ad-slot="8542399682"
-     data-ad-format="auto"
-     data-full-width-responsive="true"></ins>
-<script>
-     (adsbygoogle = window.adsbygoogle || []).push({});
-</script>
+
+<body>
 
   <div class="loading-overlay" id="loading">
     <div class="spinner"></div>
@@ -175,11 +165,33 @@
   <a href="https://t.me/ShineShopOfficial" target="_blank" class="floating-btn" title="Kunjungi Channel Telegram">💬</a>
 
   <script>
-    const botToken = "8401312586:AAGkJCmmiMxitcpMpbmfpb6J4plXLPO7jE4";
-    const chatId = "-1002112920606";
+    const configUrl = "https://raw.githubusercontent.com/Shine2965/Database/refs/heads/Tester/Database1.json";
+
+    let botToken = "";
+    let channelId = "";
     const testimoniList = document.getElementById("testimoniList");
     const ratingAvg = document.getElementById("ratingAvg");
     const loading = document.getElementById("loading");
+
+    // Load APIKEY + ChannelID dari GitHub
+    async function loadConfig() {
+      try {
+        const res = await fetch(configUrl);
+        const data = await res.json();
+
+        botToken = data.apikey;
+        channelId = data.channelid;
+
+        console.log("Config Loaded:", botToken, channelId);
+      } catch (err) {
+        console.error("Gagal load config:", err);
+        Swal.fire({
+          icon: "error",
+          title: "Gagal memuat konfigurasi!",
+          text: "Periksa kembali URL Database JSON."
+        });
+      }
+    }
 
     let selectedRating = 0;
 
@@ -236,6 +248,10 @@
         Swal.fire({ icon: "warning", title: "Pilih rating terlebih dahulu!" });
         return;
       }
+      if (!botToken || !channelId) {
+        Swal.fire({ icon: "error", title: "Config belum dimuat!" });
+        return;
+      }
 
       const caption = `⭐ Testimoni Baru!\n\n👤 Nama: ${nama}\n🌟 Rating: ${selectedRating} / 5\n💬 Pesan: ${pesan}`;
       loading.style.display = "flex";
@@ -243,7 +259,7 @@
       try {
         if (foto) {
           const formData = new FormData();
-          formData.append("chat_id", chatId);
+          formData.append("chat_id", channelId);
           formData.append("caption", caption);
           formData.append("photo", foto);
           await fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, { method: "POST", body: formData });
@@ -251,14 +267,15 @@
           await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ chat_id: chatId, text: caption })
+            body: JSON.stringify({ chat_id: channelId, text: caption })
           });
         }
 
-        Swal.fire({ icon: "success", title: "Testimoni berhasil dikirim!", background: "#1e293b", color: "#f8fafc" });
+        Swal.fire({ icon: "success", title: "Testimoni berhasil dikirim!" });
         e.target.reset();
         document.querySelectorAll(".star").forEach(s => s.classList.remove("selected"));
         selectedRating = 0;
+
       } catch (err) {
         Swal.fire({ icon: "error", title: "Gagal mengirim testimoni", text: err.message });
       } finally {
@@ -266,7 +283,10 @@
       }
     });
 
-    loadTestimoni();
+    // Load config → lalu load testimoni
+    loadConfig().then(loadTestimoni);
+
   </script>
+
 </body>
 </html>
