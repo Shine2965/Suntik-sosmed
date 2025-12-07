@@ -1,51 +1,69 @@
+/* Shine Shop - obfuscation level: medium (string table + mapper) */
+(function(){
+  // string table
+  var _s = [
+    "fetch","/bugwas/9AaYq5TS.json","then","json","catch","console.error",
+    "getElementById","value","textContent","Username atau password salah!",
+    "location","href","/bugwa/","bgmusic","muted","volume","Shine Shop",
+    "U2hpbmUgU2hvcA==","setItem","currentUser","bugwas_login"
+  ];
+  // mapper helper
+  function _m(i){ return _s[i]; }
 
-(function(global){
-  'use strict';
+  // embed watermark (base64 decode) - not used, just present
+  try {
+    var _wm = atob(_m(16)); // "Shine Shop"
+    // optional small no-op to keep watermark present
+    if(!_wm){} 
+  } catch(e){}
 
-  // ---------- Configuration ----------
-  var REDIRECT_HOME = '/home/';
-  var REDIRECT_AFTER_TAMPER = '/home/';
-  var JSON_PATH = '/bugwas/9AaYq5TS.json';
-  var WATERMARK_B64 = 'U2hpbmUgU2hvcA=='; // Shine Shop
-  var CHECK_INTERVAL = 800; // ms
-  var DEVTOOLS_TIME_THRESHOLD = 120; // ms
+  // accounts container
+  var accounts = {};
 
-  // ---------- Helpers ----------
-  function b64(s){ try{ return atob(s); }catch(e){return ''; } }
-  function now(){ return (new Date()).getTime(); }
-  function noop(){}
-
-  // safe text setter
-  function setMsg(text){
-    try{ var el = document.getElementById('msg'); if(el) el.textContent = text; }catch(e){}
+  // load accounts JSON (same-origin)
+  try {
+    window[_m(6)] = window[_m(6)]; // ensure function present (no-op)
+    fetch(_m(1))[_m(2)](function(res){ return res[_m(3)](); })[_m(2)](function(data){
+      accounts = data || {};
+    })[_m(4)](function(err){
+      console[_m(5)]("akun.json error:", err);
+    });
+  } catch(e){
+    console.error("fetch failed", e);
   }
 
-  // safe redirect
-  function redirect(h){
-    try{ window.location.href = h; }catch(e){}
-  }
-
-  // ---------- String obfuscation helpers ----------
-  // XOR-decode function for encoded strings (simple)
-  function xorDecode(b64str, key){
+  // unmute fallback (in case index.html didn't)
+  setTimeout(function(){
     try{
-      var raw = atob(b64str);
-      var out = '';
-      for(var i=0;i<raw.length;i++){
-        out += String.fromCharCode(raw.charCodeAt(i) ^ key.charCodeAt(i % key.length));
+      var a = document[_m(6)](_m(13));
+      if(a){ a[_m(14)] = false; a[_m(15)] = 1.0; }
+    }catch(e){}
+  },900);
+
+  // exported login function (button onclick calls login())
+  window.login = function(){
+    try{
+      var user = (document[_m(6)]("username") && document[_m(6)]("username")[_m(7)]) || "";
+      var pass = (document[_m(6)]("password") && document[_m(6)]("password")[_m(7)]) || "";
+      var msg  = document[_m(6)]("msg");
+      if(!user || !pass){
+        if(msg) msg[_m(8)] = "Masukkan username & password";
+        return;
       }
-      return out;
-    }catch(e){ return ''; }
-  }
+      if(!accounts[user] || accounts[user].password !== pass){
+        if(msg) msg[_m(8)] = _m(9);
+        return;
+      }
+      // optional: store current user for other pages
+      try {
+        localStorage[_m(17)](_m(18), user);
+        localStorage[_m(17)](_m(19), "true");
+      } catch(e){}
+      // redirect to /bugwa/
+      window[_m(10)][_m(11)] = _m(12);
+    }catch(e){
+      try{ if(document[_m(6)]("msg")) document[_m(6)]("msg")[_m(8)] = "Terjadi kesalahan"; }catch(_){}
+    }
+  };
 
-  // ---------- Anti-UI (disable right-click, keys) ----------
-  function blockKeysAndMenu(){
-    try{
-      document.addEventListener('contextmenu', function(e){ e.preventDefault(); e.stopPropagation(); }, true);
-      document.addEventListener('copy', function(e){ e.preventDefault(); }, true);
-      document.addEventListener('cut', function(e){ e.preventDefault(); }, true);
-      document.addEventListener('paste', function(e){ e.preventDefault(); }, true);
-      document.addEventListener('keydown', function(e){
-        // Block F12, Ctrl+Shift+I/J/C, Ctrl+U, Ctrl+S
-        if(e.keyCode === 123) { e.preventDefault(); e.stopPropagation(); return false; }
-        if(e.ctrlKey && e.shiftKey && (e.keyCode===73||e.keyCode===74||e.keyCode
+})();
