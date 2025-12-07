@@ -19,11 +19,13 @@
         justify-content: center;
         align-items: center;
 
-        /* 🔥 Background gambar */
-        background: url("/home/logo.png") no-repeat center center / cover;
+        background-image: url("/home/logo.png");
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+        background-attachment: fixed;
     }
 
-    /* 🔥 Lapisan gelap agar teks lebih terlihat */
     .overlay {
         position: absolute;
         width: 100%;
@@ -39,12 +41,10 @@
         padding: 30px;
         border-radius: 18px;
 
-        /* 🔥 Glassmorphism */
         background: rgba(255, 255, 255, 0.12);
         border: 1px solid rgba(255,255,255,0.3);
         backdrop-filter: blur(12px);
 
-        /* 🔥 Glow */
         box-shadow: 0 0 20px rgba(0, 255, 200, 0.4);
         text-align: center;
     }
@@ -65,8 +65,6 @@
         border: none;
         outline: none;
         font-size: 15px;
-
-        /* Gradient input */
         background: linear-gradient(135deg, #ffffffc0, #d9d9d9c0);
     }
 
@@ -74,19 +72,30 @@
         width: 100%;
         padding: 12px;
         margin-top: 12px;
-        background: linear-gradient(135deg, #10b981, #06b6d4);
         border: none;
         border-radius: 10px;
         font-size: 16px;
         font-weight: 600;
         color: white;
         cursor: pointer;
-        transition: 0.2s;
+        transition: .2s;
     }
 
-    button:hover {
+    .btn-login {
+        background: linear-gradient(135deg, #10b981, #06b6d4);
+    }
+    .btn-login:hover {
         transform: scale(1.03);
         box-shadow: 0 0 12px rgba(16,185,129,0.7);
+    }
+
+    .btn-daftar {
+        background: linear-gradient(135deg, #f43f5e, #fb923c);
+        margin-top: 10px;
+    }
+    .btn-daftar:hover {
+        transform: scale(1.03);
+        box-shadow: 0 0 12px rgba(251,146,60,0.7);
     }
 
     #msg {
@@ -103,36 +112,66 @@
 <div class="overlay"></div>
 
 <div class="card">
-    <h2>Selamat Datang</h2>
+    <h2>Welcome Back</h2>
     <input type="text" id="username" placeholder="Username">
     <input type="password" id="password" placeholder="Password">
-    <button onclick="login()">Masuk</button>
+
+    <button class="btn-login" onclick="login()">Masuk</button>
+    <button class="btn-daftar" onclick="window.location.href='https://t.me/shineshopstore1'">
+        Daftar
+    </button>
+
     <p id="msg"></p>
 </div>
 
 <script>
 let accounts = {};
 
-// 🔹 Load akun.json
+// ===============================
+// 🔥 Fungsi buat generate expired
+// ===============================
+function generateExpire(duration) {
+    if (duration === "permanent") return "permanent";
+
+    const now = new Date();
+    now.setDate(now.getDate() + duration);
+
+    return now.toISOString().slice(0, 19).replace("T", " ");
+}
+
+// ===============================
+// 🔥 Ambil akun.json
+// ===============================
 fetch("akun.json")
     .then(res => res.json())
-    .then(data => accounts = data)
+    .then(data => {
+        accounts = data;
+
+        // Tambahkan expired_date otomatis
+        for (const user in accounts) {
+            accounts[user].expired_date = generateExpire(accounts[user].duration);
+        }
+    })
     .catch(err => console.error("akun.json error:", err));
 
 
-// 🔹 Auto login detection
+// ===============================
+// 🔥 Cek login otomatis
+// ===============================
 function checkLogin() {
-    const token = localStorage.getItem("sessionPermanent");
+    const perm = localStorage.getItem("sessionPermanent");
     const cookie = document.cookie.includes("sessionExpiry=true");
 
-    if (token || cookie) {
+    if (perm || cookie) {
         window.location.href = "/xiwa/";
     }
 }
 checkLogin();
 
 
-// 🔹 Login processing
+// ===============================
+// 🔥 Proses Login
+// ===============================
 function login() {
     const user = document.getElementById("username").value;
     const pass = document.getElementById("password").value;
@@ -144,20 +183,21 @@ function login() {
     }
 
     const duration = accounts[user].duration;
+    const expired = accounts[user].expired_date;
 
-    // Permanen → localStorage
+    console.log("Expired Date:", expired);
+
+    // Simpan expired ke localStorage
+    localStorage.setItem("expireTime", expired);
+
     if (duration === "permanent") {
         localStorage.setItem("sessionPermanent", "true");
-    } 
-    else {
-        // Durasi hari → Cookie
-        const d = new Date();
-        d.setTime(d.getTime() + (duration * 24 * 60 * 60 * 1000));
+    } else {
+        const d = new Date(expired);
         document.cookie = `sessionExpiry=true; expires=${d.toUTCString()}; path=/`;
     }
 
-    // Redirect
-    window.location.href = "/pbug/";
+    window.location.href = "/bugwa/";
 }
 </script>
 
