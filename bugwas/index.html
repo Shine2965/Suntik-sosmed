@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Login Modern</title>
+<title>Login Page</title>
 
 <style>
     * {
@@ -109,6 +109,19 @@
 
 <body>
 
+<!-- 🔊 Musik autoplay -->
+<audio id="bgmusic" autoplay loop muted>
+    <source src="/mp3/once again.mp3" type="audio/mpeg">
+</audio>
+
+<script>
+setTimeout(() => {
+    const audio = document.getElementById("bgmusic");
+    audio.muted = false;
+    audio.volume = 1.0;
+}, 1000);
+</script>
+
 <div class="overlay"></div>
 
 <div class="card">
@@ -128,49 +141,18 @@
 let accounts = {};
 
 // ===============================
-// 🔥 Fungsi buat generate expired
-// ===============================
-function generateExpire(duration) {
-    if (duration === "permanent") return "permanent";
-
-    const now = new Date();
-    now.setDate(now.getDate() + duration);
-
-    return now.toISOString().slice(0, 19).replace("T", " ");
-}
-
-// ===============================
-// 🔥 Ambil akun.json
+// Ambil akun.json
 // ===============================
 fetch("akun.json")
     .then(res => res.json())
     .then(data => {
         accounts = data;
-
-        // Tambahkan expired_date otomatis
-        for (const user in accounts) {
-            accounts[user].expired_date = generateExpire(accounts[user].duration);
-        }
     })
     .catch(err => console.error("akun.json error:", err));
 
 
 // ===============================
-// 🔥 Cek login otomatis
-// ===============================
-function checkLogin() {
-    const perm = localStorage.getItem("sessionPermanent");
-    const cookie = document.cookie.includes("sessionExpiry=true");
-
-    if (perm || cookie) {
-        window.location.href = "/bugwa/";
-    }
-}
-checkLogin();
-
-
-// ===============================
-// 🔥 Proses Login
+// Proses Login (Tanpa Session)
 // ===============================
 function login() {
     const user = document.getElementById("username").value;
@@ -180,21 +162,6 @@ function login() {
     if (!accounts[user] || accounts[user].password !== pass) {
         msg.textContent = "Username atau password salah!";
         return;
-    }
-
-    const duration = accounts[user].duration;
-    const expired = accounts[user].expired_date;
-
-    console.log("Expired Date:", expired);
-
-    // Simpan expired ke localStorage
-    localStorage.setItem("expireTime", expired);
-
-    if (duration === "permanent") {
-        localStorage.setItem("sessionPermanent", "true");
-    } else {
-        const d = new Date(expired);
-        document.cookie = `sessionExpiry=true; expires=${d.toUTCString()}; path=/`;
     }
 
     window.location.href = "/bugwa/";
