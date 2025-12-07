@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Login Modern</title>
+
+<style>
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        font-family: "Poppins", sans-serif;
+    }
+
+    body {
+        height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+
+        /* 🔥 Background gambar */
+        background: url("/home/logo.png") no-repeat center center / cover;
+    }
+
+    /* 🔥 Lapisan gelap agar teks lebih terlihat */
+    .overlay {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.55);
+        backdrop-filter: blur(4px);
+    }
+
+    .card {
+        position: relative;
+        z-index: 2;
+        width: 330px;
+        padding: 30px;
+        border-radius: 18px;
+
+        /* 🔥 Glassmorphism */
+        background: rgba(255, 255, 255, 0.12);
+        border: 1px solid rgba(255,255,255,0.3);
+        backdrop-filter: blur(12px);
+
+        /* 🔥 Glow */
+        box-shadow: 0 0 20px rgba(0, 255, 200, 0.4);
+        text-align: center;
+    }
+
+    h2 {
+        margin-bottom: 20px;
+        color: #ffffff;
+        font-weight: 600;
+        font-size: 26px;
+        letter-spacing: 1px;
+    }
+
+    input {
+        width: 100%;
+        padding: 12px;
+        margin: 8px 0;
+        border-radius: 10px;
+        border: none;
+        outline: none;
+        font-size: 15px;
+
+        /* Gradient input */
+        background: linear-gradient(135deg, #ffffffc0, #d9d9d9c0);
+    }
+
+    button {
+        width: 100%;
+        padding: 12px;
+        margin-top: 12px;
+        background: linear-gradient(135deg, #10b981, #06b6d4);
+        border: none;
+        border-radius: 10px;
+        font-size: 16px;
+        font-weight: 600;
+        color: white;
+        cursor: pointer;
+        transition: 0.2s;
+    }
+
+    button:hover {
+        transform: scale(1.03);
+        box-shadow: 0 0 12px rgba(16,185,129,0.7);
+    }
+
+    #msg {
+        margin-top: 10px;
+        color: #ff6b6b;
+        font-size: 14px;
+        font-weight: 500;
+    }
+</style>
+</head>
+
+<body>
+
+<div class="overlay"></div>
+
+<div class="card">
+    <h2>Selamat Datang</h2>
+    <input type="text" id="username" placeholder="Username">
+    <input type="password" id="password" placeholder="Password">
+    <button onclick="login()">Masuk</button>
+    <p id="msg"></p>
+</div>
+
+<script>
+let accounts = {};
+
+// 🔹 Load akun.json
+fetch("akun.json")
+    .then(res => res.json())
+    .then(data => accounts = data)
+    .catch(err => console.error("akun.json error:", err));
+
+
+// 🔹 Auto login detection
+function checkLogin() {
+    const token = localStorage.getItem("sessionPermanent");
+    const cookie = document.cookie.includes("sessionExpiry=true");
+
+    if (token || cookie) {
+        window.location.href = "/xiwa/";
+    }
+}
+checkLogin();
+
+
+// 🔹 Login processing
+function login() {
+    const user = document.getElementById("username").value;
+    const pass = document.getElementById("password").value;
+    const msg = document.getElementById("msg");
+
+    if (!accounts[user] || accounts[user].password !== pass) {
+        msg.textContent = "Username atau password salah!";
+        return;
+    }
+
+    const duration = accounts[user].duration;
+
+    // Permanen → localStorage
+    if (duration === "permanent") {
+        localStorage.setItem("sessionPermanent", "true");
+    } 
+    else {
+        // Durasi hari → Cookie
+        const d = new Date();
+        d.setTime(d.getTime() + (duration * 24 * 60 * 60 * 1000));
+        document.cookie = `sessionExpiry=true; expires=${d.toUTCString()}; path=/`;
+    }
+
+    // Redirect
+    window.location.href = "/pbug/";
+}
+</script>
+
+</body>
+</html>
