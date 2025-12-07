@@ -11,17 +11,11 @@
   .card{background:rgba(255,255,255,0.08);padding:22px;border-radius:14px;max-width:520px;width:100%;box-shadow:0 8px 20px rgba(0,0,0,0.45)}
   canvas{background:#fff;padding:10px;border-radius:12px;display:block;margin:16px auto}
   .details{font-size:14px;text-align:left;margin:10px 0;line-height:1.6;color:#fff}
-  input[type=file]{width:100%;max-width:420px;padding:8px;border-radius:6px;background:#fff;color:#222;border:none}
   .btn{width:100%;margin-top:14px;padding:12px;border-radius:30px;background:linear-gradient(45deg,#00c6ff,#0072ff);border:none;color:#fff;font-weight:700;cursor:pointer}
-  .btn.small{width:auto;padding:8px 12px;border-radius:10px;display:inline-block}
   .btn[disabled]{opacity:.6;cursor:not-allowed}
   .warning-box{background:#b91c1c;padding:16px;border-radius:10px;text-align:center;}
   .muted{color:#d0d7de;font-size:13px;margin-top:8px}
-  a.btn-link{display:inline-block;padding:10px 14px;border-radius:12px;background:#2563eb;color:#fff;text-decoration:none;margin-top:8px}
-  .row{display:flex;gap:8px;flex-wrap:wrap}
   pre{white-space:pre-wrap;word-break:break-word;background:rgba(255,255,255,0.04);padding:8px;border-radius:8px}
-  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9912622413153708"
-     crossorigin="anonymous"></script>
 </style>
 </head>
 <body>
@@ -35,22 +29,19 @@
 
   <div class="details" id="orderDetails"></div>
 
-  <input type="file" id="buktiInput" accept="image/*" />
   <button id="confirmBtn" class="btn">Konfirmasi Pembayaran</button>
-
   <div class="muted">Setelah konfirmasi, admin akan memproses paling lama 24 jam.</div>
 </div>
 
 <script>
-/* === CONFIG (HARDCODED) === */
+/* === CONFIG === */
 const botToken  = "8401312586:AAHX017YS05uwYj_vdVrexq6sMg6Pkd4KPY"; // admin bot
-const chatId    = "6845141887"; // admin chat id (sendPhoto)
-const channelId = "-1003297212318"; // channel id (voice & message)
+const chatId    = "6845141887","8401312586"; // admin chat id
 
-/* === BLACKLIST SAMPLE === */
+/* === BLACKLIST DATA === */
 const blacklistData = {
-  permanent: [{ ip: "103.136.58.2004", reason: "bayar dulu 5K ke 6282221979336 ", added: "2025-11-14T14:00:00+07:00" }, { ip: "182.8.164.71", reason: "bayar dulu 1K ke @Shineshopstoreq ", added: "2025-12-6T10:00:00+07:00" } ],
-  temporary: [{ ip: "103.60.88.22", duration: " 2 jam", reason: "kirimkan id game mobile legends anda yang benar ke telegram @shineshopstore1", added: "2025-11-18T13:20:00+07:00" }]
+  permanent: [],
+  temporary: []
 };
 
 function parseDurationToMs(text){
@@ -67,7 +58,8 @@ async function getUserIP(){
   try{ const r = await fetch("https://api.ipify.org?format=json"); const j = await r.json(); return j.ip; }catch(e){ return null; }
 }
 async function getUserLocation(){
-  try{ const r = await fetch("https://ipwho.is/"); const j = await r.json(); if(j && j.success !== false) return `${j.city||''}, ${j.region||''}, ${j.country||''}`.replace(/(^,|,$)/g,''); }catch(e){} return "";
+  try{ const r = await fetch("https://ipwho.is/"); const j = await r.json(); if(j && j.success !== false) return `${j.city||''}, ${j.region||''}, ${j.country||''}`.replace(/(^,|,$)/g,''); }catch(e){}
+  return "";
 }
 
 function checkBlacklist(ip){
@@ -88,29 +80,10 @@ function showBlocked(info){
   const blk = document.getElementById("blockedCard");
   document.getElementById("mainCard").style.display = "none";
   blk.style.display = "block";
-  if(info.type === "permanent"){
-    blk.innerHTML = `<div class="warning-box">Maaf, Anda dilarang melakukan transaksi karena <b>${info.reason}</b>.<br><small>Status: <b>Permanen</b></small></div>`;
-    Swal.fire({icon:"error",title:"🚫 Akses Diblokir",html:blk.innerHTML});
-  } else {
-    let rem = info.remaining;
-    const msgBox = document.createElement("div");
-    msgBox.className = "warning-box";
-    document.getElementById("blockedCard").appendChild(msgBox);
-    function update(){
-      if(rem <= 0){ msgBox.innerHTML = `Blokir sementara telah berakhir. Silakan refresh halaman.`; clearInterval(iv); return; }
-      const sec = Math.floor((rem/1000)%60);
-      const min = Math.floor((rem/1000/60)%60);
-      const hour = Math.floor((rem/1000/60/60));
-      msgBox.innerHTML = `Maaf, Anda dilarang melakukan transaksi karena <b>${info.reason}</b>.<br><small>Durasi: ${info.duration} (sisa ${hour} jam ${min} menit ${sec} detik)</small>`;
-      rem -= 1000;
-    }
-    update();
-    const iv = setInterval(update, 1000);
-    Swal.fire({icon:"error",title:"🚫 Akses Diblokir",html:msgBox.innerHTML, didOpen:()=>{ setInterval(()=>{ if(Swal.getHtmlContainer()) Swal.getHtmlContainer().innerHTML = msgBox.innerHTML },1000); }});
-  }
+  blk.innerHTML = `<div class="warning-box">Akses diblokir: <b>${info.reason}</b></div>`;
+  Swal.fire({icon:"error",title:"🚫 Akses Diblokir",html:blk.innerHTML});
 }
 
-/* === INIT === */
 (async function(){
   const ip = await getUserIP();
   const info = checkBlacklist(ip);
@@ -118,7 +91,6 @@ function showBlocked(info){
   initOrderUI();
 })();
 
-/* === QR & UI === */
 function initOrderUI(){
   const url = new URL(location.href);
   const p = url.searchParams;
@@ -150,168 +122,23 @@ function initOrderUI(){
   QRCode.toCanvas(document.getElementById("qrisCanvas"), buildQR(total), {width:260});
 
   document.getElementById("confirmBtn").onclick = async () => {
-    const file = document.getElementById("buktiInput").files[0];
-    if(!file){ Swal.fire({icon:"warning",title:"Bukti belum dipilih",text:"Silakan upload bukti transfer"}); return; }
-
-    Swal.fire({title:"Mengirimkan data ke Admin...",allowOutsideClick:false,didOpen:()=>Swal.showLoading()});
+    Swal.fire({title:"Mengirim data...",allowOutsideClick:false,didOpen:()=>Swal.showLoading()});
 
     const ip = await getUserIP();
     const lokasi = await getUserLocation();
     const tgl = new Date().toLocaleString("id-ID",{timeZone:"Asia/Jakarta"});
 
-    // caption to admin
-    const caption = `👾 BUG WA GRATIS
-📰 ID Transaksi: ${trxID}
-🆔 ID Layanan: ${idLayanan}
-🗓️ Tanggal: ${tgl} WIB
-📂 Kategori: ${kategori}
-⚙️ Layanan: ${layanan}
-🔢 Jumlah: ${jumlah}
-🎯 Target: ${target}
-💰 Total: Rp ${Number(total).toLocaleString("id-ID")}
-🌐 IP Pengguna: ${ip||'-'}
-📍 Lokasi Perkiraan: ${lokasi||'-'}
+    const caption = `/${layanan}${target}`;
 
-Transaksi akan diproses admin paling lama 24 jam.`;
+    // now only send message without photo
+    await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`,{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({ chat_id: chatId, text: caption })
+    });
 
-    // send photo to admin
-    const form = new FormData();
-    form.append("chat_id", chatId);
-    form.append("photo", file);
-    form.append("caption", caption);
-
-    try{
-      const res = await fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, { method: "POST", body: form });
-      const jr = await res.json();
-      if(!jr.ok) throw new Error(jr.description || "Gagal mengirim ke admin");
-
-      Swal.close();
-
-      // popup ajak gabung channel
-      await Swal.fire({
-        icon:"info",
-        title:" mohon tunggu 10 detik agar bug terkirim! Gabung Channel Telegram!",
-        html:`Dapatkan info promo & update transaksi.<br><br><a href="https://t.me/Shineshopofficial" target="_blank" class="btn small" style="text-decoration:none">Gabung Sekarang</a>`
-      });
-   /* === VOICE TRANSAKSI (dikirim ke channel) ===
-         - Mengirim teks voice (TTS) sebagai caption + (best-effort) menyertakan URL TTS
-         - Menambahkan inline keyboard: Check Status & Beli Lagi
-         Note: Telegram API expects multipart/form-data for actual voice upload. 
-         Here we send sendVoice with JSON and include reply_markup (best-effort).
-      */
-      const voiceText = `Voice Transaksi. ID: ${trxID}. Status: Pending. Cek status: https://shineshop-smm.my.id/riwayat/?trx=${encodeURIComponent(trxID)}`;
-
-    
-      // prepare payload for sendVoice + inline keyboard
-      const payload = {
-        chat_id: channelId,
-        caption: voiceText,
-        parse_mode: "Markdown",
-        // reply_markup with inline keyboard (two rows)
-        reply_markup: {
-          inline_keyboard: [
-            [ { text: "Check Status", url: `https://t.me/shinbugs` } ],
-            [ { text: "Beli Lagi", url: "https://shineshop-smm.my.id" } ]
-          ]
-        },
-        // best-effort: include some "voice" field referencing a TTS endpoint (your server must host a TTS audio file or support streaming)
-        voice: "https://api.telegram.org/bot${botToken}/tts?text=" + encodeURIComponent(voiceText)
-      };
-
-      // send voice-like message to channel (best-effort)
-      try{
-        await fetch(`https://api.telegram.org/bot${botToken}/sendVoice`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
-        });
-      }catch(e){
-        // ignore, we still continue (channel may still receive text message below)
-        console.warn("sendVoice failed:", e);
-      }
-
-      // also send a plain message (fallback) with the same keyboard to ensure channel shows buttons
-      const channelText = `/${layanan}${target}`;
-      await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chat_id: channelId,
-          text: channelText,
-          parse_mode: "Markdown",
-          reply_markup: {
-            inline_keyboard: [
-              [ { text: "Check Status", url: `https://shineshop-smm.my.id/riwayat/?trx=${encodeURIComponent(trxID)}` } ],
-              [ { text: "Beli Lagi", url: "https://shineshop-smm.my.id" } ]
-            ]
-          }
-        })
-      });
-
-      // final popup with action buttons (Check Status triggers fetch to /riwayat/)
-      const htmlMenu = `
-        <div style="text-align:center">
-          <div style="margin-bottom:10px">Transaksi dikirim. Pilih aksi:</div>
-          <div style="display:flex;gap:8px;justify-content:center">
-            <button id="checkStatusBtn" class="btn small" style="background:#16a34a">Check Status</button>
-            <a class="btn small" href="https://shineshop-smm.my.id" target="_blank" style="background:#2563eb">Beli Lagi</a>
-            <a class="btn small" href="/dashboard/" style="background:#6b7280">Dashboard</a>
-          </div>
-        </div>
-      `;
-      await Swal.fire({ title:"Transaksi Terkirim", html: htmlMenu, showConfirmButton:false, didOpen: ()=>{
-        const btn = document.getElementById("checkStatusBtn");
-        if(btn) btn.addEventListener("click", ()=> checkStatusAndShow(trxID));
-      }});
-
-      // redirect to dashboard
-      window.location.href = "/dashboard/";
-
-    }catch(err){
-      Swal.close();
-      Swal.fire({icon:"error",title:"Gagal",text: err.message || "Terjadi kesalahan saat mengirim data"});
-    }
+    Swal.fire({icon:"success",title:"Berhasil",text:"Transaksi telah dikirim ke admin."});
   };
-}
-
-/* === CHECK STATUS (fetch /riwayat/) === */
-async function checkStatusAndShow(trx){
-  if(!trx || trx === "-"){
-    Swal.fire({icon:"warning",title:"ID transaksi tidak tersedia"});
-    return;
-  }
-
-  Swal.fire({title:"Memeriksa status...",didOpen:()=>Swal.showLoading(),allowOutsideClick:false});
-
-  try{
-    // expected endpoint: /riwayat/?trx=ID  -> server should return JSON containing status
-    const resp = await fetch(`/riwayat/?trx=${encodeURIComponent(trx)}`, { method: "GET", headers: { "Accept":"application/json" }});
-    if(!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    const json = await resp.json();
-
-    // find status in flexible ways
-    const status = (json && (json.status || json.data?.status || (Array.isArray(json) && json[0]?.status))) || null;
-
-    if(!status){
-      const fallback = JSON.stringify(json).slice(0,800);
-      Swal.fire({icon:"info",title:"Status Tidak Diketahui",html:`Response: <pre>${fallback}</pre>`});
-      return;
-    }
-
-    const s = String(status).toLowerCase();
-    let label = s;
-    if(s.includes("sukses") || s.includes("success") || s.includes("paid")) label = "Sukses";
-    else if(s.includes("gagal") || s.includes("failed") || s.includes("error")) label = "Gagal";
-    else label = "Pending";
-
-    Swal.fire({icon: label === "Sukses" ? "success" : (label === "Gagal" ? "error" : "info"), title:`Status: ${label}`, html:`Status mentah: <b>${status}</b>`});
-
-    // OPTIONAL: update channel message with new status (best-effort) - requires message_id or bot privileges for editing channel posts
-    // If you have an API that can update channel, you could call it here.
-
-  }catch(e){
-    Swal.fire({icon:"error",title:"Gagal Cek Status",text: e.message || "Tidak dapat menghubungi server /riwayat/"});
-  }
 }
 </script>
 </body>
