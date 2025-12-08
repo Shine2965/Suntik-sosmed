@@ -60,11 +60,9 @@
     "Bug wa Android": [
       { id: "0001", name: " Forsc ", pricePerFollower: 0, min: 1, max: 1, desc: "Freeze UI + Delay\n Layanan Gratis JANGAN PROTES JIKA TIDAK WORK" },
       { id: "0002", name: "Buldozer", pricePerFollower: 0, min: 1, max: 1, desc: "DELAY+SEDOT KUOTA\n Layanan Gratis JANGAN PROTES JIKA TIDAK WORK" },
-      { id: "0003", name: "Xdocu", pricePerFollower: 0, min: 1, desc: "DELAY HARD+CRASH" }
-    ],
-    "Script Bug Via WhatsApp": [
-      { id: "0004", name: "Shinbugs V1.5 enc", pricePerFollower: 5000, min: 1, max: 1, desc: "KIRIMKAN GMAIL UNTUK DIKIRIMKAN FILE" },
-      { id: "0005", name: "Shinbugs V2.0 NO ENC", pricePerFollower: 30000, min: 1, max: 1, desc: "KIRIMKAN GMAIL UNTUK DIKIRIMKAN FILE" }
+      { id: "0003", name: "Xdocu", pricePerFollower: 200, min: 1, desc: "DELAY HARD+CRASH" }, 
+       { id: "0004", name: "Sanjiva", pricePerFollower: 0, min: 1, desc: "DELAY Maker + INVISIBLE BUG" }
+
     ]
   };
 
