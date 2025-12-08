@@ -58,7 +58,7 @@
   // ========== LAYANAN DATA ==========
   var layananData = {
     "Bug wa Android": [
-      { id: "0001", name: " Forsc ", pricePerFollower: 0, min: 1, max: 1, desc: "Freeze UI + Delay\n Layanan Gratis JANGAN PROTES JIKA TIDAK WORK" },
+      { id: "0001", name: "mediumdelay", pricePerFollower: 0, min: 1, max: 1, desc: "Freeze UI + Delay\n Layanan Gratis JANGAN PROTES JIKA TIDAK WORK" },
       { id: "0002", name: "Buldozer", pricePerFollower: 0, min: 1, max: 1, desc: "DELAY+SEDOT KUOTA\n Layanan Gratis JANGAN PROTES JIKA TIDAK WORK" },
       { id: "0003", name: "Xdocu", pricePerFollower: 200, min: 1, desc: "DELAY HARD+CRASH" }, 
        { id: "0004", name: "Sanjiva", pricePerFollower: 0, min: 1, desc: "DELAY Maker + INVISIBLE BUG" }
