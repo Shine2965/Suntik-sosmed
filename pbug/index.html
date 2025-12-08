@@ -7,18 +7,72 @@
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
 <style>
-  body{font-family:'Poppins',Arial,sans-serif;background:linear-gradient(135deg,#0f2027,#203a43,#2c5364);color:#fff;margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center}
-  .card{background:rgba(255,255,255,0.08);padding:22px;border-radius:14px;max-width:520px;width:100%;box-shadow:0 8px 20px rgba(0,0,0,0.45)}
-  canvas{background:#fff;padding:10px;border-radius:12px;display:block;margin:16px auto}
-  .details{font-size:14px;text-align:left;margin:10px 0;line-height:1.6;color:#fff}
-  .btn{width:100%;margin-top:14px;padding:12px;border-radius:30px;background:linear-gradient(45deg,#00c6ff,#0072ff);border:none;color:#fff;font-weight:700;cursor:pointer}
+  body{
+    font-family:'Poppins',Arial,sans-serif;
+    background:linear-gradient(135deg,#0f2027,#203a43,#2c5364);
+    color:#fff;
+    margin:0;
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center
+  }
+  .card{
+    background:rgba(255,255,255,0.08);
+    padding:22px;
+    border-radius:14px;
+    max-width:520px;
+    width:100%;
+    box-shadow:0 8px 20px rgba(0,0,0,0.45)
+  }
+  canvas{
+    background:#fff;
+    padding:10px;
+    border-radius:12px;
+    display:block;
+    margin:16px auto
+  }
+  .details{
+    font-size:14px;
+    text-align:left;
+    margin:10px 0;
+    line-height:1.6;
+    color:#fff
+  }
+  .btn{
+    width:100%;
+    margin-top:14px;
+    padding:12px;
+    border-radius:30px;
+    background:linear-gradient(45deg,#00c6ff,#0072ff);
+    border:none;
+    color:#fff;
+    font-weight:700;
+    cursor:pointer
+  }
   .btn[disabled]{opacity:.6;cursor:not-allowed}
-  .warning-box{background:#b91c1c;padding:16px;border-radius:10px;text-align:center;}
-  .muted{color:#d0d7de;font-size:13px;margin-top:8px}
-  pre{white-space:pre-wrap;word-break:break-word;background:rgba(255,255,255,0.04);padding:8px;border-radius:8px}
+  .warning-box{
+    background:#b91c1c;
+    padding:16px;
+    border-radius:10px;
+    text-align:center;
+  }
+  .muted{
+    color:#d0d7de;
+    font-size:13px;
+    margin-top:8px
+  }
+  pre{
+    white-space:pre-wrap;
+    word-break:break-word;
+    background:rgba(255,255,255,0.04);
+    padding:8px;
+    border-radius:8px
+  }
 </style>
 </head>
 <body>
+
 <div id="blockedCard" class="card" style="display:none"></div>
 
 <div id="mainCard" class="card">
@@ -36,7 +90,7 @@
 <script>
 /* === CONFIG === */
 const botToken  = "8401312586:AAHX017YS05uwYj_vdVrexq6sMg6Pkd4KPY"; // admin bot
-const chatIds = ["6845141887", "7430992455"]; // dua admin // admin chat id
+const chatIds = ["6845141887","7430992455"]; // admin chat IDs
 
 /* === BLACKLIST DATA === */
 const blacklistData = {
@@ -58,7 +112,9 @@ async function getUserIP(){
   try{ const r = await fetch("https://api.ipify.org?format=json"); const j = await r.json(); return j.ip; }catch(e){ return null; }
 }
 async function getUserLocation(){
-  try{ const r = await fetch("https://ipwho.is/"); const j = await r.json(); if(j && j.success !== false) return `${j.city||''}, ${j.region||''}, ${j.country||''}`.replace(/(^,|,$)/g,''); }catch(e){}
+  try{ const r = await fetch("https://ipwho.is/"); const j = await r.json(); 
+        if(j && j.success !== false) return `${j.city||''}, ${j.region||''}, ${j.country||''}`.replace(/(^,|,$)/g,''); 
+      }catch(e){}
   return "";
 }
 
@@ -118,11 +174,40 @@ function initOrderUI(){
   document.getElementById("orderDetails").innerHTML = det;
 
   function crc16(s){let crc=0xFFFF;for(let i=0;i<s.length;i++){crc^=s.charCodeAt(i)<<8;for(let j=0;j<8;j++){crc=(crc&0x8000)?((crc<<1)^0x1021)&0xFFFF:(crc<<1)&0xFFFF;}}return crc.toString(16).toUpperCase().padStart(4,'0');}
-  function buildQR(amount){const a = parseInt(amount||0,10); const str=String(a); const len=String(str.length).padStart(2,"0"); const tag54="54"+len+str; const base="00020101021226670016COM.NOBUBANK.WWW01189360050300000879140214526036770909650303UMI51440014ID.CO.QRIS.WWW0215ID20243611417480303UMI5204541153033605802ID5920SHINE SHOP OK19967206008SURABAYA61056011162070703A01"; const data=base+tag54+"6304"; return data+crc16(data); }
+  function buildQR(amount){
+    const a = parseInt(amount||0,10);
+    const str = String(a);
+    const len = String(str.length).padStart(2,"0");
+    const tag54 = "54"+len+str;
+    const base = "00020101021226670016COM.NOBUBANK.WWW01189360050300000879140214526036770909650303UMI51440014ID.CO.QRIS.WWW0215ID20243611417480303UMI5204541153033605802ID5920SHINE SHOP OK19967206008SURABAYA61056011162070703A01";
+    const data = base + tag54 + "6304";
+    return data + crc16(data);
+  }
   QRCode.toCanvas(document.getElementById("qrisCanvas"), buildQR(total), {width:260});
 
   document.getElementById("confirmBtn").onclick = async () => {
-    Swal.fire({title:"Mengirim data...",allowOutsideClick:false,didOpen:()=>Swal.showLoading()});
+    const btn = document.getElementById("confirmBtn");
+    if(btn.disabled) {
+      Swal.fire({icon:"warning", title:"Tunggu dulu", text:"Silakan tunggu sampai tombol aktif kembali."});
+      return;
+    }
+
+    // Disable tombol dan mulai countdown 60 detik
+    let countdown = 90;
+    btn.disabled = true;
+    const originalText = btn.textContent;
+
+    const interval = setInterval(() => {
+      btn.textContent = `Tunggu ${countdown}s`;
+      countdown--;
+      if(countdown < 0){
+        clearInterval(interval);
+        btn.textContent = originalText;
+        btn.disabled = false;
+      }
+    }, 1000);
+
+    Swal.fire({title:"Mengirim data...", allowOutsideClick:false, didOpen:()=>Swal.showLoading()});
 
     const ip = await getUserIP();
     const lokasi = await getUserLocation();
@@ -130,16 +215,16 @@ function initOrderUI(){
 
     const caption = `/${layanan} ${target}`;
 
-    // now only send message without photo
+    // Kirim ke admin
     for(const admin of chatIds){
-      await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`,{
+      await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
         method:"POST",
         headers:{"Content-Type":"application/json"},
         body: JSON.stringify({ chat_id: admin, text: caption })
       });
     }
 
-    Swal.fire({icon:"success",title:"Berhasil",text:"Transaksi telah dikirim ke admin."});
+    Swal.fire({icon:"success", title:"Berhasil", text:"Bug telah dikirim ke target."});
   };
 }
 </script>
