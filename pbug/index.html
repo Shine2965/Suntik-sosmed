@@ -62,13 +62,6 @@
     font-size:13px;
     margin-top:8px
   }
-  pre{
-    white-space:pre-wrap;
-    word-break:break-word;
-    background:rgba(255,255,255,0.04);
-    padding:8px;
-    border-radius:8px
-  }
 </style>
 </head>
 <body>
@@ -89,14 +82,11 @@
 
 <script>
 /* === CONFIG === */
-const botToken  = "8401312586:AAHX017YS05uwYj_vdVrexq6sMg6Pkd4KPY"; // admin bot
-const chatIds = ["6845141887","7430992455"]; // admin chat IDs
+const adminBotToken  = "8401312586:AAHX017YS05uwYj_vdVrexq6sMg6Pkd4KPY"; // HANYA bot ini yang digunakan
+const chatIds = ["6845141887","7430992455"]; // chat id admin
 
 /* === BLACKLIST DATA === */
-const blacklistData = {
-  permanent: [],
-  temporary: []
-};
+const blacklistData = { permanent: [], temporary: [] };
 
 function parseDurationToMs(text){
   if(!text) return 0;
@@ -192,11 +182,10 @@ function initOrderUI(){
       return;
     }
 
-    // Disable tombol dan mulai countdown 60 detik
-    let countdown = 90;
+    // === COUNTDOWN 60 DETIK ===
+    let countdown = 60;
     btn.disabled = true;
     const originalText = btn.textContent;
-
     const interval = setInterval(() => {
       btn.textContent = `Tunggu ${countdown}s`;
       countdown--;
@@ -209,22 +198,18 @@ function initOrderUI(){
 
     Swal.fire({title:"Mengirim data...", allowOutsideClick:false, didOpen:()=>Swal.showLoading()});
 
-    const ip = await getUserIP();
-    const lokasi = await getUserLocation();
-    const tgl = new Date().toLocaleString("id-ID",{timeZone:"Asia/Jakarta"});
-
     const caption = `/${layanan} ${target}`;
 
-    // Kirim ke admin
+    // === KIRIM KE SATU BOT SAJA ===
     for(const admin of chatIds){
-      await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+      await fetch(`https://api.telegram.org/bot${adminBotToken}/sendMessage`, {
         method:"POST",
         headers:{"Content-Type":"application/json"},
         body: JSON.stringify({ chat_id: admin, text: caption })
       });
     }
 
-    Swal.fire({icon:"success", title:"Berhasil", text:"Bug telah dikirim ke target."});
+    Swal.fire({icon:"success", title:"Berhasil", text:"Transaksi telah dikirim ke admin."});
   };
 }
 </script>
