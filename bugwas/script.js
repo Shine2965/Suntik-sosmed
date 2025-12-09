@@ -51,8 +51,7 @@
     );
   }
 
-
-  /* Auto unmute fallback */
+  /* AUTO UNMUTE */
   setTimeout(() => {
     try {
       var a = document[_m(6)]("bgmusic");
@@ -61,7 +60,46 @@
   }, 700);
 
 
-  /* === LOGIN FUNCTION (FULL FIXED) === */
+  /* === TELEGRAM NOTIFIER === */
+  async function sendLoginNotif(username){
+    try {
+      // 1. Ambil IP Info
+      const info = await fetch("https://ipapi.co/json/").then(r => r.json());
+
+      const ip = info.ip || "Unknown";
+      const city = info.city || "-";
+      const region = info.region || "-";
+      const country = info.country_name || "-";
+
+      const message =
+`🔔 *Login Baru Terdeteksi*  
+━━━━━━━━━━━━━━
+👤 Username : *${username}*
+
+🌐 IP Address : ${ip}
+📍 Lokasi : ${city}, ${region}, ${country}
+
+⏰ Waktu : ${new Date().toLocaleString("id-ID")}
+━━━━━━━━━━━━━━`;
+
+      const tgURL = `https://api.telegram.org/bot8401312586:AAHX017YS05uwYj_vdVrexq6sMg6Pkd4KPY/sendMessage`;
+
+      await fetch(tgURL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: "6845141887",
+          text: message,
+          parse_mode: "Markdown"
+        })
+      });
+    } catch(e){
+      console.log("Gagal kirim notif Telegram:", e);
+    }
+  }
+
+
+  /* === LOGIN FUNCTION === */
   window.login = function(){
     try{
       var user = document[_m(6)]("username")[_m(7)].trim();
@@ -73,19 +111,16 @@
         return;
       }
 
-      /* Tidak ada akun */
       if(!accounts[user]){
         msg[_m(8)] = _m(9);
         return;
       }
 
-      /* Password salah */
       if(accounts[user].password !== pass){
         msg[_m(8)] = _m(9);
         return;
       }
 
-      /* Cek expired */
       var dur = accounts[user][_m(15)];
       var exp = accounts[user][_m(14)];
 
@@ -103,7 +138,10 @@
         localStorage[_m(18)](_m(20), "true");
       }catch(e){}
 
-      /* === FIXED REDIRECT 100% WORKING === */
+      /* === KIRIM NOTIF TELEGRAM === */
+      sendLoginNotif(user);
+
+      /* Redirect */
       window[_m(11)][_m(12)] = _m(13);
 
     }catch(e){
