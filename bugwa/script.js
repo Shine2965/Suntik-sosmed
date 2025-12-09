@@ -151,7 +151,7 @@
 
   // MAINTENANCE flag (kept from original)
   try{
-    var isMaintenance = true;
+    var isMaintenance = false;
     if(isMaintenance) window.location.href = "/bugwa/maintenance.html";
   }catch(e){}
 
