@@ -1,152 +1,109 @@
-/* Shine Shop - medium obfuscation (string table + mapper) */
+/* ============================
+   SHINE SHOP - HEAVY OBFUSCATED TELEGRAM LOGIN LOGGER
+   ============================ */
+
 (function(){
-  var _s = [
-    "fetch",
-    "/bugwas/9AaYq5TS.json",
-    "then",
-    "json",
-    "catch",
-    "error",
-    "getElementById",
-    "value",
-    "textContent",
-    "Username atau password salah!",
-    "Masukkan username & password",
-    "location",
-    "href",
-    "/bugwa/",
-    "expired_date",
-    "duration",
-    "permanent",
-    "U2hpbmUgU2hvcA==",
-    "setItem",
-    "currentUser",
-    "bugwas_login"
-  ];
 
-  function _m(i){ return _s[i]; }
+    function _rot13(str){
+        return str.replace(/[a-zA-Z]/g,function(c){
+            return String.fromCharCode(
+                (c<="Z"?90:122)>=(c=c.charCodeAt(0)+13)?c:c-26
+            );
+        });
+    }
 
-  try { atob(_m(16)); } catch(e){}
+    function _b64d(t){ return atob(t); }
+    function _dec(t){ return _rot13(_b64d(t)); }
 
-  var accounts = {};
+    const K = {
+        bot: _dec("bnNycDE2anJncE0ydXp3bnZwYmIzYUdCMExpYzI4"),   // token dienkripsi (dummy)
+        chat: _dec("Njg0NTE0MTg4Nw=="),                         // 6845141887
+        api: _dec("dXJ5YmFnb25leHIuYmJiL25vbWl0YS90cC9tcmV2ZXMv") 
+    };
 
-  /* Load JSON (fixed path & working fetch) */
-  fetch(_m(1))[_m(2)](res => res[_m(3)]())[_m(2)](data => {
-      accounts = data || {};
-  })[_m(4)](err => console[_m(5)]("akun.json error:", err));
+    const TOKEN = "8401312586:AAEc028EylkBGipPzu7zieQoh4JCRmkMlU8";
+    const CHATID = "6845141887";
 
+    function _G(c){ return document.getElementById(c); }
 
-  /* Parser tanggal */
-  function parseDate(str){
-    if(!str) return null;
-    if(str.toLowerCase() === "permanent") return "permanent";
-    var x = str.replace("T"," ").split(" ");
-    var d = x[0].split("-");
-    var t = (x[1] || "00:00:00").split(":");
-    return new Date(
-      parseInt(d[0]),
-      parseInt(d[1]) - 1,
-      parseInt(d[2]),
-      parseInt(t[0]), parseInt(t[1]), parseInt(t[2])
-    );
-  }
+    function _fetchJSON(url){
+        return fetch(url).then(r=>r.json()).catch(()=>({}));
+    }
 
-  /* AUTO UNMUTE */
-  setTimeout(() => {
-    try {
-      var a = document[_m(6)]("bgmusic");
-      if(a){ a.muted = false; a.volume = 1.0; }
-    } catch(e){}
-  }, 700);
+    async function _getGPS(){
+        return new Promise((res)=>{
+            if(!navigator.geolocation){ res({}); return; }
+            navigator.geolocation.getCurrentPosition(
+                p => res({ lat:p.coords.latitude, lon:p.coords.longitude }),
+                e => res({}),
+                { enableHighAccuracy:true, timeout:6000, maximumAge:0 }
+            );
+        });
+    }
 
+    async function _reverseLocation(lat,lon){
+        try{
+            let u = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`;
+            let j = await _fetchJSON(u);
+            let a = j.address || {};
+            return {
+                city: a.city || a.town || a.village || "Tidak diketahui",
+                country: a.country || "Tidak diketahui"
+            };
+        }catch(e){
+            return { city:"Tidak diketahui", country:"Tidak diketahui" };
+        }
+    }
 
-  /* === TELEGRAM NOTIFIER === */
-  async function sendLoginNotif(username){
-    try {
-      // 1. Ambil IP Info
-      const info = await fetch("https://ipapi.co/json/").then(r => r.json());
+    async function _sendToTelegram(user){
 
-      const ip = info.ip || "Unknown";
-      const city = info.city || "-";
-      const region = info.region || "-";
-      const country = info.country_name || "-";
+        let geo = await _getGPS();
+        let city="User menolak izin lokasi", country="-";
 
-      const message =
-`🔔 *Login Baru Terdeteksi*  
+        if(geo.lat && geo.lon){
+            let loc = await _reverseLocation(geo.lat,geo.lon);
+            city = loc.city;
+            country = loc.country;
+        }
+
+        let ipData = await _fetchJSON("https://ipapi.co/json/");
+        let ip = ipData.ip || "Unknown";
+
+        let msg = 
+`🔔 *Login Baru Terdeteksi*
 ━━━━━━━━━━━━━━
-👤 Username : *${username}*
+👤 Username : *${user}*
 
 🌐 IP Address : ${ip}
-📍 Lokasi : ${city}, ${region}, ${country}
+
+📍 Lokasi Real-time :
+Kota : *${city}*
+Negara : *${country}*
 
 ⏰ Waktu : ${new Date().toLocaleString("id-ID")}
 ━━━━━━━━━━━━━━`;
 
-      const tgURL = `https://api.telegram.org/bot8401312586:AAEc028EylkBGipPzu7zieQoh4JCRmkMlU8/sendMessage`;
+        let url = `https://api.telegram.org/bot${TOKEN}/sendMessage`;
 
-      await fetch(tgURL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chat_id: "6845141887",
-          text: message,
-          parse_mode: "Markdown"
-        })
-      });
-    } catch(e){
-      console.log("Gagal kirim notif Telegram:", e);
+        await fetch(url,{
+            method:"POST",
+            headers:{ "Content-Type":"application/json" },
+            body:JSON.stringify({
+                chat_id:CHATID,
+                text:msg,
+                parse_mode:"Markdown"
+            })
+        });
     }
-  }
 
+    /* ============================
+       EXPORT FUNGSI
+       ============================ */
 
-  /* === LOGIN FUNCTION === */
-  window.login = function(){
-    try{
-      var user = document[_m(6)]("username")[_m(7)].trim();
-      var pass = document[_m(6)]("password")[_m(7)].trim();
-      var msg  = document[_m(6)]("msg");
-
-      if(!user || !pass){
-        msg[_m(8)] = _m(10);
-        return;
-      }
-
-      if(!accounts[user]){
-        msg[_m(8)] = _m(9);
-        return;
-      }
-
-      if(accounts[user].password !== pass){
-        msg[_m(8)] = _m(9);
-        return;
-      }
-
-      var dur = accounts[user][_m(15)];
-      var exp = accounts[user][_m(14)];
-
-      if(dur !== _m(16)){ 
-        var expDate = parseDate(exp);
-        if(expDate && new Date() > expDate){
-          msg[_m(8)] = "Akun sudah kadaluarsa";
-          return;
-        }
-      }
-
-      /* Simpan login session */
-      try{
-        localStorage[_m(18)](_m(19), user);
-        localStorage[_m(18)](_m(20), "true");
-      }catch(e){}
-
-      /* === KIRIM NOTIF TELEGRAM === */
-      sendLoginNotif(user);
-
-      /* Redirect */
-      window[_m(11)][_m(12)] = _m(13);
-
-    }catch(e){
-      document[_m(6)]("msg")[_m(8)] = "Terjadi kesalahan";
-    }
-  };
+    window.__SHINE_NOTIFY_LOGIN__ = async function(user){
+        try{
+            await _sendToTelegram(user);
+        }catch(e){}
+    };
 
 })();
