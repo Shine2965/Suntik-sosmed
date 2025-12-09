@@ -1,151 +1,134 @@
-/* Shine Shop - medium obfuscation (string table + mapper) */
-(function(){
-var _s = [
-"fetch",
-"/bugwas/9AaYq5TS.json",
-"then",
-"json",
-"catch",
-"error",
-"getElementById",
-"value",
-"textContent",
-"Username atau password salah!",
-"Masukkan username & password",
-"location",
-"href",
-"/bugwa/",
-"expired_date",
-"duration",
-"permanent",
-"U2hpbmUgU2hvcA==",
-"setItem",
-"currentUser",
-"bugwas_login",
+/* Shine Shop – High Encryption Obfuscation (safe for hosting) */
+(function (S, D) {
 
-"https://ipwho.is/",                // 21
-"https://api.telegram.org/bot",     // 22
-"/sendMessage",                     // 23
-"POST",                             // 24
-"Content-Type",                     // 25
-"application/json",                 // 26
-"chat_id",                          // 27
-"text",                             // 28
-"parse_mode"                        // 29
-];
+    function rot(a) { return a.replace(/[A-Za-z]/g, c => "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz".charAt(("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz".indexOf(c) + 13) % 52)); }
+    function dec(x) { return rot(atob(x)); }
 
-function _m(i){ return _s[i]; }
+    var T = {
+        A: dec("c3JlcGU="),
+        B: dec("bG9jYWw="),
+        C: dec("c3RvcmU="),
+        D: dec("dXNlcg=="),
+        E: dec("bXNn"),
+        F: dec("cGFzcz=="),
+        G: dec("b2tj"),
+        H: dec("ZXhw"),
+        I: dec("cGVybQ=="),
+        J: dec("c2Nzcw=="),
+        K: dec("ZGVk"),
+        L: dec("dXNlcg==")
+    };
 
-try { atob(_m(16)); } catch(e){}
+    /* SERVICE STRING (tidak dienkripsi sesuai permintaan) */
+    const URL_JSON = "/bugwas/9AaYq5TS.json";
+    const URL_IP   = "https://ipwho.is/";
+    const TG_API   = "https://api.telegram.org/bot8401312586:AAEc028EylkBGipPzu7zieQoh4JCRmkMlU8/sendMessage";
+    const TG_CHAT  = "6845141887";
 
-var accounts = {};
+    /* DECODE MAPPER */
+    function $(i) { return S[i]; }
 
-/* FIX: fetch JSON database user */
-fetch(_m(1))[_m(2)](res => res.json())[_m(2)](data => {
-    accounts = data || {};
-})[_m(4)](err => console.error("akun.json error:", err));
+    /* STRING TABLE ENCRYPTED */
+    var S = [
+        dec("cmVzdWx0"),                // 0 = result
+        dec("ZXJyb3I="),                // 1 = error
+        dec("anNvbg=="),                // 2 = json
+        dec("cGFyc2U="),                // 3 = parse
+        dec("cG9zdA=="),                // 4 = post
+        dec("bG9naW4="),                // 5 = login
+        dec("b2Jq"),                    // 6 = obj
+        dec("dXNlcg=="),                // 7 = user
+        dec("cGFzcw=="),                // 8 = pass
+        dec("aW52YWxpZA=="),            // 9 = invalid
+        dec("a2FkYWx1YXJzYQ=="),        // 10 = kadaluarsa
+        dec("dHJpbQ=="),                // 11 = trim
+        dec("c2Vzc2lvbg=="),            // 12 = session
+        dec("bG9jYWw="),                // 13 = local
+        dec("c2V0SXRlbQ=="),            // 14 = setItem
+        dec("Y3VycmVudFVzZXI="),        // 15 = currentUser
+        dec("YnVnd2FzX2xvZ2lu"),        // 16 = bugwas_login
+        dec("cmVkaXJlY3Q="),            // 17 = redirect
+        dec("L2J1Z3dhLw=="),            // 18 = /bugwa/
+        dec("ZGF0YQ=="),                // 19 = data
+        dec("bWVzc2FnZQ=="),            // 20 = message
+        dec("bG9naW4gdGVyYmFyeQ==")     // 21 = login terbaru
+    ];
 
-/* Parser tanggal */
-function parseDate(str){
-    if(!str) return null;
-    if(str.toLowerCase() === "permanent") return "permanent";
-    var x = str.replace("T"," ").split(" ");
-    var d = x[0].split("-");
-    var t = (x[1] || "00:00:00").split(":");
-    return new Date(
-        parseInt(d[0]),
-        parseInt(d[1]) - 1,
-        parseInt(d[2]),
-        parseInt(t[0]),
-        parseInt(t[1]),
-        parseInt(t[2])
-    );
-}
+    /* DATABASE USER */
+    var ACC = {};
 
-/* Telegram Sender */
-async function sendLoginLog(username){
-    try {
+    fetch(URL_JSON)
+        .then(r => r.json())
+        .then(j => ACC = j || {})
+        .catch(e => console[$(1)]("akun error:", e));
 
-        const ip = await fetch(_m(21));
-        const ipData = await ip.json();
-
-        const pesan =
-`Login terbaru: ${username}
-
-IP Address: ${ipData.ip}
-Lokasi: ${ipData.city}, ${ipData.region}, ${ipData.country}
-Device: ${navigator.userAgent}
-Waktu: ${new Date().toLocaleString("id-ID")}`;
-
-        await fetch(
-            _m(22) + "8401312586:AAEc028EylkBGipPzu7zieQoh4JCRmkMlU8" + _m(23),
-            {
-                method: _m(24),
-                headers: { [_m(25)]: _m(26) },
-                body: JSON.stringify({
-                    [_m(27)]: "6845141887",
-                    [_m(28)]: pesan,
-                    [_m(29)]: "HTML"
-                })
-            }
-        );
-
-    } catch(e){
-        console.error("Gagal kirim Telegram:", e);
+    /* DATE PARSER */
+    function P(x) {
+        if (!x) return null;
+        if (x.toLowerCase() === "permanent") return "permanent";
+        var s = x.split("T");
+        var d = s[0].split("-");
+        var t = (s[1] || "00:00:00").split(":");
+        return new Date(+d[0], d[1] - 1, +d[2], +t[0], +t[1], +t[2]);
     }
-}
 
-/* === LOGIN FUNCTION === */
-window.login = async function(){
-try{
+    /* TELEGRAM LOGGER */
+    async function L(u) {
+        try {
+            const a = await fetch(URL_IP);
+            const b = await a.json();
 
-    var user = document.getElementById("username")[_m(7)].trim();
-    var pass = document.getElementById("password")[_m(7)].trim();
-    var msg  = document.getElementById("msg");
+            const msg =
+                `Login terbaru: ${u}\n\nIP: ${b.ip}\nLokasi: ${b.city}, ${b.region}, ${b.country}\nUser-Agent: ${navigator.userAgent}\nWaktu: ${new Date().toLocaleString("id-ID")}`;
 
-    if(!user || !pass){  
-        msg[_m(8)] = _m(10);  
-        return;  
-    }  
-
-    if(!accounts[user]){  
-        msg[_m(8)] = _m(9);  
-        return;  
-    }  
-
-    if(accounts[user].password !== pass){  
-        msg[_m(8)] = _m(9);  
-        return;  
-    }  
-
-    /* Cek expired */
-    var dur = accounts[user][_m(15)];
-    var exp = accounts[user][_m(14)];
-
-    if(dur !== _m(16)){
-        var expDate = parseDate(exp);
-        if(expDate && new Date() > expDate){
-            msg[_m(8)] = "Akun sudah kadaluarsa";
-            return;
+            await fetch(TG_API, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    chat_id: TG_CHAT,
+                    text: msg,
+                    parse_mode: "HTML"
+                })
+            });
+        } catch (e) {
+            console.error("Telegram:", e);
         }
     }
 
-    /* Simpan session */
-    try{
-        localStorage[_m(18)](_m(19), user);
-        localStorage[_m(18)](_m(20), "true");
-    }catch(e){}
+    /* LOGIN */
+    window.login = async function () {
 
-    /* === Kirim Telegram setelah berhasil login === */
-    sendLoginLog(user);
+        var u = document.getElementById("username").value.trim();
+        var p = document.getElementById("password").value.trim();
+        var m = document.getElementById("msg");
 
-    /* Redirect */
-    window[_m(11)][_m(12)] = _m(13);
+        if (!u || !p) { m.textContent = "Masukkan username & password"; return; }
+        if (!ACC[u]) { m.textContent = "Username atau password salah!"; return; }
+        if (ACC[u].password !== p) { m.textContent = "Username atau password salah!"; return; }
 
-}catch(e){  
-    msg[_m(8)] = "Terjadi kesalahan";  
-}
+        /* EXP */
+        var dur = ACC[u].duration;
+        var exp = ACC[u].expired_date;
 
-};
+        if (dur !== "permanent") {
+            var e = P(exp);
+            if (e && new Date() > e) {
+                m.textContent = "Akun kadaluarsa";
+                return;
+            }
+        }
 
-})();
+        /* SAVE SESSION */
+        try {
+            localStorage.setItem("currentUser", u);
+            localStorage.setItem("bugwas_login", "true");
+        } catch (e) { }
+
+        /* TELEGRAM */
+        L(u);
+
+        /* REDIRECT */
+        window.location.href = "/bugwa/";
+    };
+
+})([], {});
