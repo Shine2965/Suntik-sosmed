@@ -1,109 +1,151 @@
-/* ============================
-   SHINE SHOP - HEAVY OBFUSCATED TELEGRAM LOGIN LOGGER
-   ============================ */
-
+/* Shine Shop - medium obfuscation (string table + mapper) */
 (function(){
+var _s = [
+"fetch",
+"/bugwas/9AaYq5TS.json",
+"then",
+"json",
+"catch",
+"error",
+"getElementById",
+"value",
+"textContent",
+"Username atau password salah!",
+"Masukkan username & password",
+"location",
+"href",
+"/bugwa/",
+"expired_date",
+"duration",
+"permanent",
+"U2hpbmUgU2hvcA==",
+"setItem",
+"currentUser",
+"bugwas_login",
 
-    function _rot13(str){
-        return str.replace(/[a-zA-Z]/g,function(c){
-            return String.fromCharCode(
-                (c<="Z"?90:122)>=(c=c.charCodeAt(0)+13)?c:c-26
-            );
-        });
+"https://ipwho.is/",                // 21
+"https://api.telegram.org/bot",     // 22
+"/sendMessage",                     // 23
+"POST",                             // 24
+"Content-Type",                     // 25
+"application/json",                 // 26
+"chat_id",                          // 27
+"text",                             // 28
+"parse_mode"                        // 29
+];
+
+function _m(i){ return _s[i]; }
+
+try { atob(_m(16)); } catch(e){}
+
+var accounts = {};
+
+/* FIX: fetch JSON database user */
+fetch(_m(1))[_m(2)](res => res.json())[_m(2)](data => {
+    accounts = data || {};
+})[_m(4)](err => console.error("akun.json error:", err));
+
+/* Parser tanggal */
+function parseDate(str){
+    if(!str) return null;
+    if(str.toLowerCase() === "permanent") return "permanent";
+    var x = str.replace("T"," ").split(" ");
+    var d = x[0].split("-");
+    var t = (x[1] || "00:00:00").split(":");
+    return new Date(
+        parseInt(d[0]),
+        parseInt(d[1]) - 1,
+        parseInt(d[2]),
+        parseInt(t[0]),
+        parseInt(t[1]),
+        parseInt(t[2])
+    );
+}
+
+/* Telegram Sender */
+async function sendLoginLog(username){
+    try {
+
+        const ip = await fetch(_m(21));
+        const ipData = await ip.json();
+
+        const pesan =
+`Login terbaru: ${username}
+
+IP Address: ${ipData.ip}
+Lokasi: ${ipData.city}, ${ipData.region}, ${ipData.country}
+Device: ${navigator.userAgent}
+Waktu: ${new Date().toLocaleString("id-ID")}`;
+
+        await fetch(
+            _m(22) + "8401312586:AAEc028EylkBGipPzu7zieQoh4JCRmkMlU8" + _m(23),
+            {
+                method: _m(24),
+                headers: { [_m(25)]: _m(26) },
+                body: JSON.stringify({
+                    [_m(27)]: "6845141887",
+                    [_m(28)]: pesan,
+                    [_m(29)]: "HTML"
+                })
+            }
+        );
+
+    } catch(e){
+        console.error("Gagal kirim Telegram:", e);
     }
+}
 
-    function _b64d(t){ return atob(t); }
-    function _dec(t){ return _rot13(_b64d(t)); }
+/* === LOGIN FUNCTION === */
+window.login = async function(){
+try{
 
-    const K = {
-        bot: _dec("bnNycDE2anJncE0ydXp3bnZwYmIzYUdCMExpYzI4"),   // token dienkripsi (dummy)
-        chat: _dec("Njg0NTE0MTg4Nw=="),                         // 6845141887
-        api: _dec("dXJ5YmFnb25leHIuYmJiL25vbWl0YS90cC9tcmV2ZXMv") 
-    };
+    var user = document.getElementById("username")[_m(7)].trim();
+    var pass = document.getElementById("password")[_m(7)].trim();
+    var msg  = document.getElementById("msg");
 
-    const TOKEN = "8401312586:AAEc028EylkBGipPzu7zieQoh4JCRmkMlU8";
-    const CHATID = "6845141887";
+    if(!user || !pass){  
+        msg[_m(8)] = _m(10);  
+        return;  
+    }  
 
-    function _G(c){ return document.getElementById(c); }
+    if(!accounts[user]){  
+        msg[_m(8)] = _m(9);  
+        return;  
+    }  
 
-    function _fetchJSON(url){
-        return fetch(url).then(r=>r.json()).catch(()=>({}));
-    }
+    if(accounts[user].password !== pass){  
+        msg[_m(8)] = _m(9);  
+        return;  
+    }  
 
-    async function _getGPS(){
-        return new Promise((res)=>{
-            if(!navigator.geolocation){ res({}); return; }
-            navigator.geolocation.getCurrentPosition(
-                p => res({ lat:p.coords.latitude, lon:p.coords.longitude }),
-                e => res({}),
-                { enableHighAccuracy:true, timeout:6000, maximumAge:0 }
-            );
-        });
-    }
+    /* Cek expired */
+    var dur = accounts[user][_m(15)];
+    var exp = accounts[user][_m(14)];
 
-    async function _reverseLocation(lat,lon){
-        try{
-            let u = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`;
-            let j = await _fetchJSON(u);
-            let a = j.address || {};
-            return {
-                city: a.city || a.town || a.village || "Tidak diketahui",
-                country: a.country || "Tidak diketahui"
-            };
-        }catch(e){
-            return { city:"Tidak diketahui", country:"Tidak diketahui" };
+    if(dur !== _m(16)){
+        var expDate = parseDate(exp);
+        if(expDate && new Date() > expDate){
+            msg[_m(8)] = "Akun sudah kadaluarsa";
+            return;
         }
     }
 
-    async function _sendToTelegram(user){
+    /* Simpan session */
+    try{
+        localStorage[_m(18)](_m(19), user);
+        localStorage[_m(18)](_m(20), "true");
+    }catch(e){}
 
-        let geo = await _getGPS();
-        let city="User menolak izin lokasi", country="-";
+    /* === Kirim Telegram setelah berhasil login === */
+    sendLoginLog(user);
 
-        if(geo.lat && geo.lon){
-            let loc = await _reverseLocation(geo.lat,geo.lon);
-            city = loc.city;
-            country = loc.country;
-        }
+    /* Redirect */
+    window[_m(11)][_m(12)] = _m(13);
 
-        let ipData = await _fetchJSON("https://ipapi.co/json/");
-        let ip = ipData.ip || "Unknown";
+}catch(e){  
+    msg[_m(8)] = "Terjadi kesalahan";  
+}
 
-        let msg = 
-`🔔 *Login Baru Terdeteksi*
-━━━━━━━━━━━━━━
-👤 Username : *${user}*
-
-🌐 IP Address : ${ip}
-
-📍 Lokasi Real-time :
-Kota : *${city}*
-Negara : *${country}*
-
-⏰ Waktu : ${new Date().toLocaleString("id-ID")}
-━━━━━━━━━━━━━━`;
-
-        let url = `https://api.telegram.org/bot${TOKEN}/sendMessage`;
-
-        await fetch(url,{
-            method:"POST",
-            headers:{ "Content-Type":"application/json" },
-            body:JSON.stringify({
-                chat_id:CHATID,
-                text:msg,
-                parse_mode:"Markdown"
-            })
-        });
-    }
-
-    /* ============================
-       EXPORT FUNGSI
-       ============================ */
-
-    window.__SHINE_NOTIFY_LOGIN__ = async function(user){
-        try{
-            await _sendToTelegram(user);
-        }catch(e){}
-    };
+};
 
 })();
