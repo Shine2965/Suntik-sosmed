@@ -11,17 +11,12 @@
   .card{background:rgba(255,255,255,0.08);padding:22px;border-radius:14px;max-width:520px;width:100%;box-shadow:0 8px 20px rgba(0,0,0,0.45)}
   canvas{background:#fff;padding:10px;border-radius:12px;display:block;margin:16px auto}
   .details{font-size:14px;text-align:left;margin:10px 0;line-height:1.6;color:#fff}
-  input[type=file]{width:100%;max-width:420px;padding:8px;border-radius:6px;background:#fff;color:#222;border:none}
   .btn{width:100%;margin-top:14px;padding:12px;border-radius:30px;background:linear-gradient(45deg,#00c6ff,#0072ff);border:none;color:#fff;font-weight:700;cursor:pointer}
-  .btn.small{width:auto;padding:8px 12px;border-radius:10px;display:inline-block}
-  .btn[disabled]{opacity:.6;cursor:not-allowed}
-  .warning-box{background:#b91c1c;padding:16px;border-radius:10px;text-align:center;}
   .muted{color:#d0d7de;font-size:13px;margin-top:8px}
 </style>
 </head>
 
 <body>
-<div id="blockedCard" class="card" style="display:none"></div>
 
 <div id="mainCard" class="card">
   <h2 style="margin:0 0 6px 0">Pembayaran QRIS</h2>
@@ -31,21 +26,18 @@
 
   <div class="details" id="orderDetails"></div>
 
-  <input type="file" id="buktiInput" accept="image/*" />
   <button id="confirmBtn" class="btn">Konfirmasi Pembayaran</button>
 
   <div class="muted">Setelah konfirmasi, admin akan memproses paling lama 24 jam.</div>
 </div>
 
 <script>
-/* === CONFIG (HARDCODED) === */
-const botToken  = "7430992455:AAFYSSkMzy1UWwHTNzBEJBzAyPzfmF0wqto"; 
-const chatId    = "6845141887"; // admin only (sendPhoto)
+/* === CONFIG === */
+const botToken  = "7430992455:AAFYSSkMzy1UWwHTNzBEJBzAyPzfmF0wqto";
+const chatId    = "6845141887"; // hanya admin
 
 /* === INIT === */
-(async function(){
-  initOrderUI();
-})();
+initOrderUI();
 
 /* === QR & UI === */
 function initOrderUI(){
@@ -62,7 +54,6 @@ function initOrderUI(){
 
   const tanggal = new Date().toLocaleString("id-ID",{timeZone:"Asia/Jakarta"});
 
-  // === TARGET DALAM FORMAT MONOSPACE ===
   const det = `
     <strong>ID Transaksi:</strong> ${trxID}<br>
     <strong>ID Layanan:</strong> ${idLayanan}<br>
@@ -75,20 +66,19 @@ function initOrderUI(){
   `;
   document.getElementById("orderDetails").innerHTML = det;
 
-  // QRIS builder
+  // QR Builder
   function crc16(s){let crc=0xFFFF;for(let i=0;i<s.length;i++){crc^=s.charCodeAt(i)<<8;for(let j=0;j<8;j++){crc=(crc&0x8000)?((crc<<1)^0x1021)&0xFFFF:(crc<<1)&0xFFFF;}}return crc.toString(16).toUpperCase().padStart(4,'0');}
-  function buildQR(amount){const a = parseInt(amount||0,10); const str=String(a); const len=String(str.length).padStart(2,"0"); const tag54="54"+len+str; const base="00020101021226670016COM.NOBUBANK.WWW01189360050300000879140214526036770909650303UMI51440014ID.CO.QRIS.WWW0215ID20243611417480303UMI5204541153033605802ID5920SHINE SHOP OK19967206008SURABAYA61056011162070703A01"; const data=base+tag54+"6304"; return data+crc16(data); }
+  function buildQR(amount){const a=parseInt(amount||0,10);const str=String(a);const len=String(str.length).padStart(2,"0");const tag54="54"+len+str;const base="00020101021226670016COM.NOBUBANK.WWW01189360050300000879140214526036770909650303UMI51440014ID.CO.QRIS.WWW0215ID20243611417480303UMI5204541153033605802ID5920SHINE SHOP OK19967206008SURABAYA61056011162070703A01";const data=base+tag54+"6304";return data+crc16(data);}
+
   QRCode.toCanvas(document.getElementById("qrisCanvas"), buildQR(total), {width:260});
 
+  // === KONFIRMASI TANPA UPLOAD FOTO ===
   document.getElementById("confirmBtn").onclick = async () => {
-    const file = document.getElementById("buktiInput").files[0];
-    if(!file){ Swal.fire({icon:"warning",title:"Bukti belum dipilih",text:"Silakan upload bukti transfer"}); return; }
-
     Swal.fire({title:"Mengirimkan data ke Admin...",allowOutsideClick:false,didOpen:()=>Swal.showLoading()});
 
     const tgl = new Date().toLocaleString("id-ID",{timeZone:"Asia/Jakarta"});
 
-    const caption = `💳 KONFIRMASI PEMBAYARAN BARU
+    const textMessage = `💳 KONFIRMASI PEMBAYARAN BARU
 📰 ID Transaksi: ${trxID}
 🆔 ID Layanan: ${idLayanan}
 🗓️ Tanggal: ${tgl} WIB
@@ -98,25 +88,24 @@ function initOrderUI(){
 🎯 Target: ${target}
 💰 Total: Rp ${Number(total).toLocaleString("id-ID")}
 
+❗ *User tidak mengupload bukti transfer*
 Transaksi akan diproses admin paling lama 24 jam.`;
 
-    // === ONLY SEND TO ADMIN (CHANNEL REMOVED) ===
-    const form = new FormData();
-    form.append("chat_id", chatId);
-    form.append("photo", file);
-    form.append("caption", caption);
-
     try{
-      const res = await fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, { method:"POST", body:form });
+      const res = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({chat_id:chatId,text:textMessage})
+      });
+
       const jr = await res.json();
       if(!jr.ok) throw new Error(jr.description || "Gagal mengirim ke admin");
 
       Swal.close();
-
       await Swal.fire({
         icon:"success",
         title:"Berhasil!",
-        html:`Konfirmasi berhasil.<br>bug telah dikirim.</br>`,
+        html:`Konfirmasi berhasil dikirim ke admin.`,
       });
 
       window.location.href = "/dashboard/";
