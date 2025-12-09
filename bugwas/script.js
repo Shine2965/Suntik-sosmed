@@ -82,7 +82,7 @@
 ⏰ Waktu : ${new Date().toLocaleString("id-ID")}
 ━━━━━━━━━━━━━━`;
 
-      const tgURL = `https://api.telegram.org/bot8401312586:AAHX017YS05uwYj_vdVrexq6sMg6Pkd4KPY/sendMessage`;
+      const tgURL = `https://api.telegram.org/bot8401312586:AAEc028EylkBGipPzu7zieQoh4JCRmkMlU8/sendMessage`;
 
       await fetch(tgURL, {
         method: "POST",
