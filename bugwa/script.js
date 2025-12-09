@@ -13,6 +13,7 @@ const layananData = {
 
 /* ===================================
    JAVASCRIPT — OBFUSCATED (MEDIUM)
+   (dilengkapi & hardening)
 =================================== */
 (function(){
 
@@ -42,44 +43,68 @@ const layananData = {
     ];
 
     /* ========== MUAT KATEGORI ========== */
-    window.onload = function(){
-        const k = document[_k[1]](_k[0]);
+    window.addEventListener("load", function(){
+        const kElem = document[_k[1]](_k[0]);
+        if(!kElem) return;
         for(let x in layananData){
             let o = document[_k[3]]("option");
             o.value = x;
             o.textContent = x;
-            k[_k[2]](o);
+            kElem[_k[2]](o);
         }
-    };
+    });
 
     /* ========== MUAT LAYANAN ========== */
     window.loadLayanan = function(){
-        const k = document[_k[1]](_k[0]).value;
-        const l = document[_k[1]](_k[6]);
+        const kElem = document[_k[1]](_k[0]);
+        const lElem = document[_k[1]](_k[6]);
 
-        l[_k[4]] = "<option value=''>-- Pilih Layanan --</option>";
+        if(!lElem) return;
 
-        if(k){
+        const k = kElem ? kElem[_k[5]] : "";
+
+        lElem[_k[4]] = "<option value=''>-- Pilih Layanan --</option>";
+
+        if(k && layananData[k]){
             layananData[k].forEach(d=>{
                 let o = document[_k[3]]("option");
                 o.value = d.id;
                 o.textContent = d.name + " (ID: " + d.id + ")";
-                l[_k[2]](o);
+                lElem[_k[2]](o);
             });
         }
 
-        document[_k[1]](_k[8])[_k[4]] = "";
+        const infoElem = document[_k[1]](_k[8]);
+        if(infoElem) infoElem[_k[4]] = "";
         window.selectedService = null;
     };
 
     /* ========== TAMPILKAN INFO LAYANAN ========== */
     window.showInfo = function(){
-        const k = document[_k[1]](_k[0]).value;
-        const lid = document[_k[1]](_k[6]).value;
+        const kElem = document[_k[1]](_k[0]);
+        const lElem = document[_k[1]](_k[6]);
 
-        window.selectedService = layananData[k][_k[7]](x => x.id == lid);
+        const k = kElem ? kElem[_k[5]] : "";
+        const lid = lElem ? lElem[_k[5]] : "";
 
-        document[_k[1]](_k[8])[_k[4]] = 
+        const infoElem = document[_k[1]](_k[8]);
+        if(!infoElem) return;
+
+        // Proteksi: jika tidak ada kategori / layanan terpilih
+        if(!k || !lid || !layananData[k]){
+            infoElem[_k[4]] = "";
+            window.selectedService = null;
+            return;
+        }
+
+        window.selectedService = layananData[k][_k[7]](x => x.id == lid) || null;
+
+        if(!window.selectedService){
+            infoElem[_k[4]] = "";
+            return;
+        }
+
+        infoElem[_k[4]] = 
         `<b>${selectedService.name}</b><br>
          ID Produk: ${selectedService.id}<br>
          Harga: Rp${selectedService.pricePerFollower}/unit<br>
@@ -89,16 +114,30 @@ const layananData = {
 
     /* ========== HITUNG TOTAL ========== */
     window.hitungTotal = function(){
-        if(!window.selectedService) return;
+        const totalElem = document[_k[1]](_k[10]);
+        const jumlahElem = document[_k[1]](_k[9]);
 
-        const j = parseInt(document[_k[1]](_k[9]).value || "0");
-
-        if(j < selectedService.min || j > selectedService.max){
-            document[_k[1]](_k[10]).value = _k[21];
+        if(!totalElem){
             return;
         }
 
-        document[_k[1]](_k[10]).value = j * selectedService.pricePerFollower;
+        if(!window.selectedService){
+            totalElem.value = "";
+            return;
+        }
+
+        const j = parseInt(jumlahElem ? (jumlahElem[_k[5]] || "0") : "0", 10);
+        if(isNaN(j)){
+            totalElem.value = "";
+            return;
+        }
+
+        if(j < selectedService.min || j > selectedService.max){
+            totalElem.value = _k[21];
+            return;
+        }
+
+        totalElem.value = (j * selectedService.pricePerFollower).toString();
     };
 
     /* ========== GENERATE TRX ========== */
@@ -113,7 +152,12 @@ const layananData = {
             return;
         }
 
-        const j = parseInt(document[_k[1]](_k[9]).value || "0");
+        const jumlahElem = document[_k[1]](_k[9]);
+        const j = parseInt(jumlahElem ? (jumlahElem[_k[5]] || "0") : "0", 10);
+        if(isNaN(j)){
+            alert("Jumlah tidak valid!");
+            return;
+        }
 
         if(j < selectedService.min || j > selectedService.max){
             alert(`Jumlah harus antara ${selectedService.min} dan ${selectedService.max}`);
@@ -121,18 +165,46 @@ const layananData = {
         }
 
         const trx = genTRX();
-        const k = document[_k[1]](_k[0]).value;
-        const t = document[_k[1]](_k[11]).value;
+        const kElem = document[_k[1]](_k[0]);
+        const tElem = document[_k[1]](_k[11]);
+
+        const k = kElem ? kElem[_k[5]] : "";
+        const t = tElem ? tElem[_k[5]] : "";
         const total = j * selectedService.pricePerFollower;
 
+        // Redirect ke halaman pembayaran dengan parameter
         window[_k[12]][_k[13]] =
             _k[14] + trx +
-            _k[15] + k +
-            _k[16] + selectedService.name +
-            _k[17] + selectedService.id +
-            _k[18] + j +
-            _k[19] + total +
+            _k[15] + encodeURIComponent(k) +
+            _k[16] + encodeURIComponent(selectedService.name) +
+            _k[17] + encodeURIComponent(selectedService.id) +
+            _k[18] + encodeURIComponent(j) +
+            _k[19] + encodeURIComponent(total) +
             _k[20] + encodeURIComponent(t);
     };
+
+    /* ========== PASANG EVENT UNTUK BANZAI & INPUT JUMLAH ========== */
+    document.addEventListener("DOMContentLoaded", ()=>{
+        const btn = document.getElementById("btnBanzai");
+        if(btn){
+            btn.addEventListener("click", window.lanjutPembayaran);
+        }
+
+        const jumlahInput = document.getElementById("jumlah");
+        if(jumlahInput){
+            jumlahInput.addEventListener("input", window.hitungTotal);
+        }
+
+        // optional: jika user mengganti layanan via keyboard/select program, juga update info
+        const layananSelect = document.getElementById("layanan");
+        if(layananSelect){
+            layananSelect.addEventListener("change", window.showInfo);
+        }
+
+        const kategoriSelect = document.getElementById("kategori");
+        if(kategoriSelect){
+            kategoriSelect.addEventListener("change", window.loadLayanan);
+        }
+    });
 
 })();
