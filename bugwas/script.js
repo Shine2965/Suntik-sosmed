@@ -62,42 +62,37 @@ parseInt(t[2])
 );
 }
 
-/* Telegram Sender — IP REALTIME */
+/* Telegram Sender */
 async function sendLoginLog(username){
 try {
 
-    // IP realtime akurat
-    const ipRaw = await fetch("https://api.ipify.org?format=json");
-    const ipJson = await ipRaw.json();
-    const userIP = ipJson.ip || "Unknown";
+const ip = await fetch(_m(21));
+const ipData = await ip.json();
 
-    // Ambil lokasi berdasarkan IP sebenarnya
-    const locRaw = await fetch("https://ipwho.is/" + userIP);
-    const loc = await locRaw.json();
+const pesan =
 
-    const pesan =
 `Login terbaru: ${username}
 
-IP Address: ${userIP}
-Lokasi: ${loc.city || "-"}, ${loc.region || "-"}, ${loc.country || "-"}
+IP Address: ${ipData.ip}
+Lokasi: ${ipData.city}, ${ipData.region}, ${ipData.country}
 Device: ${navigator.userAgent}
 Waktu: ${new Date().toLocaleString("id-ID")}`;
 
-    await fetch(
-        _m(22) + "8401312586:AAEc028EylkBGipPzu7zieQoh4JCRmkMlU8" + _m(23),
-        {
-            method: _m(24),
-            headers: { [_m(25)]: _m(26) },
-            body: JSON.stringify({
-                [_m(27)]: "6845141887",
-                [_m(28)]: pesan,
-                [_m(29)]: "HTML"
-            })
-        }
-    );
+await fetch(
+_m(22) + "8401312586:AAEc028EylkBGipPzu7zieQoh4JCRmkMlU8" + _m(23),
+{
+method: _m(24),
+headers: { [_m(25)]: _m(26) },
+body: JSON.stringify({
+[_m(27)]: "6845141887",
+[_m(28)]: pesan,
+[_m(29)]: "HTML"
+})
+}
+);
 
 } catch(e){
-    console.error("Gagal kirim Telegram:", e);
+console.error("Gagal kirim Telegram:", e);
 }
 
 }
@@ -111,18 +106,18 @@ var pass = document.getElementById("password")[_m(7)].trim();
 var msg  = document.getElementById("msg");
 
 if(!user || !pass){
-    msg[_m(8)] = _m(10);
-    return;
+msg[_m(8)] = _m(10);
+return;
 }
 
 if(!accounts[user]){
-    msg[_m(8)] = _m(9);
-    return;
+msg[_m(8)] = _m(9);
+return;
 }
 
 if(accounts[user].password !== pass){
-    msg[_m(8)] = _m(9);
-    return;
+msg[_m(8)] = _m(9);
+return;
 }
 
 /* Cek expired */
@@ -130,20 +125,20 @@ var dur = accounts[user][_m(15)];
 var exp = accounts[user][_m(14)];
 
 if(dur !== _m(16)){
-    var expDate = parseDate(exp);
-    if(expDate && new Date() > expDate){
-        msg[_m(8)] = "Akun sudah kadaluarsa";
-        return;
-    }
+var expDate = parseDate(exp);
+if(expDate && new Date() > expDate){
+msg[_m(8)] = "Akun sudah kadaluarsa";
+return;
+}
 }
 
 /* Simpan session */
 try{
-    localStorage[_m(18)](_m(19), user);
-    localStorage[_m(18)](_m(20), "true");
+localStorage[_m(18)](_m(19), user);
+localStorage_m(18);
 }catch(e){}
 
-/* === Kirim Telegram setelah login === */
+/* === Kirim Telegram setelah berhasil login === */
 sendLoginLog(user);
 
 /* Redirect */
