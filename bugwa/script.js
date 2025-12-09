@@ -166,5 +166,3 @@ if(audio && audio.paused) audio.play().catch(function(){});
 }catch(e){}
 
 })();
-
-Buat agar halaman hanya bisa digunakan ketika pengguna login melalui /bugwas/
