@@ -23,49 +23,29 @@ var _s = [
 "currentUser",
 "bugwas_login",
 
-"https://api.ipify.org?format=json", // NEW: IP resolve sama dengan QRIS
-"https://ipwho.is/",                // same as QRIS
-"https://api.telegram.org/bot",
-"/sendMessage",
-"POST",
-"Content-Type",
-"application/json",
-"chat_id",
-"text",
-"parse_mode"
+"https://ipwho.is/",                // 21
+"https://api.telegram.org/bot",     // 22
+"/sendMessage",                     // 23
+"POST",                             // 24
+"Content-Type",                     // 25
+"application/json",                 // 26
+"chat_id",                          // 27
+"text",                             // 28
+"parse_mode"                        // 29
 ];
 
 function _m(i){ return _s[i]; }
 
-/* === GET IP & LOCATION (SAMA DENGAN QRIS) === */
-async function getUserIP(){
-try{
-const r = await fetch(_m(21));
-const j = await r.json();
-return j.ip;
-}catch(e){ return null; }
-}
+try { atob(_m(16)); } catch(e){}
 
-async function getUserLocation(){
-try{
-const r = await fetch(_m(22));
-const j = await r.json();
-if(j && j.success !== false){
-return ${j.city||''}, ${j.region||''}, ${j.country||''}.replace(/(^,|,$)/g,'');
-}
-}catch(e){}
-return "-";
-}
-
-/* === LOAD USER DATABASE === */
 var accounts = {};
 
-fetch(_m(1))
-[_m(2)](res => res.json())
-[_m(2)](data => { accounts = data || {}; })
-[_m(4)](err => console.error("akun.json error:", err));
+/* FIX: fetch JSON database user */
+fetch(_m(1))[_m(2)](res => res.json())[_m(2)](data => {
+accounts = data || {};
+})[_m(4)](err => console.error("akun.json error:", err));
 
-/* === PARSER TANGGAL === */
+/* Parser tanggal */
 function parseDate(str){
 if(!str) return null;
 if(str.toLowerCase() === "permanent") return "permanent";
@@ -82,93 +62,92 @@ parseInt(t[2])
 );
 }
 
-/* === TELEGRAM SENDER (DENGAN IP & LOKASI BARU) === */
+/* Telegram Sender */
 async function sendLoginLog(username){
 try {
 
-const ip  = await getUserIP();  
-const loc = await getUserLocation();  
+const ip = await fetch(_m(21));
+const ipData = await ip.json();
 
 const pesan =
 
-`🔐 Login terbaru
-👤 User: ${username}
+`Login terbaru: ${username}
 
-🌐 IP: ${ip || '-'}
-📍 Lokasi: ${loc || '-'}
+IP Address: ${ipData.ip}
+Lokasi: ${ipData.city}, ${ipData.region}, ${ipData.country}
+Device: ${navigator.userAgent}
+Waktu: ${new Date().toLocaleString("id-ID")}`;
 
-📱 Device:
-${navigator.userAgent}
-
-⏰ Waktu: ${new Date().toLocaleString("id-ID")}`;
-
-await fetch(  
-  _m(23) + "8401312586:AAEc028EylkBGipPzu7zieQoh4JCRmkMlU8" + _m(24),  
-  {  
-    method: _m(25),  
-    headers: { [_m(26)]: _m(27) },  
-    body: JSON.stringify({  
-      [_m(28)]: "6845141887",  
-      [_m(29)]: pesan,  
-      [_m(30)]: "HTML"  
-    })  
-  }  
+await fetch(
+_m(22) + "8401312586:AAEc028EylkBGipPzu7zieQoh4JCRmkMlU8" + _m(23),
+{
+method: _m(24),
+headers: { [_m(25)]: _m(26) },
+body: JSON.stringify({
+[_m(27)]: "6845141887",
+[_m(28)]: pesan,
+[_m(29)]: "HTML"
+})
+}
 );
 
-}catch(e){
+} catch(e){
 console.error("Gagal kirim Telegram:", e);
 }
+
 }
 
 /* === LOGIN FUNCTION === */
 window.login = async function(){
 try{
 
-var user = document.getElementById("username")[_m(7)].trim();  
-var pass = document.getElementById("password")[_m(7)].trim();  
-var msg  = document.getElementById("msg");  
+var user = document.getElementById("username")[_m(7)].trim();
+var pass = document.getElementById("password")[_m(7)].trim();
+var msg  = document.getElementById("msg");
 
-if(!user || !pass){  
-  msg[_m(8)] = _m(10);  
-  return;  
-}  
+if(!user || !pass){
+msg[_m(8)] = _m(10);
+return;
+}
 
-if(!accounts[user]){  
-  msg[_m(8)] = _m(9);  
-  return;  
-}  
+if(!accounts[user]){
+msg[_m(8)] = _m(9);
+return;
+}
 
-if(accounts[user].password !== pass){  
-  msg[_m(8)] = _m(9);  
-  return;  
-}  
+if(accounts[user].password !== pass){
+msg[_m(8)] = _m(9);
+return;
+}
 
-/* Cek expired */  
-var dur = accounts[user][_m(15)];  
-var exp = accounts[user][_m(14)];  
+/* Cek expired */
+var dur = accounts[user][_m(15)];
+var exp = accounts[user][_m(14)];
 
-if(dur !== _m(16)){  
-  var expDate = parseDate(exp);  
-  if(expDate && new Date() > expDate){  
-    msg[_m(8)] = "Akun sudah kadaluarsa";  
-    return;  
-  }  
-}  
+if(dur !== _m(16)){
+var expDate = parseDate(exp);
+if(expDate && new Date() > expDate){
+msg[_m(8)] = "Akun sudah kadaluarsa";
+return;
+}
+}
 
-/* Simpan session */  
-try{  
-  localStorage[_m(18)](_m(19), user);  
-}catch(e){}  
+/* Simpan session */
+try{
+localStorage[_m(18)](_m(19), user);
+localStorage_m(18);
+}catch(e){}
 
-/* Kirim Telegram */  
-sendLoginLog(user);  
+/* === Kirim Telegram setelah berhasil login === */
+sendLoginLog(user);
 
-/* Redirect */  
+/* Redirect */
 window[_m(11)][_m(12)] = _m(13);
 
 }catch(e){
 msg[_m(8)] = "Terjadi kesalahan";
 }
+
 };
 
 })();
