@@ -4,315 +4,191 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>Pembayaran QRIS - Shine Shop</title>
+
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
+
 <style>
-  body{font-family:'Poppins',Arial,sans-serif;background:linear-gradient(135deg,#0f2027,#203a43,#2c5364);color:#fff;margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center}
-  .card{background:rgba(255,255,255,0.08);padding:22px;border-radius:14px;max-width:520px;width:100%;box-shadow:0 8px 20px rgba(0,0,0,0.45)}
-  canvas{background:#fff;padding:10px;border-radius:12px;display:block;margin:16px auto}
-  .details{font-size:14px;text-align:left;margin:10px 0;line-height:1.6;color:#fff}
-  input[type=file]{width:100%;max-width:420px;padding:8px;border-radius:6px;background:#fff;color:#222;border:none}
-  .btn{width:100%;margin-top:14px;padding:12px;border-radius:30px;background:linear-gradient(45deg,#00c6ff,#0072ff);border:none;color:#fff;font-weight:700;cursor:pointer}
-  .btn.small{width:auto;padding:8px 12px;border-radius:10px;display:inline-block}
-  .btn[disabled]{opacity:.6;cursor:not-allowed}
-  .warning-box{background:#b91c1c;padding:16px;border-radius:10px;text-align:center;}
-  .muted{color:#d0d7de;font-size:13px;margin-top:8px}
-  a.btn-link{display:inline-block;padding:10px 14px;border-radius:12px;background:#2563eb;color:#fff;text-decoration:none;margin-top:8px}
-  .row{display:flex;gap:8px;flex-wrap:wrap}
-  pre{white-space:pre-wrap;word-break:break-word;background:rgba(255,255,255,0.04);padding:8px;border-radius:8px}
-  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9912622413153708"
-     crossorigin="anonymous"></script>
+body{
+  font-family:Poppins,Arial;
+  background:linear-gradient(135deg,#0f2027,#203a43,#2c5364);
+  color:#fff;
+  min-height:100vh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  margin:0
+}
+.card{
+  background:rgba(255,255,255,.08);
+  padding:22px;
+  border-radius:14px;
+  max-width:520px;
+  width:100%;
+  box-shadow:0 8px 20px rgba(0,0,0,.45)
+}
+img{
+  display:block;
+  margin:16px auto;
+  width:260px;
+  border-radius:12px;
+  background:#fff;
+  padding:8px
+}
+.details{font-size:14px;line-height:1.6}
+.status{
+  margin-top:14px;
+  text-align:center;
+  font-weight:700
+}
+.status.pending{color:#facc15}
+.status.success{color:#22c55e}
+.status.failed{color:#ef4444}
 </style>
 </head>
 <body>
-<div id="blockedCard" class="card" style="display:none"></div>
 
-<div id="mainCard" class="card">
-  <h2 style="margin:0 0 6px 0">Pembayaran QRIS</h2>
-  <p>Silakan scan QR di bawah untuk membayar</p>
+<div class="card">
+  <h2>Pembayaran QRIS</h2>
+  <p>Scan QR di bawah dan selesaikan pembayaran</p>
 
-  <canvas id="qrisCanvas" width="260" height="260"></canvas>
+  <img id="qrisImg" src="" alt="QRIS">
 
   <div class="details" id="orderDetails"></div>
 
-  <input type="file" id="buktiInput" accept="image/*" />
-  <button id="confirmBtn" class="btn">Konfirmasi Pembayaran</button>
+  <div id="paymentStatus" class="status pending">
+    ⏳ Menunggu pembayaran...
+  </div>
 
-  <div class="muted">Setelah konfirmasi, admin akan memproses paling lama 24 jam.</div>
+  <p style="font-size:13px;opacity:.8;text-align:center;margin-top:10px">
+    Status pembayaran terdeteksi otomatis
+  </p>
 </div>
 
 <script>
-/* === CONFIG (HARDCODED) === */
-const botToken  = "7430992455:AAFYSSkMzy1UWwHTNzBEJBzAyPzfmF0wqto"; // admin bot
-const chatId    = "6845141887"; // admin chat id (sendPhoto)
-const channelId = "-1002112920606"; // channel id (voice & message)
+/* ================= CONFIG ================= */
+const GATEWAY_URL = "https://atlantich2h.com/deposit/metode";
+const API_KEY = "pAKg2tNnNHyTVVxVULpZ5AEBcyyj56lGlK8vZxUZFBKq46w5cVfx06cF263K33dN53AyLL3AryByEthTlkoMgOb6FJ9RunEirBOy";
 
-/* === BLACKLIST SAMPLE === */
-const blacklistData = {
-  permanent: [{ ip: "180.251.154.210", reason: "LOW QUALITY MINTA FAST RESPON KOCAK", added: "2025-11-14T14:00:00+07:00" }],
-  temporary: [{ ip: "182.8.182.179", duration: " 3 hari", reason: "BUKTI TF PALSU LAKUKAN AJU BANDING ke telegram @shineshopstore1", added: "2025-12-10T15:00:00+07:00" }]
-};
+/* Telegram */
+const BOT_TOKEN = "7430992455:AAFYSSkMzy1UWwHTNzBEJBzAyPzfmF0wqto";
+const ADMIN_CHAT = "6845141887";
 
-function parseDurationToMs(text){
-  if(!text) return 0;
-  const s = text.toLowerCase().replace(/\s+/g,'');
-  const num = parseInt(s) || 0;
-  if(s.includes('menit')) return num * 60 * 1000;
-  if(s.includes('jam')) return num * 60 * 60 * 1000;
-  if(s.includes('hari')) return num * 24 * 60 * 60 * 1000;
-  return 0;
-}
+/* ================= PARAM ================= */
+const p = new URLSearchParams(location.search);
+const trxID   = p.get("trx") || "TRX-"+Date.now();
+const layanan = p.get("layanan") || "-";
+const total   = p.get("total") || "0";
 
-async function getUserIP(){
-  try{ const r = await fetch("https://api.ipify.org?format=json"); const j = await r.json(); return j.ip; }catch(e){ return null; }
-}
-async function getUserLocation(){
-  try{ const r = await fetch("https://ipwho.is/"); const j = await r.json(); if(j && j.success !== false) return `${j.city||''}, ${j.region||''}, ${j.country||''}`.replace(/(^,|,$)/g,''); }catch(e){} return "";
-}
+document.getElementById("orderDetails").innerHTML = `
+<b>ID Transaksi:</b> ${trxID}<br>
+<b>Layanan:</b> ${layanan}<br>
+<b>Total:</b> Rp ${Number(total).toLocaleString("id-ID")}
+`;
 
-function checkBlacklist(ip){
-  if(!ip) return { blocked:false };
-  const now = Date.now();
-  for(const b of blacklistData.permanent) if(b.ip === ip) return { blocked:true, type:"permanent", reason:b.reason };
-  for(const b of blacklistData.temporary){
-    if(b.ip === ip){
-      const added = new Date(b.added).getTime();
-      const dur = parseDurationToMs(b.duration);
-      if(now < added + dur) return { blocked:true, type:"temporary", reason:b.reason, duration:b.duration, remaining: added + dur - now };
-    }
-  }
-  return { blocked:false };
-}
-
-function showBlocked(info){
-  const blk = document.getElementById("blockedCard");
-  document.getElementById("mainCard").style.display = "none";
-  blk.style.display = "block";
-  if(info.type === "permanent"){
-    blk.innerHTML = `<div class="warning-box">Maaf, Anda dilarang melakukan transaksi karena <b>${info.reason}</b>.<br><small>Status: <b>Permanen</b></small></div>`;
-    Swal.fire({icon:"error",title:"🚫 Akses Diblokir",html:blk.innerHTML});
-  } else {
-    let rem = info.remaining;
-    const msgBox = document.createElement("div");
-    msgBox.className = "warning-box";
-    document.getElementById("blockedCard").appendChild(msgBox);
-    function update(){
-      if(rem <= 0){ msgBox.innerHTML = `Blokir sementara telah berakhir. Silakan refresh halaman.`; clearInterval(iv); return; }
-      const sec = Math.floor((rem/1000)%60);
-      const min = Math.floor((rem/1000/60)%60);
-      const hour = Math.floor((rem/1000/60/60));
-      msgBox.innerHTML = `Maaf, Anda dilarang melakukan transaksi karena <b>${info.reason}</b>.<br><small>Durasi: ${info.duration} (sisa ${hour} jam ${min} menit ${sec} detik)</small>`;
-      rem -= 1000;
-    }
-    update();
-    const iv = setInterval(update, 1000);
-    Swal.fire({icon:"error",title:"🚫 Akses Diblokir",html:msgBox.innerHTML, didOpen:()=>{ setInterval(()=>{ if(Swal.getHtmlContainer()) Swal.getHtmlContainer().innerHTML = msgBox.innerHTML },1000); }});
-  }
-}
-
-/* === INIT === */
-(async function(){
-  const ip = await getUserIP();
-  const info = checkBlacklist(ip);
-  if(info.blocked){ showBlocked(info); return; }
-  initOrderUI();
-})();
-
-/* === QR & UI === */
-function initOrderUI(){
-  const url = new URL(location.href);
-  const p = url.searchParams;
-
-  const trxID     = p.get("trx") || "-";
-  const kategori  = p.get("kategori") || "-";
-  const layanan   = p.get("layanan") || "-";
-  const idLayanan = p.get("id") || "-";
-  const jumlah    = p.get("jumlah") || "-";
-  const total     = p.get("total") || "0";
-  const target    = p.get("target") || "-";
-
-  const tanggal = new Date().toLocaleString("id-ID",{timeZone:"Asia/Jakarta"});
-
-  const det = `
-    <strong>ID Transaksi:</strong> ${trxID}<br>
-    <strong>ID Layanan:</strong> ${idLayanan}<br>
-    <strong>Tanggal:</strong> ${tanggal}<br>
-    <strong>Kategori:</strong> ${kategori}<br>
-    <strong>Layanan:</strong> ${layanan}<br>
-    <strong>Jumlah:</strong> ${jumlah}<br>
-    <strong>Target:</strong> ${target}<br>
-    <strong>Total:</strong> Rp ${Number(total).toLocaleString("id-ID")}
-  `;
-  document.getElementById("orderDetails").innerHTML = det;
-
-  function crc16(s){let crc=0xFFFF;for(let i=0;i<s.length;i++){crc^=s.charCodeAt(i)<<8;for(let j=0;j<8;j++){crc=(crc&0x8000)?((crc<<1)^0x1021)&0xFFFF:(crc<<1)&0xFFFF;}}return crc.toString(16).toUpperCase().padStart(4,'0');}
-  function buildQR(amount){const a = parseInt(amount||0,10); const str=String(a); const len=String(str.length).padStart(2,"0"); const tag54="54"+len+str; const base="00020101021226670016COM.NOBUBANK.WWW01189360050300000879140214526036770909650303UMI51440014ID.CO.QRIS.WWW0215ID20243611417480303UMI5204541153033605802ID5920SHINE SHOP OK19967206008SURABAYA61056011162070703A01"; const data=base+tag54+"6304"; return data+crc16(data); }
-  QRCode.toCanvas(document.getElementById("qrisCanvas"), buildQR(total), {width:260});
-
-  document.getElementById("confirmBtn").onclick = async () => {
-    const file = document.getElementById("buktiInput").files[0];
-    if(!file){ Swal.fire({icon:"warning",title:"Bukti belum dipilih",text:"Silakan upload bukti transfer"}); return; }
-
-    Swal.fire({title:"Mengirimkan data ke Admin...",allowOutsideClick:false,didOpen:()=>Swal.showLoading()});
-
-    const ip = await getUserIP();
-    const lokasi = await getUserLocation();
-    const tgl = new Date().toLocaleString("id-ID",{timeZone:"Asia/Jakarta"});
-
-    // caption to admin
-    const caption = `💳 KONFIRMASI PEMBAYARAN BARU
-📰 ID Transaksi: ${trxID}
-🆔 ID Layanan: ${idLayanan}
-🗓️ Tanggal: ${tgl} WIB
-📂 Kategori: ${kategori}
-⚙️ Layanan: ${layanan}
-🔢 Jumlah: ${jumlah}
-🎯 Target: ${target}
-💰 Total: Rp ${Number(total).toLocaleString("id-ID")}
-🌐 IP Pengguna: ${ip||'-'}
-📍 Lokasi Perkiraan: ${lokasi||'-'}
-
-Transaksi akan diproses admin paling lama 24 jam.`;
-
-    // send photo to admin
-    const form = new FormData();
-    form.append("chat_id", chatId);
-    form.append("photo", file);
-    form.append("caption", caption);
-
-    try{
-      const res = await fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, { method: "POST", body: form });
-      const jr = await res.json();
-      if(!jr.ok) throw new Error(jr.description || "Gagal mengirim ke admin");
-
-      Swal.close();
-
-      // popup ajak gabung channel
-      await Swal.fire({
-        icon:"info",
-        title:"Konfirmasi Dalam Antrian mohon tunggu 10 detik! Gabung Channel Telegram!",
-        html:`Pesanan akan segera di proses paling lama 24 jam Dapatkan info promo & update transaksi.<br><br><a href="https://t.me/Shineshopofficial" target="_blank" class="btn small" style="text-decoration:none">Gabung Sekarang</a>`
-      });
-   /* === VOICE TRANSAKSI (dikirim ke channel) ===
-         - Mengirim teks voice (TTS) sebagai caption + (best-effort) menyertakan URL TTS
-         - Menambahkan inline keyboard: Check Status & Beli Lagi
-         Note: Telegram API expects multipart/form-data for actual voice upload. 
-         Here we send sendVoice with JSON and include reply_markup (best-effort).
-      */
-      const voiceText = `Voice Transaksi. ID: ${trxID}. Status: Pending. Cek status: https://shineshop-smm.my.id/riwayat/?trx=${encodeURIComponent(trxID)}`;
-
-    
-      // prepare payload for sendVoice + inline keyboard
-      const payload = {
-        chat_id: channelId,
-        caption: voiceText,
-        parse_mode: "Markdown",
-        // reply_markup with inline keyboard (two rows)
-        reply_markup: {
-          inline_keyboard: [
-            [ { text: "Check Status", url: `https://shineshop-smm.my.id/riwayat/?trx=${encodeURIComponent(trxID)}` } ],
-            [ { text: "Beli Lagi", url: "https://shineshop-smm.my.id" } ]
-          ]
-        },
-        // best-effort: include some "voice" field referencing a TTS endpoint (your server must host a TTS audio file or support streaming)
-        voice: "https://api.telegram.org/bot${botToken}/tts?text=" + encodeURIComponent(voiceText)
-      };
-
-      // send voice-like message to channel (best-effort)
-      try{
-        await fetch(`https://api.telegram.org/bot${botToken}/sendVoice`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
-        });
-      }catch(e){
-        // ignore, we still continue (channel may still receive text message below)
-        console.warn("sendVoice failed:", e);
-      }
-
-      // also send a plain message (fallback) with the same keyboard to ensure channel shows buttons
-      const channelText = `🎧 *Transaksi Baru*\n\nId transaksi: ${trxID}\nTanggal pembelian: ${tgl}\nId produk: ${idLayanan}\nProduk: ${layanan}\nStatus transaksi: Pending`;
-      await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chat_id: channelId,
-          text: channelText,
-          parse_mode: "Markdown",
-          reply_markup: {
-            inline_keyboard: [
-              [ { text: "Check Status", url: `https://shineshop-smm.my.id/riwayat/?trx=${encodeURIComponent(trxID)}` } ],
-              [ { text: "Beli Lagi", url: "https://shineshop-smm.my.id" } ]
-            ]
-          }
-        })
-      });
-
-      // final popup with action buttons (Check Status triggers fetch to /riwayat/)
-      const htmlMenu = `
-        <div style="text-align:center">
-          <div style="margin-bottom:10px">Transaksi dikirim. Pilih aksi:</div>
-          <div style="display:flex;gap:8px;justify-content:center">
-            <button id="checkStatusBtn" class="btn small" style="background:#16a34a">Check Status</button>
-            <a class="btn small" href="https://shineshop-smm.my.id" target="_blank" style="background:#2563eb">Beli Lagi</a>
-            <a class="btn small" href="/dashboard/" style="background:#6b7280">Dashboard</a>
-          </div>
-        </div>
-      `;
-      await Swal.fire({ title:"Transaksi Terkirim", html: htmlMenu, showConfirmButton:false, didOpen: ()=>{
-        const btn = document.getElementById("checkStatusBtn");
-        if(btn) btn.addEventListener("click", ()=> checkStatusAndShow(trxID));
-      }});
-
-      // redirect to dashboard
-      window.location.href = "/dashboard/";
-
-    }catch(err){
-      Swal.close();
-      Swal.fire({icon:"error",title:"Gagal",text: err.message || "Terjadi kesalahan saat mengirim data"});
-    }
-  };
-}
-
-/* === CHECK STATUS (fetch /riwayat/) === */
-async function checkStatusAndShow(trx){
-  if(!trx || trx === "-"){
-    Swal.fire({icon:"warning",title:"ID transaksi tidak tersedia"});
-    return;
-  }
-
-  Swal.fire({title:"Memeriksa status...",didOpen:()=>Swal.showLoading(),allowOutsideClick:false});
-
+/* ================= CREATE QR ================= */
+(async function createQR(){
   try{
-    // expected endpoint: /riwayat/?trx=ID  -> server should return JSON containing status
-    const resp = await fetch(`/riwayat/?trx=${encodeURIComponent(trx)}`, { method: "GET", headers: { "Accept":"application/json" }});
-    if(!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    const json = await resp.json();
+    const res = await fetch(GATEWAY_URL,{
+      method:"POST",
+      headers:{
+        "Content-Type":"application/json",
+        "Authorization": API_KEY
+      },
+      body:JSON.stringify({
+        action: "create",
+        trx_id: trxID,
+        amount: total,
+        description: layanan,
+        metode: "qris"
+      })
+    });
 
-    // find status in flexible ways
-    const status = (json && (json.status || json.data?.status || (Array.isArray(json) && json[0]?.status))) || null;
+    const data = await res.json();
+    if(!data.qr_image) throw "QRIS gagal dibuat";
 
-    if(!status){
-      const fallback = JSON.stringify(json).slice(0,800);
-      Swal.fire({icon:"info",title:"Status Tidak Diketahui",html:`Response: <pre>${fallback}</pre>`});
-      return;
-    }
+    document.getElementById("qrisImg").src = data.qr_image;
 
-    const s = String(status).toLowerCase();
-    let label = s;
-    if(s.includes("sukses") || s.includes("success") || s.includes("paid")) label = "Sukses";
-    else if(s.includes("gagal") || s.includes("failed") || s.includes("error")) label = "Gagal";
-    else label = "Pending";
-
-    Swal.fire({icon: label === "Sukses" ? "success" : (label === "Gagal" ? "error" : "info"), title:`Status: ${label}`, html:`Status mentah: <b>${status}</b>`});
-
-    // OPTIONAL: update channel message with new status (best-effort) - requires message_id or bot privileges for editing channel posts
-    // If you have an API that can update channel, you could call it here.
+    startAutoCheck();
 
   }catch(e){
-    Swal.fire({icon:"error",title:"Gagal Cek Status",text: e.message || "Tidak dapat menghubungi server /riwayat/"});
+    Swal.fire("Error","Gagal membuat QRIS","error");
   }
+})();
+
+/* ================= AUTO CHECK (POST) ================= */
+let checker = null;
+
+function startAutoCheck(){
+  checker = setInterval(checkPayment, 5000);
+}
+
+async function checkPayment(){
+  try{
+    const res = await fetch(GATEWAY_URL,{
+      method:"POST",
+      headers:{
+        "Content-Type":"application/json",
+        "Authorization": API_KEY
+      },
+      body:JSON.stringify({
+        action: "status",
+        trx_id: trxID
+      })
+    });
+
+    const data = await res.json();
+    if(!data.status) return;
+
+    const status = data.status.toLowerCase();
+
+    if(status === "paid" || status === "success"){
+      clearInterval(checker);
+      paymentSuccess();
+    }
+
+    if(status === "failed"){
+      clearInterval(checker);
+      updateStatus("failed","❌ Pembayaran gagal");
+    }
+
+  }catch(e){}
+}
+
+/* ================= UI & NOTIF ================= */
+function updateStatus(type,text){
+  const el = document.getElementById("paymentStatus");
+  el.className = "status "+type;
+  el.innerText = text;
+}
+
+async function paymentSuccess(){
+  updateStatus("success","✅ Pembayaran berhasil!");
+
+  Swal.fire({
+    icon:"success",
+    title:"Pembayaran Berhasil",
+    text:"Pesanan akan diproses otomatis"
+  });
+
+  /* Notif Telegram */
+  await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,{
+    method:"POST",
+    headers:{ "Content-Type":"application/json" },
+    body:JSON.stringify({
+      chat_id: ADMIN_CHAT,
+      text:
+`✅ PEMBAYARAN SUKSES
+ID: ${trxID}
+Layanan: ${layanan}
+Total: Rp ${Number(total).toLocaleString("id-ID")}`
+    })
+  });
+
+  setTimeout(()=>{
+    window.location.href = "/dashboard/";
+  },3000);
 }
 </script>
+
 </body>
 </html>
