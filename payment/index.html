@@ -1,22 +1,23 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Pembayaran QRIS - Shine Shop</title>
 
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 <style>
 body{
-  font-family:Poppins,Arial;
+  font-family:Poppins,Arial,sans-serif;
   background:linear-gradient(135deg,#0f2027,#203a43,#2c5364);
   color:#fff;
+  margin:0;
   min-height:100vh;
   display:flex;
   align-items:center;
-  justify-content:center;
-  margin:0
+  justify-content:center
 }
 .card{
   background:rgba(255,255,255,.08);
@@ -26,32 +27,31 @@ body{
   width:100%;
   box-shadow:0 8px 20px rgba(0,0,0,.45)
 }
-img{
-  display:block;
-  margin:16px auto;
-  width:260px;
-  border-radius:12px;
+canvas{
   background:#fff;
-  padding:8px
+  padding:10px;
+  border-radius:12px;
+  display:block;
+  margin:16px auto
 }
 .details{font-size:14px;line-height:1.6}
 .status{
-  margin-top:14px;
   text-align:center;
-  font-weight:700
+  font-weight:700;
+  margin-top:12px
 }
-.status.pending{color:#facc15}
-.status.success{color:#22c55e}
-.status.failed{color:#ef4444}
+.pending{color:#facc15}
+.success{color:#22c55e}
+.failed{color:#ef4444}
 </style>
 </head>
 <body>
 
 <div class="card">
   <h2>Pembayaran QRIS</h2>
-  <p>Scan QRIS dan selesaikan pembayaran</p>
+  <p>Scan QR di bawah untuk membayar</p>
 
-  <img id="qrisImg" src="" alt="QRIS">
+  <canvas id="qrisCanvas" width="260" height="260"></canvas>
 
   <div class="details" id="orderDetails"></div>
 
@@ -60,90 +60,72 @@ img{
   </div>
 
   <p style="font-size:13px;opacity:.8;text-align:center">
-    Status terdeteksi otomatis
+    Sudah termasuk fee Rp 500
   </p>
 </div>
 
 <script>
 /* ================= CONFIG ================= */
 const API_KEY = "pAKg2tNnNHyTVVxVULpZ5AEBcyyj56lGlK8vZxUZFBKq46w5cVfx06cF263K33dN53AyLL3AryByEthTlkoMgOb6FJ9RunEirBOy";
-const CREATE_URL = "https://atlantich2h.com/deposit/create";
+const ATLANTIC_URL = "https://atlantich2h.com/deposit/create";
+const FEE = 500;
 
-/* Telegram */
-const BOT_TOKEN = "7430992455:AAFYSSkMzy1UWwHTNzBEJBzAyPzfmF0wqto";
-const ADMIN_CHAT = "6845141887";
+/* ================= BASE QRIS (BERSIH) ================= */
+const BASE_QRIS =
+"00020101021226610016ID.CO.SHOPEE.WWW01189360091800209988050208209988050303UME51440014ID.CO.QRIS.WWW0215ID20232405136140303UME5204481453033605802ID5905MITRA6012KOTA BANDUNG6105406146222051810629053121067853";
 
 /* ================= PARAM ================= */
 const p = new URLSearchParams(location.search);
-const trxID   = p.get("trx") || "TRX" + Date.now();
+const trxID   = p.get("trx") || "TRX"+Date.now();
 const layanan = p.get("layanan") || "-";
-const total   = p.get("total") || "50000";
+const total   = parseInt(p.get("total") || "0",10);
 
+/* ================= UI INFO ================= */
 document.getElementById("orderDetails").innerHTML = `
 <b>ID Transaksi:</b> ${trxID}<br>
 <b>Layanan:</b> ${layanan}<br>
-<b>Total:</b> Rp ${Number(total).toLocaleString("id-ID")}
+<b>Harga:</b> Rp ${total.toLocaleString("id-ID")}<br>
+<b>Fee QRIS:</b> Rp 500<br>
+<b>Total Bayar:</b> Rp ${(total+FEE).toLocaleString("id-ID")}
 `;
 
-/* ================= CREATE QRIS ================= */
-(async function(){
-  try{
-    const body = new URLSearchParams({
-      api_key: API_KEY,
-      reff_id: trxID,
-      nominal: total,
-      type: "ewallet",
-      method: "qris"
-    });
-
-    const res = await fetch(CREATE_URL,{
-      method:"POST",
-      headers:{
-        "Content-Type":"application/x-www-form-urlencoded"
-      },
-      body: body.toString()
-    });
-
-    const data = await res.json();
-
-    /*
-      Contoh response asumsi:
-      {
-        status: "pending",
-        qr_image: "https://..."
-      }
-    */
-
-    if(!data.qr_image) throw "QRIS tidak tersedia";
-
-    document.getElementById("qrisImg").src = data.qr_image;
-
-    startAutoCheck();
-
-  }catch(err){
-    Swal.fire("Error","Gagal membuat QRIS","error");
+/* ================= CRC16 QRIS ================= */
+function crc16(data){
+  let crc = 0xFFFF;
+  for(let i=0;i<data.length;i++){
+    crc ^= data.charCodeAt(i)<<8;
+    for(let j=0;j<8;j++){
+      crc = (crc & 0x8000) ? (crc<<1)^0x1021 : crc<<1;
+      crc &= 0xFFFF;
+    }
   }
-})();
-
-/* ================= AUTO CHECK STATUS ================= */
-let checker;
-
-function startAutoCheck(){
-  checker = setInterval(checkStatus, 5000);
+  return crc.toString(16).toUpperCase().padStart(4,"0");
 }
 
-async function checkStatus(){
+/* ================= BUILD QRIS + FEE ================= */
+function buildQris(amount){
+  const totalPay = amount + FEE;
+  const nominal = totalPay.toString();
+  const tag54 = "54" + nominal.length.toString().padStart(2,"0") + nominal;
+  const payload = BASE_QRIS + tag54 + "6304";
+  return payload + crc16(payload);
+}
+
+/* ================= GENERATE QR ================= */
+const qrisData = buildQris(total);
+QRCode.toCanvas(document.getElementById("qrisCanvas"), qrisData, { width:260 });
+
+/* ================= AUTO CHECK STATUS ================= */
+setInterval(async ()=>{
   try{
     const body = new URLSearchParams({
       api_key: API_KEY,
       reff_id: trxID
     });
 
-    const res = await fetch(CREATE_URL,{
+    const res = await fetch(ATLANTIC_URL,{
       method:"POST",
-      headers:{
-        "Content-Type":"application/x-www-form-urlencoded"
-      },
+      headers:{ "Content-Type":"application/x-www-form-urlencoded" },
       body: body.toString()
     });
 
@@ -152,51 +134,32 @@ async function checkStatus(){
 
     const status = data.status.toLowerCase();
 
-    if(status === "success" || status === "paid"){
-      clearInterval(checker);
+    if(status === "paid" || status === "success"){
       paymentSuccess();
     }
 
     if(status === "failed"){
-      clearInterval(checker);
       updateStatus("failed","❌ Pembayaran gagal");
     }
 
   }catch(e){}
-}
+},5000);
 
-/* ================= UI & NOTIF ================= */
+/* ================= UI ================= */
 function updateStatus(type,text){
   const el = document.getElementById("paymentStatus");
   el.className = "status " + type;
   el.innerText = text;
 }
 
-async function paymentSuccess(){
+function paymentSuccess(){
   updateStatus("success","✅ Pembayaran berhasil!");
-
   Swal.fire({
     icon:"success",
     title:"Pembayaran Berhasil",
     text:"Pesanan akan diproses otomatis"
   });
-
-  await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,{
-    method:"POST",
-    headers:{ "Content-Type":"application/json" },
-    body: JSON.stringify({
-      chat_id: ADMIN_CHAT,
-      text:
-`✅ PEMBAYARAN SUKSES
-ID: ${trxID}
-Layanan: ${layanan}
-Total: Rp ${Number(total).toLocaleString("id-ID")}`
-    })
-  });
-
-  setTimeout(()=>{
-    window.location.href = "/dashboard/";
-  },3000);
+  setTimeout(()=>location.href="/dashboard/",3000);
 }
 </script>
 
