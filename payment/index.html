@@ -1,19 +1,18 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-<meta charset="utf-8">
+<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Pembayaran QRIS - Shine Shop</title>
+<title>Pembayaran QRIS - ORKUT</title>
 
-<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 <style>
 body{
-  font-family:Poppins,Arial,sans-serif;
+  margin:0;
+  font-family:Arial,Helvetica,sans-serif;
   background:linear-gradient(135deg,#0f2027,#203a43,#2c5364);
   color:#fff;
-  margin:0;
   min-height:100vh;
   display:flex;
   align-items:center;
@@ -23,21 +22,20 @@ body{
   background:rgba(255,255,255,.08);
   padding:22px;
   border-radius:14px;
-  max-width:520px;
+  max-width:420px;
   width:100%;
+  text-align:center;
   box-shadow:0 8px 20px rgba(0,0,0,.45)
 }
-canvas{
+img{
   background:#fff;
   padding:10px;
   border-radius:12px;
-  display:block;
-  margin:16px auto
+  margin:15px auto;
+  display:block
 }
-.details{font-size:14px;line-height:1.6}
 .status{
-  text-align:center;
-  font-weight:700;
+  font-weight:bold;
   margin-top:12px
 }
 .pending{color:#facc15}
@@ -48,107 +46,113 @@ canvas{
 <body>
 
 <div class="card">
-  <h2>Pembayaran QRIS</h2>
-  <p>Scan QR di bawah untuk membayar</p>
+  <h2>QRIS Payment</h2>
 
-  <canvas id="qrisCanvas" width="260" height="260"></canvas>
+  <div id="info"></div>
 
-  <div class="details" id="orderDetails"></div>
+  <img id="qrisImg" width="260" style="display:none">
 
-  <div id="paymentStatus" class="status pending">
-    ⏳ Menunggu pembayaran...
+  <div id="status" class="status pending">
+    ⏳ Membuat QR...
   </div>
-
-  <p style="font-size:13px;opacity:.8;text-align:center">
-    Sudah termasuk fee Rp 500
-  </p>
 </div>
 
 <script>
-/* ================= CONFIG ================= */
-const API_KEY = "pAKg2tNnNHyTVVxVULpZ5AEBcyyj56lGlK8vZxUZFBKq46w5cVfx06cF263K33dN53AyLL3AryByEthTlkoMgOb6FJ9RunEirBOy";
-const ATLANTIC_URL = "https://atlantich2h.com/deposit/create";
+/* ================= CONFIG ORKUT ================= */
+const ORKUT_APIKEY = "1996720:aY1InAWByrUtz0JFvXfjqgc3mbsDe2xV";
+const ORKUT_BASE   = "https://orkutpay.com/api"; // ganti jika base kamu beda
 const FEE = 500;
 
-/* ================= BASE QRIS (BERSIH) ================= */
-const BASE_QRIS =
-"00020101021226610016ID.CO.SHOPEE.WWW01189360091800209988050208209988050303UME51440014ID.CO.QRIS.WWW0215ID20232405136140303UME5204481453033605802ID5905MITRA6012KOTA BANDUNG6105406146222051810629053121067853";
-
 /* ================= PARAM ================= */
-const p = new URLSearchParams(location.search);
-const trxID   = p.get("trx") || "TRX"+Date.now();
-const layanan = p.get("layanan") || "-";
-const total   = parseInt(p.get("total") || "0",10);
+const params  = new URLSearchParams(location.search);
+const amount  = parseInt(params.get("amount") || "0",10);
+const layanan = params.get("layanan") || "-";
+const total   = amount + FEE;
 
-/* ================= UI INFO ================= */
-document.getElementById("orderDetails").innerHTML = `
-<b>ID Transaksi:</b> ${trxID}<br>
-<b>Layanan:</b> ${layanan}<br>
-<b>Harga:</b> Rp ${total.toLocaleString("id-ID")}<br>
-<b>Fee QRIS:</b> Rp 500<br>
-<b>Total Bayar:</b> Rp ${(total+FEE).toLocaleString("id-ID")}
-`;
+let REFF_ID = null;
 
-/* ================= CRC16 QRIS ================= */
-function crc16(data){
-  let crc = 0xFFFF;
-  for(let i=0;i<data.length;i++){
-    crc ^= data.charCodeAt(i)<<8;
-    for(let j=0;j<8;j++){
-      crc = (crc & 0x8000) ? (crc<<1)^0x1021 : crc<<1;
-      crc &= 0xFFFF;
-    }
-  }
-  return crc.toString(16).toUpperCase().padStart(4,"0");
-}
-
-/* ================= BUILD QRIS + FEE ================= */
-function buildQris(amount){
-  const totalPay = amount + FEE;
-  const nominal = totalPay.toString();
-  const tag54 = "54" + nominal.length.toString().padStart(2,"0") + nominal;
-  const payload = BASE_QRIS + tag54 + "6304";
-  return payload + crc16(payload);
-}
-
-/* ================= GENERATE QR ================= */
-const qrisData = buildQris(total);
-QRCode.toCanvas(document.getElementById("qrisCanvas"), qrisData, { width:260 });
-
-/* ================= AUTO CHECK STATUS ================= */
-setInterval(async ()=>{
+/* ================= CREATE QR ================= */
+async function createQR(){
   try{
+    REFF_ID = "QR" + Date.now();
+
     const body = new URLSearchParams({
-      api_key: API_KEY,
-      reff_id: trxID
+      api_key: ORKUT_APIKEY,
+      reff_id: REFF_ID,
+      nominal: total,
+      metode: "QRIS"
     });
 
-    const res = await fetch(ATLANTIC_URL,{
+    const res = await fetch(`${ORKUT_BASE}/deposit/create`,{
       method:"POST",
       headers:{ "Content-Type":"application/x-www-form-urlencoded" },
-      body: body.toString()
+      body
     });
 
-    const data = await res.json();
-    if(!data.status) return;
-
-    const status = data.status.toLowerCase();
-
-    if(status === "paid" || status === "success"){
-      paymentSuccess();
+    const json = await res.json();
+    if(!json || !json.data?.qr_image){
+      throw "QR gagal dibuat";
     }
 
-    if(status === "failed"){
-      updateStatus("failed","❌ Pembayaran gagal");
+    document.getElementById("info").innerHTML = `
+      <b>ID Transaksi:</b> ${REFF_ID}<br>
+      <b>Layanan:</b> ${layanan}<br>
+      <b>Nominal:</b> Rp ${amount.toLocaleString("id-ID")}<br>
+      <b>Fee:</b> Rp 500<br>
+      <b>Total:</b> <b>Rp ${total.toLocaleString("id-ID")}</b>
+    `;
+
+    const img = document.getElementById("qrisImg");
+    img.src = json.data.qr_image;
+    img.style.display = "block";
+
+    updateStatus("pending","⏳ Menunggu pembayaran...");
+
+    startCheck();
+
+  }catch(e){
+    console.error(e);
+    updateStatus("failed","❌ Gagal membuat QR");
+  }
+}
+
+/* ================= CHECK STATUS ================= */
+function startCheck(){
+  setInterval(async ()=>{
+    if(!REFF_ID) return;
+
+    try{
+      const body = new URLSearchParams({
+        api_key: ORKUT_APIKEY,
+        reff_id: REFF_ID
+      });
+
+      const res = await fetch(`${ORKUT_BASE}/deposit/status`,{
+        method:"POST",
+        headers:{ "Content-Type":"application/x-www-form-urlencoded" },
+        body
+      });
+
+      const json = await res.json();
+      const status = json?.data?.status?.toLowerCase();
+
+      if(status === "success"){
+        paymentSuccess();
+      } else if(status === "failed"){
+        updateStatus("failed","❌ Pembayaran gagal");
+      }
+
+    }catch(e){
+      console.error("Status error",e);
     }
 
-  }catch(e){}
-},5000);
+  },5000);
+}
 
 /* ================= UI ================= */
-function updateStatus(type,text){
-  const el = document.getElementById("paymentStatus");
-  el.className = "status " + type;
+function updateStatus(cls,text){
+  const el = document.getElementById("status");
+  el.className = "status " + cls;
   el.innerText = text;
 }
 
@@ -157,10 +161,15 @@ function paymentSuccess(){
   Swal.fire({
     icon:"success",
     title:"Pembayaran Berhasil",
-    text:"Pesanan akan diproses otomatis"
+    text:"Pesanan sedang diproses"
   });
-  setTimeout(()=>location.href="/dashboard/",3000);
+  setTimeout(()=>{
+    location.href="/dashboard";
+  },3000);
 }
+
+/* ================= INIT ================= */
+createQR();
 </script>
 
 </body>
