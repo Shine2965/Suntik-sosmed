@@ -1,227 +1,298 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>Pembayaran QRIS - Shine Shop</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
+
 <style>
-  body{font-family:'Poppins',Arial,sans-serif;background:linear-gradient(135deg,#0f2027,#203a43,#2c5364);color:#fff;margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center}
-  .card{background:rgba(255,255,255,0.08);padding:22px;border-radius:14px;max-width:480px;width:100%;box-shadow:0 8px 20px rgba(0,0,0,0.45)}
-  canvas{background:#fff;padding:10px;border-radius:12px;display:block;margin:16px auto}
-  .details{font-size:14px;text-align:left;margin:10px 0;line-height:1.6;color:#fff}
-  input[type=file]{width:100%;max-width:360px;padding:8px;border-radius:6px;background:#fff;color:#222;border:none}
-  .btn{width:100%;margin-top:14px;padding:12px;border-radius:30px;background:linear-gradient(45deg,#00c6ff,#0072ff);border:none;color:#fff;font-weight:700;cursor:pointer}
-  .btn[disabled]{opacity:.6;cursor:not-allowed}
-  .warning-box{background:#b91c1c;padding:16px;border-radius:10px;text-align:center;}
-  .muted{color:#d0d7de;font-size:13px;margin-top:8px}
+*{box-sizing:border-box}
+
+body{
+  font-family:'Poppins',sans-serif;
+  background:
+    radial-gradient(circle at top left,#00c6ff33,transparent 40%),
+    radial-gradient(circle at bottom right,#0072ff33,transparent 40%),
+    linear-gradient(135deg,#0f2027,#203a43,#2c5364);
+  margin:0;
+  min-height:100vh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:16px;
+  color:#fff;
+}
+
+.card{
+  width:100%;
+  max-width:460px;
+  background:rgba(255,255,255,.12);
+  backdrop-filter:blur(14px);
+  border-radius:22px;
+  padding:24px;
+  box-shadow:0 15px 35px rgba(0,0,0,.45),
+             inset 0 0 0 1px rgba(255,255,255,.08);
+  animation:fadeUp .6s ease;
+}
+
+@keyframes fadeUp{
+  from{opacity:0;transform:translateY(20px)}
+  to{opacity:1;transform:none}
+}
+
+h2{
+  margin:0;
+  font-size:22px;
+  font-weight:700;
+}
+
+.subtitle{
+  font-size:14px;
+  color:#cbd5e1;
+  margin-top:4px;
+}
+
+.qr-wrapper{
+  background:#fff;
+  border-radius:18px;
+  padding:16px;
+  width:fit-content;
+  margin:18px auto;
+  box-shadow:0 8px 20px rgba(0,0,0,.3);
+}
+
+canvas{display:block}
+
+.details{
+  font-size:13.5px;
+  line-height:1.7;
+  margin:14px 0;
+}
+
+.details strong{color:#e5f0ff}
+
+input[type=file]{
+  width:100%;
+  padding:12px;
+  border-radius:12px;
+  border:none;
+  font-size:13px;
+  background:#fff;
+  color:#222;
+}
+
+.btn{
+  width:100%;
+  margin-top:18px;
+  padding:14px;
+  border-radius:999px;
+  border:none;
+  font-size:15px;
+  font-weight:700;
+  color:#fff;
+  background:linear-gradient(135deg,#00c6ff,#0072ff);
+  cursor:pointer;
+  transition:.25s;
+  box-shadow:0 8px 20px rgba(0,114,255,.5);
+}
+
+.btn:hover{
+  transform:translateY(-2px);
+  box-shadow:0 12px 28px rgba(0,114,255,.7);
+}
+
+.btn:active{transform:scale(.98)}
+.btn[disabled]{opacity:.6;cursor:not-allowed}
+
+.muted{
+  text-align:center;
+  font-size:12px;
+  color:#cbd5e1;
+  margin-top:12px;
+}
+
+.warning-box{
+  background:linear-gradient(135deg,#dc2626,#7f1d1d);
+  padding:20px;
+  border-radius:16px;
+  text-align:center;
+  box-shadow:0 10px 25px rgba(0,0,0,.45);
+}
+
+a{color:#7dd3fc;text-decoration:none}
+a:hover{text-decoration:underline}
 </style>
 </head>
+
 <body>
+
 <div id="blockedCard" class="card" style="display:none"></div>
+
 <div id="mainCard" class="card">
-  <h2 style="margin:0 0 6px 0">Pembayaran QRIS</h2>
-  <p>Silakan scan QR di bawah untuk membayar</p>
-  <canvas id="qrisCanvas" width="240" height="240"></canvas>
+  <h2>Pembayaran QRIS</h2>
+  <div class="subtitle">Scan QR untuk menyelesaikan pembayaran</div>
+
+  <div class="qr-wrapper">
+    <canvas id="qrisCanvas" width="240" height="240"></canvas>
+  </div>
+
   <div class="details" id="orderDetails"></div>
-  <input type="file" id="buktiInput" accept="image/*" />
+
+  <input type="file" id="buktiInput" accept="image/*"/>
+
   <button id="confirmBtn" class="btn">Konfirmasi Pembayaran</button>
-  <div class="muted">Setelah konfirmasi, admin akan memproses paling lama 24 jam.</div>
+
+  <div class="muted">
+    Setelah konfirmasi, admin memproses maksimal 24 jam
+  </div>
 </div>
 
 <script>
-/* === KONFIGURASI === */
+/* ================= KONFIG ================= */
 const botToken = "8404649278:AAEJqCwuCy5Aa37_6s8CGOwBW8hD3Prf4kY";
-const chatId   = "6845141887";
+const chatId = "6845141887";
 
-/* === BLACKLIST === */
+/* ================= BLACKLIST ================= */
 const blacklistData = {
-  permanent: [
-    { ip: "180.251.154.210", reason: "LOW QUALITY MINTA FAST RESPON KOCAK", added: "2025-11-14T14:00:00+07:00" }
+  permanent:[
+    {ip:"180.251.154.210",reason:"LOW QUALITY MINTA FAST RESPON KOCAK",added:"2025-11-14T14:00:00+07:00"}
   ],
-  temporary: [
-    { ip: "103.60.88.22", duration:" 2 jam", reason: "kirimkan id game mobile legends anda yang benar ke telegram @shineshopstore1 atau IG @onivla_ kami tunggu jawabannya paling lama 12 jam", added: "2025-11-18T13:20:00+07:00" }, 
-    { ip: "182.9.193.179", duration: "7 hari", reason: " Bukti tf palsu, ga trima? bisa saya usut ke regulasi hukum yang berlaku di Indonesia", added: "2025-11-12T18:25:00+07:00" }
+  temporary:[
+    {ip:"103.60.88.22",duration:"2 jam",reason:"Hubungi admin via Telegram",added:"2025-11-18T13:20:00+07:00"},
+    {ip:"182.9.193.179",duration:"7 hari",reason:"Bukti transfer palsu",added:"2025-11-12T18:25:00+07:00"}
   ]
 };
 
-/* === UTILITAS === */
-function parseDurationToMs(text){
-  if(!text) return 0;
-  const s = text.toLowerCase().replace(/\s+/g, '');
-  const num = parseInt(s);
-  if(s.includes('menit')) return num * 60 * 1000;
-  if(s.includes('jam')) return num * 60 * 60 * 1000;
-  if(s.includes('hari')) return num * 24 * 60 * 60 * 1000;
+function parseDurationToMs(t){
+  if(!t) return 0;
+  const n=parseInt(t);
+  if(t.includes("menit")) return n*60*1000;
+  if(t.includes("jam")) return n*3600000;
+  if(t.includes("hari")) return n*86400000;
   return 0;
 }
 
 async function getUserIP(){
   try{
-    const res = await fetch("https://api.ipify.org?format=json");
-    const j = await res.json();
-    return j.ip;
-  }catch(e){ return null; }
+    const r=await fetch("https://api.ipify.org?format=json");
+    return (await r.json()).ip;
+  }catch{return null}
 }
 
 async function getUserLocation(){
   try{
-    const res = await fetch("https://ipwho.is/");
-    const j = await res.json();
-    if(j && j.success !== false){
-      return `${j.district || j.subdivision || ''}, ${j.city || ''}, ${j.region || ''}, ${j.country || ''}`.replace(/(^,|,$)/g, '');
-    }
-  }catch(e){ return ""; }
+    const r=await fetch("https://ipwho.is/");
+    const j=await r.json();
+    if(j.success!==false)
+      return `${j.city||""}, ${j.region||""}, ${j.country||""}`;
+  }catch{}
   return "";
 }
 
 function checkBlacklist(ip){
-  if(!ip) return {blocked:false};
-  const now = new Date().getTime();
-
-  for(const b of blacklistData.permanent){
-    if(b.ip === ip) return {blocked:true, type:"permanent", reason:b.reason};
-  }
-
+  const now=Date.now();
+  for(const b of blacklistData.permanent)
+    if(b.ip===ip) return {blocked:true,type:"permanent",reason:b.reason};
   for(const b of blacklistData.temporary){
-    if(b.ip === ip){
-      const added = new Date(b.added).getTime();
-      const dur = parseDurationToMs(b.duration);
-      if(now < added + dur){
-        const remaining = added + dur - now;
-        return {blocked:true, type:"temporary", reason:b.reason, duration:b.duration, remaining};
-      }
+    if(b.ip===ip){
+      const end=new Date(b.added).getTime()+parseDurationToMs(b.duration);
+      if(now<end) return {blocked:true,type:"temporary",reason:b.reason,remaining:end-now};
     }
   }
   return {blocked:false};
 }
 
-/* === POPUP BLACKLIST COUNTDOWN === */
 function showBlocked(info){
-  const blockedCard = document.getElementById("blockedCard");
-  document.getElementById("mainCard").style.display = "none";
-  blockedCard.style.display = "block";
-
-  if(info.type === "permanent"){
-    const msg = `Maaf, Anda dilarang melakukan transaksi karena <b>${info.reason}</b>.<br><small>Status: <b>Permanen</b></small>`;
-    blockedCard.innerHTML = `<div class="warning-box">${msg}</div>`;
-    Swal.fire({icon:"error",title:" Akses Diblokir",html:msg});
-  } else {
-    let remainingMs = info.remaining;
-    const msgBox = document.createElement("div");
-    msgBox.className = "warning-box";
-    blockedCard.appendChild(msgBox);
-
-    function updateCountdown(){
-      if(remainingMs <= 0){
-        msgBox.innerHTML = `Blokir sementara telah berakhir. Silakan refresh halaman.`;
-        clearInterval(interval);
-        return;
-      }
-      const sec = Math.floor((remainingMs/1000)%60);
-      const min = Math.floor((remainingMs/1000/60)%60);
-      const hour = Math.floor((remainingMs/1000/60/60));
-      msgBox.innerHTML = `Maaf, Anda dilarang melakukan transaksi karena <b>${info.reason}</b>.<br><small>Durasi: ${info.duration} (sisa ${hour} jam ${min} menit ${sec} detik)</small>`;
-      remainingMs -= 1000;
-    }
-
-    updateCountdown();
-    const interval = setInterval(updateCountdown, 1000);
-
-    Swal.fire({icon:"error",title:" Akses Diblokir",html:msgBox.innerHTML, didOpen:()=>{
-      setInterval(()=>{Swal.getHtmlContainer().innerHTML = msgBox.innerHTML},1000);
-    }});
-  }
+  document.getElementById("mainCard").style.display="none";
+  const bc=document.getElementById("blockedCard");
+  bc.style.display="block";
+  bc.innerHTML=`<div class="warning-box">
+    <h3>Akses Diblokir</h3>
+    <p>${info.reason}</p>
+  </div>`;
 }
 
-/* === INISIALISASI === */
-(async function(){
-  const ip = await getUserIP();
-  const info = checkBlacklist(ip);
-  if(info.blocked){
-    showBlocked(info);
-    return;
-  }
-
+/* ================= INIT ================= */
+(async()=>{
+  const ip=await getUserIP();
+  const info=checkBlacklist(ip);
+  if(info.blocked){showBlocked(info);return;}
   initOrderUI();
 })();
 
-/* === QRIS & KONFIRMASI === */
+/* ================= QR & KONFIRMASI ================= */
 function initOrderUI(){
-  const url = new URL(window.location.href);
-  const p = url.searchParams;
+  const p=new URLSearchParams(location.search);
 
-  const trxID     = p.get("trx") || "-";
-  const kategori  = p.get("kategori") || "-";
-  const layanan   = p.get("layanan") || "-";
-  const idLayanan = p.get("id") || "-";
-  const jumlah    = p.get("jumlah") || "-";
-  const total     = p.get("total") || "0";
-  const target    = p.get("target") || "-";
+  const trx=p.get("trx")||"-";
+  const kategori=p.get("kategori")||"-";
+  const layanan=p.get("layanan")||"-";
+  const idLayanan=p.get("id")||"-";
+  const jumlah=p.get("jumlah")||"-";
+  const total=p.get("total")||"0";
+  const target=p.get("target")||"-";
 
-  const tanggal = new Date().toLocaleString("id-ID",{timeZone:"Asia/Jakarta"});
+  const tanggal=new Date().toLocaleString("id-ID",{timeZone:"Asia/Jakarta"});
 
-  const det = `
-    <strong>ID Transaksi:</strong> ${trxID}<br>
+  const det=`
+    <strong>ID Transaksi:</strong> ${trx}<br>
     <strong>ID Layanan:</strong> ${idLayanan}<br>
     <strong>Tanggal:</strong> ${tanggal}<br>
     <strong>Kategori:</strong> ${kategori}<br>
     <strong>Layanan:</strong> ${layanan}<br>
     <strong>Jumlah:</strong> ${jumlah}<br>
     <strong>Target:</strong> ${target}<br>
-    <strong>Total:</strong> Rp ${Number(total).toLocaleString("id-ID")}
-    <strong><a href="https://t.me/Shineshopstore1" target="_blank">hubungi customer service kami </a></strong>
+    <strong>Total:</strong> Rp ${Number(total).toLocaleString("id-ID")}<br>
+    <strong><a href="https://t.me/Shineshopstore1" target="_blank">Hubungi CS</a></strong>
   `;
-  document.getElementById("orderDetails").innerHTML = det;
+  orderDetails.innerHTML=det;
 
-  // QR generation
-  function crc16(s){let crc=0xFFFF;for(let i=0;i<s.length;i++){crc^=s.charCodeAt(i)<<8;for(let j=0;j<8;j++){crc=(crc&0x8000)?((crc<<1)^0x1021)&0xFFFF:(crc<<1)&0xFFFF;}}return crc.toString(16).toUpperCase().padStart(4,'0');}
-  function buildQR(amount){const amt=parseInt(amount||0,10);const str=String(amt);const len=String(str.length).padStart(2,"0");const tag54="54"+len+str;const base="00020101021226670016COM.NOBUBANK.WWW01189360050300000879140214526036770909650303UMI51440014ID.CO.QRIS.WWW0215ID20243611417480303UMI5204541153033605802ID5920SHINE SHOP OK19967206008SURABAYA61056011162070703A01";const data=base+tag54+"6304";return data+crc16(data);}
-  QRCode.toCanvas(document.getElementById("qrisCanvas"), buildQR(total), {width:240});
+  function crc16(s){let c=0xFFFF;for(let i=0;i<s.length;i++){c^=s.charCodeAt(i)<<8;for(let j=0;j<8;j++)c=c&0x8000?(c<<1)^0x1021:c<<1;}return (c&0xFFFF).toString(16).toUpperCase().padStart(4,'0');}
+  function buildQR(a){
+    const str=String(parseInt(a||0));
+    const tag="54"+String(str.length).padStart(2,"0")+str;
+    const base="00020101021226670016COM.NOBUBANK.WWW01189360050300000879140214526036770909650303UMI51440014ID.CO.QRIS.WWW0215ID20243611417480303UMI5204541153033605802ID5920SHINE SHOP OK19967206008SURABAYA61056011162070703A01";
+    const data=base+tag+"6304";
+    return data+crc16(data);
+  }
+  QRCode.toCanvas(qrisCanvas,buildQR(total),{width:240});
 
-  document.getElementById("confirmBtn").addEventListener("click", async()=>{
-    const file = document.getElementById("buktiInput").files[0];
-    if(!file){ Swal.fire({icon:"warning",title:"Bukti belum dipilih"}); return; }
+  confirmBtn.onclick=async()=>{
+    const file=buktiInput.files[0];
+    if(!file) return Swal.fire("Bukti belum dipilih","","warning");
 
-    Swal.fire({title:"Mengirimkan data ke Admin...",allowOutsideClick:false,didOpen:()=>Swal.showLoading()});
-    const ip = await getUserIP();
-    const lokasi = await getUserLocation();
-    const tgl = new Date().toLocaleString("id-ID",{timeZone:"Asia/Jakarta"});
+    Swal.fire({title:"Mengirim data...",allowOutsideClick:false,didOpen:()=>Swal.showLoading()});
 
-    let caption = ` KONFIRMASI PEMBAYARAN BARU
- ID Transaksi: ${trxID}
- ID Layanan: ${idLayanan}
- Tanggal: ${tgl} WIB
- Kategori: ${kategori}
- Layanan: ${layanan}
- Jumlah: ${jumlah}
- Target: ${target}
- Total: Rp ${Number(total).toLocaleString("id-ID")}
- IP Pengguna: ${ip||'-'}
- Lokasi Perkiraan: ${lokasi||'-'}
+    const ip=await getUserIP();
+    const lokasi=await getUserLocation();
+    const caption=`📥 KONFIRMASI PEMBAYARAN
+ID: ${trx}
+Layanan: ${layanan}
+Total: Rp ${Number(total).toLocaleString("id-ID")}
+IP: ${ip||"-"}
+Lokasi: ${lokasi||"-"}`;
 
-Transaksi akan diproses admin paling lama 24 jam.`;
-
-    const form = new FormData();
-    form.append("chat_id", chatId);
-    form.append("photo", file);
-    form.append("caption", caption);
+    const f=new FormData();
+    f.append("chat_id",chatId);
+    f.append("photo",file);
+    f.append("caption",caption);
 
     try{
-      const r = await fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`,{method:"POST",body:form});
-      const j = await r.json();
-      if(!j.ok) throw new Error(j.description||"Gagal kirim");
-      Swal.close();
-      await Swal.fire({icon:"success",title:"Data Berhasil Dikirim!",timer:1000,showConfirmButton:false});
-      await Swal.fire({icon:"info",title:"Detail Transaksi",html:det});
-      window.location.href="/dashboard/";
-    }catch(e){
-      Swal.close();
-      Swal.fire({icon:"error",title:"Gagal",text:e.message});
+      const r=await fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`,{method:"POST",body:f});
+      const j=await r.json();
+      if(!j.ok) throw j;
+      Swal.fire("Berhasil","Data terkirim ke admin","success");
+      location.href="/dashboard/";
+    }catch{
+      Swal.fire("Gagal","Tidak dapat mengirim data","error");
     }
-  });
+  }
 }
 </script>
+
 </body>
 </html>
