@@ -11,7 +11,6 @@
 
 <style>
 *{box-sizing:border-box}
-
 body{
   font-family:'Poppins',sans-serif;
   background:
@@ -26,7 +25,6 @@ body{
   padding:16px;
   color:#fff;
 }
-
 .card{
   width:100%;
   max-width:460px;
@@ -36,99 +34,39 @@ body{
   padding:24px;
   box-shadow:0 15px 35px rgba(0,0,0,.45),
              inset 0 0 0 1px rgba(255,255,255,.08);
-  animation:fadeUp .6s ease;
 }
-
-@keyframes fadeUp{
-  from{opacity:0;transform:translateY(20px)}
-  to{opacity:1;transform:none}
-}
-
-h2{
-  margin:0;
-  font-size:22px;
-  font-weight:700;
-}
-
-.subtitle{
-  font-size:14px;
-  color:#cbd5e1;
-  margin-top:4px;
-}
-
+h2{margin:0;font-size:22px;font-weight:700}
+.subtitle{font-size:14px;color:#cbd5e1;margin-top:4px}
 .qr-wrapper{
-  background:#fff;
-  border-radius:18px;
-  padding:16px;
-  width:fit-content;
-  margin:18px auto;
-  box-shadow:0 8px 20px rgba(0,0,0,.3);
+  background:#fff;border-radius:18px;padding:16px;
+  width:fit-content;margin:18px auto;
 }
-
-canvas{display:block}
-
-.details{
-  font-size:13.5px;
-  line-height:1.7;
-  margin:14px 0;
+.details{font-size:13.5px;line-height:1.7}
+input{
+  width:100%;padding:12px;border-radius:12px;
+  border:none;margin-top:10px;font-size:13px;
 }
-
-.details strong{color:#e5f0ff}
-
-input[type=file]{
-  width:100%;
-  padding:12px;
-  border-radius:12px;
-  border:none;
-  font-size:13px;
-  background:#fff;
-  color:#222;
-}
-
 .btn{
-  width:100%;
-  margin-top:18px;
-  padding:14px;
-  border-radius:999px;
-  border:none;
-  font-size:15px;
-  font-weight:700;
-  color:#fff;
+  width:100%;margin-top:18px;padding:14px;
+  border-radius:999px;border:none;font-size:15px;
+  font-weight:700;color:#fff;
   background:linear-gradient(135deg,#00c6ff,#0072ff);
   cursor:pointer;
-  transition:.25s;
-  box-shadow:0 8px 20px rgba(0,114,255,.5);
 }
-
-.btn:hover{
-  transform:translateY(-2px);
-  box-shadow:0 12px 28px rgba(0,114,255,.7);
-}
-
-.btn:active{transform:scale(.98)}
-.btn[disabled]{opacity:.6;cursor:not-allowed}
-
-.muted{
-  text-align:center;
-  font-size:12px;
-  color:#cbd5e1;
-  margin-top:12px;
-}
-
+.muted{text-align:center;font-size:12px;color:#cbd5e1;margin-top:12px}
 .warning-box{
   background:linear-gradient(135deg,#dc2626,#7f1d1d);
-  padding:20px;
-  border-radius:16px;
-  text-align:center;
-  box-shadow:0 10px 25px rgba(0,0,0,.45);
+  padding:20px;border-radius:16px;text-align:center;
 }
-
-a{color:#7dd3fc;text-decoration:none}
-a:hover{text-decoration:underline}
 </style>
 </head>
 
 <body>
+
+<!-- BACKSOUND AUTO PLAY -->
+<audio autoplay loop hidden>
+  <source src="https://files.catbox.moe/1120of.mp3" type="audio/mpeg">
+</audio>
 
 <div id="blockedCard" class="card" style="display:none"></div>
 
@@ -142,7 +80,9 @@ a:hover{text-decoration:underline}
 
   <div class="details" id="orderDetails"></div>
 
-  <input type="file" id="buktiInput" accept="image/*"/>
+  <input type="text" id="namaInput" placeholder="Nama Lengkap">
+  <input type="email" id="gmailInput" placeholder="Gmail Aktif">
+  <input type="file" id="buktiInput" accept="image/*">
 
   <button id="confirmBtn" class="btn">Konfirmasi Pembayaran</button>
 
@@ -152,147 +92,108 @@ a:hover{text-decoration:underline}
 </div>
 
 <script>
-/* ================= KONFIG ================= */
+/* KONFIG */
 const botToken = "8404649278:AAEJqCwuCy5Aa37_6s8CGOwBW8hD3Prf4kY";
 const chatId = "6845141887";
+const channelId = "-1002112920606";
 
-/* ================= BLACKLIST ================= */
-const blacklistData = {
-  permanent:[
-    {ip:"180.251.154.210",reason:"LOW QUALITY MINTA FAST RESPON KOCAK",added:"2025-11-14T14:00:00+07:00"}
-  ],
-  temporary:[
-    {ip:"103.60.88.22",duration:"2 jam",reason:"Hubungi admin via Telegram",added:"2025-11-18T13:20:00+07:00"},
-    {ip:"182.9.193.179",duration:"7 hari",reason:"Bukti transfer palsu",added:"2025-11-12T18:25:00+07:00"}
-  ]
-};
-
-function parseDurationToMs(t){
-  if(!t) return 0;
-  const n=parseInt(t);
-  if(t.includes("menit")) return n*60*1000;
-  if(t.includes("jam")) return n*3600000;
-  if(t.includes("hari")) return n*86400000;
-  return 0;
+/* UTIL */
+function maskGmail(email){
+  if(!email.includes("@")) return email;
+  const [n,d] = email.split("@");
+  return n.slice(0,2)+"****@"+d;
 }
 
 async function getUserIP(){
   try{
     const r=await fetch("https://api.ipify.org?format=json");
     return (await r.json()).ip;
-  }catch{return null}
+  }catch{return "-"}
 }
 
 async function getUserLocation(){
   try{
     const r=await fetch("https://ipwho.is/");
     const j=await r.json();
-    if(j.success!==false)
-      return `${j.city||""}, ${j.region||""}, ${j.country||""}`;
-  }catch{}
-  return "";
+    return `${j.city||""}, ${j.country||""}`;
+  }catch{return "-"}
 }
 
-function checkBlacklist(ip){
-  const now=Date.now();
-  for(const b of blacklistData.permanent)
-    if(b.ip===ip) return {blocked:true,type:"permanent",reason:b.reason};
-  for(const b of blacklistData.temporary){
-    if(b.ip===ip){
-      const end=new Date(b.added).getTime()+parseDurationToMs(b.duration);
-      if(now<end) return {blocked:true,type:"temporary",reason:b.reason,remaining:end-now};
-    }
+/* INIT */
+const p=new URLSearchParams(location.search);
+const trx=p.get("trx")||"-";
+const kategori=p.get("kategori")||"-";
+const layanan=p.get("layanan")||"-";
+const total=p.get("total")||"0";
+const target=p.get("target")||"-";
+
+orderDetails.innerHTML=`
+<strong>ID Transaksi:</strong> ${trx}<br>
+<strong>Kategori:</strong> ${kategori}<br>
+<strong>Layanan:</strong> ${layanan}<br>
+<strong>Target:</strong> ${target}<br>
+<strong>Total:</strong> Rp ${Number(total).toLocaleString("id-ID")}
+`;
+
+function crc16(s){
+  let c=0xFFFF;
+  for(let i=0;i<s.length;i++){
+    c^=s.charCodeAt(i)<<8;
+    for(let j=0;j<8;j++)
+      c=c&0x8000?(c<<1)^0x1021:c<<1;
   }
-  return {blocked:false};
+  return (c&0xFFFF).toString(16).toUpperCase().padStart(4,'0');
 }
 
-function showBlocked(info){
-  document.getElementById("mainCard").style.display="none";
-  const bc=document.getElementById("blockedCard");
-  bc.style.display="block";
-  bc.innerHTML=`<div class="warning-box">
-    <h3>Akses Diblokir</h3>
-    <p>${info.reason}</p>
-  </div>`;
+function buildQR(a){
+  const str=String(parseInt(a));
+  const tag="54"+String(str.length).padStart(2,"0")+str;
+  const base="00020101021226670016COM.NOBUBANK.WWW01189360050300000879140214526036770909650303UMI51440014ID.CO.QRIS.WWW0215ID20243611417480303UMI5204541153033605802ID5920SHINE SHOP OK19967206008SURABAYA61056011162070703A01";
+  const d=base+tag+"6304";
+  return d+crc16(d);
 }
 
-/* ================= INIT ================= */
-(async()=>{
+QRCode.toCanvas(qrisCanvas,buildQR(total),{width:240});
+
+/* KONFIRMASI */
+confirmBtn.onclick=async()=>{
+  const nama=namaInput.value.trim();
+  const gmail=gmailInput.value.trim();
+  const file=buktiInput.files[0];
+
+  if(!nama||!gmail||!file)
+    return Swal.fire("Lengkapi Data","","warning");
+
+  Swal.fire({title:"Mengirim...",didOpen:()=>Swal.showLoading()});
+
   const ip=await getUserIP();
-  const info=checkBlacklist(ip);
-  if(info.blocked){showBlocked(info);return;}
-  initOrderUI();
-})();
+  const lokasi=await getUserLocation();
+  const gMask=maskGmail(gmail);
 
-/* ================= QR & KONFIRMASI ================= */
-function initOrderUI(){
-  const p=new URLSearchParams(location.search);
+  const caption=`
+🚨 TRANSAKSI BARU !
 
-  const trx=p.get("trx")||"-";
-  const kategori=p.get("kategori")||"-";
-  const layanan=p.get("layanan")||"-";
-  const idLayanan=p.get("id")||"-";
-  const jumlah=p.get("jumlah")||"-";
-  const total=p.get("total")||"0";
-  const target=p.get("target")||"-";
+ID TRANSAKSI: ${trx}
+KATEGORI: ${kategori}
+LAYANAN: ${layanan}
+NAMA: ${nama}
+GMAIL: ${gMask}
 
-  const tanggal=new Date().toLocaleString("id-ID",{timeZone:"Asia/Jakarta"});
+Terima kasih sudah memesan di
+fine.shinedomain.my.id
+`;
 
-  const det=`
-    <strong>ID Transaksi:</strong> ${trx}<br>
-    <strong>ID Layanan:</strong> ${idLayanan}<br>
-    <strong>Tanggal:</strong> ${tanggal}<br>
-    <strong>Kategori:</strong> ${kategori}<br>
-    <strong>Layanan:</strong> ${layanan}<br>
-    <strong>Jumlah:</strong> ${jumlah}<br>
-    <strong>Target:</strong> ${target}<br>
-    <strong>Total:</strong> Rp ${Number(total).toLocaleString("id-ID")}<br>
-    <strong><a href="https://t.me/Shineshopstore1" target="_blank">Hubungi CS</a></strong>
-  `;
-  orderDetails.innerHTML=det;
+  let f=new FormData();
+  f.append("chat_id",channelId);
+  f.append("photo",file);
+  f.append("caption",caption);
 
-  function crc16(s){let c=0xFFFF;for(let i=0;i<s.length;i++){c^=s.charCodeAt(i)<<8;for(let j=0;j<8;j++)c=c&0x8000?(c<<1)^0x1021:c<<1;}return (c&0xFFFF).toString(16).toUpperCase().padStart(4,'0');}
-  function buildQR(a){
-    const str=String(parseInt(a||0));
-    const tag="54"+String(str.length).padStart(2,"0")+str;
-    const base="00020101021226670016COM.NOBUBANK.WWW01189360050300000879140214526036770909650303UMI51440014ID.CO.QRIS.WWW0215ID20243611417480303UMI5204541153033605802ID5920SHINE SHOP OK19967206008SURABAYA61056011162070703A01";
-    const data=base+tag+"6304";
-    return data+crc16(data);
-  }
-  QRCode.toCanvas(qrisCanvas,buildQR(total),{width:240});
+  await fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`,{
+    method:"POST",body:f
+  });
 
-  confirmBtn.onclick=async()=>{
-    const file=buktiInput.files[0];
-    if(!file) return Swal.fire("Bukti belum dipilih","","warning");
-
-    Swal.fire({title:"Mengirim data...",allowOutsideClick:false,didOpen:()=>Swal.showLoading()});
-
-    const ip=await getUserIP();
-    const lokasi=await getUserLocation();
-    const caption=`📥 KONFIRMASI PEMBAYARAN
-ID: ${trx}
-Layanan: ${layanan}
-Target: ${target}
-Total: Rp ${Number(total).toLocaleString("id-ID")}
-IP: ${ip||"-"}
-Lokasi: ${lokasi||"-"}`;
-
-    const f=new FormData();
-    f.append("chat_id",chatId);
-    f.append("photo",file);
-    f.append("caption",caption);
-
-    try{
-      const r=await fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`,{method:"POST",body:f});
-      const j=await r.json();
-      if(!j.ok) throw j;
-      Swal.fire("Berhasil","Data terkirim ke admin","success");
-      location.href="/dashboard/";
-    }catch{
-      Swal.fire("Gagal","Tidak dapat mengirim data","error");
-    }
-  }
-}
+  Swal.fire("Berhasil","Pembayaran dikirim","success");
+};
 </script>
 
 </body>
