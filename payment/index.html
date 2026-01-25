@@ -80,8 +80,8 @@ const ownerChatId = "6845141887";
 const channelId = "-1002112920606";
 
 /* UTIL */
-function maskGmail(e){
-  const [n,d]=e.split("@");
+function maskGmail(email){
+  const [n,d]=email.split("@");
   return n.slice(0,2)+"****@"+d;
 }
 async function getUserIP(){
@@ -145,60 +145,51 @@ confirmBtn.onclick=async()=>{
 
   const ip=await getUserIP();
   const lokasi=await getUserLocation();
-  const gMask=maskGmail(gmail);
 
-  /* NOTIF OWNER (TEXT) */
-  const ownerText = `
-📥 KONFIRMASI PEMBAYARAN
-ID: ${trx}
-Layanan: ${layanan}
-Target: ${target}
-Total: Rp ${Number(total).toLocaleString("id-ID")}
-IP: ${ip}
-Lokasi: ${lokasi}
-`;
+  const gmailAsli = gmail;
+  const gmailMask = maskGmail(gmail);
 
+  /* TEXT OWNER (GMAIL ASLI) */
   await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`,{
     method:"POST",
     headers:{'Content-Type':'application/json'},
     body:JSON.stringify({
       chat_id: ownerChatId,
-      text: ownerText
+      text: `📥 KONFIRMASI PEMBAYARAN
+ID: ${trx}
+Layanan: ${layanan}
+Target: ${target}
+Total: Rp ${Number(total).toLocaleString("id-ID")}
+Gmail: ${gmailAsli}
+IP: ${ip}
+Lokasi: ${lokasi}`
     })
   });
 
-  /* FOTO KE OWNER */
+  /* FOTO OWNER */
   let f1=new FormData();
   f1.append("chat_id",ownerChatId);
   f1.append("photo",file);
-  f1.append("caption",`Bukti pembayaran dari ${nama} (${gMask})`);
+  f1.append("caption",`Bukti pembayaran dari ${nama} (${gmailAsli})`);
+  await fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`,{method:"POST",body:f1});
 
-  await fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`,{
-    method:"POST",body:f1
-  });
-
-  /* NOTIF CHANNEL */
+  /* FOTO + TRANSAKSI BARU CHANNEL (GMAIL DISENSOR) */
   let f2=new FormData();
   f2.append("chat_id",channelId);
   f2.append("photo",file);
-  f2.append("caption",`
-🚨 TRANSAKSI BARU !
+  f2.append("caption",`🚨 TRANSAKSI BARU !
 
 ID TRANSAKSI: ${trx}
 KATEGORI: ${kategori}
 LAYANAN: ${layanan}
 NAMA: ${nama}
-GMAIL: ${gMask}
+GMAIL: ${gmailMask}
 
 Terima kasih sudah memesan di
-fine.shinedomain.my.id
-`);
+fine.shinedomain.my.id`);
+  await fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`,{method:"POST",body:f2});
 
-  await fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`,{
-    method:"POST",body:f2
-  });
-
-  Swal.fire("Berhasil","Konfirmasi terkirim","success");
+  Swal.fire("Berhasil","Konfirmasi pembayaran terkirim","success");
 };
 </script>
 
