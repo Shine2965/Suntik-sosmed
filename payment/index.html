@@ -17,30 +17,20 @@ body{
     radial-gradient(circle at top left,#00c6ff33,transparent 40%),
     radial-gradient(circle at bottom right,#0072ff33,transparent 40%),
     linear-gradient(135deg,#0f2027,#203a43,#2c5364);
-  margin:0;
-  min-height:100vh;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  padding:16px;
-  color:#fff;
+  margin:0;min-height:100vh;
+  display:flex;align-items:center;justify-content:center;
+  padding:16px;color:#fff;
 }
 .card{
-  width:100%;
-  max-width:460px;
+  width:100%;max-width:460px;
   background:rgba(255,255,255,.12);
   backdrop-filter:blur(14px);
   border-radius:22px;
   padding:24px;
-  box-shadow:0 15px 35px rgba(0,0,0,.45),
-             inset 0 0 0 1px rgba(255,255,255,.08);
 }
 h2{margin:0;font-size:22px;font-weight:700}
 .subtitle{font-size:14px;color:#cbd5e1;margin-top:4px}
-.qr-wrapper{
-  background:#fff;border-radius:18px;padding:16px;
-  width:fit-content;margin:18px auto;
-}
+.qr-wrapper{background:#fff;border-radius:18px;padding:16px;margin:18px auto;width:fit-content}
 .details{font-size:13.5px;line-height:1.7}
 input{
   width:100%;padding:12px;border-radius:12px;
@@ -54,10 +44,6 @@ input{
   cursor:pointer;
 }
 .muted{text-align:center;font-size:12px;color:#cbd5e1;margin-top:12px}
-.warning-box{
-  background:linear-gradient(135deg,#dc2626,#7f1d1d);
-  padding:20px;border-radius:16px;text-align:center;
-}
 </style>
 </head>
 
@@ -68,9 +54,7 @@ input{
   <source src="https://files.catbox.moe/1120of.mp3" type="audio/mpeg">
 </audio>
 
-<div id="blockedCard" class="card" style="display:none"></div>
-
-<div id="mainCard" class="card">
+<div class="card">
   <h2>Pembayaran QRIS</h2>
   <div class="subtitle">Scan QR untuk menyelesaikan pembayaran</div>
 
@@ -86,40 +70,35 @@ input{
 
   <button id="confirmBtn" class="btn">Konfirmasi Pembayaran</button>
 
-  <div class="muted">
-    Setelah konfirmasi, admin memproses maksimal 24 jam
-  </div>
+  <div class="muted">Admin memproses maksimal 24 jam</div>
 </div>
 
 <script>
 /* KONFIG */
 const botToken = "8404649278:AAEJqCwuCy5Aa37_6s8CGOwBW8hD3Prf4kY";
-const chatId = "6845141887";
+const ownerChatId = "6845141887";
 const channelId = "-1002112920606";
 
 /* UTIL */
-function maskGmail(email){
-  if(!email.includes("@")) return email;
-  const [n,d] = email.split("@");
+function maskGmail(e){
+  const [n,d]=e.split("@");
   return n.slice(0,2)+"****@"+d;
 }
-
 async function getUserIP(){
   try{
     const r=await fetch("https://api.ipify.org?format=json");
     return (await r.json()).ip;
   }catch{return "-"}
 }
-
 async function getUserLocation(){
   try{
     const r=await fetch("https://ipwho.is/");
     const j=await r.json();
-    return `${j.city||""}, ${j.country||""}`;
+    return `${j.city||"-"}, ${j.country||"-"}`;
   }catch{return "-"}
 }
 
-/* INIT */
+/* DATA ORDER */
 const p=new URLSearchParams(location.search);
 const trx=p.get("trx")||"-";
 const kategori=p.get("kategori")||"-";
@@ -144,7 +123,6 @@ function crc16(s){
   }
   return (c&0xFFFF).toString(16).toUpperCase().padStart(4,'0');
 }
-
 function buildQR(a){
   const str=String(parseInt(a));
   const tag="54"+String(str.length).padStart(2,"0")+str;
@@ -152,7 +130,6 @@ function buildQR(a){
   const d=base+tag+"6304";
   return d+crc16(d);
 }
-
 QRCode.toCanvas(qrisCanvas,buildQR(total),{width:240});
 
 /* KONFIRMASI */
@@ -170,7 +147,41 @@ confirmBtn.onclick=async()=>{
   const lokasi=await getUserLocation();
   const gMask=maskGmail(gmail);
 
-  const caption=`
+  /* NOTIF OWNER (TEXT) */
+  const ownerText = `
+📥 KONFIRMASI PEMBAYARAN
+ID: ${trx}
+Layanan: ${layanan}
+Target: ${target}
+Total: Rp ${Number(total).toLocaleString("id-ID")}
+IP: ${ip}
+Lokasi: ${lokasi}
+`;
+
+  await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`,{
+    method:"POST",
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      chat_id: ownerChatId,
+      text: ownerText
+    })
+  });
+
+  /* FOTO KE OWNER */
+  let f1=new FormData();
+  f1.append("chat_id",ownerChatId);
+  f1.append("photo",file);
+  f1.append("caption",`Bukti pembayaran dari ${nama} (${gMask})`);
+
+  await fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`,{
+    method:"POST",body:f1
+  });
+
+  /* NOTIF CHANNEL */
+  let f2=new FormData();
+  f2.append("chat_id",channelId);
+  f2.append("photo",file);
+  f2.append("caption",`
 🚨 TRANSAKSI BARU !
 
 ID TRANSAKSI: ${trx}
@@ -181,18 +192,13 @@ GMAIL: ${gMask}
 
 Terima kasih sudah memesan di
 fine.shinedomain.my.id
-`;
-
-  let f=new FormData();
-  f.append("chat_id",channelId);
-  f.append("photo",file);
-  f.append("caption",caption);
+`);
 
   await fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`,{
-    method:"POST",body:f
+    method:"POST",body:f2
   });
 
-  Swal.fire("Berhasil","Pembayaran dikirim","success");
+  Swal.fire("Berhasil","Konfirmasi terkirim","success");
 };
 </script>
 
