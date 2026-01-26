@@ -45,6 +45,74 @@ input{
 }
 .muted{text-align:center;font-size:12px;color:#cbd5e1;margin-top:12px}
 </style>
+
+<!-- =========================
+     IP BAN SYSTEM + REASON
+========================= -->
+<script>
+async function checkIPBan(){
+  try{
+    const ipRes = await fetch("https://api.ipify.org?format=json");
+    const { ip } = await ipRes.json();
+
+    const banRes = await fetch("/payment/ip.json",{cache:"no-store"});
+    if(!banRes.ok) return;
+
+    const bannedList = await banRes.json();
+    if(!Array.isArray(bannedList)) return;
+
+    const banned = bannedList.find(x => x.ip === ip);
+    if(banned){
+      const reason = banned.reason || "Tidak ada keterangan";
+
+      document.body.innerHTML = `
+        <div style="
+          display:flex;
+          align-items:center;
+          justify-content:center;
+          height:100vh;
+          background:linear-gradient(135deg,#0f2027,#203a43,#2c5364);
+          color:white;
+          font-family:Poppins,sans-serif;
+          text-align:center;
+          padding:20px;
+        ">
+          <div style="
+            max-width:420px;
+            background:rgba(255,255,255,.12);
+            backdrop-filter:blur(14px);
+            border-radius:22px;
+            padding:30px;
+          ">
+            <h1 style="font-size:26px;">🚫 Akses Diblokir</h1>
+            <p style="opacity:.8;font-size:14px;">
+              IP kamu telah diblokir oleh sistem <b>Shine Shop</b>
+            </p>
+            <div style="
+              margin-top:14px;
+              background:rgba(0,0,0,.35);
+              padding:14px;
+              border-radius:12px;
+              font-size:13px;
+              line-height:1.6;
+            ">
+              <b>Alasan:</b><br>
+              ${reason}
+            </div>
+            <p style="opacity:.6;font-size:12px;margin-top:16px;">
+              Jika ini kesalahan, silakan hubungi admin.
+            </p>
+          </div>
+        </div>
+      `;
+      throw new Error("IP_BANNED");
+    }
+  }catch(e){
+    if(e.message==="IP_BANNED") throw e;
+  }
+}
+checkIPBan();
+</script>
 </head>
 
 <body>
@@ -69,12 +137,11 @@ input{
   <input type="file" id="buktiInput" accept="image/*">
 
   <button id="confirmBtn" class="btn">Konfirmasi Pembayaran</button>
-
   <div class="muted">Admin memproses maksimal 24 jam</div>
 </div>
 
 <script>
-/* KONFIG */
+/* KONFIG TELEGRAM */
 const botToken = "8404649278:AAEJqCwuCy5Aa37_6s8CGOwBW8hD3Prf4kY";
 const ownerChatId = "6845141887";
 const channelId = "-1002112920606";
@@ -114,6 +181,7 @@ orderDetails.innerHTML=`
 <strong>Total:</strong> Rp ${Number(total).toLocaleString("id-ID")}
 `;
 
+/* QRIS */
 function crc16(s){
   let c=0xFFFF;
   for(let i=0;i<s.length;i++){
@@ -146,50 +214,39 @@ confirmBtn.onclick=async()=>{
   const ip=await getUserIP();
   const lokasi=await getUserLocation();
 
-  const gmailAsli = gmail;
-  const gmailMask = maskGmail(gmail);
-
-  /* TEXT OWNER (GMAIL ASLI) */
   await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`,{
     method:"POST",
     headers:{'Content-Type':'application/json'},
     body:JSON.stringify({
       chat_id: ownerChatId,
-      text: `📥 KONFIRMASI PEMBAYARAN
+      text:`📥 KONFIRMASI PEMBAYARAN
 ID: ${trx}
 Layanan: ${layanan}
 Target: ${target}
 Total: Rp ${Number(total).toLocaleString("id-ID")}
-Gmail: ${gmailAsli}
+Gmail: ${gmail}
 IP: ${ip}
 Lokasi: ${lokasi}`
     })
   });
 
-  /* FOTO OWNER */
   let f1=new FormData();
   f1.append("chat_id",ownerChatId);
   f1.append("photo",file);
-  f1.append("caption",`Bukti pembayaran dari ${nama} (${gmailAsli})`);
   await fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`,{method:"POST",body:f1});
 
-  /* FOTO + TRANSAKSI BARU CHANNEL (GMAIL DISENSOR) */
   let f2=new FormData();
   f2.append("chat_id",channelId);
   f2.append("photo",file);
-  f2.append("caption",`🚨 TRANSAKSI BARU !
+  f2.append("caption",`🚨 TRANSAKSI BARU
 
-ID TRANSAKSI: ${trx}
-KATEGORI: ${kategori}
+ID: ${trx}
 LAYANAN: ${layanan}
 NAMA: ${nama}
-GMAIL: ${gmailMask}
-
-Terima kasih sudah memesan di
-fine.shinedomain.my.id`);
+GMAIL: ${maskGmail(gmail)}`);
   await fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`,{method:"POST",body:f2});
 
-  Swal.fire("Berhasil","Konfirmasi pembayaran terkirim","success");
+  Swal.fire("Berhasil","Konfirmasi terkirim","success");
 };
 </script>
 
