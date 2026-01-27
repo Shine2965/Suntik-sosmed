@@ -5,73 +5,29 @@
   <title>Dashboard Saham & Reksadana - Shine Shop</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #0f172a;
-      color: #e5e7eb;
-      padding: 20px;
-    }
-    h1 { margin-bottom: 6px; }
-    .container {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-      gap: 16px;
-    }
-    .card {
-      background: #020617;
-      border-radius: 14px;
-      padding: 16px;
-      box-shadow: 0 10px 20px rgba(0,0,0,0.35);
-    }
-    label { font-size: 14px; margin-top: 8px; display: block; }
-    select {
-      width: 100%;
-      padding: 8px;
-      margin-top: 4px;
-      border-radius: 8px;
-      border: none;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 10px;
-    }
-    th, td {
-      padding: 8px;
-      font-size: 14px;
-      border-bottom: 1px solid #1e293b;
-    }
+    body { font-family: Arial, sans-serif; background: #0f172a; color: #e5e7eb; padding: 20px; }
+    .container { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+    .card { background: #020617; border-radius: 14px; padding: 16px; box-shadow: 0 10px 20px rgba(0,0,0,.35); }
+    input { width: 100%; padding: 10px; border-radius: 10px; border: none; margin-top: 6px; }
+    button { margin-top: 10px; width: 100%; padding: 10px; border-radius: 10px; border: none; background: #22c55e; font-weight: bold; cursor: pointer; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { padding: 8px; font-size: 14px; border-bottom: 1px solid #1e293b; }
     .profit { color: #22c55e; }
     .loss { color: #ef4444; }
-    .summary {
-      display: flex;
-      justify-content: space-between;
-      margin-top: 10px;
-      font-size: 15px;
-    }
+    .summary { display: flex; justify-content: space-between; margin-top: 10px; }
   </style>
 </head>
 <body><h1>📈 Portofolio Saham & Reksadana</h1>
-<p>Data aset & profit per user (Shine Shop)</p><div class="container">  <div class="card">
-    <h3>Pilih Username</h3>
-    <label>Username</label>
-    <select id="username" onchange="loadUser()"></select>
+<p>Semua saham & reksadana dikelola oleh <b>Shine Shop</b></p><div class="container">  <div class="card">
+    <h3>Masukkan Username</h3>
+    <input id="username" placeholder="username wajib diisi" />
+    <button onclick="loadUser()">Lihat Portofolio</button>
   </div>  <div class="card">
     <h3>Ringkasan Portofolio</h3>
-    <div class="summary">
-      <span>Total Aset</span>
-      <strong id="totalAset">Rp 0</strong>
-    </div>
-    <div class="summary">
-      <span>Total Profit/Loss</span>
-      <strong id="totalPL">Rp 0</strong>
-    </div><table>
+    <div class="summary"><span>Total Aset</span><strong id="totalAset">Rp 0</strong></div>
+    <div class="summary"><span>Total Profit/Loss</span><strong id="totalPL">Rp 0</strong></div><table>
   <thead>
-    <tr>
-      <th>Aset</th>
-      <th>Nilai</th>
-      <th>P/L</th>
-    </tr>
+    <tr><th>Aset</th><th>Nilai</th><th>P/L</th></tr>
   </thead>
   <tbody id="tbody"></tbody>
 </table>
@@ -83,43 +39,30 @@
   let users = {};
   let chart;
 
-  async function loadUsers() {
+  async function loadUser() {
+    const username = document.getElementById('username').value.trim();
+    if (!username) return alert('Username wajib diisi');
+
     const res = await fetch('/saham/aset.json');
     users = await res.json();
 
-    const select = document.getElementById('username');
-    select.innerHTML = '';
+    const aset = users[username];
+    if (!aset) return alert('Username tidak ditemukan');
 
-    Object.keys(users).forEach(u => {
-      const opt = document.createElement('option');
-      opt.value = u;
-      opt.innerText = u;
-      select.appendChild(opt);
-    });
-
-    loadUser();
-  }
-
-  function loadUser() {
-    const user = document.getElementById('username').value;
-    const aset = users[user] || [];
-
-    let total = 0;
-    let totalPL = 0;
+    let total = 0, totalPL = 0;
     const tb = document.getElementById('tbody');
     tb.innerHTML = '';
 
     aset.forEach(a => {
+      const namaAset = a.nama.replace(/^Saham - /, 'Saham Shine Shop - ');
       total += a.nilai;
       totalPL += a.pl;
 
       tb.innerHTML += `
         <tr>
-          <td>${a.nama}</td>
+          <td>${namaAset}</td>
           <td>Rp ${a.nilai.toLocaleString('id-ID')}</td>
-          <td class="${a.pl >= 0 ? 'profit' : 'loss'}">
-            Rp ${a.pl.toLocaleString('id-ID')}
-          </td>
+          <td class="${a.pl >= 0 ? 'profit' : 'loss'}">Rp ${a.pl.toLocaleString('id-ID')}</td>
         </tr>`;
     });
 
@@ -127,26 +70,18 @@
     totalPL.innerText = 'Rp ' + totalPL.toLocaleString('id-ID');
     totalPL.className = totalPL >= 0 ? 'profit' : 'loss';
 
-    updateChart(aset.map((_, i) => i + 1), aset.map(() => total));
+    renderChart(aset.map((_, i) => i + 1), aset.map(() => total));
   }
 
-  function updateChart(labels, data) {
+  function renderChart(labels, data) {
     if (chart) chart.destroy();
-
     chart = new Chart(document.getElementById('chart'), {
       type: 'line',
       data: {
         labels,
-        datasets: [{
-          label: 'Total Nilai Portofolio',
-          data,
-          borderColor: '#22c55e',
-          tension: 0.3
-        }]
+        datasets: [{ label: 'Total Nilai Portofolio', data, borderColor: '#22c55e', tension: 0.3 }]
       }
     });
   }
-
-  loadUsers();
 </script></body>
 </html>
