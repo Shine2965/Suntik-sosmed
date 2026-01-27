@@ -1,0 +1,152 @@
+<!DOCTYPE html><html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard Saham & Reksadana - Shine Shop</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #0f172a;
+      color: #e5e7eb;
+      padding: 20px;
+    }
+    h1 { margin-bottom: 6px; }
+    .container {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 16px;
+    }
+    .card {
+      background: #020617;
+      border-radius: 14px;
+      padding: 16px;
+      box-shadow: 0 10px 20px rgba(0,0,0,0.35);
+    }
+    label { font-size: 14px; margin-top: 8px; display: block; }
+    select {
+      width: 100%;
+      padding: 8px;
+      margin-top: 4px;
+      border-radius: 8px;
+      border: none;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+    th, td {
+      padding: 8px;
+      font-size: 14px;
+      border-bottom: 1px solid #1e293b;
+    }
+    .profit { color: #22c55e; }
+    .loss { color: #ef4444; }
+    .summary {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 10px;
+      font-size: 15px;
+    }
+  </style>
+</head>
+<body><h1>📈 Portofolio Saham & Reksadana</h1>
+<p>Data aset & profit per user (Shine Shop)</p><div class="container">  <div class="card">
+    <h3>Pilih Username</h3>
+    <label>Username</label>
+    <select id="username" onchange="loadUser()"></select>
+  </div>  <div class="card">
+    <h3>Ringkasan Portofolio</h3>
+    <div class="summary">
+      <span>Total Aset</span>
+      <strong id="totalAset">Rp 0</strong>
+    </div>
+    <div class="summary">
+      <span>Total Profit/Loss</span>
+      <strong id="totalPL">Rp 0</strong>
+    </div><table>
+  <thead>
+    <tr>
+      <th>Aset</th>
+      <th>Nilai</th>
+      <th>P/L</th>
+    </tr>
+  </thead>
+  <tbody id="tbody"></tbody>
+</table>
+
+  </div>  <div class="card">
+    <h3>Grafik Line Portofolio</h3>
+    <canvas id="chart"></canvas>
+  </div></div><script>
+  let users = {};
+  let chart;
+
+  async function loadUsers() {
+    const res = await fetch('/saham/aset.json');
+    users = await res.json();
+
+    const select = document.getElementById('username');
+    select.innerHTML = '';
+
+    Object.keys(users).forEach(u => {
+      const opt = document.createElement('option');
+      opt.value = u;
+      opt.innerText = u;
+      select.appendChild(opt);
+    });
+
+    loadUser();
+  }
+
+  function loadUser() {
+    const user = document.getElementById('username').value;
+    const aset = users[user] || [];
+
+    let total = 0;
+    let totalPL = 0;
+    const tb = document.getElementById('tbody');
+    tb.innerHTML = '';
+
+    aset.forEach(a => {
+      total += a.nilai;
+      totalPL += a.pl;
+
+      tb.innerHTML += `
+        <tr>
+          <td>${a.nama}</td>
+          <td>Rp ${a.nilai.toLocaleString('id-ID')}</td>
+          <td class="${a.pl >= 0 ? 'profit' : 'loss'}">
+            Rp ${a.pl.toLocaleString('id-ID')}
+          </td>
+        </tr>`;
+    });
+
+    totalAset.innerText = 'Rp ' + total.toLocaleString('id-ID');
+    totalPL.innerText = 'Rp ' + totalPL.toLocaleString('id-ID');
+    totalPL.className = totalPL >= 0 ? 'profit' : 'loss';
+
+    updateChart(aset.map((_, i) => i + 1), aset.map(() => total));
+  }
+
+  function updateChart(labels, data) {
+    if (chart) chart.destroy();
+
+    chart = new Chart(document.getElementById('chart'), {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          label: 'Total Nilai Portofolio',
+          data,
+          borderColor: '#22c55e',
+          tension: 0.3
+        }]
+      }
+    });
+  }
+
+  loadUsers();
+</script></body>
+</html>
