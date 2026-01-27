@@ -25,9 +25,9 @@
   </div>  <div class="card">
     <h3>Ringkasan Portofolio</h3>
     <div class="summary"><span>Total Aset</span><strong id="totalAset">Rp 0</strong></div>
-    <div class="summary"><span>Profit Pengguna</span><strong id="userProfit">Rp 0</strong></div><table>
+    <div class="summary"><span>Total Profit (Gabungan)</span><strong id="totalProfit">Rp 0</strong></div><table>
   <thead>
-    <tr><th>Aset</th><th>Nilai</th><th>P/L Aset</th></tr>
+    <tr><th>Aset</th><th>Nilai</th><th>Profit Aset</th></tr>
   </thead>
   <tbody id="tbody"></tbody>
 </table>
@@ -49,15 +49,18 @@
     if (!user) return alert('Username tidak ditemukan');
 
     const aset = user.aset || [];
-    const profitUser = Number(user.profit || 0);
+    const manualProfit = Number(user.profit || 0);
 
-    let total = 0;
+    let totalAset = 0;
+    let totalProfit = manualProfit;
+
     const tb = document.getElementById('tbody');
     tb.innerHTML = '';
 
     aset.forEach(a => {
       const namaAset = a.nama.replace(/^Saham - /, 'Saham Shine Shop - ');
-      total += a.nilai;
+      totalAset += a.nilai;
+      totalProfit += a.pl;
 
       tb.innerHTML += `
         <tr>
@@ -67,19 +70,19 @@
         </tr>`;
     });
 
-    document.getElementById('totalAset').innerText = 'Rp ' + total.toLocaleString('id-ID');
-    const up = document.getElementById('userProfit');
-    up.innerText = 'Rp ' + profitUser.toLocaleString('id-ID');
-    up.className = profitUser >= 0 ? 'profit' : 'loss';
+    document.getElementById('totalAset').innerText = 'Rp ' + totalAset.toLocaleString('id-ID');
+    const tp = document.getElementById('totalProfit');
+    tp.innerText = 'Rp ' + totalProfit.toLocaleString('id-ID');
+    tp.className = totalProfit >= 0 ? 'profit' : 'loss';
 
-    renderChart(aset.map((_, i) => i + 1), aset.map(() => total));
+    renderChart(aset.map((_, i) => i + 1), aset.map(() => totalAset + totalProfit));
   }
 
   function renderChart(labels, data) {
     if (chart) chart.destroy();
     chart = new Chart(document.getElementById('chart'), {
       type: 'line',
-      data: { labels, datasets: [{ label: 'Total Nilai Portofolio', data, borderColor: '#22c55e', tension: 0.3 }] }
+      data: { labels, datasets: [{ label: 'Total Portofolio (Aset + Profit)', data, borderColor: '#22c55e', tension: 0.3 }] }
     });
   }
 </script></body>
