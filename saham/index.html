@@ -25,9 +25,9 @@
   </div>  <div class="card">
     <h3>Ringkasan Portofolio</h3>
     <div class="summary"><span>Total Aset</span><strong id="totalAset">Rp 0</strong></div>
-    <div class="summary"><span>Total Profit/Loss</span><strong id="totalPL">Rp 0</strong></div><table>
+    <div class="summary"><span>Profit Pengguna</span><strong id="userProfit">Rp 0</strong></div><table>
   <thead>
-    <tr><th>Aset</th><th>Nilai</th><th>P/L</th></tr>
+    <tr><th>Aset</th><th>Nilai</th><th>P/L Aset</th></tr>
   </thead>
   <tbody id="tbody"></tbody>
 </table>
@@ -36,7 +36,6 @@
     <h3>Grafik Line Portofolio</h3>
     <canvas id="chart"></canvas>
   </div></div><script>
-  let users = {};
   let chart;
 
   async function loadUser() {
@@ -44,19 +43,21 @@
     if (!username) return alert('Username wajib diisi');
 
     const res = await fetch('/saham/aset.json');
-    users = await res.json();
+    const users = await res.json();
 
-    const aset = users[username];
-    if (!aset) return alert('Username tidak ditemukan');
+    const user = users[username];
+    if (!user) return alert('Username tidak ditemukan');
 
-    let total = 0, totalPL = 0;
+    const aset = user.aset || [];
+    const profitUser = Number(user.profit || 0);
+
+    let total = 0;
     const tb = document.getElementById('tbody');
     tb.innerHTML = '';
 
     aset.forEach(a => {
       const namaAset = a.nama.replace(/^Saham - /, 'Saham Shine Shop - ');
       total += a.nilai;
-      totalPL += a.pl;
 
       tb.innerHTML += `
         <tr>
@@ -66,9 +67,10 @@
         </tr>`;
     });
 
-    totalAset.innerText = 'Rp ' + total.toLocaleString('id-ID');
-    totalPL.innerText = 'Rp ' + totalPL.toLocaleString('id-ID');
-    totalPL.className = totalPL >= 0 ? 'profit' : 'loss';
+    document.getElementById('totalAset').innerText = 'Rp ' + total.toLocaleString('id-ID');
+    const up = document.getElementById('userProfit');
+    up.innerText = 'Rp ' + profitUser.toLocaleString('id-ID');
+    up.className = profitUser >= 0 ? 'profit' : 'loss';
 
     renderChart(aset.map((_, i) => i + 1), aset.map(() => total));
   }
@@ -77,10 +79,7 @@
     if (chart) chart.destroy();
     chart = new Chart(document.getElementById('chart'), {
       type: 'line',
-      data: {
-        labels,
-        datasets: [{ label: 'Total Nilai Portofolio', data, borderColor: '#22c55e', tension: 0.3 }]
-      }
+      data: { labels, datasets: [{ label: 'Total Nilai Portofolio', data, borderColor: '#22c55e', tension: 0.3 }] }
     });
   }
 </script></body>
