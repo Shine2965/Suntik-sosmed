@@ -2,7 +2,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Shine Shop Testimoni</title><script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script><link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet"><style>
+<title>Shine Shop Testimoni</title>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet"><style>
 *{margin:0;padding:0;box-sizing:border-box;font-family:'Poppins',sans-serif;}
 body{
   min-height:100vh;
@@ -48,10 +50,8 @@ button:hover{transform:translateY(-4px);box-shadow:0 0 40px rgba(255,215,0,1);}
 .star{font-size:30px;cursor:pointer;color:#555;}
 .star.selected{color:gold;text-shadow:0 0 15px gold;}
 .rating-avg{text-align:center;padding:12px;border-radius:20px;margin-top:20px;background:rgba(255,215,0,0.15);font-weight:600;box-shadow:0 0 25px rgba(255,215,0,0.5);} 
-.music-btn{position:fixed;bottom:25px;right:25px;width:60px;height:60px;border-radius:50%;background:linear-gradient(90deg,#fbbf24,#f59e0b);display:flex;justify-content:center;align-items:center;cursor:pointer;font-size:22px;color:black;box-shadow:0 0 25px rgba(255,215,0,0.8);} 
-</style></head><body><audio id="bgMusic" src="https://files.catbox.moe/e749oh.mp3" loop></audio>
-
-<div class="container">
+</style></head>
+<body><div class="container">
 <h2>✨ Shine Shop Luxury Testimoni ✨</h2>
 <form id="testiForm">
 <label>Nama</label>
@@ -69,127 +69,82 @@ button:hover{transform:translateY(-4px);box-shadow:0 0 40px rgba(255,215,0,1);}
 <button type="submit">Kirim Testimoni</button>
 </form>
 <div class="rating-avg" id="ratingAvg"></div>
-</div><div class="music-btn" onclick="toggleMusic()">🎵</div><script>
+</div><script>
 
-const botToken="8404649278:AAG9La-pAczf9b77BeP_y4hGJ7BcFHru61M";
-const channelId="-1002112920606";
+/* =============================
+   🔐 LOAD CONFIG FROM JSON
+   Path: /Testimoni/database.json
+============================= */
 
-const badWords=["anjing","babi","kontol","memek","ngentot","bangsat","tolol","goblok","idiot","mmk","emak","emaklho","maklo","ewe","longgar","Yatim","Yapit","Yatim Piatu","Hama","Anonymous","Anonim"];
-function containsBadWords(text){
-  const lower=text.toLowerCase();
-  return badWords.some(word=>lower.includes(word));
+let botToken="";
+let channelId="";
+let totalRating=0;
+let totalReview=0;
+
+async function loadDatabase(){
+  const res = await fetch("/Testimoni/database.json");
+  const data = await res.json();
+
+  botToken = data.botToken;
+  channelId = data.channelId;
+  totalRating = data.totalRating;
+  totalReview = data.totalReview;
+
+  updateAverage();
 }
 
-const BAN_DURATION=7*24*60*60*1000;
-let userIP="";
-async function getIP(){
-  try{
-    const res=await fetch("https://api.ipify.org?format=json");
-    const data=await res.json();
-    userIP=data.ip;
-    checkIPBan();
-  }catch(e){console.log("Gagal ambil IP");}
-}
-function checkIPBan(){
-  const banned=JSON.parse(localStorage.getItem("shineIPBan"))||{};
-  if(banned[userIP]){
-    const remaining=banned[userIP]-Date.now();
-    if(remaining>0){
-      const days=Math.ceil(remaining/(1000*60*60*24));
-      document.body.innerHTML=`<h1 style='color:red;text-align:center;margin-top:40vh;'>🚫 AKSES ANDA DIBLOKIR ${days} HARI</h1>`;
-    }else{
-      delete banned[userIP];
-      localStorage.setItem("shineIPBan",JSON.stringify(banned));
-    }
-  }
-}
-function banIP(){
-  const banned=JSON.parse(localStorage.getItem("shineIPBan"))||{};
-  banned[userIP]=Date.now()+BAN_DURATION;
-  localStorage.setItem("shineIPBan",JSON.stringify(banned));
-}
-getIP();
-
-let totalRating=135;
-let totalReview=27;
 function updateAverage(){
-let avg = totalRating / totalReview;
-if(avg>5) avg=5;
-avg=avg.toFixed(1);
-document.getElementById("ratingAvg").innerHTML=`⭐ Rating Shine Shop: ${avg}/5 (${totalReview} ulasan)`;
+  if(totalReview === 0) return;
+  let avg = totalRating / totalReview;
+  if(avg > 5) avg = 5;
+  avg = avg.toFixed(1);
+  document.getElementById("ratingAvg").innerHTML = `⭐ Rating Shine Shop: ${avg}/5 (${totalReview} ulasan)`;
 }
-updateAverage();
+
+loadDatabase();
 
 let selectedRating=0;
 document.querySelectorAll(".star").forEach(star=>{
-star.addEventListener("click",()=>{
-selectedRating=parseInt(star.dataset.value);
-document.querySelectorAll(".star").forEach(s=>s.classList.remove("selected"));
-for(let i=0;i<selectedRating;i++){
-document.querySelectorAll(".star")[i].classList.add("selected");
-}
-});
+  star.addEventListener("click",()=>{
+    selectedRating=parseInt(star.dataset.value);
+    document.querySelectorAll(".star").forEach(s=>s.classList.remove("selected"));
+    for(let i=0;i<selectedRating;i++){
+      document.querySelectorAll(".star")[i].classList.add("selected");
+    }
+  });
 });
 
-const COOLDOWN_TIME = 12*60*60*1000;
-function checkLock(){
-const data=JSON.parse(localStorage.getItem("shine12hpLock"))||{lastSubmit:0};
-if(Date.now()-data.lastSubmit<COOLDOWN_TIME){
-Swal.fire("⏳ Tunggu 12 jam sebelum kirim lagi!");
-return false;
-}
-return true;
-}
-function activateLock(){
-localStorage.setItem("shine12hpLock",JSON.stringify({lastSubmit:Date.now()}));
-}
 
 document.getElementById("testiForm").addEventListener("submit",async(e)=>{
-e.preventDefault();
-if(!checkLock()) return;
-if(!selectedRating){Swal.fire("Pilih rating dahulu!");return;}
+  e.preventDefault();
 
-const nama=document.getElementById("nama").value;
-const pesan=document.getElementById("pesan").value;
+  if(!selectedRating){
+    Swal.fire("Pilih rating dahulu!");
+    return;
+  }
 
-if(containsBadWords(nama)||containsBadWords(pesan)){
-  banIP();
-  Swal.fire({
-    icon:"error",
-    title:"🚫 Kata Tidak Pantas Terdeteksi!",
-    text:"Akses Anda diblokir selama 7 hari."
-  }).then(()=>location.reload());
-  return;
-}
+  const nama=document.getElementById("nama").value;
+  const pesan=document.getElementById("pesan").value;
 
-let safeRating=Math.min(Math.max(selectedRating,1),5);
-totalRating+=safeRating;
-totalReview+=1;
-updateAverage();
+  totalRating += selectedRating;
+  totalReview += 1;
+  updateAverage();
 
-let avgNow=(totalRating/totalReview);
-if(avgNow>5) avgNow=5;
-avgNow=avgNow.toFixed(1);
+  const caption=`⭐ TESTIMONI SHINE SHOP ⭐\n\n👤 ${nama}\n🌟 Rating: ${selectedRating}/5\n📝 ${pesan}`;
 
-const caption=`⭐ TESTIMONI SHINE SHOP ⭐\n\n👤 ${nama}\n🌟 Rating: ${safeRating}/5\n📝 ${pesan}\n\n📊 Rating Saat Ini: ${avgNow}/5\n📝 Total Review: ${totalReview} ulasan`;
+  await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`,{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({chat_id:channelId,text:caption})
+  });
 
-await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`,{
-method:"POST",
-headers:{"Content-Type":"application/json"},
-body:JSON.stringify({chat_id:channelId,text:caption})
+  Swal.fire("Testimoni berhasil dikirim!");
+  e.target.reset();
+  document.querySelectorAll(".star").forEach(s=>s.classList.remove("selected"));
+  selectedRating=0;
 });
 
-activateLock();
-Swal.fire("Testimoni berhasil dikirim!");
-e.target.reset();
-document.querySelectorAll(".star").forEach(s=>s.classList.remove("selected"));
-selectedRating=0;
-});
 
-const music=document.getElementById("bgMusic");
-music.volume=0.4;
-function toggleMusic(){music.paused?music.play():music.pause();}
-document.body.addEventListener("click",()=>{if(music.paused)music.play();},{once:true});
 
 /* ========================= */
 /* 🔒 ANTI INSPECT SYSTEM 🔒 */
@@ -200,15 +155,15 @@ document.addEventListener("contextmenu",e=>e.preventDefault());
 
 // Disable Shortcut Keys
 document.addEventListener("keydown",function(e){
-  if(e.key==="F12") e.preventDefault();
+  if(e.key === "F12") e.preventDefault();
   if(e.ctrlKey && e.shiftKey && ["I","C","J"].includes(e.key)) e.preventDefault();
-  if(e.ctrlKey && e.key.toLowerCase()==="u") e.preventDefault();
+  if(e.ctrlKey && e.key.toLowerCase() === "u") e.preventDefault();
 });
 
 // Detect DevTools Open
 setInterval(()=>{
   if(window.outerWidth - window.innerWidth > 160 || window.outerHeight - window.innerHeight > 160){
-    document.body.innerHTML="<h1 style='color:gold;text-align:center;margin-top:40vh;'>🚫 Developer Tools Terdeteksi</h1>";
+    document.body.innerHTML = "<h1 style='color:gold;text-align:center;margin-top:40vh;'>🚫 Developer Tools Terdeteksi</h1>";
   }
 },1000);
 
