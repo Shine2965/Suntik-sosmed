@@ -1,10 +1,7 @@
-<!DOCTYPE html>
-<html lang="id">
+<!DOCTYPE html><html lang="id">
 <head>
   <meta charset="UTF-8">
-  <title>Air Hockey Game v1.8 Neon</title>
-
-  <style>
+  <title>Air Hockey Game v2.0 Neon</title>  <style>
     body {
       margin: 0;
       background: #000;
@@ -16,24 +13,16 @@
       text-shadow: 0 0 8px #0ff;
     }
 
-    h1 {
-      margin: 10px;
-      text-align: center;
-      color: #0ff;
-      text-shadow: 0 0 10px #0ff, 0 0 20px #0ff;
-    }
+    h1 { margin: 10px; }
 
-    #controls {
-      margin: 10px;
-      text-align: center;
-    }
+    #controls { margin: 10px; }
 
     select, button {
       padding: 8px;
       font-size: 16px;
       margin: 5px;
-      border: none;
       border-radius: 8px;
+      border: none;
       background: #111;
       color: #0ff;
       box-shadow: 0 0 10px #0ff inset, 0 0 15px #0ff;
@@ -42,44 +31,25 @@
 
     .donate-btn {
       color: #76CC11;
-      font-weight: bold;
       box-shadow: 0 0 10px #76CC11 inset, 0 0 15px #76CC11;
-      text-shadow: 0 0 5px #76CC11;
     }
 
-    #gameCanvas {
+    canvas {
       background: #02010a;
-      display: block;
-      margin: 10px auto;
       border: 3px solid #0ff;
-      box-shadow: 0 0 20px #0ff, 0 0 40px #0ff;
+      box-shadow: 0 0 20px #0ff;
       touch-action: none;
     }
 
-    #status {
-      font-size: 18px;
-      margin-top: 10px;
-      color: #0ff;
-    }
-
-    footer {
-      margin: 20px;
-      font-size: 14px;
-      color: #f0f;
-      text-shadow: 0 0 10px #f0f, 0 0 20px #f0f;
-    }
+    #status { margin-top: 10px; }
 
     .modal {
       position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
+      inset: 0;
       background: rgba(0,0,0,0.85);
       display: none;
       align-items: center;
       justify-content: center;
-      z-index: 999;
     }
 
     .modal-content {
@@ -87,135 +57,125 @@
       padding: 20px;
       border-radius: 15px;
       text-align: center;
-      box-shadow: 0 0 20px #0ff;
-      max-width: 350px;
     }
 
-    .modal-content img {
-      width: 250px;
-      margin: 15px 0;
-      border-radius: 10px;
-      box-shadow: 0 0 15px #0ff;
-    }
+    .modal-content img { width: 250px; }
+  </style></head>
+<body><h1>Air Hockey Game v2.0 Neon</h1><div id="controls">
+  <select id="mode">
+    <option value="easy">AI EASY</option>
+    <option value="hard">AI HARD</option>
+    <option value="pvp">PLAYER VS PLAYER</option>
+  </select>
+  <button onclick="startGame()">Mulai Game</button>
+  <button class="donate-btn" onclick="openQRIS()">❤️ Donate QRIS</button>
+</div><canvas id="gameCanvas" width="400" height="600"></canvas>
 
-    .close-btn {
-      background: #ff0055;
-      color: #fff;
-      margin-top: 10px;
-    }
-  </style>
-</head>
-
-<body>
-
-  <h1>Air Hockey Game v1.8 Neon</h1>
-
-  <div id="controls">
-    <select id="mode">
-      <option value="2p">2 Pemain</option>
-      <option value="easy">Vs AI Easy</option>
-      <option value="hard">Vs AI Hard</option>
-    </select>
-
-    <button onclick="startGame()">Mulai Game</button>
-    <button class="donate-btn" onclick="openQRIS()">❤️ Donate QRIS</button>
+<div id="status">Skor P1: 0 | P2: 0 | Waktu: 180</div><div class="modal" id="qrisModal">
+  <div class="modal-content">
+    <h2>Scan QRIS Untuk Donate</h2>
+    <img src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=00020101021126670016COM.NOBUBANK.WWW01189360050300000879140214526036770909650303UMI51440014ID.CO.QRIS.WWW0215ID20243611417480303UMI5204541153033605802ID5920SHINE%20SHOP%20OK19967206008SURABAYA61056011162070703A0163041008">
+    <br><br>
+    <button onclick="closeQRIS()">Tutup</button>
   </div>
+</div><script>
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+const statusText = document.getElementById("status");
 
-  <canvas id="gameCanvas" width="400" height="600"></canvas>
+let mode = "easy";
+let score1 = 0, score2 = 0, timeLeft = 180;
+let player1, player2, puck;
+let gameInterval, timer;
 
-  <div id="status">
-    Skor P1: 0 | P2: 0 | Waktu: 180
-  </div>
+function startGame(){
+  mode = document.getElementById("mode").value;
+  score1 = 0; score2 = 0; timeLeft = 180;
 
-  <footer>
-    Dibuat oleh Alvino Jeremy - 2025
-  </footer>
+  player1 = { x:200, y:550, r:25 };
+  player2 = { x:200, y:50, r:25 };
+  puck = { x:200, y:300, r:15, dx:4, dy:4 };
 
-  <div class="modal" id="qrisModal">
-    <div class="modal-content">
-      <h2>Scan QRIS Untuk Donate</h2>
-      <img src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=00020101021126670016COM.NOBUBANK.WWW01189360050300000879140214526036770909650303UMI51440014ID.CO.QRIS.WWW0215ID20243611417480303UMI5204541153033605802ID5920SHINE%20SHOP%20OK19967206008SURABAYA61056011162070703A0163041008" alt="QRIS Code">
-      <br>
-      <button class="close-btn" onclick="closeQRIS()">Tutup</button>
-    </div>
-  </div>
+  clearInterval(gameInterval);
+  clearInterval(timer);
 
-  <script>
-    /* =======================
-       GAME LOGIC
-    ======================== */
-
-    const canvas = document.getElementById("gameCanvas");
-    const ctx = canvas.getContext("2d");
-    const statusText = document.getElementById("status");
-
-    let score1 = 0, score2 = 0, timeLeft = 180;
-    let player1, player2, puck;
-    let gameInterval, timer;
-
-    function startGame() {
-      score1 = 0;
-      score2 = 0;
-      timeLeft = 180;
-
-      player1 = { x: 200, y: 550, r: 25 };
-      player2 = { x: 200, y: 50, r: 25 };
-      puck = { x: 200, y: 300, r: 15, dx: 3, dy: 3 };
-
+  gameInterval = setInterval(update,1000/60);
+  timer = setInterval(()=>{
+    timeLeft--;
+    statusText.textContent = `Skor P1: ${score1} | P2: ${score2} | Waktu: ${timeLeft}`;
+    if(timeLeft<=0){
       clearInterval(gameInterval);
       clearInterval(timer);
-
-      gameInterval = setInterval(update, 1000 / 60);
-      timer = setInterval(() => {
-        timeLeft--;
-        statusText.textContent = `Skor P1: ${score1} | P2: ${score2} | Waktu: ${timeLeft}`;
-        if (timeLeft <= 0) {
-          clearInterval(gameInterval);
-          clearInterval(timer);
-          statusText.textContent = `Waktu Habis! Skor Akhir P1: ${score1} | P2: ${score2}`;
-        }
-      }, 1000);
     }
+  },1000);
+}
 
-    function update() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+function update(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
 
-      puck.x += puck.dx;
-      puck.y += puck.dy;
+  puck.x += puck.dx;
+  puck.y += puck.dy;
 
-      if (puck.x < puck.r || puck.x > canvas.width - puck.r) puck.dx *= -1;
-      if (puck.y < puck.r) { score1++; resetPuck(); }
-      if (puck.y > canvas.height - puck.r) { score2++; resetPuck(); }
+  if(puck.x < puck.r || puck.x > canvas.width-puck.r) puck.dx *= -1;
+  if(puck.y < puck.r){ score1++; resetPuck(); }
+  if(puck.y > canvas.height-puck.r){ score2++; resetPuck(); }
 
-      ctx.beginPath();
-      ctx.arc(puck.x, puck.y, puck.r, 0, Math.PI * 2);
-      ctx.fillStyle = "#ff0";
-      ctx.fill();
-    }
+  if(mode !== "pvp"){
+    let speed = mode === "easy" ? 3 : 6;
+    player2.x += (puck.x - player2.x) * 0.05 * speed;
+  }
 
-    function resetPuck(){
-      puck.x = 200;
-      puck.y = 300;
-      puck.dx *= -1;
-      puck.dy *= -1;
-    }
+  collide(player1);
+  collide(player2);
 
-    function openQRIS(){
-      document.getElementById("qrisModal").style.display = "flex";
-    }
+  drawCircle(player1,"#0ff");
+  drawCircle(player2,"#f0f");
+  drawCircle(puck,"#ff0");
+}
 
-    function closeQRIS(){
-      document.getElementById("qrisModal").style.display = "none";
-    }
+function collide(player){
+  let dx = puck.x - player.x;
+  let dy = puck.y - player.y;
+  let dist = Math.sqrt(dx*dx + dy*dy);
+  if(dist < player.r + puck.r){
+    let angle = Math.atan2(dy,dx);
+    puck.dx = Math.cos(angle)*6;
+    puck.dy = Math.sin(angle)*6;
+  }
+}
 
-    window.onclick = function(e){
-      const modal = document.getElementById("qrisModal");
-      if(e.target === modal){
-        modal.style.display = "none";
-      }
-    }
+function drawCircle(obj,color){
+  ctx.beginPath();
+  ctx.arc(obj.x,obj.y,obj.r,0,Math.PI*2);
+  ctx.fillStyle = color;
+  ctx.fill();
+}
 
-  </script>
+function resetPuck(){
+  puck.x = 200;
+  puck.y = 300;
+  puck.dx *= -1;
+  puck.dy *= -1;
+}
 
-</body>
+canvas.addEventListener("mousemove",e=>{
+  const rect = canvas.getBoundingClientRect();
+  player1.x = e.clientX - rect.left;
+});
+
+canvas.addEventListener("touchmove",e=>{
+  const rect = canvas.getBoundingClientRect();
+  player1.x = e.touches[0].clientX - rect.left;
+});
+
+canvas.addEventListener("mousemove",e=>{
+  if(mode==="pvp"){
+    const rect = canvas.getBoundingClientRect();
+    player2.x = e.clientX - rect.left;
+  }
+});
+
+function openQRIS(){ document.getElementById("qrisModal").style.display="flex"; }
+function closeQRIS(){ document.getElementById("qrisModal").style.display="none"; }
+</script></body>
 </html>
