@@ -1,7 +1,7 @@
 <!DOCTYPE html><html lang="id">
 <head>
 <meta charset="UTF-8">
-<title>Air Hockey Game v3.1 Arena Fix</title>
+<title>Air Hockey Game v4.0 Physics Pro</title>
 <style>
 body{margin:0;background:#000;display:flex;flex-direction:column;align-items:center;color:#0ff;font-family:Arial Black,sans-serif}
 h1{margin:10px}
@@ -42,14 +42,15 @@ let gameInterval,timer;
 const goalWidth=140;
 const goalLeft=(canvas.width-goalWidth)/2;
 const goalRight=goalLeft+goalWidth;
+const friction=0.995;
 
-function clamp(value,min,max){return Math.max(min,Math.min(max,value));}
+function clamp(v,min,max){return Math.max(min,Math.min(max,v));}
 
 function startGame(){
 mode=document.getElementById("mode").value;
 score1=0;score2=0;timeLeft=180;
-player1={x:200,y:520,r:25};
-player2={x:200,y:80,r:25};
+player1={x:200,y:520,r:25,vx:0,vy:0};
+player2={x:200,y:80,r:25,vx:0,vy:0};
 puck={x:200,y:300,r:15,dx:4,dy:4};
 clearInterval(gameInterval);clearInterval(timer);
 gameInterval=setInterval(update,1000/60);
@@ -78,74 +79,102 @@ drawArena();
 // PUCK MOVEMENT
 puck.x+=puck.dx;
 puck.y+=puck.dy;
+puck.dx*=friction;
+puck.dy*=friction;
 
-// side walls
+// WALL COLLISION
 if(puck.x<puck.r){puck.x=puck.r;puck.dx*=-1;}
 if(puck.x>canvas.width-puck.r){puck.x=canvas.width-puck.r;puck.dx*=-1;}
 
-// top wall & goal
 if(puck.y<puck.r){
 if(puck.x>goalLeft&&puck.x<goalRight){score1++;resetPuck();}
 else{puck.y=puck.r;puck.dy*=-1;}
 }
-
-// bottom wall & goal
 if(puck.y>canvas.height-puck.r){
 if(puck.x>goalLeft&&puck.x<goalRight){score2++;resetPuck();}
 else{puck.y=canvas.height-puck.r;puck.dy*=-1;}
 }
 
-// AI movement
+// AI
 if(mode!=="pvp"){
 let speed=mode==="easy"?2:5;
-player2.x+= (puck.x-player2.x)*0.05*speed;
+player2.x+=(puck.x-player2.x)*0.05*speed;
 }
 
-// COLLISION
-collide(player1);
-collide(player2);
+resolveCollision(player1);
+resolveCollision(player2);
 
-// CLAMP PLAYERS (cannot leave arena)
+// CLAMP
 player1.x=clamp(player1.x,player1.r,canvas.width-player1.r);
 player1.y=clamp(player1.y,canvas.height/2+player1.r,canvas.height-player1.r);
-
 player2.x=clamp(player2.x,player2.r,canvas.width-player2.r);
 player2.y=clamp(player2.y,player2.r,canvas.height/2-player2.r);
 
-// DRAW
-drawCircle(player1,"#0ff");
-drawCircle(player2,"#f0f");
-drawCircle(puck,"#ff0");
+circle(player1,"#0ff");
+circle(player2,"#f0f");
+circle(puck,"#ff0");
 }
 
-function collide(player){
+function resolveCollision(player){
 let dx=puck.x-player.x;
 let dy=puck.y-player.y;
 let dist=Math.sqrt(dx*dx+dy*dy);
-if(dist<player.r+puck.r){
+let minDist=player.r+puck.r;
+if(dist<minDist){
 let angle=Math.atan2(dy,dx);
-puck.dx=Math.cos(angle)*6;
-puck.dy=Math.sin(angle)*6;
+puck.x=player.x+Math.cos(angle)*minDist;
+puck.y=player.y+Math.sin(angle)*minDist;
+
+// momentum boost from paddle velocity
+let boostX=player.vx*0.5;
+let boostY=player.vy*0.5;
+let speed=8;
+puck.dx=Math.cos(angle)*speed+boostX;
+puck.dy=Math.sin(angle)*speed+boostY;
 }
 }
 
-function drawCircle(o,c){ctx.beginPath();ctx.arc(o.x,o.y,o.r,0,Math.PI*2);ctx.fillStyle=c;ctx.fill();}
+function circle(o,c){ctx.beginPath();ctx.arc(o.x,o.y,o.r,0,Math.PI*2);ctx.fillStyle=c;ctx.fill();}
 
 function resetPuck(){puck.x=200;puck.y=300;puck.dx*=-1;puck.dy*=-1;}
 
+// DESKTOP CONTROL
 canvas.addEventListener("mousemove",e=>{
 const rect=canvas.getBoundingClientRect();
 let x=e.clientX-rect.left;
 let y=e.clientY-rect.top;
+
+player1.vx=x-player1.x;
+player1.vy=y-player1.y;
+
 if(y>canvas.height/2){player1.x=x;player1.y=y;}
-if(mode==="pvp"&&y<canvas.height/2){player2.x=x;player2.y=y;}
+
+if(mode==="pvp"&&y<canvas.height/2){
+player2.vx=x-player2.x;
+player2.vy=y-player2.y;
+player2.x=x;player2.y=y;
+}
 });
 
+// MOBILE 2 TOUCH PVP
 canvas.addEventListener("touchmove",e=>{
 const rect=canvas.getBoundingClientRect();
-let x=e.touches[0].clientX-rect.left;
-let y=e.touches[0].clientY-rect.top;
-if(y>canvas.height/2){player1.x=x;player1.y=y;}
+for(let i=0;i<e.touches.length;i++){
+let touch=e.touches[i];
+let x=touch.clientX-rect.left;
+let y=touch.clientY-rect.top;
+
+if(y>canvas.height/2){
+player1.vx=x-player1.x;
+player1.vy=y-player1.y;
+player1.x=x;player1.y=y;
+}
+else if(mode==="pvp"){
+player2.vx=x-player2.x;
+player2.vy=y-player2.y;
+player2.x=x;player2.y=y;
+}
+}
 });
 
 function openQRIS(){document.getElementById("qrisModal").style.display="flex"}
