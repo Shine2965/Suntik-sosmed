@@ -1,1 +1,255 @@
+<!DOCTYPE html>  <html lang="id">  
+<head>  
+<meta charset="utf-8"/>  
+<meta name="viewport" content="width=device-width,initial-scale=1"/>  
+<title>Pembayaran QRIS - Shine Shop</title>  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">  
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>  
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>  <style>  
+*{box-sizing:border-box}  
+body{  
+  font-family:'Poppins',sans-serif;  
+  background:  
+    radial-gradient(circle at top left,#00c6ff33,transparent 40%),  
+    radial-gradient(circle at bottom right,#0072ff33,transparent 40%),  
+    linear-gradient(135deg,#0f2027,#203a43,#2c5364);  
+  margin:0;min-height:100vh;  
+  display:flex;align-items:center;justify-content:center;  
+  padding:16px;color:#fff;  
+}  
+.card{  
+  width:100%;max-width:460px;  
+  background:rgba(255,255,255,.12);  
+  backdrop-filter:blur(14px);  
+  border-radius:22px;  
+  padding:24px;  
+}  
+h2{margin:0;font-size:22px;font-weight:700}  
+.subtitle{font-size:14px;color:#cbd5e1;margin-top:4px}  
+.qr-wrapper{background:#fff;border-radius:18px;padding:16px;margin:18px auto;width:fit-content}  
+.details{font-size:13.5px;line-height:1.7}  
+input{  
+  width:100%;padding:12px;border-radius:12px;  
+  border:none;margin-top:10px;font-size:13px;  
+}  
+.btn{  
+  width:100%;margin-top:18px;padding:14px;  
+  border-radius:999px;border:none;font-size:15px;  
+  font-weight:700;color:#fff;  
+  background:linear-gradient(135deg,#00c6ff,#0072ff);  
+  cursor:pointer;  
+}  
+.muted{text-align:center;font-size:12px;color:#cbd5e1;margin-top:12px}  
+</style>  <!-- =========================  
+     IP BAN SYSTEM + REASON  
+========================= -->  <script>  
+async function checkIPBan(){  
+  try{  
+    const ipRes = await fetch("https://api.ipify.org?format=json");  
+    const { ip } = await ipRes.json();  
+  
+    const banRes = await fetch("telegram/payment/ip.json",{cache:"no-store"});  
+    if(!banRes.ok) return;  
+  
+    const bannedList = await banRes.json();  
+    if(!Array.isArray(bannedList)) return;  
+  
+    const banned = bannedList.find(x => x.ip === ip);  
+    if(banned){  
+      const reason = banned.reason || "Tidak ada keterangan";  
+  
+      document.body.innerHTML = `  
+        <div style="  
+          display:flex;  
+          align-items:center;  
+          justify-content:center;  
+          height:100vh;  
+          background:linear-gradient(135deg,#0f2027,#203a43,#2c5364);  
+          color:white;  
+          font-family:Poppins,sans-serif;  
+          text-align:center;  
+          padding:20px;  
+        ">  
+          <div style="  
+            max-width:420px;  
+            background:rgba(255,255,255,.12);  
+            backdrop-filter:blur(14px);  
+            border-radius:22px;  
+            padding:30px;  
+          ">  
+            <h1 style="font-size:26px;">🚫 Akses Diblokir</h1>  
+            <p style="opacity:.8;font-size:14px;">  
+              akses kamu telah diblokir oleh sistem <b>Shine Shop</b>  
+            </p>  
+            <div style="  
+              margin-top:14px;  
+              background:rgba(0,0,0,.35);  
+              padding:14px;  
+              border-radius:12px;  
+              font-size:13px;  
+              line-height:1.6;  
+            ">  
+              <b>Alasan:</b><br>  
+              ${reason}  
+            </div>  
+            <p style="opacity:.6;font-size:12px;margin-top:16px;">  
+              Jika ini kesalahan, silakan hubungi admin.  
+            </p>  
+          </div>  
+        </div>  
+      `;  
+      throw new Error("IP_BANNED");  
+    }  
+  }catch(e){  
+    if(e.message==="IP_BANNED") throw e;  
+  }  
+}  
+checkIPBan();  
+</script> <!-- Script Google AdSense -->
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9912622413153708"
+crossorigin="anonymous"></script>
+</head>  <body>  <!-- BACKSOUND AUTO PLAY -->  <audio autoplay loop hidden>  
+  <source src="https://raw.githubusercontent.com/IkyyExecutive/IkyyBokep/main/uploads/1771704869679_26048_1771704868780_file_485.mp3" type="audio/mpeg">  
+</audio>  <div class="card">  
+  <h2>Pembayaran QRIS Shine Shop - Telegram</h2>  
+  <div class="subtitle">Scan QR untuk menyelesaikan pembayaran</div>    <div class="qr-wrapper">  
+    <canvas id="qrisCanvas" width="240" height="240"></canvas>  
+  </div>    <div class="details" id="orderDetails"></div>    <input type="text" id="namaInput" placeholder="Nama Lengkap">  
+  <input type="email" id="gmailInput" placeholder="Gmail Aktif">  
+  <input type="file" id="buktiInput" accept="image/*">  <button id="confirmBtn" class="btn">Konfirmasi Pembayaran</button>
+<li>MASUKKAN BUKTI TRANSFER YANG VALID JIKA TIDAK MAU DI BLACKLIST </li>
+  <div class="muted">Admin memproses maksimal 24 jam</div>  
+  
+<h2>Iklan</h2>
+  <script async="async" data-cfasync="false" src="https://pl28880721.effectivegatecpm.com/3aa5a2d87e4436714cb0e357ba04fb99/invoke.js"></script>
+<div id="container-3aa5a2d87e4436714cb0e357ba04fb99"></div>
+</div>
+  <script>  
+/* KONFIG TELEGRAM */  
+const botToken = "8404649278:AAHE9Og0hNA1RbKktA6o0fR-eQPOGvArQkE";  
+const ownerChatId = "6845141887";  
+const channelId = "-1002112920606";  
+  
+/* UTIL */  
+function maskGmail(email){  
+  const [n,d]=email.split("@gmail.com");  
+  return n.slice(0,2)+"****@"+d;  
+}  
+async function getUserIP(){  
+  try{  
+    const r=await fetch("https://api.ipify.org?format=json");  
+    return (await r.json()).ip;  
+  }catch{return "-"}  
+}  
+async function getUserLocation(){  
+  try{  
+    const r=await fetch("https://ipwho.is/");  
+    const j=await r.json();  
+    return `${j.city||"-"}, ${j.country||"-"}`;  
+  }catch{return "-"}  
+}  
+  
+/* DATA ORDER */  
+const p=new URLSearchParams(location.search);  
+const trx=p.get("trx")||"-";  
+const kategori=p.get("kategori")||"-";  
+const layanan=p.get("layanan")||"-";  
+const total=p.get("total")||"0";  
+const target=p.get("target")||"-";  
+  
+orderDetails.innerHTML=`  
+<strong>ID Transaksi:</strong> ${trx}<br>  
+<strong>Kategori:</strong> ${kategori}<br>  
+<strong>Layanan:</strong> ${layanan}<br>  
+<strong>Target:</strong> ${target}<br>  
+<strong>Total:</strong> Rp ${Number(total).toLocaleString("id-ID")}  
+`;  
+  
+/* QRIS */  
+function crc16(s){  
+  let c=0xFFFF;  
+  for(let i=0;i<s.length;i++){  
+    c^=s.charCodeAt(i)<<8;  
+    for(let j=0;j<8;j++)  
+      c=c&0x8000?(c<<1)^0x1021:c<<1;  
+  }  
+  return (c&0xFFFF).toString(16).toUpperCase().padStart(4,'0');  
+}  
+function buildQR(a){  
+  const str=String(parseInt(a));  
+  const tag="54"+String(str.length).padStart(2,"0")+str;  
+  const base="00020101021226670016COM.NOBUBANK.WWW01189360050300000879140214526036770909650303UMI51440014ID.CO.QRIS.WWW0215ID20243611417480303UMI5204541153033605802ID5920SHINE SHOP OK19967206008SURABAYA61056011162070703A01";  
+  const d=base+tag+"6304";  
+  return d+crc16(d);  
+}  
+QRCode.toCanvas(qrisCanvas,buildQR(total),{width:240});  
+  
+/* KONFIRMASI */  
+confirmBtn.onclick=async()=>{  
+  const nama=namaInput.value.trim();  
+  const gmail=gmailInput.value.trim();  
+  const file=buktiInput.files[0];  
+  
+  if(!nama||!gmail||!file)  
+    return Swal.fire("Lengkapi Data","","warning");  
+  
+  Swal.fire({title:"Mengirim...",didOpen:()=>Swal.showLoading()});  
+  
+  const ip=await getUserIP();  
+  const lokasi=await getUserLocation();  
+  
+  await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`,{  
+    method:"POST",  
+    headers:{'Content-Type':'application/json'},  
+    body:JSON.stringify({  
+      chat_id: ownerChatId,  
+      text:`📥 KONFIRMASI PEMBAYARAN TELEGRAM MARKET
+ID: ${trx}  
+Layanan: ${layanan}  
+Target: ${target}  
+Total: Rp ${Number(total).toLocaleString("id-ID")}  
+Gmail: ${gmail}  
+IP: ${ip}  
+Lokasi: ${lokasi}`  
+    })  
+  });  
+  
+  let f1=new FormData();  
+  f1.append("chat_id",ownerChatId);  
+  f1.append("photo",file);  
+  await fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`,{method:"POST",body:f1});  
+  
+  let f2=new FormData();  
+  f2.append("chat_id",channelId);  
+  f2.append("photo",file);  
+  f2.append("caption",`🚨 TRANSAKSI BARU TELEGRAM
+  
+ID: ${trx}  
+LAYANAN: ${layanan}  
+NAMA: ${nama}  
+GMAIL: ${maskGmail(gmail)}  
+terima kasih sudah belanja di shinedomain.my.id`);  
+  await fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`,{method:"POST",body:f2});  
+  
+  Swal.fire("Berhasil","Konfirmasi terkirim","success");  
+};  
+  
+/* 🚫 ANTI INSPECT */
+document.addEventListener("contextmenu",e=>e.preventDefault());
+document.addEventListener("keydown",function(e){
+if(e.key==="F12") e.preventDefault();
+if(e.ctrlKey&&e.shiftKey&&["I","C","J"].includes(e.key)) e.preventDefault();
+if(e.ctrlKey&&e.key==="u") e.preventDefault();
+});
 
+setInterval(()=>{
+if(window.outerWidth-window.innerWidth>160||window.outerHeight-window.innerHeight>160){
+document.body.innerHTML="<h1 style='color:gold;text-align:center;margin-top:40vh;'>🚫 Developer Tools Terdeteksi</h1>";
+}
+},1000);
+
+setInterval(()=>{console.clear();},1000);
+setInterval(()=>{debugger;},3000);
+
+
+</script>  </body>  
+</html>  
