@@ -1,382 +1,179 @@
-<!DOCTYPE html>
-<html lang="id">
+<!DOCTYPE html><html lang="id">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-<title>Sewa Web • Shine Shop</title>
-
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-
-<style>
-
-*{
-box-sizing:border-box;
-font-family:Poppins;
-}
-
+<title>Shine Shop • Ramadhan 2026</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet"><style>
+*{box-sizing:border-box}
 body{
-background:#0f172a;
-color:white;
-padding:20px;
+  margin:0;
+  font-family:'Poppins',sans-serif;
+  background:linear-gradient(180deg,#031926,#064e3b,#022c22);
+  color:white;
+  min-height:100vh;
+  overflow-x:hidden;
 }
-
-h1{
-text-align:center;
-margin-bottom:20px;
+.moon{
+  position:fixed;
+  top:60px;
+  right:80px;
+  width:120px;
+  height:120px;
+  background:radial-gradient(circle,#facc15 60%,#eab308 80%);
+  border-radius:50%;
+  box-shadow:0 0 50px #facc15;
 }
-
+.moon::after{
+  content:'';
+  position:absolute;
+  top:0;
+  left:30px;
+  width:120px;
+  height:120px;
+  background:#031926;
+  border-radius:50%;
+}
+.star{
+  position:fixed;
+  color:#facc15;
+  font-size:14px;
+  animation:twinkle 2s infinite alternate;
+}
+@keyframes twinkle{from{opacity:.3}to{opacity:1}}
+.mosque{
+  position:fixed;
+  bottom:0;
+  width:100%;
+  height:180px;
+  background:url('https://i.ibb.co/6y0Z8xK/mosque.png') repeat-x bottom;
+  background-size:contain;
+  opacity:.25;
+}
 .container{
-display:grid;
-grid-template-columns:repeat(auto-fit,minmax(260px,1fr));
-gap:20px;
+  max-width:640px;
+  margin:120px auto 60px;
+  padding:30px;
+  background:rgba(0,0,0,.4);
+  backdrop-filter:blur(18px);
+  border-radius:26px;
+  box-shadow:0 0 40px rgba(250,204,21,.6);
+  text-align:center;
+  border:1px solid rgba(250,204,21,.4);
+}
+h1{
+  margin:0 0 10px;
+  font-size:26px;
+  background:linear-gradient(90deg,#dcfce7,#facc15,#bbf7d0);
+  -webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;
+  text-shadow:0 0 25px rgba(250,204,21,.8);
+}
+.countdown{margin:10px 0 20px;font-size:14px;color:#facc15;}
+.nav-btn{
+  width:100%;margin:10px 0;padding:15px;border:none;border-radius:16px;
+  background:linear-gradient(135deg,#065f46,#facc15);
+  color:white;font-size:15px;font-weight:600;cursor:pointer;transition:.3s;
+}
+.nav-btn:hover{transform:translateY(-3px) scale(1.02);box-shadow:0 15px 35px rgba(250,204,21,.7);} 
+
+.sound-toggle{
+  margin-top:15px;
+  padding:10px 18px;
+  border:none;
+  border-radius:14px;
+  background:linear-gradient(135deg,#facc15,#065f46);
+  color:#000;
+  font-weight:600;
+  cursor:pointer;
 }
 
-/* CARD */
-
-.card{
-background:#1e293b;
-padding:25px;
-border-radius:15px;
+.watermark{
+  position:fixed;bottom:10px;left:50%;transform:translateX(-50%);
+  font-size:12px;color:rgba(255,255,255,.6);
+}
+</style></head>
+<body><div class="moon"></div>
+<div class="mosque"></div><script>
+/* STARS */
+for(let i=0;i<40;i++){
+  const s=document.createElement('div');
+  s.className='star';
+  s.textContent='★';
+  s.style.left=Math.random()*100+'vw';
+  s.style.top=Math.random()*100+'vh';
+  s.style.animationDuration=(1+Math.random()*2)+'s';
+  document.body.appendChild(s);
 }
 
-.price{
-color:#38bdf8;
-font-weight:700;
-margin-bottom:10px;
+/* DATES */
+const idulFitri = new Date("March 31, 2026 00:00:00");
+const takbiranStart = new Date("March 30, 2026 18:00:00");
+
+/* AUDIO */
+const ramadhanSound = "https://h.uguu.se/jUSzHsOE.mp3";
+const takbiranSound = "https://h.uguu.se/gnhYpllC.mp3";
+
+let bgAudio = new Audio();
+bgAudio.loop = true;
+bgAudio.volume = 1;
+bgAudio.muted = false;
+
+function setAudio(){
+  const now = new Date();
+  if(now >= takbiranStart){
+    bgAudio.src = takbiranSound;
+  }else{
+    bgAudio.src = ramadhanSound;
+  }
+  bgAudio.play().catch(()=>{});
 }
 
-ul{
-font-size:14px;
-margin-bottom:15px;
-padding-left:18px;
+document.addEventListener("click", function initAudio(){
+  setAudio();
+  document.removeEventListener("click", initAudio);
+});
+
+function toggleSound(){
+  bgAudio.muted = !bgAudio.muted;
+  document.getElementById("soundBtn").innerText = bgAudio.muted ? "🔇 Unmute Sound" : "🔊 Mute Sound";
 }
 
-/* MUSIC */
-
-.music-box{
-display:flex;
-flex-direction:column;
-align-items:center;
-margin-bottom:10px;
+/* COUNTDOWN */
+function updateCountdown(){
+  const now=new Date().getTime();
+  const diff=idulFitri-now;
+  if(diff<=0){
+    document.getElementById("countdown").innerHTML="🌙 Selamat Hari Raya Idul Fitri 1447H 🌙";
+    return;
+  }
+  const days=Math.floor(diff/(1000*60*60*24));
+  const hours=Math.floor((diff%(1000*60*60*24))/(1000*60*60));
+  const minutes=Math.floor((diff%(1000*60*60))/(1000*60));
+  document.getElementById("countdown").innerHTML=
+    "⏳ Menuju Idul Fitri: "+days+" Hari "+hours+" Jam "+minutes+" Menit";
 }
-
-.music-title{
-width:100%;
-overflow:hidden;
-white-space:nowrap;
-border-top:1px solid #334155;
-border-bottom:1px solid #334155;
-margin-bottom:6px;
-}
-
-.music-title span{
-display:inline-block;
-padding-left:100%;
-animation:marquee 10s linear infinite;
-}
-
-@keyframes marquee{
-0%{transform:translateX(0)}
-100%{transform:translateX(-100%)}
-}
-
-/* equalizer */
-
-.equalizer{
-display:flex;
-gap:3px;
-height:18px;
-align-items:flex-end;
-}
-
-.bar{
-width:4px;
-background:#38bdf8;
-height:5px;
-animation:music 1s infinite;
-animation-play-state:paused;
-}
-
-.bar:nth-child(2){animation-delay:.2s}
-.bar:nth-child(3){animation-delay:.4s}
-.bar:nth-child(4){animation-delay:.6s}
-.bar:nth-child(5){animation-delay:.8s}
-
-@keyframes music{
-
-0%{height:5px}
-50%{height:18px}
-100%{height:5px}
-
-}
-
-.music-btn{
-width:40px;
-height:40px;
-border-radius:50%;
-background:#38bdf8;
-display:flex;
-align-items:center;
-justify-content:center;
-cursor:pointer;
-margin-top:6px;
-}
-
-/* BUTTON */
-
-.btns{
-display:flex;
-gap:10px;
-}
-
-button{
-flex:1;
-padding:10px;
-border:none;
-border-radius:8px;
-cursor:pointer;
-font-weight:600;
-}
-
-.month{
-background:#38bdf8;
-}
-
-.perma{
-background:#22c55e;
-color:white;
-}
-
-/* popup */
-
-.popup{
-position:fixed;
-top:0;
-left:0;
-width:100%;
-height:100%;
-display:none;
-justify-content:center;
-align-items:center;
-background:rgba(0,0,0,.7);
-}
-
-.box{
-background:white;
-color:black;
-padding:25px;
-border-radius:12px;
-text-align:center;
-max-width:320px;
-}
-
-.confirm{
-background:#22c55e;
-color:white;
-padding:10px;
-border:none;
-border-radius:8px;
-margin-top:10px;
-}
-
-.close{
-background:#ef4444;
-color:white;
-padding:10px;
-border:none;
-border-radius:8px;
-margin-top:10px;
-}
-
-.info{
-margin-top:40px;
-background:#1e293b;
-padding:25px;
-border-radius:15px;
-line-height:1.6;
-}
-
-.info h3{
-color:#38bdf8;
-margin-top:15px;
-}
-
-</style>
-</head>
-
-<body>
-
-<h1>Sewa Web Shine Shop</h1>
-
-<div class="container">
-
-<div class="card">
-
-<h3>Paket Newbie</h3>
-
-<div class="price">
-Rp5.000/bulan<br>
-Rp10.000/permanen
-</div>
-
-<ul>
-<li>Fee add balance 11%</li>
-<li>Web suntik sosmed terbatas</li>
-<li>Bebas request tampilan</li>
-<li>Bebas subdomain</li>
-</ul>
-
-<div class="music-box">
-
-<div class="music-title">
-<span>🎵 Benson Boone - In The Stars</span>
-</div>
-
-<div class="equalizer">
-
-<div class="bar"></div>
-<div class="bar"></div>
-<div class="bar"></div>
-<div class="bar"></div>
-<div class="bar"></div>
-
-</div>
-
-<div class="music-btn" onclick="toggleMusic()" id="musicBtn">
-▶
-</div>
-
-</div>
-
-<div class="btns">
-<button class="month" onclick="buy('Newbie',5000)">Perbulan</button>
-<button class="perma" onclick="buy('Newbie',10000)">Permanen</button>
-</div>
-
-</div>
-
-</div>
-
-<!-- POPUP -->
-
-<div class="popup" id="popup">
-
-<div class="box">
-
-<h3 id="paket"></h3>
-
-<p id="harga"></p>
-
-<div id="qrcode"></div>
-
-<button class="confirm"
-onclick="window.location.href='https://t.me/shinedomain'">
-Konfirmasi Pembayaran
-</button>
-
-<br>
-
-<button class="close" onclick="closeQR()">Tutup</button>
-
-</div>
-
-</div>
-
-<audio id="music" loop>
-<source src="https://raw.githubusercontent.com/IkyyExecutive-v2/IkyySukaNgewe/main/uploads/1773720595309_2430_1773720593858_file_3108.mp3">
-</audio>
-
-<script>
-
-/* QRIS */
-
-const qris =
-"00020101021226670016COM.NOBUBANK.WWW01189360050300000879140214526036770909650303UMI51440014ID.CO.QRIS.WWW0215ID20243611417480303UMI5204541153033605802ID5920SHINE SHOP OK19967206008SURABAYA61056011162070703A01"
-
-function buy(paket,nominal){
-
-document.getElementById("popup").style.display="flex"
-
-document.getElementById("paket").innerText="Paket "+paket
-
-document.getElementById("harga").innerText="Rp "+nominal.toLocaleString()
-
-document.getElementById("qrcode").innerHTML=""
-
-new QRCode(document.getElementById("qrcode"),{
-
-text:qris,
-
-width:220,
-
-height:220
-
-})
-
-}
-
-function closeQR(){
-
-document.getElementById("popup").style.display="none"
-
-}
-
-/* MUSIC */
-
-function toggleMusic(){
-
-let music=document.getElementById("music")
-
-let btn=document.getElementById("musicBtn")
-
-let bars=document.querySelectorAll(".bar")
-
-if(music.paused){
-
-music.play()
-
-btn.innerHTML="⏸"
-
-bars.forEach(bar=>{
-
-bar.style.animationPlayState="running"
-
-})
-
-}else{
-
-music.pause()
-
-btn.innerHTML="▶"
-
-bars.forEach(bar=>{
-
-bar.style.animationPlayState="paused"
-
-})
-
-}
-
-}
+setInterval(updateCountdown,1000);
 
 /* ANTI INSPECT */
+document.addEventListener("contextmenu",e=>e.preventDefault());
+document.addEventListener("keydown",function(e){
+  if(e.key==="F12") e.preventDefault();
+  if(e.ctrlKey && e.shiftKey && ["I","C","J"].includes(e.key)) e.preventDefault();
+  if(e.ctrlKey && e.key==="u") e.preventDefault();
+});
+setInterval(function(){
+  if(window.outerWidth-window.innerWidth>160 || window.outerHeight-window.innerHeight>160){
+    document.body.innerHTML="<h1 style='color:#facc15;text-align:center;margin-top:40vh;'>🚫 Developer Tools Terdeteksi</h1>";
+  }
+},1000);
+setInterval(()=>{console.clear();},1000);
+setInterval(()=>{debugger;},3000);
 
-document.addEventListener("contextmenu",e=>e.preventDefault())
+</script><div class="container">
+  <h1>🌙 Shine Shop • Ramadhan 2026 🌙</h1>
+  <div class="countdown" id="countdown"></div><button class="nav-btn" onclick="location.href='/dashboard/'">🛒 Belanja</button> <button class="nav-btn" onclick="location.href='/sewaweb/'">🌐 Sewa Website</button> <button class="nav-btn" onclick="location.href='/testimoni/'">📈 Testimoni</button> <button class="nav-btn" onclick="location.href='/ewallet/'">💳 E Wallet</button> <button class="nav-btn" onclick="location.href='https://store.shinedomain.my.id'">📰 Informasi</button> <button class="nav-btn" onclick="location.href='https://t.me/shineshopstore1'">💬 Customer Service</button>
 
-document.onkeydown=function(e){
+<button class="sound-toggle" id="soundBtn" onclick="toggleSound()">🔊 Mute Sound</button>
 
-if(e.keyCode==123)return false
-
-if(e.ctrlKey && e.shiftKey && e.keyCode==73)return false
-
-if(e.ctrlKey && e.keyCode==85)return false
-
-}
-
-</script>
-
-</body>
+</div><div class="watermark">© SHINE SHOP 2026 • Marhaban Ya Ramadhan 🌙</div></body>
 </html>
