@@ -3,15 +3,15 @@ import { NextResponse } from 'next/server';
 export function middleware(req) {
   const url = req.nextUrl;
 
-  // Ambil data request
-  const ip =
-    req.headers.get('x-forwarded-for')?.split(',')[0] ||
-    req.ip ||
-    '';
+  // =========================
+  // AMBIL DATA REQUEST (SAFE)
+  // =========================
+  const forwardedFor = req.headers.get('x-forwarded-for');
+  const ip = forwardedFor ? forwardedFor.split(',')[0].trim() : '';
 
   const userAgent = req.headers.get('user-agent') || '';
   const referer = req.headers.get('referer') || '';
-  const token = url.searchParams.get('token');
+  const token = url.searchParams.get('token') || '';
 
   // =========================
   // CONFIG
@@ -24,7 +24,7 @@ export function middleware(req) {
   const SECRET_TOKEN = 'RAHASIA_BANGET_123';
 
   const ALLOWED_UA = [
-    'Mozilla', // browser normal
+    'Mozilla'
   ];
 
   const ALLOWED_REFERER = [
@@ -36,28 +36,40 @@ export function middleware(req) {
   // =========================
   if (url.pathname.startsWith('/telegram')) {
 
-    // 1. Cek IP
+    // 1. IP CHECK
     if (!ALLOWED_IPS.includes(ip)) {
       return NextResponse.redirect(new URL('/tidaktersedia/', req.url));
     }
 
-    // 2. Cek token rahasia
+    // 2. TOKEN CHECK
     if (token !== SECRET_TOKEN) {
       return NextResponse.redirect(new URL('/tidaktersedia/', req.url));
     }
 
-    // 3. Cek User-Agent (hindari bot)
+    // 3. USER AGENT CHECK
     const validUA = ALLOWED_UA.some(ua => userAgent.includes(ua));
     if (!validUA) {
       return NextResponse.redirect(new URL('/tidaktersedia/', req.url));
     }
 
-    // 4. Cek referer (opsional tapi kuat)
-    const validReferer = ALLOWED_REFERER.some(r => referer.startsWith(r));
-    if (!validReferer) {
+    // 4. REFERER CHECK (SAFE)
+    if (referer) {
+      const validReferer = ALLOWED_REFERER.some(r => referer.startsWith(r));
+      if (!validReferer) {
+        return NextResponse.redirect(new URL('/tidaktersedia/', req.url));
+      }
+    } else {
+      // kalau tidak ada referer → blok (opsional, bisa kamu ubah)
       return NextResponse.redirect(new URL('/tidaktersedia/', req.url));
     }
   }
 
   return NextResponse.next();
 }
+
+// =========================
+// BATASI HANYA KE ROUTE INI
+// =========================
+export const config = {
+  matcher: ['/telegram/:path*'],
+};
