@@ -1,10 +1,15 @@
-<!DOCTYPE html><html lang="id">
+<!DOCTYPE html>
+<html lang="id">
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Pembayaran QRIS - Shine Shop</title><link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+<title>Pembayaran QRIS - Shine Shop</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script><style>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
+
+<style>
 *{box-sizing:border-box}
 body{
   font-family:'Poppins',sans-serif;
@@ -20,7 +25,6 @@ body{
   padding:16px;
   color:#fff;
 }
-
 .card{
   width:100%;
   max-width:460px;
@@ -29,15 +33,8 @@ body{
   border-radius:22px;
   padding:24px;
 }
-
 h2{margin:0;font-size:22px;font-weight:700}
-
-.subtitle{
-  font-size:14px;
-  color:#cbd5e1;
-  margin-top:4px
-}
-
+.subtitle{font-size:14px;color:#cbd5e1;margin-top:4px}
 .qr-wrapper{
   background:#fff;
   border-radius:18px;
@@ -45,12 +42,7 @@ h2{margin:0;font-size:22px;font-weight:700}
   margin:18px auto;
   width:fit-content
 }
-
-.details{
-  font-size:13.5px;
-  line-height:1.7
-}
-
+.details{font-size:13.5px;line-height:1.7}
 input{
   width:100%;
   padding:12px;
@@ -59,7 +51,6 @@ input{
   margin-top:10px;
   font-size:13px
 }
-
 .btn{
   width:100%;
   margin-top:18px;
@@ -72,18 +63,12 @@ input{
   background:linear-gradient(135deg,#00c6ff,#0072ff);
   cursor:pointer
 }
+.muted{text-align:center;font-size:12px;color:#cbd5e1;margin-top:12px}
+</style>
 
-.muted{
-  text-align:center;
-  font-size:12px;
-  color:#cbd5e1;
-  margin-top:12px
-}
-</style><script>
-
+<script>
 async function checkIPBan(){
   try{
-
     const ipRes = await fetch("https://api.ipify.org?format=json");
     const { ip } = await ipRes.json();
 
@@ -91,286 +76,186 @@ async function checkIPBan(){
     if(!banRes.ok) return;
 
     const bannedList = await banRes.json();
-    if(!Array.isArray(bannedList)) return;
-
     const banned = bannedList.find(x => x.ip === ip);
 
     if(banned){
-
       const reason = banned.reason || "Tidak ada keterangan";
 
       document.body.innerHTML = `
-      <div style="display:flex;align-items:center;justify-content:center;height:100vh;background:linear-gradient(135deg,#0f2027,#203a43,#2c5364);color:white;font-family:Poppins;text-align:center;padding:20px;">
-
-      <div style="max-width:420px;background:rgba(255,255,255,.12);backdrop-filter:blur(14px);border-radius:22px;padding:30px;">
-
-      <h1 style="font-size:26px;">🚫 Akses Diblokir</h1>
-
-      <p style="opacity:.8;font-size:14px;">akses kamu telah diblokir oleh sistem <b>Shine Shop</b></p>
-
-      <div style="margin-top:14px;background:rgba(0,0,0,.35);padding:14px;border-radius:12px;font-size:13px;line-height:1.6;">
-      <b>Alasan:</b><br>
-      ${reason}
-      </div>
-
-      </div>
-      </div>`;
-
+      <div style="display:flex;align-items:center;justify-content:center;height:100vh;background:linear-gradient(135deg,#0f2027,#203a43,#2c5364);color:white;text-align:center;">
+      <div style="max-width:420px;background:rgba(255,255,255,.12);padding:30px;border-radius:22px;">
+      <h1>🚫 Akses Diblokir</h1>
+      <p>Akses kamu diblokir</p>
+      <div>${reason}</div>
+      </div></div>`;
       throw new Error("IP_BANNED");
-
     }
-
   }catch(e){
-
     if(e.message === "IP_BANNED") throw e;
-
   }
 }
-
 checkIPBan();
+</script>
 
-</script></head><body><div class="card"><h2>Pembayaran QRIS Shine Shop</h2>
-<div class="subtitle">Scan QR untuk menyelesaikan pembayaran</div><div class="qr-wrapper">
+</head>
+<body>
+
+<div class="card">
+<h2>Pembayaran QRIS Shine Shop - Sosmed 1</h2>
+<div class="subtitle">Scan QR untuk menyelesaikan pembayaran</div>
+
+<div class="qr-wrapper">
 <canvas id="qrisCanvas" width="240" height="240"></canvas>
-</div><div class="details" id="orderDetails"></div><input type="text" id="namaInput" placeholder="Nama Lengkap">
+</div>
+
+<div class="details" id="orderDetails"></div>
+
+<input type="text" id="namaInput" placeholder="Nama Lengkap">
 <input type="email" id="gmailInput" placeholder="Gmail Aktif">
-<input type="file" id="buktiInput" accept="image/*"><button id="confirmBtn" class="btn">Konfirmasi Pembayaran</button>
 
-<li>MASUKKAN BUKTI TRANSFER YANG VALID JIKA TIDAK MAU DI BLACKLIST</li><div class="muted">Admin memproses maksimal 72 jam</div></div><script>
+<input type="text" id="voucherInput" placeholder="Kode Voucher (opsional)">
+<button id="applyVoucher" class="btn" style="margin-top:10px;background:#22c55e;">Gunakan Voucher</button>
 
-const discordWebhook = "https://discord.com/api/webhooks/1482244989021851748/oq__kcKXWHJILOG96lbfFxfZKoKCLEqkLJrlSS_rTQ6YEhgSTnFL_Guu8ZulERNEmCZV";
+<input type="file" id="buktiInput" accept="image/*">
 
-/* WEBHOOK NOTIF TRANSAKSI BARU */
-const discordWebhookTransaksi = "https://discord.com/api/webhooks/1482245411325345793/79LyZzxEZxoHVZeW9bgJpf_SmPDQ4uZCO6DO652Hids_7xZjK0gUYuOZrgBqoin-Qez6";
+<button id="confirmBtn" class="btn">Konfirmasi Pembayaran</button>
 
-function maskGmail(email){
+<div class="muted">Admin memproses maksimal 72 jam</div>
+</div>
 
-  const [n,d] = email.split("@gmail.com");
+<script>
+const discordWebhook = "WEBHOOK_KAMU";
+const discordWebhookTransaksi = "WEBHOOK_TRANSAKSI";
 
-  return n.slice(0,2) + "****@" + d;
-
-}
-
-async function getUserIP(){
-
-  try{
-
-    const r = await fetch("https://api.ipify.org?format=json");
-
-    return (await r.json()).ip;
-
-  }
-
-  catch{
-
-    return "-";
-
-  }
-
-}
-
-async function getUserLocation(){
-
-  try{
-
-    const r = await fetch("https://ipwho.is/");
-
-    const j = await r.json();
-
-    return `${j.city||"-"}, ${j.country||"-"}`;
-
-  }
-
-  catch{
-
-    return "-";
-
-  }
-
-}
-
+/* PARAM */
 const p = new URLSearchParams(location.search);
-
 const trx = p.get("trx") || "-";
 const kategori = p.get("kategori") || "-";
 const layanan = p.get("layanan") || "-";
-const total = p.get("total") || "0";
+const total = Number(p.get("total") || 0);
 const target = p.get("target") || "-";
 
-orderDetails.innerHTML = `
+/* STATE */
+let originalTotal = total;
+let finalTotal = total;
+let appliedVoucher = null;
 
-<strong>ID Transaksi:</strong> ${trx}<br>
-<strong>Kategori:</strong> ${kategori}<br>
-<strong>Layanan:</strong> ${layanan}<br>
-<strong>Target:</strong> ${target}<br>
-<strong>Total:</strong> Rp ${Number(total).toLocaleString("id-ID")}
+/* DISPLAY */
+function updateDisplay(){
+  orderDetails.innerHTML = `
+  <strong>ID:</strong> ${trx}<br>
+  <strong>Layanan:</strong> ${layanan}<br>
+  <strong>Target:</strong> ${target}<br>
+  <strong>Total:</strong> <s>Rp ${originalTotal.toLocaleString("id-ID")}</s><br>
+  <strong>Total Bayar:</strong> Rp ${finalTotal.toLocaleString("id-ID")}
+  `;
+  QRCode.toCanvas(qrisCanvas, buildQR(finalTotal), {width:240});
+}
 
-`;
-
+/* QR */
 function crc16(s){
-
-let c = 0xFFFF;
-
+let c=0xFFFF;
 for(let i=0;i<s.length;i++){
-
-c ^= s.charCodeAt(i) << 8;
-
+c^=s.charCodeAt(i)<<8;
 for(let j=0;j<8;j++){
-
-c = c & 0x8000 ? (c<<1)^0x1021 : c<<1;
-
+c=c&0x8000?(c<<1)^0x1021:c<<1;
+}}
+return (c&0xFFFF).toString(16).toUpperCase().padStart(4,'0');
 }
-
-}
-
-return (c & 0xFFFF).toString(16).toUpperCase().padStart(4,'0');
-
-}
-
 function buildQR(a){
-
-const str = String(parseInt(a));
-
-const tag = "54" + String(str.length).padStart(2,"0") + str;
-
-const base = "00020101021226670016COM.NOBUBANK.WWW01189360050300000879140214526036770909650303UMI51440014ID.CO.QRIS.WWW0215ID20243611417480303UMI5204541153033605802ID5920SHINE SHOP OK19967206008SURABAYA61056011162070703A01";
-
-const d = base + tag + "6304";
-
-return d + crc16(d);
-
+const str=String(parseInt(a));
+const tag="54"+String(str.length).padStart(2,"0")+str;
+const base="00020101021226670016COM.NOBUBANK.WWW01189360050300000879140214526036770909650303UMI51440014ID.CO.QRIS.WWW0215ID20243611417480303UMI5204541153033605802ID5920SHINE SHOP OK19967206008SURABAYA61056011162070703A01";
+const d=base+tag+"6304";
+return d+crc16(d);
 }
 
-QRCode.toCanvas(qrisCanvas, buildQR(total), {width:240});
-
-async function sendDiscord(data){
-
-const payload = {
-
-username:"Shine Shop Payment",
-
-embeds:[
-
-{
-
-title:"💰 Konfirmasi Pembayaran Baru Sosmed 1",
-
-color:3447003,
-
-fields:[
-
-{name:"ID Transaksi",value:data.trx,inline:true},
-{name:"Layanan",value:data.layanan,inline:true},
-{name:"Target",value:data.target,inline:true},
-{name:"Total",value:"Rp "+data.total,inline:true},
-{name:"Nama",value:data.nama,inline:true},
-{name:"Gmail",value:data.gmail,inline:false},
-{name:"IP",value:data.ip,inline:true},
-{name:"Lokasi",value:data.lokasi,inline:true}
-
-],
-
-footer:{text:"Shine Shop Payment"},
-
-timestamp:new Date()
-
+/* LOAD VOUCHER */
+async function loadVoucher(){
+  try{
+    const r = await fetch("voucher.json",{cache:"no-store"});
+    return await r.json();
+  }catch{return [];}
 }
 
-]
+/* APPLY VOUCHER */
+applyVoucher.onclick = async()=>{
+  const code = voucherInput.value.trim().toUpperCase();
+  if(!code) return Swal.fire("Isi kode voucher","","warning");
 
+  const list = await loadVoucher();
+  const v = list.find(x => x.code === code);
+
+  if(!v) return Swal.fire("Voucher tidak valid","","error");
+
+  if(v.min_purchase && originalTotal < v.min_purchase){
+    return Swal.fire("Minimal pembelian",
+    `Min Rp ${v.min_purchase.toLocaleString("id-ID")}`,"warning");
+  }
+
+  let discount = 0;
+
+  if(v.type==="percent"){
+    discount = originalTotal * v.value / 100;
+    if(v.max_discount) discount = Math.min(discount, v.max_discount);
+  }else{
+    discount = v.value;
+  }
+
+  finalTotal = Math.max(originalTotal - discount,0);
+  appliedVoucher = v.code;
+
+  updateDisplay();
+  Swal.fire("Berhasil","Voucher dipakai","success");
 };
 
-await fetch(discordWebhook,{
-
-method:"POST",
-
-headers:{"Content-Type":"application/json"},
-
-body:JSON.stringify(payload)
-
-});
-
-}
-
+/* SEND */
 confirmBtn.onclick = async()=>{
+  const nama = namaInput.value;
+  const gmail = gmailInput.value;
+  const file = buktiInput.files[0];
 
-const nama = namaInput.value.trim();
-const gmail = gmailInput.value.trim();
-const file = buktiInput.files[0];
+  if(!nama||!gmail||!file){
+    return Swal.fire("Lengkapi data","","warning");
+  }
 
-if(!nama || !gmail || !file){
+  Swal.fire({title:"Mengirim...",didOpen:()=>Swal.showLoading()});
 
-return Swal.fire("Lengkapi Data","","warning");
-
-}
-
-Swal.fire({title:"Mengirim...",didOpen:()=>Swal.showLoading()});
-
-const ip = await getUserIP();
-const lokasi = await getUserLocation();
-
-await sendDiscord({
-
-trx,
-layanan,
-target,
-total:Number(total).toLocaleString("id-ID"),
-nama,
-gmail,
-ip,
-lokasi
-
-});
-
-/* KIRIM NOTIF TRANSAKSI BARU */
-await fetch(discordWebhookTransaksi,{
-method:"POST",
-headers:{"Content-Type":"application/json"},
-body:JSON.stringify({
-content:`🆕 TRANSAKSI BARU SOSMED 1
-
-ID Transaksi: ${trx}
+  await fetch(discordWebhook,{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({
+      content:`💰 Pembayaran Baru
+ID: ${trx}
 Layanan: ${layanan}
-Total Bayar: Rp ${Number(total).toLocaleString("id-ID")}
-Tunggu apa lagi? order sekarang di shinedomain.my.id`
-})
-});
+Total: Rp ${finalTotal.toLocaleString("id-ID")}
+Voucher: ${appliedVoucher || "-"}
+Nama: ${nama}
+Gmail: ${gmail}`
+    })
+  });
 
-let form = new FormData();
-form.append("file",file);
+  let form = new FormData();
+  form.append("file",file);
+  await fetch(discordWebhook,{method:"POST",body:form});
 
-await fetch(discordWebhook,{method:"POST",body:form});
+  await fetch(discordWebhookTransaksi,{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({
+      content:`🆕 TRANSAKSI BARU
+ID: ${trx}
+Total: Rp ${finalTotal.toLocaleString("id-ID")}
+Voucher: ${appliedVoucher || "-"}`
+    })
+  });
 
-Swal.fire("Berhasil","Konfirmasi terkirim","success");
-
+  Swal.fire("Berhasil","Terkirim","success");
 };
 
+/* INIT */
+updateDisplay();
+</script>
 
-/* ANTI INSPECT */
-
-document.addEventListener("contextmenu",e=>e.preventDefault());
-
-document.addEventListener("keydown",function(e){
-
-if(e.key === "F12") e.preventDefault();
-
-if(e.ctrlKey && e.shiftKey && ["I","C","J"].includes(e.key)) e.preventDefault();
-
-if(e.ctrlKey && e.key === "u") e.preventDefault();
-
-});
-
-setInterval(()=>{
-
-if(window.outerWidth-window.innerWidth>160||window.outerHeight-window.innerHeight>160){
-
- document.body.innerHTML="<h1 style='color:gold;text-align:center;margin-top:40vh;'>🚫 Developer Tools Terdeteksi</h1>";
-
-}
-
-},1000);
-
-setInterval(()=>{console.clear();},1000);
-
-</script></body>
+</body>
 </html>
