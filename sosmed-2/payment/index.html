@@ -1,15 +1,10 @@
-<!DOCTYPE html>
-<html lang="id">
+<!DOCTYPE html><html lang="id">
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Pembayaran QRIS - Shine Shop</title>
-
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+<title>Pembayaran QRIS - Shine Shop</title><link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
-
-<style>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script><style>
 *{box-sizing:border-box}
 body{
   font-family:'Poppins',sans-serif;
@@ -64,9 +59,7 @@ input{
   cursor:pointer
 }
 .muted{text-align:center;font-size:12px;color:#cbd5e1;margin-top:12px}
-</style>
-
-<script>
+</style><script>
 async function checkIPBan(){
   try{
     const ipRes = await fetch("https://api.ipify.org?format=json");
@@ -95,35 +88,17 @@ async function checkIPBan(){
   }
 }
 checkIPBan();
-</script>
-
-</head>
-<body>
-
-<div class="card">
+</script></head>
+<body><div class="card">
 <h2>Pembayaran QRIS Shine Shop - Sosmed 2</h2>
-<div class="subtitle">Scan QR untuk menyelesaikan pembayaran</div>
-
-<div class="qr-wrapper">
+<div class="subtitle">Scan QR untuk menyelesaikan pembayaran</div><div class="qr-wrapper">
 <canvas id="qrisCanvas" width="240" height="240"></canvas>
-</div>
-
-<div class="details" id="orderDetails"></div>
-
-<input type="text" id="namaInput" placeholder="Nama Lengkap">
-<input type="email" id="gmailInput" placeholder="Gmail Aktif">
-
-<input type="text" id="voucherInput" placeholder="Kode Voucher (opsional)">
-<button id="applyVoucher" class="btn" style="margin-top:10px;background:#22c55e;">Gunakan Voucher</button>
-
-<input type="file" id="buktiInput" accept="image/*">
-
-<button id="confirmBtn" class="btn">Konfirmasi Pembayaran</button>
+</div><div class="details" id="orderDetails"></div><input type="text" id="namaInput" placeholder="Nama Lengkap">
+<input type="email" id="gmailInput" placeholder="Gmail Aktif"><input type="text" id="voucherInput" placeholder="Kode Voucher (opsional)">
+<button id="applyVoucher" class="btn" style="margin-top:10px;background:#22c55e;">Gunakan Voucher</button><input type="file" id="buktiInput" accept="image/*"><button id="confirmBtn" class="btn">Konfirmasi Pembayaran</button>
 
 <div class="muted">Admin memproses maksimal 72 jam</div>
-</div>
-
-<script>
+</div><script>
 const discordWebhook = "https://discord.com/api/webhooks/1482244989021851748/oq__kcKXWHJILOG96lbfFxfZKoKCLEqkLJrlSS_rTQ6YEhgSTnFL_Guu8ZulERNEmCZV";
 const discordWebhookTransaksi = "https://discord.com/api/webhooks/1482245411325345793/79LyZzxEZxoHVZeW9bgJpf_SmPDQ4uZCO6DO652Hids_7xZjK0gUYuOZrgBqoin-Qez6";
 
@@ -140,15 +115,38 @@ let originalTotal = total;
 let finalTotal = total;
 let appliedVoucher = null;
 
+/* IP */
+async function getUserIP(){
+  try{
+    const r = await fetch("https://api.ipify.org?format=json");
+    const j = await r.json();
+    return j.ip || "-";
+  }catch{
+    return "-";
+  }
+}
+
 /* DISPLAY */
 function updateDisplay(){
-  orderDetails.innerHTML = `
+  let html = `
   <strong>ID:</strong> ${trx}<br>
   <strong>Layanan:</strong> ${layanan}<br>
   <strong>Target:</strong> ${target}<br>
-  <strong>Total:</strong> <s>Rp ${originalTotal.toLocaleString("id-ID")}</s><br>
-  <strong>Total Bayar:</strong> Rp ${finalTotal.toLocaleString("id-ID")}
   `;
+
+  if(appliedVoucher){
+    html += `
+    <strong>Total:</strong> <s>Rp ${originalTotal.toLocaleString("id-ID")}</s><br>
+    <strong>Total Bayar:</strong> Rp ${finalTotal.toLocaleString("id-ID")}<br>
+    <strong>Voucher:</strong> ${appliedVoucher}
+    `;
+  }else{
+    html += `
+    <strong>Total Bayar:</strong> Rp ${finalTotal.toLocaleString("id-ID")}
+    `;
+  }
+
+  orderDetails.innerHTML = html;
   QRCode.toCanvas(qrisCanvas, buildQR(finalTotal), {width:240});
 }
 
@@ -174,16 +172,19 @@ async function loadVoucher(){
   try{
     const r = await fetch("/sosmed-1/payment/voucher.json",{cache:"no-store"});
     const data = await r.json();
-
     if(!Array.isArray(data)) return [];
-
     return data;
   }catch{
     return [];
   }
 }
+
 /* APPLY VOUCHER */
+let voucherUsed = false;
 applyVoucher.onclick = async()=>{
+
+  if(voucherUsed) return Swal.fire("Voucher sudah digunakan","","warning");
+
   const code = voucherInput.value.trim().toUpperCase();
   if(!code) return Swal.fire("Isi kode voucher","","warning");
 
@@ -207,7 +208,11 @@ applyVoucher.onclick = async()=>{
   }
 
   finalTotal = Math.max(originalTotal - discount,0);
+
+  if(finalTotal < 100) finalTotal = 100;
+
   appliedVoucher = v.code;
+  voucherUsed = true;
 
   updateDisplay();
   Swal.fire("Berhasil","Voucher dipakai","success");
@@ -223,7 +228,11 @@ confirmBtn.onclick = async()=>{
     return Swal.fire("Lengkapi data","","warning");
   }
 
+  confirmBtn.disabled = true;
+
   Swal.fire({title:"Mengirim...",didOpen:()=>Swal.showLoading()});
+
+  const ip = await getUserIP();
 
   await fetch(discordWebhook,{
     method:"POST",
@@ -232,11 +241,12 @@ confirmBtn.onclick = async()=>{
       content:`💰 Pembayaran Baru Sosmed 2
 ID: ${trx}
 Layanan: ${layanan}
-Total: Rp ${finalTotal.toLocaleString("id-ID")}
 Target: ${target}
+Total: Rp ${finalTotal.toLocaleString("id-ID")}
 Voucher: ${appliedVoucher || "-"}
 Nama: ${nama}
-Gmail: ${gmail}`
+Gmail: ${gmail}
+IP: ${ip}`
     })
   });
 
@@ -250,43 +260,17 @@ Gmail: ${gmail}`
     body:JSON.stringify({
       content:`🆕 TRANSAKSI BARU SUNTIK SOSMED 2
 ID: ${trx}
+Layanan: ${layanan}
 Total: Rp ${finalTotal.toLocaleString("id-ID")}
-Voucher: ${appliedVoucher || "-"}`
+Voucher: ${appliedVoucher || "-"}
+`
     })
   });
 
   Swal.fire("Berhasil","Terkirim","success");
 };
 
-  /* ANTI INSPECT */
-
-document.addEventListener("contextmenu",e=>e.preventDefault());
-
-document.addEventListener("keydown",function(e){
-
-if(e.key === "F12") e.preventDefault();
-
-if(e.ctrlKey && e.shiftKey && ["I","C","J"].includes(e.key)) e.preventDefault();
-
-if(e.ctrlKey && e.key === "u") e.preventDefault();
-
-});
-
-setInterval(()=>{
-
-if(window.outerWidth-window.innerWidth>160||window.outerHeight-window.innerHeight>160){
-
-document.body.innerHTML="<h1 style='color:gold;text-align:center;margin-top:40vh;'>🚫 Developer Tools Terdeteksi</h1>";
-
-}
-
-},1000);
-
-setInterval(()=>{console.clear();},1000);
-  
 /* INIT */
 updateDisplay();
-</script>
-
-</body>
+</script></body>
 </html>
