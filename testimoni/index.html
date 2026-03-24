@@ -4,7 +4,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SHINE SHOP Testimoni</title><script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script><link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet"><style>
 *{margin:0;padding:0;box-sizing:border-box;font-family:'Poppins',sans-serif;}
-
 body{
   min-height:100vh;
   color:white;
@@ -16,13 +15,11 @@ body{
   align-items:center;
   padding:20px;
 }
-
 @keyframes gradientMove{
   0%{background-position:0% 50%;}
   50%{background-position:100% 50%;}
   100%{background-position:0% 50%;}
 }
-
 .container{
   width:400px;
   padding:35px;
@@ -33,7 +30,6 @@ body{
   box-shadow:0 0 60px rgba(255,215,0,0.6);
   margin-top:40px;
 }
-
 h2{
   text-align:center;
   margin-bottom:25px;
@@ -41,9 +37,7 @@ h2{
   -webkit-background-clip:text;
   -webkit-text-fill-color:transparent;
 }
-
 label{font-size:14px;font-weight:500;}
-
 input,textarea{
   width:100%;
   margin-top:8px;
@@ -54,15 +48,12 @@ input,textarea{
   background:rgba(255,255,255,0.07);
   color:white;
 }
-
 input:focus,textarea:focus{
   outline:none;
   border:1px solid gold;
   box-shadow:0 0 20px rgba(255,215,0,0.6);
 }
-
 textarea{resize:none;height:90px;}
-
 button{
   width:100%;
   padding:15px;
@@ -75,16 +66,13 @@ button{
   box-shadow:0 0 30px rgba(255,215,0,0.6);
   transition:0.3s;
 }
-
 button:hover{
   transform:translateY(-4px);
   box-shadow:0 0 40px rgba(255,215,0,1);
 }
-
 .rating{display:flex;justify-content:center;gap:10px;margin-bottom:15px;}
 .star{font-size:30px;cursor:pointer;color:#555;}
 .star.selected{color:gold;text-shadow:0 0 15px gold;}
-
 .rating-avg{
   text-align:center;
   padding:12px;
@@ -94,7 +82,6 @@ button:hover{
   font-weight:600;
   box-shadow:0 0 25px rgba(255,215,0,0.5);
 }
-
 .music-btn{
   position:fixed;
   bottom:25px;
@@ -111,7 +98,8 @@ button:hover{
   color:black;
   box-shadow:0 0 25px rgba(255,215,0,0.8);
 }
-</style></head><body><audio id="bgMusic" src="https://files.catbox.moe/e749oh.mp3" loop></audio>
+</style></head>
+<body><audio id="bgMusic" src="https://files.catbox.moe/e749oh.mp3" loop></audio>
 
 <div class="container">
 <h2>✨ Shine Shop Testimoni ✨</h2><form id="testiForm">
@@ -130,15 +118,35 @@ button:hover{
 
 </form><div class="rating-avg" id="ratingAvg"></div>
 </div><div class="music-btn" onclick="toggleMusic()">🎵</div><script>
-fetch("https://api.ipify.org?format=json")
-.then(res => res.json())
-.then(data => {
-  const blockedIPs = ["36.80.133.87","182.4.73.201","202.65.239.25","36.70.150.7","114.198.244.146","114.5.241.235","182.9.1.220","45.251.6.228","104.28.163.232","103.153.62.69"]
+let userIP = null;
+let allowedIPs = [];
 
-  if(blockedIPs.includes(data.ip)){
-    document.body.innerHTML = "<h1>Access Denied</h1> <br> <li>Akses anda telah di hapus permanen oleh Admin! ajukan banding melalui discord https://discord.gg/mynsbkXhR</li>"
+async function checkAccess(){
+  try{
+    const ipRes = await fetch("https://api.ipify.org?format=json");
+    const ipData = await ipRes.json();
+    userIP = ipData.ip;
+
+    const listRes = await fetch("/testimoni/daftar.json");
+    const listData = await listRes.json();
+    allowedIPs = listData.allowed_ips || [];
+
+    if(!allowedIPs.includes(userIP)){
+      document.body.innerHTML = `
+        <h1 style="text-align:center;margin-top:40vh;color:red;">🚫 Access Denied</h1>
+        <p style="text-align:center;">IP kamu (${userIP}) tidak terdaftar.</p>
+      `;
+      return false;
+    }
+
+    return true;
+  }catch(err){
+    document.body.innerHTML = "<h1>⚠️ Gagal validasi akses</h1> <br> <h7> silahkan melakukan transaksi untuk memberikan testimoni<h7>";
+    return false;
   }
-})
+}
+
+checkAccess();
 
 const discordWebhook = "https://discord.com/api/webhooks/1482244989021851748/oq__kcKXWHJILOG96lbfFxfZKoKCLEqkLJrlSS_rTQ6YEhgSTnFL_Guu8ZulERNEmCZV";
 
@@ -147,14 +155,9 @@ let totalReview=38;
 
 function updateAverage(){
 let avg = totalRating / totalReview;
-
 if(avg > 5) avg = 5;
-if(avg < 0) avg = 0;
-
 avg = avg.toFixed(1);
-
-document.getElementById("ratingAvg").innerHTML =
-`⭐ Rating Shine Shop: ${avg}/5 (${totalReview} ulasan)`;
+document.getElementById("ratingAvg").innerHTML = `⭐ Rating: ${avg}/5 (${totalReview} ulasan)`;
 }
 updateAverage();
 
@@ -174,14 +177,7 @@ const COOLDOWN_TIME = 12 * 60 * 60 * 1000;
 function checkLock(){
 const data=JSON.parse(localStorage.getItem("shine12hLock"))||{lastSubmit:0};
 if(Date.now()-data.lastSubmit < COOLDOWN_TIME){
-const remaining=COOLDOWN_TIME-(Date.now()-data.lastSubmit);
-const hours=Math.floor(remaining/(1000*60*60));
-const minutes=Math.floor((remaining%(1000*60*60))/(1000*60));
-Swal.fire({
-icon:"warning",
-title:"⏳ Dibatasi 12 Jam",
-html:`Sisa waktu:<br><b style="color:gold">${hours} jam ${minutes} menit</b>`
-});
+Swal.fire("⏳ Tunggu 12 jam sebelum kirim lagi");
 return false;
 }
 return true;
@@ -193,6 +189,12 @@ localStorage.setItem("shine12hLock",JSON.stringify({lastSubmit:Date.now()}));
 
 document.getElementById("testiForm").addEventListener("submit",async(e)=>{
 e.preventDefault();
+
+if(!allowedIPs.includes(userIP)){
+  Swal.fire("Akses ditolak!");
+  return;
+}
+
 if(!checkLock()) return;
 if(!selectedRating){Swal.fire("Pilih rating dahulu!");return;}
 
@@ -203,31 +205,23 @@ let safeRating = Math.min(Math.max(selectedRating,1),5);
 
 totalRating += safeRating;
 totalReview += 1;
-
 updateAverage();
 
-let avgNow = totalRating / totalReview;
-if(avgNow > 5) avgNow = 5;
-avgNow = avgNow.toFixed(1);
+let avgNow = (totalRating / totalReview).toFixed(1);
 
 const message = {
   username: "Shine Shop Testimoni",
-  embeds: [
-    {
+  embeds: [{
       title: "⭐ TESTIMONI SHINE SHOP ⭐",
       color: 16766720,
       fields: [
-        { name: "👤 Nama", value: nama, inline: true },
-        { name: "🌟 Rating", value: `${safeRating}/5`, inline: true },
-        { name: "📊 Rata-rata Saat Ini", value: `${avgNow}/5`, inline: true },
-        { name: "📝 Total Review", value: `${totalReview}`, inline: true },
-        { name: "💬 Testimoni", value: pesan }
-      ],
-      footer: {
-        text: "Shine Shop • shinedomain.my.id"
-      }
-    }
-  ]
+        { name: "Nama", value: nama },
+        { name: "Rating", value: `${safeRating}/5` },
+        { name: "Rata-rata", value: `${avgNow}/5` },
+        { name: "Total Review", value: `${totalReview}` },
+        { name: "Testimoni", value: pesan }
+      ]
+  }]
 };
 
 await fetch(discordWebhook,{
@@ -237,7 +231,6 @@ body:JSON.stringify(message)
 });
 
 activateLock();
-
 Swal.fire("Testimoni berhasil dikirim!");
 e.target.reset();
 document.querySelectorAll(".star").forEach(s=>s.classList.remove("selected"));
@@ -248,22 +241,5 @@ const music=document.getElementById("bgMusic");
 music.volume=0.4;
 function toggleMusic(){music.paused?music.play():music.pause();}
 document.body.addEventListener("click",()=>{if(music.paused)music.play();},{once:true});
-
-document.addEventListener("contextmenu",e=>e.preventDefault());
-document.addEventListener("keydown",function(e){
-if(e.key==="F12") e.preventDefault();
-if(e.ctrlKey&&e.shiftKey&&["I","C","J"].includes(e.key)) e.preventDefault();
-if(e.ctrlKey&&e.key==="u") e.preventDefault();
-});
-
-setInterval(()=>{
-if(window.outerWidth-window.innerWidth>160||window.outerHeight-window.innerHeight>160){
-document.body.innerHTML="<h1 style='color:gold;text-align:center;margin-top:40vh;'>🚫 Developer Tools Terdeteksi</h1>";
-}
-},1000);
-
-setInterval(()=>{console.clear();},1000);
-setInterval(()=>{debugger;},3000);
-
 </script></body>
 </html>
