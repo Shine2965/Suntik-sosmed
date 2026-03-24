@@ -48,11 +48,6 @@ input,textarea{
   background:rgba(255,255,255,0.07);
   color:white;
 }
-input:focus,textarea:focus{
-  outline:none;
-  border:1px solid gold;
-  box-shadow:0 0 20px rgba(255,215,0,0.6);
-}
 textarea{resize:none;height:90px;}
 button{
   width:100%;
@@ -64,11 +59,6 @@ button{
   background:linear-gradient(90deg,#fbbf24,#f59e0b);
   color:black;
   box-shadow:0 0 30px rgba(255,215,0,0.6);
-  transition:0.3s;
-}
-button:hover{
-  transform:translateY(-4px);
-  box-shadow:0 0 40px rgba(255,215,0,1);
 }
 .rating{display:flex;justify-content:center;gap:10px;margin-bottom:15px;}
 .star{font-size:30px;cursor:pointer;color:#555;}
@@ -79,30 +69,30 @@ button:hover{
   border-radius:20px;
   margin-top:20px;
   background:rgba(255,215,0,0.15);
-  font-weight:600;
-  box-shadow:0 0 25px rgba(255,215,0,0.5);
 }
-.music-btn{
-  position:fixed;
-  bottom:25px;
-  right:25px;
-  width:60px;
-  height:60px;
-  border-radius:50%;
-  background:linear-gradient(90deg,#fbbf24,#f59e0b);
-  display:flex;
-  justify-content:center;
-  align-items:center;
-  cursor:pointer;
-  font-size:22px;
-  color:black;
-  box-shadow:0 0 25px rgba(255,215,0,0.8);
+
+.badge{
+  display:inline-block;
+  margin:10px auto 20px auto;
+  padding:6px 12px;
+  border-radius:999px;
+  font-size:12px;
+  font-weight:600;
+  letter-spacing:.3px;
+}
+.badge.verified{
+  background:rgba(34,197,94,.15);
+  color:#22c55e;
+  box-shadow:0 0 12px rgba(34,197,94,.35);
+}
+.badge.guest{
+  background:rgba(255,255,255,.1);
+  color:#cbd5f5;
 }
 </style></head>
-<body><audio id="bgMusic" src="https://files.catbox.moe/e749oh.mp3" loop></audio>
-
-<div class="container">
-<h2>✨ Shine Shop Testimoni ✨</h2><form id="testiForm">
+<body><div class="container">
+<h2>✨ Shine Shop Testimoni ✨</h2>
+<div id="userBadge" class="badge guest">👁️ Guest Viewer</div><form id="testiForm">
 <label>Nama</label>
 <input type="text" id="nama" required><label>Testimoni</label>
 
@@ -114,12 +104,13 @@ button:hover{
 <span class="star" data-value="3">★</span>
 <span class="star" data-value="4">★</span>
 <span class="star" data-value="5">★</span>
-</div><button type="submit">Kirim Testimoni</button>
+</div><button type="submit" id="submitBtn">Kirim Testimoni</button>
 
 </form><div class="rating-avg" id="ratingAvg"></div>
-</div><div class="music-btn" onclick="toggleMusic()">🎵</div><script>
+</div><script>
 let userIP = null;
 let allowedIPs = [];
+let canSubmit = false;
 
 async function checkAccess(){
   try{
@@ -131,24 +122,44 @@ async function checkAccess(){
     const listData = await listRes.json();
     allowedIPs = listData.allowed_ips || [];
 
-    if(!allowedIPs.includes(userIP)){
-      document.body.innerHTML = `
-        <h1 style="text-align:center;margin-top:40vh;color:red;">🚫 Access Denied</h1>
-        <p style="text-align:center;">IP kamu (${userIP}) tidak terdaftar.</p>
-      `;
-      return false;
+    if(allowedIPs.includes(userIP)){
+      canSubmit = true;
+      const badge = document.getElementById("userBadge");
+      badge.classList.remove("guest");
+      badge.classList.add("verified");
+      badge.innerText = "✔ Verified Buyer";
+    } else {
+      canSubmit = false;
+      const badge = document.getElementById("userBadge");
+      badge.classList.remove("verified");
+      badge.classList.add("guest");
+      badge.innerText = "👁️ Guest Viewer";
+      document.getElementById("submitBtn").disabled = true;
+      document.getElementById("submitBtn").innerText = "Tidak Diizinkan";
+
+      Swal.fire({
+        icon: "info",
+        title: "Mode View Only",
+        text: "Kamu bisa melihat testimoni, tapi tidak bisa mengirim. silahkan melakukan transaksi terlebih dahulu",
+      });
+    }
+      canSubmit = false;
+      document.getElementById("submitBtn").disabled = true;
+      document.getElementById("submitBtn").innerText = "Tidak Diizinkan";
+
+      Swal.fire({
+        icon: "info",
+        title: "Mode View Only",
+        text: "Kamu bisa melihat testimoni, tapi tidak bisa mengirim. silahkan melakukan transaksi terlebih dahulu",
+      });
     }
 
-    return true;
   }catch(err){
-    document.body.innerHTML = "<h1>⚠️ Gagal validasi akses</h1> <br> <h7> silahkan melakukan transaksi untuk memberikan testimoni<h7>";
-    return false;
+    Swal.fire("Gagal validasi akses");
   }
 }
 
 checkAccess();
-
-const discordWebhook = "https://discord.com/api/webhooks/1482244989021851748/oq__kcKXWHJILOG96lbfFxfZKoKCLEqkLJrlSS_rTQ6YEhgSTnFL_Guu8ZulERNEmCZV";
 
 let totalRating=186;
 let totalReview=38;
@@ -157,13 +168,14 @@ function updateAverage(){
 let avg = totalRating / totalReview;
 if(avg > 5) avg = 5;
 avg = avg.toFixed(1);
-document.getElementById("ratingAvg").innerHTML = `⭐ Rating: ${avg}/5 (${totalReview} ulasan)`;
+document.getElementById("ratingAvg").innerHTML = `Testimoni baru! <br>⭐ Rating: ${avg}/5 (${totalReview} ulasan)`;
 }
 updateAverage();
 
 let selectedRating=0;
 document.querySelectorAll(".star").forEach(star=>{
 star.addEventListener("click",()=>{
+if(!canSubmit) return;
 selectedRating=parseInt(star.dataset.value);
 document.querySelectorAll(".star").forEach(s=>s.classList.remove("selected"));
 for(let i=0;i<selectedRating;i++){
@@ -172,74 +184,18 @@ document.querySelectorAll(".star")[i].classList.add("selected");
 });
 });
 
-const COOLDOWN_TIME = 12 * 60 * 60 * 1000;
-
-function checkLock(){
-const data=JSON.parse(localStorage.getItem("shine12hLock"))||{lastSubmit:0};
-if(Date.now()-data.lastSubmit < COOLDOWN_TIME){
-Swal.fire("⏳ Tunggu 12 jam sebelum kirim lagi");
-return false;
-}
-return true;
-}
-
-function activateLock(){
-localStorage.setItem("shine12hLock",JSON.stringify({lastSubmit:Date.now()}));
-}
-
 document.getElementById("testiForm").addEventListener("submit",async(e)=>{
 e.preventDefault();
 
-if(!allowedIPs.includes(userIP)){
-  Swal.fire("Akses ditolak!");
+if(!canSubmit){
+  Swal.fire("Kamu tidak diizinkan mengirim testimoni!");
   return;
 }
 
-if(!checkLock()) return;
 if(!selectedRating){Swal.fire("Pilih rating dahulu!");return;}
 
-const nama=document.getElementById("nama").value;
-const pesan=document.getElementById("pesan").value;
-
-let safeRating = Math.min(Math.max(selectedRating,1),5);
-
-totalRating += safeRating;
-totalReview += 1;
-updateAverage();
-
-let avgNow = (totalRating / totalReview).toFixed(1);
-
-const message = {
-  username: "Shine Shop Testimoni",
-  embeds: [{
-      title: "⭐ TESTIMONI SHINE SHOP ⭐",
-      color: 16766720,
-      fields: [
-        { name: "Nama", value: nama },
-        { name: "Rating", value: `${safeRating}/5` },
-        { name: "Rata-rata", value: `${avgNow}/5` },
-        { name: "Total Review", value: `${totalReview}` },
-        { name: "Testimoni", value: pesan }
-      ]
-  }]
-};
-
-await fetch(discordWebhook,{
-method:"POST",
-headers:{"Content-Type":"application/json"},
-body:JSON.stringify(message)
-});
-
-activateLock();
 Swal.fire("Testimoni berhasil dikirim!");
 e.target.reset();
-document.querySelectorAll(".star").forEach(s=>s.classList.remove("selected"));
-selectedRating=0;
 });
-
-const music=document.getElementById("bgMusic");
-music.volume=0.4;
-function toggleMusic(){music.paused?music.play():music.pause();}
-document.body.addEventListener("click",()=>{if(music.paused)music.play();},{once:true});
 </script></body>
 </html>
