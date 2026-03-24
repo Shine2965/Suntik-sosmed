@@ -70,7 +70,6 @@ button{
   margin-top:20px;
   background:rgba(255,215,0,0.15);
 }
-
 .badge{
   display:inline-block;
   margin:10px auto 20px auto;
@@ -78,7 +77,6 @@ button{
   border-radius:999px;
   font-size:12px;
   font-weight:600;
-  letter-spacing:.3px;
 }
 .badge.verified{
   background:rgba(34,197,94,.15);
@@ -89,10 +87,17 @@ button{
   background:rgba(255,255,255,.1);
   color:#cbd5f5;
 }
+.notice{
+  text-align:center;
+  font-size:13px;
+  margin-top:10px;
+  color:#fbbf24;
+}
 </style></head>
 <body><div class="container">
 <h2>✨ Shine Shop Testimoni ✨</h2>
-<div id="userBadge" class="badge guest">👁️ Guest Viewer</div><form id="testiForm">
+<div id="userBadge" class="badge guest">👁️ Guest Viewer</div>
+<div id="guestNotice" class="notice"></div><form id="testiForm">
 <label>Nama</label>
 <input type="text" id="nama" required><label>Testimoni</label>
 
@@ -122,35 +127,30 @@ async function checkAccess(){
     const listData = await listRes.json();
     allowedIPs = listData.allowed_ips || [];
 
+    const badge = document.getElementById("userBadge");
+    const notice = document.getElementById("guestNotice");
+
     if(allowedIPs.includes(userIP)){
       canSubmit = true;
-      const badge = document.getElementById("userBadge");
       badge.classList.remove("guest");
       badge.classList.add("verified");
       badge.innerText = "✔ Verified Buyer";
+      notice.innerText = "";
     } else {
       canSubmit = false;
-      const badge = document.getElementById("userBadge");
       badge.classList.remove("verified");
       badge.classList.add("guest");
       badge.innerText = "👁️ Guest Viewer";
+
       document.getElementById("submitBtn").disabled = true;
       document.getElementById("submitBtn").innerText = "Tidak Diizinkan";
+
+      notice.innerText = "Lakukan transaksi terlebih dahulu untuk memberikan testimoni.";
 
       Swal.fire({
         icon: "info",
         title: "Mode View Only",
-        text: "Kamu bisa melihat testimoni, tapi tidak bisa mengirim. silahkan melakukan transaksi terlebih dahulu",
-      });
-    }
-      canSubmit = false;
-      document.getElementById("submitBtn").disabled = true;
-      document.getElementById("submitBtn").innerText = "Tidak Diizinkan";
-
-      Swal.fire({
-        icon: "info",
-        title: "Mode View Only",
-        text: "Kamu bisa melihat testimoni, tapi tidak bisa mengirim. silahkan melakukan transaksi terlebih dahulu",
+        text: "Silahkan melakukan transaksi terlebih dahulu untuk memberikan testimoni",
       });
     }
 
@@ -168,7 +168,7 @@ function updateAverage(){
 let avg = totalRating / totalReview;
 if(avg > 5) avg = 5;
 avg = avg.toFixed(1);
-document.getElementById("ratingAvg").innerHTML = `Testimoni baru! <br>⭐ Rating: ${avg}/5 (${totalReview} ulasan)`;
+document.getElementById("ratingAvg").innerHTML = `⭐ Rating: ${avg}/5 (${totalReview} ulasan)`;
 }
 updateAverage();
 
