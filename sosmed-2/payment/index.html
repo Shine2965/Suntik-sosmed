@@ -60,34 +60,30 @@ input{
 }
 .muted{text-align:center;font-size:12px;color:#cbd5e1;margin-top:12px}
 </style><script>
-// ================= DEVICE ID RANDOM =================
-function generateUUID(){
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c){
-    const r = Math.random()*16|0;
-    const v = c === 'x' ? r : (r&0x3|0x8);
-    return v.toString(16);
-  });
+// ================= USER ID RANDOM =================
+function generateUserID(){
+  return 'user-' + Math.random().toString(36).substring(2,10) + '-' + Date.now().toString(36);
 }
 
-async function getDeviceID(){
-  let id = localStorage.getItem("device_id");
+async function getUserID(){
+  let id = localStorage.getItem("user_id");
   if(!id){
-    id = generateUUID() + "-" + Date.now().toString(36);
-    localStorage.setItem("device_id", id);
+    id = generateUserID();
+    localStorage.setItem("user_id", id);
   }
   return id;
 }
 
-// ================= DEVICE BAN =================
-async function checkDeviceBan(){
+// ================= USER BAN =================
+async function checkUserBan(){
   try{
-    const deviceID = await getDeviceID();
+    const userID = await getUserID();
 
-    const res = await fetch("/sosmed-2/payment/device.json",{cache:"no-store"});
+    const res = await fetch("/sosmed-2/payment/user.json",{cache:"no-store"});
     if(!res.ok) return;
 
     const list = await res.json();
-    const banned = list.find(x => x.device === deviceID);
+    const banned = list.find(x => x.user === userID);
 
     if(banned){
       const reason = banned.reason || "Tidak ada keterangan";
@@ -96,19 +92,19 @@ async function checkDeviceBan(){
       <div style="display:flex;align-items:center;justify-content:center;height:100vh;background:linear-gradient(135deg,#0f2027,#203a43,#2c5364);color:white;text-align:center;">
       <div style="max-width:420px;background:rgba(255,255,255,.12);padding:30px;border-radius:22px;">
       <h1>🚫 Akses Diblokir</h1>
-      <p>Akses kamu diblokir</p>
+      <p>Akun kamu diblokir</p>
       <div>${reason}</div>
       <br>
-      <small>ID: ${deviceID}</small>
+      <small>User ID: ${userID}</small>
       </div></div>`;
 
-      throw new Error("DEVICE_BANNED");
+      throw new Error("USER_BANNED");
     }
   }catch(e){
-    if(e.message === "DEVICE_BANNED") throw e;
+    if(e.message === "USER_BANNED") throw e;
   }
 }
-checkDeviceBan();
+checkUserBan();
 </script></head><body>
 <div class="card">
 <h2>Pembayaran QRIS Shine Shop - Sosmed 2</h2>
@@ -192,7 +188,7 @@ confirmBtn.onclick = async()=>{
   const nama = namaInput.value;
   const gmail = gmailInput.value;
   const file = buktiInput.files[0];
-  const deviceID = await getDeviceID();
+  const userID = await getUserID();
 
   if(!nama||!gmail||!file){
     return Swal.fire("Lengkapi data","","warning");
@@ -204,7 +200,7 @@ confirmBtn.onclick = async()=>{
     method:"POST",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify({
-      content:`💰 Pembayaran Baru SOSMED 2\nID: ${trx}\nLayanan: ${layanan}\nTotal: Rp ${finalTotal.toLocaleString("id-ID")}\nTarget: ${target}\nVoucher: ${appliedVoucher || "-"}\nNama: ${nama}\nGmail: ${gmail}\nDevice ID: ${deviceID}`
+      content:`💰 Pembayaran Baru SOSMED 2\nID: ${trx}\nLayanan: ${layanan}\nTotal: Rp ${finalTotal.toLocaleString("id-ID")}\nTarget: ${target}\nVoucher: ${appliedVoucher || "-"}\nNama: ${nama}\nGmail: ${gmail}\nUser ID: ${userID}`
     })
   });
 
@@ -216,7 +212,7 @@ confirmBtn.onclick = async()=>{
     method:"POST",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify({
-      content:`🆕 TRANSAKSI BARU SOSMED 2\nID: ${trx}\nTotal: Rp ${finalTotal.toLocaleString("id-ID")}\nVoucher: ${appliedVoucher || "-"}\nDevice ID: ${deviceID}`
+      content:`🆕 TRANSAKSI BARU SOSMED 2\nID: ${trx}\nTotal: Rp ${finalTotal.toLocaleString("id-ID")}\nVoucher: ${appliedVoucher || "-"}\nUser ID: ${userID}`
     })
   });
 
