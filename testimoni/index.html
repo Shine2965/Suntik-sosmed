@@ -87,7 +87,6 @@ button{
 .badge.verified{
   background:rgba(34,197,94,.15);
   color:#22c55e;
-  box-shadow:0 0 12px rgba(34,197,94,.35);
 }
 .badge.guest{
   background:rgba(255,255,255,.1);
@@ -133,34 +132,38 @@ button{
 </div>
 
 <script>
-// ================= DEVICE ID =================
-function getDeviceID(){
-  let id = localStorage.getItem("device_id");
+// ================= USER ID =================
+function generateUserID(){
+  return 'user-' + Math.random().toString(36).substring(2,10) + '-' + Date.now().toString(36);
+}
+
+function getUserID(){
+  let id = localStorage.getItem("user_id");
   if(!id){
-    const raw = navigator.userAgent + Date.now() + Math.random();
-    id = btoa(raw).substring(0,25);
-    localStorage.setItem("device_id", id);
+    id = generateUserID();
+    localStorage.setItem("user_id", id);
   }
   return id;
 }
 
-// ================= ACCESS CONTROL =================
-let userDevice = null;
-let allowedDevices = [];
+// ================= ACCESS =================
+let userID = null;
+let allowedUsers = [];
 let canSubmit = false;
 
 async function checkAccess(){
   try{
-    userDevice = getDeviceID();
+    userID = getUserID();
 
-    const listRes = await fetch("/testimoni/daftar.json");
-    const listData = await listRes.json();
-    allowedDevices = listData.allowed_devices || [];
+    const res = await fetch("/testimoni/daftar.json");
+    const data = await res.json();
+
+    allowedUsers = data.allowed_users || [];
 
     const badge = document.getElementById("userBadge");
     const notice = document.getElementById("guestNotice");
 
-    if(allowedDevices.includes(userDevice)){
+    if(allowedUsers.includes(userID)){
       canSubmit = true;
       badge.classList.remove("guest");
       badge.classList.add("verified");
@@ -168,23 +171,12 @@ async function checkAccess(){
       notice.innerText = "";
     } else {
       canSubmit = false;
-      badge.classList.remove("verified");
-      badge.classList.add("guest");
       badge.innerText = "👁️ Guest Viewer";
-
       document.getElementById("submitBtn").disabled = true;
-      document.getElementById("submitBtn").innerText = "Tidak Diizinkan";
-
       notice.innerText = "Lakukan transaksi terlebih dahulu untuk memberikan testimoni.";
-
-      Swal.fire({
-        icon: "info",
-        title: "Mode View Only",
-        text: "Silahkan melakukan transaksi terlebih dahulu untuk memberikan testimoni",
-      });
     }
 
-  }catch(err){
+  }catch{
     Swal.fire("Gagal validasi akses");
   }
 }
@@ -219,18 +211,12 @@ document.querySelectorAll(".star")[i].classList.add("selected");
 });
 
 // ================= SUBMIT =================
-document.getElementById("testiForm").addEventListener("submit",async(e)=>{
+document.getElementById("testiForm").addEventListener("submit",(e)=>{
 e.preventDefault();
 
-if(!canSubmit){
-  Swal.fire("Kamu tidak diizinkan mengirim testimoni!");
-  return;
-}
+if(!canSubmit) return Swal.fire("Tidak diizinkan");
 
-if(!selectedRating){
-  Swal.fire("Pilih rating dahulu!");
-  return;
-}
+if(!selectedRating) return Swal.fire("Pilih rating dahulu!");
 
 Swal.fire("Testimoni berhasil dikirim!");
 e.target.reset();
