@@ -1,8 +1,14 @@
-<!DOCTYPE html><html lang="id">
+<!DOCTYPE html>
+<html lang="id">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SHINE SHOP Testimoni</title><script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script><link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet"><style>
+<title>SHINE SHOP Testimoni</title>
+
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+
+<style>
 *{margin:0;padding:0;box-sizing:border-box;font-family:'Poppins',sans-serif;}
 body{
   min-height:100vh;
@@ -93,44 +99,68 @@ button{
   margin-top:10px;
   color:#fbbf24;
 }
-</style></head>
-<body><div class="container">
+</style>
+</head>
+
+<body>
+
+<div class="container">
 <h2>✨ Shine Shop Testimoni ✨</h2>
+
 <div id="userBadge" class="badge guest">👁️ Guest Viewer</div>
-<div id="guestNotice" class="notice"></div><form id="testiForm">
+<div id="guestNotice" class="notice"></div>
+
+<form id="testiForm">
 <label>Nama</label>
-<input type="text" id="nama" required><label>Testimoni</label>
+<input type="text" id="nama" required>
 
-<textarea id="pesan" required></textarea><label>Rating</label>
+<label>Testimoni</label>
+<textarea id="pesan" required></textarea>
 
+<label>Rating</label>
 <div class="rating">
 <span class="star" data-value="1">★</span>
 <span class="star" data-value="2">★</span>
 <span class="star" data-value="3">★</span>
 <span class="star" data-value="4">★</span>
 <span class="star" data-value="5">★</span>
-</div><button type="submit" id="submitBtn">Kirim Testimoni</button>
+</div>
 
-</form><div class="rating-avg" id="ratingAvg"></div>
-</div><script>
-let userIP = null;
-let allowedIPs = [];
+<button type="submit" id="submitBtn">Kirim Testimoni</button>
+</form>
+
+<div class="rating-avg" id="ratingAvg"></div>
+</div>
+
+<script>
+// ================= DEVICE ID =================
+function getDeviceID(){
+  let id = localStorage.getItem("device_id");
+  if(!id){
+    const raw = navigator.userAgent + Date.now() + Math.random();
+    id = btoa(raw).substring(0,25);
+    localStorage.setItem("device_id", id);
+  }
+  return id;
+}
+
+// ================= ACCESS CONTROL =================
+let userDevice = null;
+let allowedDevices = [];
 let canSubmit = false;
 
 async function checkAccess(){
   try{
-    const ipRes = await fetch("https://api.ipify.org?format=json");
-    const ipData = await ipRes.json();
-    userIP = ipData.ip;
+    userDevice = getDeviceID();
 
     const listRes = await fetch("/testimoni/daftar.json");
     const listData = await listRes.json();
-    allowedIPs = listData.allowed_ips || [];
+    allowedDevices = listData.allowed_devices || [];
 
     const badge = document.getElementById("userBadge");
     const notice = document.getElementById("guestNotice");
 
-    if(allowedIPs.includes(userIP)){
+    if(allowedDevices.includes(userDevice)){
       canSubmit = true;
       badge.classList.remove("guest");
       badge.classList.add("verified");
@@ -161,6 +191,7 @@ async function checkAccess(){
 
 checkAccess();
 
+// ================= RATING =================
 let totalRating=186;
 let totalReview=38;
 
@@ -173,17 +204,21 @@ document.getElementById("ratingAvg").innerHTML = `⭐ Rating: ${avg}/5 (${totalR
 updateAverage();
 
 let selectedRating=0;
+
 document.querySelectorAll(".star").forEach(star=>{
 star.addEventListener("click",()=>{
 if(!canSubmit) return;
+
 selectedRating=parseInt(star.dataset.value);
 document.querySelectorAll(".star").forEach(s=>s.classList.remove("selected"));
+
 for(let i=0;i<selectedRating;i++){
 document.querySelectorAll(".star")[i].classList.add("selected");
 }
 });
 });
 
+// ================= SUBMIT =================
 document.getElementById("testiForm").addEventListener("submit",async(e)=>{
 e.preventDefault();
 
@@ -192,10 +227,15 @@ if(!canSubmit){
   return;
 }
 
-if(!selectedRating){Swal.fire("Pilih rating dahulu!");return;}
+if(!selectedRating){
+  Swal.fire("Pilih rating dahulu!");
+  return;
+}
 
 Swal.fire("Testimoni berhasil dikirim!");
 e.target.reset();
 });
-</script></body>
+</script>
+
+</body>
 </html>
