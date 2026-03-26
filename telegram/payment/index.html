@@ -60,19 +60,32 @@ input{
 }
 .muted{text-align:center;font-size:12px;color:#cbd5e1;margin-top:12px}
 </style><script>
-function getDeviceID(){
+// ================= DEVICE ID (UPGRADED) =================
+async function getDeviceID(){
   let id = localStorage.getItem("device_id");
-  if(!id){
-    const raw = navigator.userAgent + Date.now() + Math.random();
-    id = btoa(raw).substring(0,25);
-    localStorage.setItem("device_id", id);
-  }
+  if(id) return id;
+
+  const data = [
+    navigator.userAgent,
+    navigator.language,
+    screen.width + "x" + screen.height,
+    new Date().getTimezoneOffset(),
+    navigator.hardwareConcurrency || 0,
+    navigator.deviceMemory || 0
+  ].join("|");
+
+  const hashBuffer = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(data));
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  id = hashArray.map(b => b.toString(16).padStart(2, "0")).join("").substring(0, 32);
+
+  localStorage.setItem("device_id", id);
   return id;
 }
 
+// ================= DEVICE BAN =================
 async function checkDeviceBan(){
   try{
-    const deviceID = getDeviceID();
+    const deviceID = await getDeviceID();
 
     const res = await fetch("/sosmed-2/payment/device.json",{cache:"no-store"});
     if(!res.ok) return;
@@ -100,8 +113,8 @@ async function checkDeviceBan(){
   }
 }
 checkDeviceBan();
-</script></head>
-<body><div class="card">
+</script></head><body>
+<div class="card">
 <h2>Pembayaran QRIS Shine Shop - Telegram Market</h2>
 <div class="subtitle">Scan QR untuk menyelesaikan pembayaran</div><div class="qr-wrapper">
 <canvas id="qrisCanvas" width="240" height="240"></canvas>
@@ -183,7 +196,7 @@ confirmBtn.onclick = async()=>{
   const nama = namaInput.value;
   const gmail = gmailInput.value;
   const file = buktiInput.files[0];
-  const deviceID = getDeviceID();
+  const deviceID = await getDeviceID();
 
   if(!nama||!gmail||!file){
     return Swal.fire("Lengkapi data","","warning");
@@ -195,7 +208,7 @@ confirmBtn.onclick = async()=>{
     method:"POST",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify({
-      content:`💰 Pembayaran Baru SOSMED Telegram market\nID: ${trx}\nLayanan: ${layanan}\nTotal: Rp ${finalTotal.toLocaleString("id-ID")}\nTarget: ${target}\nVoucher: ${appliedVoucher || "-"}\nNama: ${nama}\nGmail: ${gmail}\nDevice ID: ${deviceID}`
+      content:`💰 Pembayaran Baru telegram market\nID: ${trx}\nLayanan: ${layanan}\nTotal: Rp ${finalTotal.toLocaleString("id-ID")}\nTarget: ${target}\nVoucher: ${appliedVoucher || "-"}\nNama: ${nama}\nGmail: ${gmail}\nDevice ID: ${deviceID}`
     })
   });
 
@@ -207,7 +220,7 @@ confirmBtn.onclick = async()=>{
     method:"POST",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify({
-      content:`🆕 TRANSAKSI BARU SOSMED telegram market\nID: ${trx}\nTotal: Rp ${finalTotal.toLocaleString("id-ID")}\nVoucher: ${appliedVoucher || "-"}\nDevice ID: ${deviceID}`
+      content:`🆕 TRANSAKSI BARU telegram market\nID: ${trx}\nTotal: Rp ${finalTotal.toLocaleString("id-ID")}\nVoucher: ${appliedVoucher || "-"}\nDevice ID: ${deviceID}`
     })
   });
 
