@@ -1,14 +1,23 @@
-import axios from "axios";
+const express = require("express");
+const axios = require("axios");
+
+const app = express();
+app.use(express.json());
 
 // ================= CONFIG =================
 const TELEGRAM_TOKEN = "8785872128:AAGJApScDjRIjg1VorXB35OvrvtUDCtVr0M";
 const CHAT_ID = "-1003853365342";
 
-const RATE_LIMIT = 5; // max request per window
-const WINDOW_TIME = 5000; // 10 detik
+const RATE_LIMIT = 5; // max request
+const WINDOW_TIME = 5 * 1000; // 10 detik
+const AUTO_UNBLOCK_TIME = 60 * 60 * 1000; // 1 jam
 
-// ⚠️ NOTE: ini hanya sementara (akan reset tiap request baru instance)
+// whitelist IP (biar ga ke block)
+const WHITELIST = ["127.0.0.1", "::1"];
+
+// ================= DATA =================
 let ipLogs = {};
+let blockedIPs = new Map();
 
 // ================= TELEGRAM =================
 async function sendTelegram(msg) {
@@ -23,53 +32,126 @@ async function sendTelegram(msg) {
   }
 }
 
-// ================= HANDLER =================
-export default async function handler(req, res) {
+// ================= MIDDLEWARE =================
+app.use(async (req, res, next) => {
   const ip =
     req.headers["x-forwarded-for"] ||
-    req.socket?.remoteAddress ||
-    "unknown";
+    req.socket.remoteAddress ||
+    req.ip;
 
-  const now = Date.now();
+  // skip whitelist
+  if (WHITELIST.includes(ip)) return next();
 
+  // cek IP diblok
+  if (blockedIPs.has(ip)) {
+    return res.status(403).send("🚫 IP BLOCKED");
+  }
+
+  // tracking request
   if (!ipLogs[ip]) {
     ipLogs[ip] = {
       count: 1,
-      start: now
+      start: Date.now()
     };
   } else {
     ipLogs[ip].count++;
   }
 
-  const elapsed = now - ipLogs[ip].start;
+  const elapsed = Date.now() - ipLogs[ip].start;
 
   // reset window
   if (elapsed > WINDOW_TIME) {
     ipLogs[ip] = {
       count: 1,
-      start: now
+      start: Date.now()
     };
   }
 
-  // 🚫 DETEKSI DDoS
+  // DETEKSI DDoS
   if (ipLogs[ip].count > RATE_LIMIT) {
-    await sendTelegram(`
-🚫 <b>DDoS TERDETEKSI Shine Shop</b>
+    blockedIPs.set(ip, Date.now());
+
+    console.log("🚫 IP diblok:", ip);
+
+    // kirim telegram
+    sendTelegram(`
+🚫 <b>IP DIBLOK</b>
 IP: <code>${ip}</code>
 Request: ${ipLogs[ip].count}
+Status: DDoS terdeteksi
 Waktu: ${new Date().toLocaleString()}
     `);
 
-    return res.status(429).json({
-      status: "blocked",
-      message: "Too many requests"
-    });
+    return res.status(403).send("🚫 DDoS detected, IP blocked");
   }
 
-  // normal response
-  return res.status(200).json({
-    status: "ok",
-    ip,
-    request_count: ipLogs[ip].count
-  });
-}
+  next();
+});
+
+// ================= AUTO UNBLOCK =================
+setInterval(() => {
+  const now = Date.now();
+
+  for (let [ip, time] of blockedIPs) {
+    if (now - time > AUTO_UNBLOCK_TIME) {
+      blockedIPs.delete(ip);
+
+      sendTelegram(`
+✅ <b>IP DIUNBLOCK</b>
+IP: <code>${ip}</code>
+Status: Sudah dibuka otomatis
+      `);
+
+      console.log("✅ IP di-unblock:", ip);
+    }
+  }
+}, 60 * 1000);
+
+// ================= ROUTES =================
+app.get("/", (req, res) => {
+  res.send("🔥 Server Aman - Anti DDoS Aktif");
+});
+
+// manual block
+app.get("/block", async (req, res) => {
+  const ip = req.query.ip;
+
+  if (!ip) return res.send("Masukkan IP");
+
+  blockedIPs.set(ip, Date.now());
+
+  await sendTelegram(`
+🚫 <b>MANUAL BLOCK</b>
+IP: <code>${ip}</code>
+  `);
+
+  res.send("IP diblok manual");
+});
+
+// manual unblock
+app.get("/unblock", async (req, res) => {
+  const ip = req.query.ip;
+
+  if (!ip) return res.send("Masukkan IP");
+
+  blockedIPs.delete(ip);
+
+  await sendTelegram(`
+✅ <b>MANUAL UNBLOCK</b>
+IP: <code>${ip}</code>
+  `);
+
+  res.send("IP di-unblock");
+});
+
+// ================= START =================
+const PORT = 3000;
+app.listen(PORT, () => {
+  console.log("🚀 Server jalan di port", PORT);
+
+  sendTelegram(`
+🚀 <b>SERVER AKTIF</b>
+Port: ${PORT}
+Status: Anti-DDoS aktif
+  `);
+});
