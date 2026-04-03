@@ -1,209 +1,131 @@
-<!DOCTYPE html>
-<html lang="id">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>QRIS Payment - Shine Shop</title>
-
+<!DOCTYPE html><html lang="id"><head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Pembayaran QRIS - Shine Shop</title>
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
-
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
 <style>
-*{
-  margin:0;
-  padding:0;
-  box-sizing:border-box;
-  font-family:'Poppins',sans-serif;
-}
-
+*{box-sizing:border-box}
 body{
-  background: linear-gradient(135deg,#0f172a,#1e293b);
-  color:#fff;
-  display:flex;
-  justify-content:center;
-  align-items:center;
+  font-family:'Poppins',sans-serif;
+  background:
+    radial-gradient(circle at top left,#00c6ff33,transparent 40%),
+    radial-gradient(circle at bottom right,#0072ff33,transparent 40%),
+    linear-gradient(135deg,#0f2027,#203a43,#2c5364);
+  margin:0;
   min-height:100vh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:16px;
+  color:#fff;
 }
-
-.container{
+.card{
   width:100%;
-  max-width:420px;
-  background:rgba(255,255,255,0.05);
-  backdrop-filter:blur(15px);
-  border-radius:20px;
-  padding:25px;
-  box-shadow:0 0 40px rgba(0,0,0,0.5);
+  max-width:460px;
+  background:rgba(255,255,255,.12);
+  backdrop-filter:blur(14px);
+  border-radius:22px;
+  padding:24px;
 }
-
-h1{
-  text-align:center;
-  margin-bottom:15px;
-}
-
-.qr-box{
-  position:relative;
-  text-align:center;
-  margin:15px 0;
-}
-
-.qr-box img{
-  width:220px;
-  border-radius:15px;
+h2{margin:0;font-size:22px;font-weight:700}
+.subtitle{font-size:14px;color:#cbd5e1;margin-top:4px}
+.qr-wrapper{
   background:#fff;
-  padding:10px;
+  border-radius:18px;
+  padding:16px;
+  margin:18px auto;
+  width:fit-content
 }
-
-/* 🔥 LOGO DI TENGAH QR */
-.qr-logo{
-  position:absolute;
-  top:50%;
-  left:50%;
-  transform:translate(-50%,-50%);
-  width:60px;
-  height:60px;
-  border-radius:50%;
-  object-fit:cover;
-}
-
-input, textarea{
+.details{font-size:13.5px;line-height:1.7}
+input{
   width:100%;
   padding:12px;
-  margin:8px 0;
-  border:none;
-  border-radius:10px;
-  background:rgba(255,255,255,0.08);
-  color:#fff;
-}
-
-input::placeholder, textarea::placeholder{
-  color:#ccc;
-}
-
-button{
-  width:100%;
-  padding:12px;
-  border:none;
   border-radius:12px;
-  background:#22c55e;
+  border:none;
+  margin-top:10px;
+  font-size:13px
+}
+p {
+  color: red;
+  font-family: 'Verdana', sans-serif;
+  font-size: 10px;
+  line-height: 1.6;
+  margin-bottom: 20px;
+}
+.btn{
+  width:100%;
+  margin-top:18px;
+  padding:14px;
+  border-radius:999px;
+  border:none;
+  font-size:15px;
+  font-weight:700;
   color:#fff;
-  font-weight:600;
-  cursor:pointer;
-  margin-top:10px;
+  background:linear-gradient(135deg,#00c6ff,#0072ff);
+  cursor:pointer
 }
-
-button:hover{
-  background:#16a34a;
-}
-
-.file{
-  background:rgba(255,255,255,0.08);
-  padding:10px;
-  border-radius:10px;
-}
-
-.status{
-  text-align:center;
-  margin-top:10px;
-  font-size:14px;
-  color:#22c55e;
-}
+.muted{text-align:center;font-size:12px;color:#cbd5e1;margin-top:12px}
 </style>
 </head>
-
 <body>
-
-<div class="container">
-  <h1>QRIS Payment Shine Shop</h1>
-
-  <input type="number" id="nominal" placeholder="Masukkan nominal" oninput="generateQR()">
-
-  <div class="qr-box">
-    <img id="qr" src="">
-    <!-- 🔥 LOGO -->
-    <img src="/home/logo.png" class="qr-logo">
-  </div>
-
-  <input type="text" id="tele" placeholder="Username Telegram (@username)">
-  <textarea id="produk" placeholder="Apa yang dibeli..."></textarea>
-
-  <input type="file" id="bukti" class="file" accept="image/*">
-
-  <button onclick="kirim()">Kirim Bukti Transfer</button>
-
-  <div class="status" id="status"></div>
+<div class="card">
+<h2>Pembayaran QRIS Andashaa Store - Sosmed 2</h2>
+<div class="subtitle">Scan QR untuk menyelesaikan pembayaran</div>
+<div class="qr-wrapper">
+<canvas id="qrisCanvas" width="240" height="240"></canvas>
 </div>
-
+<div class="details" id="orderDetails"></div>
+<input type="text" id="namaInput" placeholder="Nama Lengkap">
+<input type="email" id="gmailInput" placeholder="Gmail Aktif">
+<input type="text" id="voucherInput" placeholder="Kode Voucher (opsional)">
+<button id="applyVoucher" class="btn" style="margin-top:10px;background:#22c55e;">Gunakan Voucher</button>
+<input type="file" id="buktiInput" accept="image/*">
+<button id="confirmBtn" class="btn">Konfirmasi Pembayaran</button>
+<div class="muted">Admin memproses maksimal 72 jam</div>
+<p>Screenshot seluruh transaksi sebagai bukti jika terjadi kendala.</p>
+</div>
 <script>
-const BOT_TOKEN = "8785872128:AAGJApScDjRIjg1VorXB35OvrvtUDCtVr0M";
-const CHAT_ID = "6367582755";
+const p = new URLSearchParams(location.search);
+const trx = p.get("trx") || "-";
+const layanan = p.get("layanan") || "-";
+const total = Number(p.get("total") || 0);
+const target = p.get("target") || "-";let originalTotal = total; let finalTotal = total;
 
-const baseQR = "00020101021126670016COM.NOBUBANK.WWW01189360050300000879140214526036770909650303UMI51440014ID.CO.QRIS.WWW0215ID20243611417480303UMI5204541153033605802ID5920SHINE SHOP OK19967206008SURABAYA61056011162070703A0163041008";
+function crc16(s){ let c=0xFFFF; for(let i=0;i<s.length;i++){ c^=s.charCodeAt(i)<<8; for(let j=0;j<8;j++){ c=c&0x8000?(c<<1)^0x1021:c<<1; }} return (c&0xFFFF).toString(16).toUpperCase().padStart(4,'0'); }
 
-function crc16(str) {
-  let crc = 0xFFFF;
-  for (let c = 0; c < str.length; c++) {
-    crc ^= str.charCodeAt(c) << 8;
-    for (let i = 0; i < 8; i++) {
-      crc = (crc & 0x8000) ? (crc << 1) ^ 0x1021 : crc << 1;
-    }
-  }
-  return (crc & 0xFFFF).toString(16).toUpperCase().padStart(4, "0");
-}
+function buildQR(a){ const str=String(parseInt(a)); const tag="54"+String(str.length).padStart(2,"0")+str; const base="00020101021226670016COM.NOBUBANK.WWW01189360050300000879140214526036770909650303UMI51440014ID.CO.QRIS.WWW0215ID20243611417480303UMI5204541153033605802ID5920SHINE SHOP OK19967206008SURABAYA61056011162070703A01"; const d=base+tag+"6304"; return d+crc16(d); }
 
-function generateQR(){
-  let nominal = document.getElementById("nominal").value;
-  if(!nominal) return;
+function updateDisplay(){ orderDetails.innerHTML = <strong>ID:</strong> ${trx}<br> <strong>Layanan:</strong> ${layanan}<br> <strong>Target:</strong> ${target}<br> <strong>Total:</strong> Rp ${finalTotal.toLocaleString("id-ID")};
 
-  let amount = "54" + ("0" + nominal.length).slice(-2) + nominal;
-  let raw = baseQR.slice(0,-4) + amount;
-  let finalQR = raw + crc16(raw);
+QRCode.toCanvas(qrisCanvas, buildQR(finalTotal), { width:240 }, function(err){ if(err) return console.error(err);
 
-  document.getElementById("qr").src =
-    "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=" + finalQR;
-}
+const ctx = qrisCanvas.getContext("2d");
+const logo = new Image();
+logo.src = "/home/logo.png";
 
-async function kirim(){
-  let file = document.getElementById("bukti").files[0];
-  let nominal = document.getElementById("nominal").value;
-  let produk = document.getElementById("produk").value;
-  let tele = document.getElementById("tele").value;
+logo.onload = function(){
+  const size = 50;
+  const x = (qrisCanvas.width - size)/2;
+  const y = (qrisCanvas.height - size)/2;
 
-  if(!file || !nominal || !tele){
-    alert("Lengkapi semua data!");
-    return;
-  }
+  // Clip jadi lingkaran biar nyatu halus
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(x + size/2, y + size/2, size/2, 0, Math.PI * 2);
+  ctx.closePath();
+  ctx.clip();
 
-  let formData = new FormData();
-  formData.append("chat_id", CHAT_ID);
-  formData.append("photo", file);
-  formData.append("caption",
-`🧾 PEMBAYARAN MASUK
+  // Gambar logo tanpa background putih
+  ctx.drawImage(logo, x, y, size, size);
 
-👤 Telegram: ${tele}
-💰 Nominal: Rp${nominal}
-📦 Produk: ${produk}
+  ctx.restore();
+};
 
-📍 QRIS Shine Shop`);
+}); }
 
-  document.getElementById("status").innerText = "Mengirim...";
-
-  try{
-    let res = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
-      method: "POST",
-      body: formData
-    });
-
-    let data = await res.json();
-
-    if(data.ok){
-      document.getElementById("status").innerText = "✅ Berhasil dikirim!";
-    } else {
-      document.getElementById("status").innerText = "❌ Gagal kirim!";
-    }
-  }catch(e){
-    document.getElementById("status").innerText = "❌ Error koneksi!";
-  }
-}
-</script>
+updateDisplay(); </script>
 
 </body>
 </html>
