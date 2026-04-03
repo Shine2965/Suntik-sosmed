@@ -3,7 +3,7 @@ let burst = {};
 let blacklist = new Set();
 
 // ===== CONFIG =====
-const MAX_REQUEST = 100;
+const MAX_REQUEST = 10;
 const WINDOW_MS = 60 * 1000;
 
 const BURST_LIMIT = 30;
