@@ -40,6 +40,7 @@ h1{
 }
 
 .qr-box{
+  position:relative;
   text-align:center;
   margin:15px 0;
 }
@@ -49,6 +50,18 @@ h1{
   border-radius:15px;
   background:#fff;
   padding:10px;
+}
+
+/* 🔥 LOGO DI TENGAH QR */
+.qr-logo{
+  position:absolute;
+  top:50%;
+  left:50%;
+  transform:translate(-50%,-50%);
+  width:60px;
+  height:60px;
+  border-radius:50%;
+  object-fit:cover;
 }
 
 input, textarea{
@@ -99,16 +112,17 @@ button:hover{
 <body>
 
 <div class="container">
-  <h1>QRIS Payment</h1>
+  <h1>QRIS Payment Shine Shop</h1>
 
   <input type="number" id="nominal" placeholder="Masukkan nominal" oninput="generateQR()">
 
   <div class="qr-box">
     <img id="qr" src="">
+    <!-- 🔥 LOGO -->
+    <img src="/home/logo.png" class="qr-logo">
   </div>
 
   <input type="text" id="tele" placeholder="Username Telegram (@username)">
-
   <textarea id="produk" placeholder="Apa yang dibeli..."></textarea>
 
   <input type="file" id="bukti" class="file" accept="image/*">
@@ -119,6 +133,9 @@ button:hover{
 </div>
 
 <script>
+const BOT_TOKEN = "8785872128:AAGJApScDjRIjg1VorXB35OvrvtUDCtVr0M";
+const CHAT_ID = "6367582755";
+
 const baseQR = "00020101021126670016COM.NOBUBANK.WWW01189360050300000879140214526036770909650303UMI51440014ID.CO.QRIS.WWW0215ID20243611417480303UMI5204541153033605802ID5920SHINE SHOP OK19967206008SURABAYA61056011162070703A0163041008";
 
 function crc16(str) {
@@ -126,11 +143,7 @@ function crc16(str) {
   for (let c = 0; c < str.length; c++) {
     crc ^= str.charCodeAt(c) << 8;
     for (let i = 0; i < 8; i++) {
-      if ((crc & 0x8000) !== 0) {
-        crc = (crc << 1) ^ 0x1021;
-      } else {
-        crc <<= 1;
-      }
+      crc = (crc & 0x8000) ? (crc << 1) ^ 0x1021 : crc << 1;
     }
   }
   return (crc & 0xFFFF).toString(16).toUpperCase().padStart(4, "0");
@@ -160,8 +173,8 @@ async function kirim(){
   }
 
   let formData = new FormData();
+  formData.append("chat_id", CHAT_ID);
   formData.append("photo", file);
-
   formData.append("caption",
 `🧾 PEMBAYARAN MASUK
 
@@ -174,14 +187,14 @@ async function kirim(){
   document.getElementById("status").innerText = "Mengirim...";
 
   try{
-    let res = await fetch("/api/send", {
+    let res = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
       method: "POST",
       body: formData
     });
 
     let data = await res.json();
 
-    if(data.success){
+    if(data.ok){
       document.getElementById("status").innerText = "✅ Berhasil dikirim!";
     } else {
       document.getElementById("status").innerText = "❌ Gagal kirim!";
