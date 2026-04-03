@@ -146,9 +146,25 @@ function updateDisplay(){
   <strong>Total:</strong> <s>Rp ${originalTotal.toLocaleString("id-ID")}</s><br>
   <strong>Total Bayar:</strong> Rp ${finalTotal.toLocaleString("id-ID")}
   `;
-  QRCode.toCanvas(qrisCanvas, buildQR(finalTotal), {width:240});
-}
+  QRCode.toCanvas(qrisCanvas, buildQR(finalTotal), { width:240 }, function(err){
+    if(err) return console.error(err);
 
+    const ctx = qrisCanvas.getContext("2d");
+    const logo = new Image();
+    logo.src = "/home/logo.png";
+
+    logo.onload = function(){
+      const size = 50;
+      const x = (qrisCanvas.width - size)/2;
+      const y = (qrisCanvas.height - size)/2;
+
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(x-5,y-5,size+10,size+10);
+
+      ctx.drawImage(logo,x,y,size,size);
+    };
+  });
+}
 function crc16(s){
 let c=0xFFFF;
 for(let i=0;i<s.length;i++){
