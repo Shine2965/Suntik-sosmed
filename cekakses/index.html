@@ -1,8 +1,14 @@
-<!DOCTYPE html><html lang="id">
+<!DOCTYPE html>
+<html lang="id">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Cek Akses User</title><script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script><link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet"><style>
+<title>Cek Akses User</title>
+
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+
+<style>
 body{
   font-family:'Poppins',sans-serif;
   background:#0f172a;
@@ -19,16 +25,57 @@ body{
   width:350px;
   text-align:center;
 }
-.badge{padding:6px 12px;border-radius:999px;margin-top:10px;display:inline-block}
+.badge{
+  padding:6px 12px;
+  border-radius:999px;
+  margin-top:10px;
+  display:inline-block;
+}
 .ok{background:#22c55e33;color:#22c55e}
 .no{background:#ef444433;color:#ef4444}
-.info{margin-top:15px;font-size:13px;color:#cbd5e1}
-</style></head><body>
+
+.reason-box{
+  margin-top:12px;
+  padding:12px;
+  background:#7f1d1d33;
+  border-radius:12px;
+  font-size:13px;
+  color:#fecaca;
+}
+
+.btn{
+  display:inline-block;
+  margin-top:12px;
+  padding:8px 14px;
+  border-radius:999px;
+  background:#38bdf8;
+  color:white;
+  text-decoration:none;
+  font-size:13px;
+}
+
+.info{
+  margin-top:15px;
+  font-size:13px;
+  color:#cbd5e1;
+}
+</style>
+</head>
+
+<body>
+
 <div class="card">
-<h2>🔍 Cek Akses User</h2><div id="userID"></div>
-<div id="statusPayment"></div>
-<div id="statusTestimoni"></div><div class="info">Status berdasarkan data server</div>
-</div><script>
+  <h2>🔍 Cek Akses User</h2>
+
+  <div id="userID"></div>
+
+  <div id="statusPayment"></div>
+  <div id="statusTestimoni"></div>
+
+  <div class="info">Status berdasarkan data server</div>
+</div>
+
+<script>
 // ================= USER ID =================
 function generateUserID(){
   return 'user-' + Math.random().toString(36).substring(2,10) + '-' + Date.now().toString(36);
@@ -52,15 +99,32 @@ async function checkPayment(){
     const res = await fetch("/sosmed-2/payment/user.json",{cache:"no-store"});
     const data = await res.json();
 
-    const banned = data.find(x => x.user === userID);
+    // SUPPORT user & device
+    const banned = data.find(x => x.user === userID || x.device === userID);
 
     if(banned){
-      document.getElementById("statusPayment").innerHTML = `<div class="badge no">🚫 DIBLOKIR PEMBELIAN</div>`;
+      document.getElementById("statusPayment").innerHTML = `
+        <div class="badge no">🚫 DIBLOKIR PEMBELIAN</div>
+
+        <div class="reason-box">
+          <b>Alasan:</b><br>
+          ${banned.reason || "Tidak ada keterangan"}
+        </div>
+
+        <a href="https://t.me/Shineshoipbot" target="_blank" class="btn">
+          Ajukan Banding
+        </a>
+      `;
     } else {
-      document.getElementById("statusPayment").innerHTML = `<div class="badge ok">✅ AMAN PEMBELIAN</div>`;
+      document.getElementById("statusPayment").innerHTML = `
+        <div class="badge ok">✅ AMAN PEMBELIAN</div>
+      `;
     }
-  }catch{
-    document.getElementById("statusPayment").innerHTML = `<div class="badge no">Gagal cek</div>`;
+
+  }catch(e){
+    document.getElementById("statusPayment").innerHTML = `
+      <div class="badge no">❌ Gagal cek server</div>
+    `;
   }
 }
 
@@ -73,32 +137,43 @@ async function checkTestimoni(){
     const allowed = data.allowed_users || [];
 
     if(allowed.includes(userID)){
-      document.getElementById("statusTestimoni").innerHTML = `<div class="badge ok">⭐ BOLEH TESTIMONI</div>`;
+      document.getElementById("statusTestimoni").innerHTML = `
+        <div class="badge ok">⭐ BOLEH TESTIMONI</div>
+      `;
     } else {
-      document.getElementById("statusTestimoni").innerHTML = `<div class="badge no">❌ TIDAK BOLEH TESTIMONI</div>`;
+      document.getElementById("statusTestimoni").innerHTML = `
+        <div class="badge no">❌ TIDAK BOLEH TESTIMONI</div>
+      `;
     }
   }catch{
-    document.getElementById("statusTestimoni").innerHTML = `<div class="badge no">akses dibekukan</div>`;
+    document.getElementById("statusTestimoni").innerHTML = `
+      <div class="badge no">akses dibekukan</div>
+    `;
   }
 }
 
 checkPayment();
 checkTestimoni();
-  /* 🚫 ANTI INSPECT */  
-document.addEventListener("contextmenu",e=>e.preventDefault());  
-document.addEventListener("keydown",function(e){  
-if(e.key==="F12") e.preventDefault();  
-if(e.ctrlKey&&e.shiftKey&&["I","C","J"].includes(e.key)) e.preventDefault();  
-if(e.ctrlKey&&e.key==="u") e.preventDefault();  
-});  
-  
-setInterval(()=>{  
-if(window.outerWidth-window.innerWidth>160||window.outerHeight-window.innerHeight>160){  
-document.body.innerHTML="<h1 style='color:gold;text-align:center;margin-top:40vh;'>🚫 Developer Tools Terdeteksi</h1>";  
-}  
-},1000);  
-  
-setInterval(()=>{console.clear();},1000);  
-setInterval(()=>{debugger;},3000);  
-</script></body>
+
+
+// ================= ANTI INSPECT =================
+document.addEventListener("contextmenu",e=>e.preventDefault());
+
+document.addEventListener("keydown",function(e){
+  if(e.key==="F12") e.preventDefault();
+  if(e.ctrlKey && e.shiftKey && ["I","C","J"].includes(e.key)) e.preventDefault();
+  if(e.ctrlKey && e.key==="u") e.preventDefault();
+});
+
+setInterval(()=>{
+  if(window.outerWidth-window.innerWidth>160 || window.outerHeight-window.innerHeight>160){
+    document.body.innerHTML="<h1 style='color:gold;text-align:center;margin-top:40vh;'>🚫 Developer Tools Terdeteksi</h1>";
+  }
+},1000);
+
+setInterval(()=>{console.clear();},1000);
+setInterval(()=>{debugger;},3000);
+</script>
+
+</body>
 </html>
