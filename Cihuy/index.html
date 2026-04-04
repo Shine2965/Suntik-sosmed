@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kirim ke Telegram</title>
+
+<style>
+body{
+  font-family: Arial;
+  background:#0f172a;
+  color:#fff;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  height:100vh;
+}
+
+.box{
+  background:#1e293b;
+  padding:20px;
+  border-radius:15px;
+  width:320px;
+}
+
+textarea, input{
+  width:100%;
+  margin-top:10px;
+  padding:10px;
+  border-radius:8px;
+  border:none;
+}
+
+button{
+  width:100%;
+  margin-top:15px;
+  padding:12px;
+  border:none;
+  border-radius:10px;
+  background:#22c55e;
+  color:white;
+  font-weight:bold;
+}
+
+.status{
+  margin-top:10px;
+  text-align:center;
+}
+</style>
+</head>
+
+<body>
+
+<div class="box">
+  <h3>Kirim Pesan</h3>
+
+  <textarea id="message" placeholder="Tulis pesan..."></textarea>
+  <input type="file" id="photo">
+
+  <button onclick="kirim()">Kirim</button>
+
+  <div class="status" id="status"></div>
+</div>
+
+<script>
+async function kirim(){
+  const message = document.getElementById("message").value;
+  const photo = document.getElementById("photo").files[0];
+  const status = document.getElementById("status");
+
+  status.innerHTML = "Mengirim...";
+
+  try{
+    let res;
+
+    if(photo){
+      let formData = new FormData();
+      formData.append("message", message);
+      formData.append("photo", photo);
+
+      res = await fetch("/api/telegram", {
+        method: "POST",
+        body: formData
+      });
+
+    } else {
+      res = await fetch("/api/telegram", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ message })
+      });
+    }
+
+    const data = await res.json();
+
+    if(data.ok){
+      status.innerHTML = "✅ Berhasil!";
+    } else {
+      status.innerHTML = "❌ Gagal!";
+    }
+
+  } catch(err){
+    status.innerHTML = "❌ Error!";
+    console.error(err);
+  }
+}
+</script>
+
+</body>
+</html>
