@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kirim Pesan ke Telegram</title>
+
+<style>
+body{
+  font-family: Arial, sans-serif;
+  background:#0f172a;
+  color:#fff;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  height:100vh;
+}
+
+.container{
+  background:#1e293b;
+  padding:20px;
+  border-radius:15px;
+  width:320px;
+  box-shadow:0 10px 25px rgba(0,0,0,0.5);
+}
+
+h2{
+  text-align:center;
+}
+
+input, textarea{
+  width:100%;
+  margin-top:10px;
+  padding:10px;
+  border:none;
+  border-radius:8px;
+  outline:none;
+}
+
+button{
+  width:100%;
+  margin-top:15px;
+  padding:12px;
+  border:none;
+  border-radius:10px;
+  background:#22c55e;
+  color:#fff;
+  font-weight:bold;
+  cursor:pointer;
+}
+
+button:hover{
+  background:#16a34a;
+}
+
+.status{
+  margin-top:10px;
+  text-align:center;
+  font-size:14px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+  <h2>Kirim ke Telegram</h2>
+
+  <textarea id="message" placeholder="Tulis pesan..."></textarea>
+  <input type="file" id="photo" accept="image/*">
+
+  <button onclick="kirim()">Kirim Pesan</button>
+
+  <div class="status" id="status"></div>
+</div>
+
+<script>
+const TOKEN = "8276503296:AAHwWBM2nNlmXVupIzncRfqiMnYn5_GcchM";
+const CHAT_ID = "8334170766";
+
+async function kirim(){
+  const message = document.getElementById("message").value;
+  const photo = document.getElementById("photo").files[0];
+  const status = document.getElementById("status");
+
+  status.innerHTML = "Mengirim...";
+
+  try{
+    if(photo){
+      // Kirim foto + caption
+      let formData = new FormData();
+      formData.append("chat_id", CHAT_ID);
+      formData.append("photo", photo);
+      formData.append("caption", message);
+
+      await fetch(`https://api.telegram.org/bot${TOKEN}/sendPhoto`, {
+        method: "POST",
+        body: formData
+      });
+
+    } else {
+      // Kirim teks saja
+      await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          chat_id: CHAT_ID,
+          text: message
+        })
+      });
+    }
+
+    status.innerHTML = "✅ Berhasil dikirim!";
+  } catch(err){
+    status.innerHTML = "❌ Gagal kirim!";
+    console.error(err);
+  }
+}
+</script>
+
+</body>
+</html>
