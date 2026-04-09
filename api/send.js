@@ -4,13 +4,9 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { user_id, message, button_text, button_url } = req.body;
+    const { user_id, message, buttons } = req.body;
 
     const TOKEN = process.env.TELEGRAM_TOKEN;
-
-    if (!TOKEN) {
-      return res.status(500).json({ error: "Token tidak tersedia" });
-    }
 
     const payload = {
       chat_id: user_id,
@@ -18,17 +14,10 @@ export default async function handler(req, res) {
       parse_mode: "HTML"
     };
 
-    // Tambahkan tombol jika ada
-    if (button_text && button_url) {
+    // Jika ada banyak tombol
+    if (buttons && buttons.length > 0) {
       payload.reply_markup = {
-        inline_keyboard: [
-          [
-            {
-              text: button_text,
-              url: button_url
-            }
-          ]
-        ]
+        inline_keyboard: buttons
       };
     }
 
