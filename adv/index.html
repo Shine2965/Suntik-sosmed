@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Telegram Advertisement by Shine Shop</title>
+
+<style>
+body{
+  font-family:Poppins;
+  background:#0f172a;
+  color:white;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  height:100vh;
+}
+.container{
+  background:#1e293b;
+  padding:20px;
+  border-radius:12px;
+  width:400px;
+}
+input, textarea{
+  width:100%;
+  margin:6px 0;
+  padding:10px;
+  border:none;
+  border-radius:8px;
+}
+button{
+  width:100%;
+  padding:12px;
+  margin-top:8px;
+  background:#22c55e;
+  border:none;
+  border-radius:8px;
+  color:white;
+  cursor:pointer;
+}
+.btn-add{
+  background:#3b82f6;
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+  <h2>Kirim Telegram</h2>
+
+  <input type="text" id="user_id" placeholder="User ID">
+  <textarea id="message" placeholder="Isi pesan"></textarea>
+
+  <h4>Inline Buttons</h4>
+  <div id="buttons"></div>
+
+  <button class="btn-add" onclick="tambahButton()">+ Tambah Button</button>
+  <button onclick="kirim()">Kirim</button>
+</div>
+
+<script>
+let buttonCount = 0;
+
+function tambahButton(){
+  buttonCount++;
+
+  const div = document.createElement("div");
+  div.innerHTML = `
+    <input type="text" placeholder="Teks Button" id="text_${buttonCount}">
+    <input type="text" placeholder="URL Button" id="url_${buttonCount}">
+    <input type="number" placeholder="Baris (row)" id="row_${buttonCount}">
+  `;
+
+  document.getElementById("buttons").appendChild(div);
+}
+
+async function kirim(){
+  const user_id = document.getElementById("user_id").value;
+  const message = document.getElementById("message").value;
+
+  let rows = {};
+
+  for(let i=1;i<=buttonCount;i++){
+    const text = document.getElementById(`text_${i}`)?.value;
+    const url = document.getElementById(`url_${i}`)?.value;
+    const row = document.getElementById(`row_${i}`)?.value || 1;
+
+    if(text && url){
+      if(!rows[row]) rows[row] = [];
+
+      rows[row].push({
+        text: text,
+        url: url
+      });
+    }
+  }
+
+  const buttons = Object.values(rows);
+
+  const res = await fetch("/api/send", {
+    method:"POST",
+    headers:{
+      "Content-Type":"application/json"
+    },
+    body:JSON.stringify({
+      user_id,
+      message,
+      buttons
+    })
+  });
+
+  const data = await res.json();
+
+  if(data.ok){
+    alert("Berhasil dikirim!");
+  }else{
+    alert("Error: " + JSON.stringify(data));
+  }
+}
+</script>
+
+</body>
+</html>
