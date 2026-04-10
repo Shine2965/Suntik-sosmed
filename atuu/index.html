@@ -3,17 +3,17 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SMM Panel Frontend</title>
+<title>SMM Panel</title>
 
 <style>
 body{
-  font-family:Poppins,sans-serif;
+  font-family:Poppins;
   background:#0f172a;
   color:white;
   display:flex;
   justify-content:center;
   align-items:center;
-  min-height:100vh;
+  height:100vh;
 }
 .box{
   background:#1e293b;
@@ -21,11 +21,10 @@ body{
   border-radius:12px;
   width:350px;
 }
-h2{text-align:center;}
 input,select,button{
   width:100%;
   padding:10px;
-  margin:6px 0;
+  margin:5px 0;
   border:none;
   border-radius:8px;
 }
@@ -37,12 +36,11 @@ button{
   background:#22c55e;
   color:white;
   font-weight:bold;
-  cursor:pointer;
 }
 .result{
-  margin-top:10px;
   background:#0f172a;
   padding:10px;
+  margin-top:10px;
   border-radius:8px;
   font-size:13px;
 }
@@ -52,36 +50,33 @@ button{
 <body>
 
 <div class="box">
-  <h2>SMM Panel</h2>
+  <h3>SMM Panel</h3>
 
   <button onclick="loadServices()">Load Services</button>
-
   <select id="service"></select>
 
   <input type="text" id="link" placeholder="Link target">
   <input type="number" id="quantity" placeholder="Quantity">
 
-  <button onclick="order()">Buat Order</button>
+  <button onclick="createOrder()">Order</button>
 
   <hr>
 
   <input type="number" id="orderId" placeholder="Order ID">
-  <button onclick="statusOrder()">Cek Status</button>
+  <button onclick="checkStatus()">Cek Status</button>
 
-  <div class="result" id="result">Result...</div>
+  <div class="result" id="result">...</div>
 </div>
 
 <script>
-const API = "/smm/";
+const API = "/smm"; // 🔥 ini connect ke backend
 
 // LOAD SERVICES
 async function loadServices(){
   const res = await fetch(API, {
     method: "POST",
     headers: {"Content-Type":"application/json"},
-    body: JSON.stringify({
-      action: "services"
-    })
+    body: JSON.stringify({ action: "services" })
   });
 
   const data = await res.json();
@@ -92,15 +87,15 @@ async function loadServices(){
   data.forEach(s => {
     let opt = document.createElement("option");
     opt.value = s.service;
-    opt.textContent = s.name + " | $" + s.rate;
+    opt.textContent = `${s.name} - $${s.rate}`;
     select.appendChild(opt);
   });
 
-  result("Service berhasil dimuat");
+  show("Services loaded");
 }
 
-// ORDER
-async function order(){
+// CREATE ORDER
+async function createOrder(){
   const service = document.getElementById("service").value;
   const link = document.getElementById("link").value;
   const quantity = document.getElementById("quantity").value;
@@ -117,11 +112,11 @@ async function order(){
   });
 
   const data = await res.json();
-  result(data);
+  show(data);
 }
 
-// STATUS
-async function statusOrder(){
+// CHECK STATUS
+async function checkStatus(){
   const order = document.getElementById("orderId").value;
 
   const res = await fetch(API, {
@@ -134,11 +129,11 @@ async function statusOrder(){
   });
 
   const data = await res.json();
-  result(data);
+  show(data);
 }
 
-// RESULT VIEW
-function result(data){
+// SHOW RESULT
+function show(data){
   document.getElementById("result").innerText =
     typeof data === "object"
     ? JSON.stringify(data, null, 2)
