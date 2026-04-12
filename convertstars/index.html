@@ -3,7 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Convert Stars Telegram</title>
+<title>Convert Stars - Shine Shop</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
 
 <style>
 body{
@@ -15,24 +17,45 @@ body{
   align-items:center;
   height:100vh;
 }
+
 .box{
   background:#1e293b;
   padding:25px;
   border-radius:15px;
   width:320px;
+  box-shadow:0 0 20px rgba(0,0,0,0.5);
 }
-input, textarea, button{
+
+h2{
+  text-align:center;
+  margin-bottom:15px;
+}
+
+input, select{
   width:100%;
   padding:10px;
-  margin-top:10px;
+  margin:8px 0;
   border:none;
   border-radius:8px;
+  outline:none;
 }
+
 button{
-  background:#38bdf8;
-  color:black;
+  width:100%;
+  padding:10px;
+  background:#22c55e;
+  border:none;
+  border-radius:8px;
+  color:white;
   font-weight:bold;
   cursor:pointer;
+}
+
+.result{
+  margin-top:10px;
+  text-align:center;
+  font-size:14px;
+  color:#38bdf8;
 }
 </style>
 </head>
@@ -42,39 +65,45 @@ button{
 <div class="box">
   <h2>Convert Stars ⭐</h2>
 
-  <input type="text" id="user" placeholder="User ID / Username">
   <input type="number" id="stars" placeholder="Jumlah Stars">
-  <textarea id="payment" placeholder="Isi QRIS / Rekening / E-Wallet"></textarea>
-  <input type="file" id="bukti">
+  
+  <input type="text" id="userid" placeholder="User ID Telegram">
+  
+  <input type="text" id="payment" placeholder="Rekening / QRIS Kamu">
 
-  <button onclick="kirim()">Kirim</button>
+  <div class="result" id="result">Rp 0</div>
+
+  <button onclick="convert()">Convert & Kirim</button>
 </div>
 
 <script>
-async function kirim(){
-  const user = document.getElementById("user").value;
-  const stars = document.getElementById("stars").value;
-  const payment = document.getElementById("payment").value;
-  const file = document.getElementById("bukti").files[0];
+const RATE = 150; // 1 star = Rp150
 
-  if(!user || !stars || !payment){
-    alert("Lengkapi semua data!");
-    return;
-  }
+function convert(){
+  let stars = document.getElementById("stars").value;
+  let userid = document.getElementById("userid").value;
+  let payment = document.getElementById("payment").value;
 
-  const formData = new FormData();
-  formData.append("user", user);
-  formData.append("stars", stars);
-  formData.append("payment", payment);
-  if(file) formData.append("file", file);
+  let total = stars * RATE;
 
-  const res = await fetch("/api/order", {
+  document.getElementById("result").innerText = "Rp " + total.toLocaleString();
+
+  fetch("/api/convert",{
     method:"POST",
-    body: formData
-  });
-
-  const data = await res.json();
-  alert(data.message);
+    headers:{
+      "Content-Type":"application/json"
+    },
+    body:JSON.stringify({
+      stars,
+      userid,
+      payment,
+      total
+    })
+  })
+  .then(res=>res.json())
+  .then(data=>{
+    alert("Berhasil dikirim ke owner!");
+  })
 }
 </script>
 
