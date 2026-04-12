@@ -8,7 +8,8 @@ export default async function handler(req, res){
   const TOKEN = process.env.TELEGRAM_TOKEN;
   const OWNER = process.env.OWNER_ID;
 
-  const message = `
+  // pesan ke owner
+  const ownerMsg = `
 🚀 REQUEST CONVERT STARS
 
 ⭐ Stars: ${stars}
@@ -19,19 +20,49 @@ export default async function handler(req, res){
 `;
 
   try{
+
+    // kirim ke owner
     await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`,{
       method:"POST",
-      headers:{
-        "Content-Type":"application/json"
-      },
+      headers:{"Content-Type":"application/json"},
       body:JSON.stringify({
         chat_id: OWNER,
-        text: message
+        text: ownerMsg
+      })
+    });
+
+    // kirim invoice ke user
+    await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`,{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({
+        chat_id: userid,
+        text: `💸 INVOICE CONVERT STARS
+
+⭐ ${stars} Stars
+💰 Rp ${total}
+
+Klik tombol di bawah untuk konfirmasi convert`,
+        reply_markup:{
+          inline_keyboard:[
+            [
+              {
+                text:"✅ Convert Stars",
+                callback_data: JSON.stringify({
+                  action:"convert",
+                  stars,
+                  total
+                })
+              }
+            ]
+          ]
+        }
       })
     });
 
     return res.status(200).json({msg:"success"});
+
   }catch(e){
-    return res.status(500).json({msg:"error"});
+    return res.status(500).json({msg:"error", error:e.message});
   }
 }
