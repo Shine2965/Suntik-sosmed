@@ -1,3 +1,8 @@
+export const config = {
+  api: {
+    bodyParser: true,
+  },
+};
 export default async function handler(req, res){
   const TOKEN = process.env.TELEGRAM_TOKEN;
   const OWNER = process.env.OWNER_ID;
