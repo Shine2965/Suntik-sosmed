@@ -10,7 +10,7 @@
 <style>
 body{
   font-family:Poppins;
-  background:#0f172a;
+  background:linear-gradient(135deg,#0f172a,#020617);
   color:white;
   display:flex;
   justify-content:center;
@@ -21,9 +21,10 @@ body{
 .box{
   background:#1e293b;
   padding:25px;
-  border-radius:15px;
-  width:320px;
-  box-shadow:0 0 20px rgba(0,0,0,0.5);
+  border-radius:20px;
+  width:330px;
+  box-shadow:0 0 30px rgba(0,0,0,0.6);
+  animation:fadeIn 1s ease;
 }
 
 h2{
@@ -31,31 +32,70 @@ h2{
   margin-bottom:15px;
 }
 
-input, select{
+input{
   width:100%;
-  padding:10px;
+  padding:12px;
   margin:8px 0;
   border:none;
-  border-radius:8px;
+  border-radius:10px;
   outline:none;
+  background:#0f172a;
+  color:white;
 }
 
 button{
   width:100%;
-  padding:10px;
+  padding:12px;
   background:#22c55e;
   border:none;
-  border-radius:8px;
+  border-radius:10px;
   color:white;
   font-weight:bold;
   cursor:pointer;
+  transition:0.3s;
+}
+
+button:hover{
+  background:#16a34a;
 }
 
 .result{
   margin-top:10px;
   text-align:center;
-  font-size:14px;
+  font-size:15px;
   color:#38bdf8;
+}
+
+.loader{
+  display:none;
+  text-align:center;
+  margin-top:15px;
+}
+
+.spinner{
+  width:40px;
+  height:40px;
+  border:4px solid rgba(255,255,255,0.2);
+  border-top:4px solid #22c55e;
+  border-radius:50%;
+  animation:spin 1s linear infinite;
+  margin:auto;
+}
+
+.status{
+  text-align:center;
+  margin-top:10px;
+  font-size:14px;
+}
+
+@keyframes spin{
+  0%{transform:rotate(0deg);}
+  100%{transform:rotate(360deg);}
+}
+
+@keyframes fadeIn{
+  from{opacity:0; transform:translateY(20px);}
+  to{opacity:1; transform:translateY(0);}
 }
 </style>
 </head>
@@ -66,44 +106,69 @@ button{
   <h2>Convert Stars ⭐</h2>
 
   <input type="number" id="stars" placeholder="Jumlah Stars">
-  
   <input type="text" id="userid" placeholder="User ID Telegram">
-  
   <input type="text" id="payment" placeholder="Rekening / QRIS Kamu">
 
   <div class="result" id="result">Rp 0</div>
 
   <button onclick="convert()">Convert & Kirim</button>
+
+  <div class="loader" id="loader">
+    <div class="spinner"></div>
+    <div class="status" id="status">Mengirim invoice...</div>
+  </div>
 </div>
 
 <script>
-const RATE = 150; // 1 star = Rp150
+const RATE = 150;
 
-function convert(){
+document.getElementById("stars").addEventListener("input",()=>{
+  let stars = document.getElementById("stars").value;
+  let total = stars * RATE;
+  document.getElementById("result").innerText = "Rp " + total.toLocaleString();
+});
+
+async function convert(){
   let stars = document.getElementById("stars").value;
   let userid = document.getElementById("userid").value;
   let payment = document.getElementById("payment").value;
 
+  if(!stars || !userid || !payment){
+    alert("Harap isi semua data!");
+    return;
+  }
+
   let total = stars * RATE;
 
-  document.getElementById("result").innerText = "Rp " + total.toLocaleString();
+  // tampilkan loader
+  document.getElementById("loader").style.display = "block";
+  document.getElementById("status").innerText = "Mengirim invoice ke Telegram...";
 
-  fetch("/api/convert",{
-    method:"POST",
-    headers:{
-      "Content-Type":"application/json"
-    },
-    body:JSON.stringify({
-      stars,
-      userid,
-      payment,
-      total
-    })
-  })
-  .then(res=>res.json())
-  .then(data=>{
-    alert("Berhasil dikirim ke owner!");
-  })
+  try{
+    let res = await fetch("/api/convert",{
+      method:"POST",
+      headers:{
+        "Content-Type":"application/json"
+      },
+      body:JSON.stringify({
+        stars,
+        userid,
+        payment,
+        total
+      })
+    });
+
+    let data = await res.json();
+
+    if(res.ok){
+      document.getElementById("status").innerText = "✅ Invoice berhasil dikirim!";
+    }else{
+      document.getElementById("status").innerText = "❌ Gagal mengirim!";
+    }
+
+  }catch(e){
+    document.getElementById("status").innerText = "⚠️ Server error!";
+  }
 }
 </script>
 
