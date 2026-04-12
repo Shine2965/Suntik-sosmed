@@ -1,0 +1,37 @@
+export default async function handler(req, res){
+  if(req.method !== "POST"){
+    return res.status(405).json({msg:"Method not allowed"});
+  }
+
+  const { stars, userid, payment, total } = req.body;
+
+  const TOKEN = process.env.TELEGRAM_TOKEN;
+  const OWNER = process.env.OWNER_ID;
+
+  const message = `
+🚀 REQUEST CONVERT STARS
+
+⭐ Stars: ${stars}
+💰 Total: Rp ${total}
+
+👤 User ID: ${userid}
+💳 Payment: ${payment}
+`;
+
+  try{
+    await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`,{
+      method:"POST",
+      headers:{
+        "Content-Type":"application/json"
+      },
+      body:JSON.stringify({
+        chat_id: OWNER,
+        text: message
+      })
+    });
+
+    return res.status(200).json({msg:"success"});
+  }catch(e){
+    return res.status(500).json({msg:"error"});
+  }
+}
