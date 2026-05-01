@@ -20,46 +20,59 @@
       box-shadow: 0 2px 6px rgba(0,0,0,0.1);
     }
     h1 { text-align: center; }
-    input, button {
+
+    input, select {
       width: 100%;
       padding: 10px;
-      margin: 5px 0;
+      margin-bottom: 10px;
+      border-radius: 8px;
       border: 1px solid #ccc;
-      border-radius: 8px;
-      font-size: 14px;
     }
-    button {
-      background: #007bff;
-      color: white;
-      border: none;
-      cursor: pointer;
-      font-weight: bold;
-    }
-    button:hover { background: #0056b3; }
-    .result {
-      margin-top: 15px;
+
+    .card {
       padding: 15px;
-      border-radius: 8px;
+      border-radius: 10px;
       background: #f9f9f9;
-      display: none;
+      margin-bottom: 10px;
+      border-left: 5px solid #ccc;
     }
-    .status { font-weight: bold; font-size: 15px; }
+
+    .status { font-weight: bold; }
     .success { color: green; }
     .process { color: orange; }
     .pending { color: #888; }
     .failed { color: red; }
+
+    .refresh-info {
+      text-align: center;
+      font-size: 12px;
+      color: #666;
+      margin-bottom: 10px;
+    }
+
     .nav { text-align: center; margin-top: 15px; }
     .nav a { color: #007bff; text-decoration: none; font-weight: bold; }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>Cek Riwayat Pesanan</h1>
+    <h1>Riwayat Pesanan</h1>
 
-    <input type="text" id="transaksiId" placeholder="Masukkan ID Transaksi">
-    <button onclick="cekStatus()">Cek Status</button>
+    <div class="refresh-info">🔄 Auto refresh setiap 5 detik</div>
 
-    <div id="hasil" class="result"></div>
+    <!-- 🔍 SEARCH GLOBAL -->
+    <input type="text" id="searchId" placeholder="Cari ID Transaksi (global)..." oninput="tampilkanRiwayat()">
+
+    <!-- 🔽 FILTER -->
+    <select id="filterStatus" onchange="tampilkanRiwayat()">
+      <option value="semua">Semua Status</option>
+      <option value="sukses">Sukses</option>
+      <option value="pending">Pending</option>
+      <option value="proses">Proses</option>
+      <option value="gagal">Gagal</option>
+    </select>
+
+    <div id="hasil"></div>
 
     <div class="nav">
       <p>⬅️ <a href="/home/">Kembali ke Pemesanan</a></p>
@@ -69,53 +82,73 @@
   <script>
     let dataPesanan = {};
 
-    // Load data JSON
     async function loadData() {
       try {
-        const res = await fetch('/riwayat/data.json');
+        const res = await fetch('/riwayat/data.json?t=' + Date.now());
         dataPesanan = await res.json();
+        tampilkanRiwayat();
       } catch (err) {
         console.error("Gagal load data:", err);
       }
     }
 
-    // Jalankan saat halaman dibuka
-    loadData();
-
-    function cekStatus() {
-      const inputId = document.getElementById("transaksiId").value.trim().toUpperCase();
+    function tampilkanRiwayat() {
       const hasil = document.getElementById("hasil");
+      const filter = document.getElementById("filterStatus").value;
+      const search = document.getElementById("searchId").value.trim().toUpperCase();
+      const userId = localStorage.getItem("user_id");
 
-      if (!inputId) {
-        hasil.style.display = "block";
-        hasil.innerHTML = `<p style="color:red;">❌ Masukkan ID Transaksi dulu!</p>`;
-        return;
-      }
+      hasil.innerHTML = "";
+      let ditemukan = false;
 
-      if (dataPesanan[inputId]) {
+      for (let id in dataPesanan) {
+        let item = dataPesanan[id];
+
+        // 🔍 MODE SEARCH GLOBAL
+        if (search) {
+          if (!id.includes(search)) continue;
+        } else {
+          // 👤 MODE NORMAL (berdasarkan user)
+          if (item.userid !== userId) continue;
+        }
+
+        // 🔽 FILTER STATUS
+        if (filter !== "semua" && item.status.toLowerCase() !== filter) continue;
+
+        ditemukan = true;
+
         let statusClass = "";
-        switch(dataPesanan[inputId].status.toLowerCase()) {
+        switch(item.status.toLowerCase()) {
           case "sukses": statusClass = "success"; break;
           case "proses": statusClass = "process"; break;
           case "pending": statusClass = "pending"; break;
           case "gagal": statusClass = "failed"; break;
         }
 
-        hasil.style.display = "block";
-        hasil.innerHTML = `
-          <p>📌 ID Transaksi: <b>${inputId}</b></p>
-            <p>🛒 Produk: ${dataPesanan[inputId].produk}</p>
-          <p>#️⃣ Jumlah Order: ${dataPesanan[inputId].jumlah}</p>
-          <p>🗓️ Waktu Pembelian: ${dataPesanan[inputId].waktu}</p>
-          <p class="status ${statusClass}">📦 Status: ${dataPesanan[inputId].status}</p>
-          <p>✉️ Pesan dari admin: ${dataPesanan[inputId].pesan}</p>
+        hasil.innerHTML += `
+          <div class="card">
+            <p>📌 ID: <b>${id}</b></p>
+            <p>🛒 Produk: ${item.produk}</p>
+            <p>#️⃣ Jumlah: ${item.jumlah}</p>
+            <p>🗓️ Waktu: ${item.waktu}</p>
+            <p class="status ${statusClass}">📦 Status: ${item.status}</p>
+            <p>✉️ Pesan: ${item.pesan}</p>
+          </div>
         `;
-      } else {
-        hasil.style.display = "block";
-        hasil.innerHTML = `<p style="color:red;">❌ ID Transaksi tidak ditemukan! silahkan coba lagi dalam 24 jam</p>`;
+      }
+
+      if (!ditemukan) {
+        hasil.innerHTML = `<p style="color:red;">❌ Data tidak ditemukan</p>`;
       }
     }
-    /* 🚫 ANTI INSPECT */  
+
+    loadData();
+
+    // 🔄 AUTO REFRESH
+    setInterval(() => {
+      loadData();
+    }, 5000);
+        /* 🚫 ANTI INSPECT */  
 document.addEventListener("contextmenu",e=>e.preventDefault());  
 document.addEventListener("keydown",function(e){  
 if(e.key==="F12") e.preventDefault();  
@@ -131,7 +164,6 @@ document.body.innerHTML="<h1 style='color:gold;text-align:center;margin-top:40vh
   
 setInterval(()=>{console.clear();},1000);  
 setInterval(()=>{debugger;},3000);  
-  
   </script>
 </body>
 </html>
