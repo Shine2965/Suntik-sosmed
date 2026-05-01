@@ -4,7 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Shine Shop</title>
-    <link rel="icon" href="/home/logo.png" type="image/png">
+
+<link rel="icon" href="/home/logo.png" type="image/png">
 <link rel="shortcut icon" href="/home/logo.png" type="image/png">
 <link rel="apple-touch-icon" href="/home/logo.png">
 
@@ -48,13 +49,18 @@ h1{
   margin-bottom:30px;
   letter-spacing:1px;
 }
+
 /* MENU */
 .hamburger-btn {
+    position:fixed;
+    top:20px;
+    left:20px;
     background:none;
-    border:1px solid var(--border);
+    border:1px solid rgba(255,255,255,0.2);
     padding:10px;
     border-radius:10px;
     cursor:pointer;
+    z-index:1001;
 }
 
 .hamburger-icon span {
@@ -110,20 +116,6 @@ h1{
     text-decoration:none;
 }
 
-/* CONTENT */
-.container {
-    max-width:900px;
-    margin:auto;
-    padding:40px 20px;
-}
-
-.section {
-    background:#151515;
-    padding:25px;
-    border-radius:14px;
-    border:1px solid var(--border);
-}
-    
 /* BUTTON */
 .nav-btn{
   width:100%;
@@ -149,23 +141,40 @@ h1{
   font-size:12px;
   opacity:0.6;
 }
-</style>
-  <!-- Script Google AdSense -->
 
-  
+/* USER BUBBLE */
+.user-bubble{
+  position:fixed;
+  bottom:20px;
+  right:20px;
+  background:rgba(0,0,0,0.85);
+  color:white;
+  padding:12px 16px;
+  border-radius:12px;
+  font-size:13px;
+  box-shadow:0 5px 20px rgba(0,0,0,0.4);
+  opacity:0;
+  transform:translateY(20px);
+  transition:0.3s;
+  z-index:9999;
+}
+
+.user-bubble.show{
+  opacity:1;
+  transform:translateY(0);
+}
+</style>
 </head>
 
 <body>
 
-        
-    <button class="hamburger-btn" id="menuToggle">
-        <div class="hamburger-icon">
-            <span></span>
-            <span></span>
-            <span></span>
-        </div>
-    </button>
-</header>
+<button class="hamburger-btn" id="menuToggle">
+    <div class="hamburger-icon">
+        <span></span>
+        <span></span>
+        <span></span>
+    </div>
+</button>
 
 <div id="menuOverlay" class="overlay"></div>
 
@@ -173,24 +182,38 @@ h1{
     <button id="menuClose">Tutup</button>
     <ul class="menu-list">
         <li><a href="/home2/">Home</a></li>
-         <li><a href="/testimoni/">Testimoni</a></li>
+        <li><a href="/testimoni/">Testimoni</a></li>
         <li><a href="/sosmed-2/">Suntik Sosmed</a></li>
         <li><a href="/aboutowner/">Portofolio</a></li>
-         <li><a href="/cekakses/">Cek Akses kamu</a></li>
+        <li><a href="/cekakses/">Cek Akses kamu</a></li>
     </ul>
 </nav>
 
 <div class="container">
 
 <h1>Shine Shop Suntik Sosmed</h1>
-<button class="nav-btn" onclick="location.href='/global/'">🛒 Belanja</button> <button class="nav-btn" onclick="location.href='/sewaweb/'">🌐 Sewa Website</button> <button class="nav-btn" onclick="location.href='/testimoni/'">📈 Testimoni</button> <button class="nav-btn" onclick="location.href='/riwayat/'">Riwayat Transaksi</button> <button class="nav-btn" onclick="location.href='/cekakses/'">🔥 Cek Akses</button> <button class="nav-btn" onclick="location.href='/aboutowner/'">🏆 Tentang Owner</button> <button class="nav-btn" onclick="location.href='https://store.shinedomain.my.id'">📰 Informasi</button> <button class="nav-btn" onclick="location.href='https://t.me/shineshoipbot'">💬 Customer Service</button><button class="nav-btn" onclick="location.href='https://wa.me/6289518103883'">💬 Customer Service 2</button>
-<button class="nav-btn" onclick="location.href='/scammer/'">List scammer</button>
 
+<button class="nav-btn" onclick="location.href='/global/'">🛒 Belanja</button>
+<button class="nav-btn" onclick="location.href='/sewaweb/'">🌐 Sewa Website</button>
+<button class="nav-btn" onclick="location.href='/testimoni/'">📈 Testimoni</button>
+<button class="nav-btn" onclick="location.href='/riwayat/'">Riwayat Transaksi</button>
+<button class="nav-btn" onclick="location.href='/cekakses/'">🔥 Cek Akses</button>
+<button class="nav-btn" onclick="location.href='/aboutowner/'">🏆 Tentang Owner</button>
+<button class="nav-btn" onclick="location.href='https://store.shinedomain.my.id'">📰 Informasi</button>
+<button class="nav-btn" onclick="location.href='https://t.me/shineshoipbot'">💬 Customer Service</button>
+<button class="nav-btn" onclick="location.href='https://wa.me/6289518103883'">💬 Customer Service 2</button>
+<button class="nav-btn" onclick="location.href='/scammer/'">List scammer</button>
 
 <div class="footer">
 ©Shine Shop - 2023
 </div>
+</div>
+
+<!-- USER BUBBLE -->
+<div id="userBubble" class="user-bubble"></div>
+
 <script>
+// MENU
 const toggle = document.getElementById("menuToggle");
 const menu = document.getElementById("siteMenu");
 const overlay = document.getElementById("menuOverlay");
@@ -210,8 +233,8 @@ close.onclick = () => {
     menu.classList.remove("open");
     overlay.classList.remove("show");
 }
-    
-// ================= USER ID =================
+
+// USER ID
 function generateUserID(){
   return 'user-' + Math.random().toString(36).substring(2,10) + '-' + Date.now().toString(36);
 }
@@ -226,7 +249,23 @@ function getUserID(){
 }
 
 const userID = getUserID();
-document.getElementById("userID").innerHTML = `<b>User ID:</b><br>${userID}`;
-    </script>
+
+// USER BUBBLE
+function showUserBubble(){
+  const bubble = document.getElementById("userBubble");
+  bubble.innerHTML = `<b>User ID:</b><br>${userID}`;
+  
+  setTimeout(() => {
+    bubble.classList.add("show");
+  }, 500);
+
+  setTimeout(() => {
+    bubble.classList.remove("show");
+  }, 5500);
+}
+
+window.onload = showUserBubble;
+</script>
+
 </body>
 </html>
