@@ -55,8 +55,10 @@
 <body>
   <div class="container">
     <h1>Cek Riwayat Pesanan</h1>
+
     <input type="text" id="transaksiId" placeholder="Masukkan ID Transaksi">
     <button onclick="cekStatus()">Cek Status</button>
+
     <div id="hasil" class="result"></div>
 
     <div class="nav">
@@ -65,18 +67,30 @@
   </div>
 
   <script>
-    // Data pesanan manual
-      const dataPesanan = {
-            
-                   "TRX1765271969312963": { produk: "1K Like Tiktok", status: "Pending" },
-        
-       
-        
-    };
-    
+    let dataPesanan = {};
+
+    // Load data JSON
+    async function loadData() {
+      try {
+        const res = await fetch('/riwayat/data.json');
+        dataPesanan = await res.json();
+      } catch (err) {
+        console.error("Gagal load data:", err);
+      }
+    }
+
+    // Jalankan saat halaman dibuka
+    loadData();
+
     function cekStatus() {
       const inputId = document.getElementById("transaksiId").value.trim().toUpperCase();
       const hasil = document.getElementById("hasil");
+
+      if (!inputId) {
+        hasil.style.display = "block";
+        hasil.innerHTML = `<p style="color:red;">❌ Masukkan ID Transaksi dulu!</p>`;
+        return;
+      }
 
       if (dataPesanan[inputId]) {
         let statusClass = "";
