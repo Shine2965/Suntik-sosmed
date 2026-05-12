@@ -66,7 +66,6 @@ h1{font-size:22px;font-weight:600;margin-bottom:30px;}
 
 <div class="footer">©Shine Shop - 2023</div>
 </div><div id="userBubble" class="user-bubble"></div><script>
-// USER ID
 function generateUserID(){
   return 'user-'+Math.random().toString(36).substring(2,10)+'-'+Date.now().toString(36);
 }
@@ -82,31 +81,42 @@ function showUserBubble(){
   bubble.innerHTML="<b>Selamat Datang</b><br>User ID:<br>"+userID;
   bubble.classList.add("show");
 
-  // Auto close 1 detik lalu lanjut cek pesan
   setTimeout(()=>{
     bubble.classList.remove("show");
     cekPesan();
-  },2000);
+  },1000);
 }
 
-// CEK PESAN + SWEETALERT
+// MULTIPLE SWEET ALERT SUPPORT
 async function cekPesan(){
   try{
     const res=await fetch("/home2/pesan.json?cache="+Date.now());
     const data=await res.json();
 
+    let alerts=[];
+
     if(data[userID]){
-      Swal.fire({
-        title:'📩 Pesan Baru dari admin',
+      alerts.push({
+        title:'📩 Pesan Baru',
         html:'<b>UserID:</b><br>'+userID+'<br><br><b>Pesan:</b><br>'+data[userID],
-        icon:'info',
-        confirmButtonText:'Tutup'
+        icon:'info'
       });
-    }else if(data["all"]){
-      Swal.fire({
+    }
+
+    if(data["all"]){
+      alerts.push({
         title:'📢 Pengumuman',
         html:data["all"],
-        icon:'warning',
+        icon:'warning'
+      });
+    }
+
+    // Tampilkan lebih dari 2 alert secara berurutan
+    for(const alert of alerts){
+      await Swal.fire({
+        title:alert.title,
+        html:alert.html,
+        icon:alert.icon,
         confirmButtonText:'Tutup'
       });
     }
