@@ -146,7 +146,54 @@ h1{
   opacity:0.6;
 }
 </style>
-  <!-- Script Google AdSense -->
+   <!--BANNED! -->
+  <script>
+// ================= USER ID RANDOM =================
+function generateUserID(){
+  return 'user-' + Math.random().toString(36).substring(2,10) + '-' + Date.now().toString(36);
+}
+
+async function getUserID(){
+  let id = localStorage.getItem("user_id");
+  if(!id){
+    id = generateUserID();
+    localStorage.setItem("user_id", id);
+  }
+  return id;
+}
+
+// ================= USER BAN =================
+async function checkUserBan(){
+  try{
+    const userID = await getUserID();
+
+    const res = await fetch("/sosmed-2/payment/user.json",{cache:"no-store"});
+    if(!res.ok) return;
+
+    const list = await res.json();
+    const banned = list.find(x => x.user === userID);
+
+    if(banned){
+      const reason = banned.reason || "Tidak ada keterangan";
+
+      document.body.innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:center;height:100vh;background:linear-gradient(135deg,#0f2027,#203a43,#2c5364);color:white;text-align:center;">
+      <div style="max-width:420px;background:rgba(255,255,255,.12);padding:30px;border-radius:22px;">
+      <h1>🚫 Akses Diblokir</h1>
+      <p>Akun kamu diblokir</p>
+      <div>${reason}</div>
+      <br>
+      <small>User ID: ${userID}</small>
+      </div></div>`;
+
+      throw new Error("USER_BANNED");
+    }
+  }catch(e){
+    if(e.message === "USER_BANNED") throw e;
+  }
+}
+checkUserBan();
+  </script>
 
   
 </head>
