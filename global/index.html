@@ -149,7 +149,111 @@
     </style>
 
 </head>
+<script>
+function generateUserID() {
+  return 'user-' +
+    Math.random().toString(36).substring(2, 10) +
+    '-' +
+    Date.now().toString(36);
+}
 
+function getUserID() {
+  let id = localStorage.getItem("user_id");
+
+  if (!id) {
+    id = generateUserID();
+    localStorage.setItem("user_id", id);
+  }
+
+  return id;
+}
+
+// ================= USER BAN =================
+async function checkUserBan() {
+  const userID = getUserID();
+
+  try {
+    const res = await fetch("/sosmed-2/payment/user.json?t=" + Date.now(), {
+      cache: "no-store"
+    });
+
+    if (!res.ok) return;
+
+    const list = await res.json();
+
+    if (!Array.isArray(list)) return;
+
+    const banned = list.find(item =>
+      item.user &&
+      item.user.trim() === userID.trim()
+    );
+
+    if (banned) {
+      const reason = banned.reason || "Tidak ada keterangan";
+
+      document.body.innerHTML = `
+      <div style="
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        min-height:100vh;
+        background:linear-gradient(135deg,#0f2027,#203a43,#2c5364);
+        color:#fff;
+        font-family:Poppins,sans-serif;
+        padding:20px;
+      ">
+        <div style="
+          width:100%;
+          max-width:450px;
+          background:rgba(255,255,255,.1);
+          backdrop-filter:blur(10px);
+          padding:30px;
+          border-radius:20px;
+          text-align:center;
+          box-shadow:0 10px 30px rgba(0,0,0,.3);
+        ">
+          <h1>🚫 Akses Diblokir</h1>
+
+          <p style="margin-top:10px;">
+            Akun kamu telah diblokir.
+          </p>
+
+          <div style="
+            margin-top:15px;
+            padding:12px;
+            background:rgba(255,255,255,.08);
+            border-radius:12px;
+            word-break:break-word;
+          ">
+            ${reason}
+          </div>
+
+          <p style="
+            margin-top:20px;
+            font-size:12px;
+            opacity:.8;
+          ">
+            User ID:<br>
+            <b>${userID}</b>
+          </p>
+        </div>
+      </div>
+      `;
+
+      throw new Error("USER_BANNED");
+    }
+
+  } catch (err) {
+    if (err.message === "USER_BANNED") {
+      throw err;
+    }
+
+    console.error("Gagal memeriksa status ban:", err);
+  }
+}
+
+checkUserBan();
+</script>
 <body>
     <div class="container">
         <h1>Shine Shop Menu Global</h1>
