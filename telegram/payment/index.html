@@ -214,6 +214,7 @@ confirmBtn.onclick = async()=>{
   const gmail = gmailInput.value;
   const file = buktiInput.files[0];
   const userID = await getUserID();
+  const refCode = localStorage.getItem('referral_code') || "-"; // Mengambil kode referral dengan aman
 
   if(!nama||!gmail||!file){
     return Swal.fire("Lengkapi data","","warning");
@@ -225,14 +226,14 @@ await fetch("https://api.telegram.org/bot8785872128:AAGJApScDjRIjg1VorXB35OvrvtU
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({
         chat_id:"-1003853365342",
-        text:`🆕 TRANSAKSI BARU Telegram Market\n\nID: ${trx}\n\nLayanan: ${layanan}\n\nHarga beli; Rp${originalTotal.toLocaleString("id-ID")}\nTotal bayar: Rp ${finalTotal.toLocaleString("id-ID")}\nVoucher: ${appliedVoucher || "-"}\nUser ID: ${userID}\nOrder sekarang di\nshinedomain.my.id`
+        text:`🆕 TRANSAKSI BARU Telegram Market\n\nID: ${trx}\n\nLayanan: ${layanan}\n\nHarga beli; Rp${originalTotal.toLocaleString("id-ID")}\nTotal bayar: Rp ${finalTotal.toLocaleString("id-ID")}\nVoucher: ${appliedVoucher || "-"}\nUser ID: ${userID}\n\nReferal Code: ${refCode}\n\nOrder sekarang di\nshinedomain.my.id`
       })
     });
   await fetch(discordWebhook,{
     method:"POST",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify({
-      content:`💰 Pembayaran Baru Telegram Market\nID: ${trx}\nLayanan: ${layanan}\nHarga beli: Rp${originalTotal.toLocaleString("id-ID")}\nTotal Bayar: Rp ${finalTotal.toLocaleString("id-ID")}\nTarget: ${target}\nVoucher: ${appliedVoucher || "-"}\nNama: ${nama}\nGmail: ${gmail}\nUser ID: ${userID}`
+      content:`💰 Pembayaran Baru Telegram Market\nID: ${trx}\nLayanan: ${layanan}\nHarga beli: Rp${originalTotal.toLocaleString("id-ID")}\nTotal Bayar: Rp ${finalTotal.toLocaleString("id-ID")}\nTarget: ${target}\nVoucher: ${appliedVoucher || "-"}\nNama: ${nama}\nGmail: ${gmail}\nUser ID: ${userID}\n\nReferal Code: ${refCode}\n\n`
     })
   });
 
@@ -245,6 +246,24 @@ await fetch("https://api.telegram.org/bot8785872128:AAGJApScDjRIjg1VorXB35OvrvtU
 };
 
 updateDisplay();
+  // SKRIP MENGAMBIL DATA REFERRAL DARI LOCALSTORAGE
+function ambilReferral() {
+    const savedRef = localStorage.getItem('referral_code');
+    const statusElement = document.getElementById('status-ref');
+    
+    // PERBAIKAN: Menambahkan kondisi 'if(statusElement)' agar tidak error jika id tidak ditemukan di HTML
+    if (statusElement) {
+        if (savedRef) {
+            statusElement.innerHTML = `Terdeteksi! Kode referral Anda adalah: <strong>${savedRef}</strong>`;
+        } else {
+            statusElement.innerHTML = `Tidak ada kode referral yang tersimpan.`;
+        }
+    }
+    return savedRef;
+}
+
+// Jalankan fungsi referral saat halaman dimuat
+ambilReferral();
   /* 🚫 ANTI INSPECT */  
 document.addEventListener("contextmenu",e=>e.preventDefault());  
 document.addEventListener("keydown",function(e){  
