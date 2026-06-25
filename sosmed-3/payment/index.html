@@ -295,15 +295,31 @@ confirmBtn.onclick = async()=>{
 
   Swal.fire({title:"Mengirim...",didOpen:()=>Swal.showLoading()});
   
-  // PERBAIKAN: Mengubah ${status-ref} menjadi variabel ${refCode} yang valid
-  await fetch("https://api.telegram.org/bot8785872128:AAGJApScDjRIjg1VorXB35OvrvtUDCtVr0M/sendMessage",{
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({
-        chat_id:"-1002112920606",
-        text:`🆕 TRANSAKSI BARU SOSMED 3\n\nID: ${trx}\n\nLayanan: ${layanan}\n\nHarga asli: Rp${originalTotal.toLocaleString("id-ID")}\nTotal Bayar: Rp ${finalTotal.toLocaleString("id-ID")}\nVoucher: ${appliedVoucher || "-"}\nUser ID: ${userID}\nReferal Code: ${refCode}\n\nOrder sekarang di\nshinedomain.my.id`
-      })
-    });
+ await fetch("/api/send-telegram",{
+  method:"POST",
+  headers:{
+    "Content-Type":"application/json"
+  },
+  body:JSON.stringify({
+    chat_id:"-1002112920606",
+    text:`
+🆕 TRANSAKSI BARU SOSMED 4
+
+ID TRANSAKSI: ${trx}
+Layanan: ${layanan}
+
+Harga asli: Rp${originalTotal.toLocaleString("id-ID")}
+Total Bayar: Rp ${finalTotal.toLocaleString("id-ID")}
+
+Voucher: ${appliedVoucher || "-"}
+User ID: ${userID}
+Referal Code: ${refCode}
+\n
+
+Order sekarang di
+shinedomain.my.id`
+  })
+});    
     
   await fetch(discordWebhook,{
     method:"POST",
@@ -322,12 +338,10 @@ confirmBtn.onclick = async()=>{
 
 updateDisplay();
   
-// SKRIP MENGAMBIL DATA REFERRAL DARI LOCALSTORAGE
 function ambilReferral() {
     const savedRef = localStorage.getItem('referral_code');
     const statusElement = document.getElementById('status-ref');
     
-    // PERBAIKAN: Menambahkan kondisi 'if(statusElement)' agar tidak error jika id tidak ditemukan di HTML
     if (statusElement) {
         if (savedRef) {
             statusElement.innerHTML = `Terdeteksi! Kode referral Anda adalah: <strong>${savedRef}</strong>`;
@@ -338,11 +352,9 @@ function ambilReferral() {
     return savedRef;
 }
 
-// Jalankan fungsi referral saat halaman dimuat
 ambilReferral();     
       
-  /* 🔒 ANTI DEVTOOLS (tidak ganggu mobile) */
-
+  
 document.addEventListener("keydown", function(e){
   // F12
   if(e.key === "F12") e.preventDefault();
