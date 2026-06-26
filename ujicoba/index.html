@@ -400,28 +400,42 @@ setTimeout(() => {
   audio.play().catch(()=>{});  
 }, 1000);  
 	  
-// DATA LAYANAN  let layananData = {};
+<script>
+const audio = document.getElementById("bgm");
+
+// setelah audio mulai, unmute otomatis
+audio.addEventListener("canplay", () => {
+    audio.muted = false;
+    audio.volume = 1;
+});
+
+setTimeout(() => {
+    audio.muted = false;
+    audio.play().catch(() => {});
+}, 1000);
+
+// =============================
+// DATA DARI API
+// =============================
+
+let layananData = {};
+let selectedService = null;
 
 async function loadServices() {
     try {
-        const res = await fetch("https://fayupedia.id/api/services", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                api_key: "tz1kcs-eizrjo-bqmt10-13suhv-n7m7zt"
-            })
-        });
 
-        const data = await res.json();
+        const response = await fetch("/api/service");
 
-        // Jika API mengembalikan array
-        const services = data.data || data.services || data;
+        const result = await response.json();
+
+        if (!result.status) {
+            throw new Error(result.msg || "Gagal mengambil layanan");
+        }
 
         layananData = {};
 
-        services.forEach(service => {
+        result.services.forEach(service => {
+
             const kategori = service.category || "Lainnya";
 
             if (!layananData[kategori]) {
@@ -429,118 +443,305 @@ async function loadServices() {
             }
 
             layananData[kategori].push({
-                id: service.id,
+                id: String(service.id),
                 name: service.name,
                 pricePerFollower: Number(service.price),
                 min: Number(service.min),
                 max: Number(service.max),
-                desc: service.description || "-"
+                desc: service.description || "-",
+                refill: service.refill,
+                type: service.type
             });
+
         });
 
         const kategori = document.getElementById("kategori");
+
         kategori.innerHTML =
             "<option value=''>-- Pilih Kategori --</option>";
 
-        Object.keys(layananData).forEach(k => {
-            kategori.innerHTML += `<option value="${k}">${k}</option>`;
+        Object.keys(layananData).sort().forEach(k => {
+
+            const option = document.createElement("option");
+
+            option.value = k;
+            option.textContent = k;
+
+            kategori.appendChild(option);
+
         });
 
     } catch (err) {
+
         console.error(err);
-        alert("Gagal mengambil daftar layanan.");
+
+        alert("Gagal mengambil daftar layanan dari server.");
+
     }
 }
 
-window.onload = loadServices;
-  
-window.onload=function(){  
-  const kategori=document.getElementById("kategori");  
-  for(let k in layananData){  
-    let opt=document.createElement("option");  
-    opt.value=k; opt.textContent=k;  
-    kategori.appendChild(opt);  
-  }  
-}  
-  
-function loadLayanan(){  
-  const kategori=document.getElementById("kategori").value;  
-  const layanan=document.getElementById("layanan");  
-  layanan.innerHTML="<option value=''>-- Pilih Layanan --</option>";  
-  
-  if(kategori){  
-    layananData[kategori].forEach(l=>{  
-      let opt=document.createElement("option");  
-      opt.value=l.id;  
-      opt.textContent=l.name+" (ID: "+l.id+")";  
-      layanan.appendChild(opt);  
-    });  
-  }  
-  document.getElementById("infoLayanan").innerHTML="";  
-  selectedService=null;  
-}  
-  
-function showInfo(){  
-  const kategori=document.getElementById("kategori").value;  
-  const layananID=document.getElementById("layanan").value;  
-  
-  selectedService=layananData[kategori].find(l=>l.id==layananID);  
-  document.getElementById("infoLayanan").innerHTML=  
-  `<b>${selectedService.name}</b><br>  
-   ID Produk: ${selectedService.id}<br>  
-   Harga: Rp${selectedService.pricePerFollower}/unit<br>  
-   Min: ${selectedService.min} | Max: ${selectedService.max}<br>  
-   ${selectedService.desc}`;  
-}  
-  
-function hitungTotal(){  
-  if(!selectedService)return;  
-  const jumlah=parseInt(document.getElementById("jumlah").value||"0");  
-  if(jumlah < selectedService.min || jumlah > selectedService.max){  
-    document.getElementById("total").value="Jumlah tidak valid!";  
-    return;  
-  }  
-  document.getElementById("total").value=jumlah * selectedService.pricePerFollower;  
-}  
-  
-function generateTransactionID(){  
-  return `TRX${Date.now()}${Math.floor(Math.random()*1000)}`;  
-}  
-  
-function searchLayanan(){  
-  const q=document.getElementById("search").value.toLowerCase();  
-  const kategori=document.getElementById("kategori");  
-  const layanan=document.getElementById("layanan");  
-  
-  for(let k in layananData){  
-    for(let l of layananData[k]){  
-      if(l.name.toLowerCase().includes(q) || String(l.id).includes(q)){  
-        kategori.value=k;  
-        loadLayanan();  
-        layanan.value=l.id;  
-        showInfo();  
-        return;  
-      }  
-    }  
-  }  
-}  
-  
-function lanjutPembayaran(){  
-  if(!selectedService){alert("Pilih layanan terlebih dahulu!");return;}  
-  
-  const jumlah=parseInt(document.getElementById("jumlah").value||"0");  
-  if(jumlah < selectedService.min || jumlah > selectedService.max){  
-    alert(`Jumlah harus antara ${selectedService.min} dan ${selectedService.max}`);  
-    return;  
-  }  
-  
-  const trxID=generateTransactionID();  
-  const kategori=document.getElementById("kategori").value;  
-  const target=document.getElementById("target").value;  
-  const total=jumlah * selectedService.pricePerFollower;  
-  
-  window.location.href=`payment/?trx=${trxID}&kategori=${kategori}&layanan=${selectedService.name}&id=${selectedService.id}&jumlah=${jumlah}&total=${total}&target=${encodeURIComponent(target)}`;  
-}  
+window.onload = loadServices;// =============================
+// LOAD LAYANAN
+// =============================
+
+function loadLayanan() {
+
+    const kategori = document.getElementById("kategori").value;
+
+    const layanan = document.getElementById("layanan");
+
+    layanan.innerHTML =
+        "<option value=''>-- Pilih Layanan --</option>";
+
+    document.getElementById("infoLayanan").innerHTML = "";
+
+    selectedService = null;
+
+    if (!kategori) return;
+
+    layananData[kategori].forEach(item => {
+
+        const option = document.createElement("option");
+
+        option.value = item.id;
+
+        option.textContent =
+            `${item.name} (ID : ${item.id})`;
+
+        layanan.appendChild(option);
+
+    });
+
+}
+
+// =============================
+// INFO LAYANAN
+// =============================
+
+function showInfo() {
+
+    const kategori = document.getElementById("kategori").value;
+
+    const id = document.getElementById("layanan").value;
+
+    if (!kategori || !id) {
+
+        selectedService = null;
+
+        document.getElementById("infoLayanan").innerHTML = "";
+
+        return;
+
+    }
+
+    selectedService = layananData[kategori].find(x => x.id == id);
+
+    if (!selectedService) return;
+
+    document.getElementById("infoLayanan").innerHTML = `
+        <b>${selectedService.name}</b><br><br>
+
+        <b>ID :</b> ${selectedService.id}<br>
+
+        <b>Harga :</b> Rp ${selectedService.pricePerFollower.toLocaleString("id-ID")}<br>
+
+        <b>Minimal :</b> ${selectedService.min}<br>
+
+        <b>Maksimal :</b> ${selectedService.max}<br>
+
+        <b>Refill :</b> ${
+            selectedService.refill == 1
+            ? "Ya"
+            : "Tidak"
+        }<br>
+
+        <b>Tipe :</b> ${selectedService.type}<br><br>
+
+        ${selectedService.desc}
+    `;
+
+    hitungTotal();
+
+}
+
+// =============================
+// HITUNG TOTAL
+// =============================
+
+function hitungTotal() {
+
+    if (!selectedService) return;
+
+    const jumlah =
+        parseInt(document.getElementById("jumlah").value) || 0;
+
+    if (
+        jumlah < selectedService.min ||
+        jumlah > selectedService.max
+    ) {
+
+        document.getElementById("total").value =
+            "Jumlah tidak valid";
+
+        return;
+
+    }
+
+    const total =
+        jumlah * selectedService.pricePerFollower;
+
+    document.getElementById("total").value =
+        total.toLocaleString("id-ID");
+
+}
+
+// =============================
+// SEARCH
+// =============================
+
+function searchLayanan() {
+
+    const keyword =
+        document
+        .getElementById("search")
+        .value
+        .toLowerCase()
+        .trim();
+
+    if (!keyword) return;
+
+    for (const kategori in layananData) {
+
+        const hasil =
+            layananData[kategori].find(item =>
+
+                item.name.toLowerCase().includes(keyword) ||
+
+                item.id.toString().includes(keyword)
+
+            );
+
+        if (hasil) {
+
+            document.getElementById("kategori").value =
+                kategori;
+
+            loadLayanan();
+
+            document.getElementById("layanan").value =
+                hasil.id;
+
+            showInfo();
+
+            return;
+
+        }
+
+    }
+
+}
+  // =============================
+// GENERATE TRANSACTION ID
+// =============================
+
+function generateTransactionID() {
+
+    return "TRX" +
+        Date.now() +
+        Math.floor(Math.random() * 9999);
+
+}
+
+// =============================
+// LANJUT PEMBAYARAN
+// =============================
+
+async function lanjutPembayaran() {
+
+    if (!selectedService) {
+        alert("Pilih layanan terlebih dahulu!");
+        return;
+    }
+
+    const jumlah =
+        parseInt(document.getElementById("jumlah").value);
+
+    if (isNaN(jumlah)) {
+        alert("Masukkan jumlah.");
+        return;
+    }
+
+    if (
+        jumlah < selectedService.min ||
+        jumlah > selectedService.max
+    ) {
+        alert(
+            `Jumlah minimal ${selectedService.min} dan maksimal ${selectedService.max}`
+        );
+        return;
+    }
+
+    const target =
+        document.getElementById("target").value.trim();
+
+    if (!target) {
+        alert("Masukkan target / username.");
+        return;
+    }
+
+    const button =
+        document.querySelector("button");
+
+    button.disabled = true;
+    button.innerHTML = "Memproses...";
+
+    try {
+
+        const response = await fetch("/api/order", {
+
+            method: "POST",
+
+            headers: {
+                "Content-Type": "application/json"
+            },
+
+            body: JSON.stringify({
+
+                trx: generateTransactionID(),
+
+                service: selectedService.id,
+
+                quantity: jumlah,
+
+                target: target
+
+            })
+
+        });
+
+        const result = await response.json();
+
+        if (!result.status) {
+
+            throw new Error(result.msg);
+
+        }
+
+        // arahkan ke halaman pembayaran
+
+        window.location.href =
+            `/payment/?id=${result.order_id}`;
+
+    } catch (err) {
+
+        alert(err.message || "Terjadi kesalahan.");
+
+    }
+
+    button.disabled = false;
+    button.innerHTML = "Lanjut ke Pembayaran";
+
+} 
   
 // MAINTENANCE REDIRECT  
 const isMaintenance=false;  
