@@ -3,10 +3,10 @@ let burst = {};
 let blacklist = new Set();
 
 // ===== CONFIG =====
-const MAX_REQUEST = 3;              // Maksimal request per menit
+const MAX_REQUEST = 20;              // Maksimal request per menit
 const WINDOW_MS = 60 * 1000;         // 1 menit
 
-const BURST_LIMIT = 1;              // Maksimal request cepat
+const BURST_LIMIT = 20;              // Maksimal request cepat
 const BURST_WINDOW = 5000;           // 5 detik
 
 // ===== TELEGRAM =====
@@ -85,14 +85,6 @@ export default async function handler(req, res) {
 
   const ua = req.headers["user-agent"] || "Unknown";
   const url = req.url || "/";
-
-  // ===== BLACKLIST =====
-  if (blacklist.has(ip)) {
-    return res.status(403).json({
-      status: "blocked",
-      message: "IP diblokir permanen"
-    });
-  }
 
   // ===== RATE LIMIT =====
   if (!requests[ip]) requests[ip] = [];
