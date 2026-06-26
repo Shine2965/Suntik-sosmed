@@ -3,7 +3,7 @@
 <head>  
 <meta charset="UTF-8">  
 <meta name="viewport" content="width=device-width, initial-scale=1.0">  
-<title>Panji Shop - SMM</title>  
+<title>Shine Shop - SMM</title>  
   <style>
 /* ===============================  
    ROOT THEME  
@@ -292,7 +292,6 @@ p {
   margin-bottom: 20px;  
 }
 </style>
- 
 </head>  
 <body>  
 <audio id="bgm" autoplay loop muted>  
@@ -305,7 +304,7 @@ p {
     <div class="logo">  
       <img src="/home/logo.png" alt="Shine Shop Logo">  
     </div>  
-    <h1>Panji Shop</h1>  
+    <h1>Shine Shop</h1>  
   </div>  
   
   <button class="hamburger-btn" id="menuToggle">  
@@ -356,7 +355,7 @@ overlay.onclick=closeMenu;
 <!-- FORM -->  
 <div class="container">  
   
-<h2>Suntik Sosmed 2 - Panji Shop</h2>  
+<h2>Suntik Sosmed 2 - Shine Shop</h2>  
   
 <label>Cari Layanan:</label>  
 <input type="text" id="search" placeholder="Contoh: Instagram / 14444" onkeyup="searchLayanan()">  
@@ -401,25 +400,68 @@ setTimeout(() => {
   audio.play().catch(()=>{});  
 }, 1000);  
 	  
-// DATA LAYANAN  
-let layananData = {};
+// DATA LAYANAN  let layananData = {};
+
+async function loadServices() {
+    try {
+        const res = await fetch("https://fayupedia.id/api/services", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                api_key: "tz1kcs-eizrjo-bqmt10-13suhv-n7m7zt"
+            })
+        });
+
+        const data = await res.json();
+
+        // Jika API mengembalikan array
+        const services = data.data || data.services || data;
+
+        layananData = {};
+
+        services.forEach(service => {
+            const kategori = service.category || "Lainnya";
+
+            if (!layananData[kategori]) {
+                layananData[kategori] = [];
+            }
+
+            layananData[kategori].push({
+                id: service.id,
+                name: service.name,
+                pricePerFollower: Number(service.price),
+                min: Number(service.min),
+                max: Number(service.max),
+                desc: service.description || "-"
+            });
+        });
+
+        const kategori = document.getElementById("kategori");
+        kategori.innerHTML =
+            "<option value=''>-- Pilih Kategori --</option>";
+
+        Object.keys(layananData).forEach(k => {
+            kategori.innerHTML += `<option value="${k}">${k}</option>`;
+        });
+
+    } catch (err) {
+        console.error(err);
+        alert("Gagal mengambil daftar layanan.");
+    }
+}
+
+window.onload = loadServices;
   
-let selectedService=null;  
-  window.onload = async function () {
-
-  const response = await fetch("/api/layanan");
-  layananData = await response.json();
-
-  const kategori = document.getElementById("kategori");
-
-  for(let k in layananData){
-    let opt=document.createElement("option");
-    opt.value=k;
-    opt.textContent=k;
-    kategori.appendChild(opt);
-  }
-
-}; 
+window.onload=function(){  
+  const kategori=document.getElementById("kategori");  
+  for(let k in layananData){  
+    let opt=document.createElement("option");  
+    opt.value=k; opt.textContent=k;  
+    kategori.appendChild(opt);  
+  }  
+}  
   
 function loadLayanan(){  
   const kategori=document.getElementById("kategori").value;  
@@ -506,7 +548,7 @@ if(isMaintenance){
   window.location.href="/sosmed-2/";  
 }  
 	  
-/* 🔒 ANTI DEVTOOLS  */
+/* 🔒 ANTI DEVTOOLS (tidak ganggu mobile) */
 
 document.addEventListener("keydown", function(e){
   // F12
