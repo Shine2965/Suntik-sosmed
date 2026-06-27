@@ -409,34 +409,41 @@ setTimeout(() => {
   audio.muted = false;  
   audio.play().catch(()=>{});  
 }, 1000);  
-	  
-// DATA LAYANAN  
-const layananData={  
- //Layanan Promo    
-	"Telegram bot start": [
-    {id: "14913", name: "Telegram - bot start ~ Cancel enable ~ max 100K ~ 50K/day ~ <b> No Refill</b> - Rp 5.500/K", pricePerFollower: 5.5, min: 100, max: 100000, desc: "Tidak Ada Garansi apapun yang terjadi<br> isi target dengan username bot telegram anda", average: "2 menit 30 detik"},
-	  {id: "14914", name: "Telegram - bot start ~ Cancel enable ~ max 100K ~ 50K/day ~ <b>Refill 30D</b> - Rp 6.500/K", pricePerFollower: 6.5, min: 100, max: 100000, desc: "Isi target dengan username bot telegram anda ", average: "2 menit 30 detik"}
-		],
-		"Telegram - Boost [ Channel/Group ]": [
-		{id: "12336", name: "Telegram Channel Boost | 1+ days - Rp 450.000/K", pricePerFollower: 450, min: 1, max: 100000, desc: " Boost berlaku kurang lebih 1 hari <br> layanan ini tidak memiliki garansi", average: "not enough data" },	
-		{id: "12337", name: "Telegram  Channel Boost | 7+ days - Rp 1.800.000/K", pricePerFollower: 1800, min: 1, max: 100000, desc: " Boost berlaku kurang lebih 7 hari <br> layanan ini tidak memiliki garansi", average: "not enough data" },
-        {id: "12339", name: "Telegram Channel Boost | 30+ days - Rp 5.000.000/K", pricePerFollower: 5000, min: 1, max: 100000, desc: " Boost berlaku kurang lebih 30 hari <br> layanan ini tidak memiliki garansi", average: "not enough data" },
-	  {id: "12339", name: "Telegram Channel Boost | 60+ days - Rp 8.300.000/K", pricePerFollower: 8300, min: 1, max: 100000, desc: " Boost berlaku kurang lebih 60 hari <br> layanan ini tidak memiliki garansi", average: "not enough data" }
-]
+
+// DATA LAYANAN
+let layananData = {};
+let selectedService = null;
+
+async function loadData() {
+  try {
+    const res = await fetch("/sosmed-4/list.json?ts=" + Date.now());
+
+    if (!res.ok) {
+      throw new Error("Gagal memuat list.json");
+    }
+
+    layananData = await res.json();
+
+    const kategori = document.getElementById("kategori");
+    kategori.innerHTML = '<option value="">-- Pilih Kategori --</option>';
+
+    for (const k in layananData) {
+      const opt = document.createElement("option");
+      opt.value = k;
+      opt.textContent = k;
+      kategori.appendChild(opt);
+    }
+
+  } catch (err) {
+    console.error(err);
+    alert("Data layanan gagal dimuat.");
+  }
+}
+
+// Jalankan saat halaman selesai dimuat
+window.addEventListener("load", loadData);
 	
-};  
-  
-let selectedService=null;  
-  
-window.onload=function(){  
-  const kategori=document.getElementById("kategori");  
-  for(let k in layananData){  
-    let opt=document.createElement("option");  
-    opt.value=k; opt.textContent=k;  
-    kategori.appendChild(opt);  
-  }  
-}  
-  
+	
 function loadLayanan(){  
   const kategori=document.getElementById("kategori").value;  
   const layanan=document.getElementById("layanan");  
