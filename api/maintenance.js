@@ -23,7 +23,7 @@ export default async function handler(req, res) {
     const BRANCH = "Yey";
     const PATH = "maintenance/maintenance.json";
 
-    const TOKEN = process.env.GITHUB_TOKEN;
+    const TOKEN = "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";
 
     if (!TOKEN) {
       return res.status(500).json({
