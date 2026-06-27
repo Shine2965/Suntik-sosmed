@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Maintenance Admin</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+
+<style>
+*{
+margin:0;
+padding:0;
+box-sizing:border-box;
+font-family:Poppins,sans-serif;
+}
+
+body{
+background:#0f172a;
+display:flex;
+justify-content:center;
+align-items:center;
+min-height:100vh;
+padding:20px;
+}
+
+.card{
+width:100%;
+max-width:450px;
+background:#1e293b;
+padding:25px;
+border-radius:18px;
+color:#fff;
+box-shadow:0 10px 30px rgba(0,0,0,.35);
+}
+
+h2{
+text-align:center;
+margin-bottom:20px;
+}
+
+label{
+display:block;
+margin-top:15px;
+margin-bottom:5px;
+font-size:14px;
+}
+
+input,textarea{
+width:100%;
+padding:12px;
+border:none;
+border-radius:10px;
+background:#334155;
+color:#fff;
+}
+
+textarea{
+resize:none;
+height:100px;
+}
+
+button{
+margin-top:20px;
+width:100%;
+padding:14px;
+border:none;
+border-radius:10px;
+background:#3b82f6;
+color:#fff;
+font-size:16px;
+cursor:pointer;
+}
+
+button:hover{
+opacity:.9;
+}
+
+#status{
+margin-top:15px;
+text-align:center;
+font-size:14px;
+}
+</style>
+
+</head>
+<body>
+
+<div class="card">
+
+<h2>Maintenance Admin</h2>
+
+<label>Judul</label>
+<input id="title" value="Website Sedang Maintenance">
+
+<label>Pesan</label>
+<textarea id="message">Kami sedang melakukan pembaruan sistem. Mohon tunggu hingga maintenance selesai.</textarea>
+
+<label>Estimasi Selesai</label>
+<input type="datetime-local" id="endTime">
+
+<button onclick="saveMaintenance()">Simpan</button>
+
+<div id="status"></div>
+
+</div>
+
+<script>
+
+const API="https://shineshop.vercel.app/api/maintenance";
+
+async function load(){
+
+try{
+
+const res=await fetch("/maintenance/maintenance.json?t="+Date.now());
+
+const data=await res.json();
+
+title.value=data.title||"";
+message.value=data.message||"";
+endTime.value=data.endTime.substring(0,16);
+
+}catch(e){}
+
+}
+
+async function saveMaintenance(){
+
+status.innerHTML="Menyimpan...";
+
+try{
+
+const res=await fetch(API,{
+method:"POST",
+headers:{
+"Content-Type":"application/json"
+},
+body:JSON.stringify({
+title:title.value,
+message:message.value,
+endTime:endTime.value
+})
+});
+
+const json=await res.json();
+
+if(res.ok){
+
+status.style.color="#22c55e";
+status.innerHTML="✅ "+(json.message||"Berhasil disimpan.");
+
+}else{
+
+status.style.color="#ef4444";
+status.innerHTML="❌ "+(json.error||"Gagal.");
+
+}
+
+}catch(err){
+
+status.style.color="#ef4444";
+status.innerHTML="❌ Tidak dapat terhubung ke server.";
+
+}
+
+}
+
+load();
+
+</script>
+
+</body>
+</html>
