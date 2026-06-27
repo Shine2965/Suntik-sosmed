@@ -21,7 +21,7 @@ export default async function handler(req, res) {
     const OWNER = "shine2965";
     const REPO = "Suntik-sosmed";
     const BRANCH = "Yey";
-    const PATH = "maintenance/maintenance.json";
+    const PATH = "/maintenance/maintenance.json";
 
     const TOKEN = procces.env.GITHUB_TOKEN;
 
