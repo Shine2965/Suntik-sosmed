@@ -167,7 +167,79 @@ function getUserID() {
 
   return id;
 }
+    function hitungStatistik() {
 
+  let total = 0;
+  let sukses = 0;
+  let proses = 0;
+  let pending = 0;
+  let batal = 0;
+
+  for (let id in dataPesanan) {
+
+    total++;
+
+    switch ((dataPesanan[id].status || "").toLowerCase()) {
+
+      case "sukses":
+        sukses++;
+        break;
+
+      case "proses":
+        proses++;
+        break;
+
+      case "pending":
+        pending++;
+        break;
+
+      case "dibatalkan":
+        batal++;
+        break;
+    }
+  }
+
+  document.getElementById("totalTransaksi").textContent = total;
+  document.getElementById("totalSukses").textContent = sukses;
+  document.getElementById("totalProses").textContent = proses;
+  document.getElementById("totalPending").textContent = pending;
+  document.getElementById("totalBatal").textContent = batal;
+    }
+let dataPesanan = {};
+
+async function loadData() {
+  try {
+
+    const files = [
+      "/riwayat/data.json",
+      "/riwayat/data-juli-2026.json"
+      // Tambahkan file lain di sini jika ada
+      // "/riwayat/data-agustus-2026.json",
+      // "/riwayat/data-september-2026.json"
+    ];
+
+    const responses = await Promise.all(
+      files.map(file => fetch(file + "?t=" + Date.now()))
+    );
+
+    const jsons = await Promise.all(
+      responses.map(res => res.ok ? res.json() : {})
+    );
+
+    // Gabungkan seluruh data
+    dataPesanan = {};
+
+    jsons.forEach(data => {
+      Object.assign(dataPesanan, data);
+    });
+
+    hitungStatistik();
+    tampilkanRiwayat();
+
+  } catch (err) {
+    console.error("Gagal memuat data:", err);
+  }
+}
 // ================= USER BAN =================
 async function checkUserBan() {
   const userID = getUserID();
@@ -260,6 +332,21 @@ async function checkUserBan() {
 checkUserBan();
 </script>
 <body>
+    <div id="statistik" style="
+margin:15px 0;
+padding:15px;
+background:#f8f9fa;
+border-radius:10px;
+border:1px solid #ddd;
+">
+  <h3 style="margin-top:0;">📊 Statistik Transaksi Shine Shop</h3>
+
+  <p>📦 Total Transaksi : <b id="totalTransaksi">0</b></p>
+  <p style="color:green;">✅ Sukses : <b id="totalSukses">0</b></p>
+  <p style="color:orange;">🟠 Proses : <b id="totalProses">0</b></p>
+  <p style="color:#666;">⏳ Pending : <b id="totalPending">0</b></p>
+  <p style="color:red;">❌ Dibatalkan : <b id="totalBatal">0</b></p>
+    </div>
     <div class="container">
         <h1>Shine Shop Menu Global</h1>
 
