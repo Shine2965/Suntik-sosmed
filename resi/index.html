@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Upload Produk</title>
+
+<style>
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+    font-family:Arial,Helvetica,sans-serif;
+}
+body{
+    background:#0f172a;
+    color:#fff;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    min-height:100vh;
+    padding:20px;
+}
+.container{
+    width:100%;
+    max-width:550px;
+    background:#1e293b;
+    border-radius:15px;
+    padding:25px;
+    box-shadow:0 0 25px rgba(0,0,0,.35);
+}
+h1{
+    text-align:center;
+    margin-bottom:20px;
+}
+label{
+    display:block;
+    margin-top:15px;
+    margin-bottom:6px;
+    font-weight:bold;
+}
+input[type=text],
+input[type=file]{
+    width:100%;
+    padding:12px;
+    border:none;
+    border-radius:10px;
+    background:#334155;
+    color:white;
+}
+small{
+    color:#cbd5e1;
+}
+button{
+    width:100%;
+    margin-top:25px;
+    padding:14px;
+    border:none;
+    border-radius:10px;
+    background:#2563eb;
+    color:white;
+    font-size:16px;
+    cursor:pointer;
+    transition:.3s;
+}
+button:hover{
+    background:#1d4ed8;
+}
+.preview{
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+    margin-top:10px;
+}
+.preview img{
+    width:100px;
+    height:100px;
+    object-fit:cover;
+    border-radius:8px;
+    border:2px solid #475569;
+}
+video{
+    width:100%;
+    margin-top:10px;
+    border-radius:10px;
+}
+#status{
+    margin-top:18px;
+    text-align:center;
+    font-weight:bold;
+}
+</style>
+
+</head>
+<body>
+
+<div class="container">
+
+<h1>Upload Produk</h1>
+
+<form id="uploadForm">
+
+<label>Nama Produk</label>
+<input
+type="text"
+id="nama"
+name="nama"
+placeholder="Masukkan nama produk"
+required>
+
+<label>Upload Foto (Maksimal 3)</label>
+<input
+type="file"
+id="foto"
+name="foto"
+accept="image/*"
+multiple
+required>
+
+<small>Maksimal 3 foto. antara lain foto resi,foto paket sebelum dan sesudah packing</small>
+
+<div class="preview" id="fotoPreview"></div>
+
+<label>Upload Video proses packing (Maksimal 20 Menit)</label>
+
+<input
+type="file"
+id="video"
+name="video"
+accept="video/*"
+required>
+
+<small>Video maksimal 20 menit.</small>
+
+<div id="videoPreview"></div>
+
+<button type="submit">
+Kirim ke Telegram
+</button>
+
+</form>
+
+<div id="status"></div>
+
+</div>
+
+<script>
+const fotoInput=document.getElementById("foto");
+const videoInput=document.getElementById("video");
+
+fotoInput.addEventListener("change",()=>{
+
+const preview=document.getElementById("fotoPreview");
+preview.innerHTML="";
+
+if(fotoInput.files.length>3){
+alert("Maksimal hanya 3 foto.");
+fotoInput.value="";
+return;
+}
+
+Array.from(fotoInput.files).forEach(file=>{
+
+const reader=new FileReader();
+
+reader.onload=e=>{
+const img=document.createElement("img");
+img.src=e.target.result;
+preview.appendChild(img);
+}
+
+reader.readAsDataURL(file);
+
+});
+
+});
+
+videoInput.addEventListener("change",()=>{
+
+const file=videoInput.files[0];
+
+if(!file) return;
+
+const container=document.getElementById("videoPreview");
+container.innerHTML="";
+
+const video=document.createElement("video");
+video.controls=true;
+video.src=URL.createObjectURL(file);
+
+video.onloadedmetadata=()=>{
+
+if(video.duration>20*60){
+
+alert("Video maksimal 20 menit.");
+
+videoInput.value="";
+container.innerHTML="";
+
+return;
+
+}
+
+}
+
+container.appendChild(video);
+
+});
+
+document.getElementById("uploadForm").addEventListener("submit",async(e)=>{
+
+e.preventDefault();
+
+const status=document.getElementById("status");
+status.innerHTML="Mengirim...";
+
+const formData=new FormData();
+
+formData.append("nama",document.getElementById("nama").value);
+
+Array.from(fotoInput.files).forEach(f=>{
+formData.append("foto",f);
+});
+
+if(videoInput.files[0]){
+formData.append("video",videoInput.files[0]);
+}
+
+try{
+
+const res=await fetch("/api/upload",{
+method:"POST",
+body:formData
+});
+
+const json=await res.json();
+
+if(json.success){
+status.innerHTML="✅ Berhasil dikirim.";
+document.getElementById("uploadForm").reset();
+document.getElementById("fotoPreview").innerHTML="";
+document.getElementById("videoPreview").innerHTML="";
+}else{
+status.innerHTML="❌ "+(json.message||"Gagal.");
+}
+
+}catch(err){
+
+status.innerHTML="❌ Gagal menghubungi server.";
+
+}
+
+});
+</script>
+
+</body>
+</html>
