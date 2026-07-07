@@ -12,6 +12,7 @@
     box-sizing:border-box;
     font-family:Arial,Helvetica,sans-serif;
 }
+
 body{
     background:#0f172a;
     color:#fff;
@@ -21,76 +22,109 @@ body{
     min-height:100vh;
     padding:20px;
 }
+
 .container{
     width:100%;
-    max-width:550px;
+    max-width:650px;
     background:#1e293b;
-    border-radius:15px;
     padding:25px;
-    box-shadow:0 0 25px rgba(0,0,0,.35);
+    border-radius:18px;
+    box-shadow:0 0 30px rgba(0,0,0,.4);
 }
+
 h1{
     text-align:center;
     margin-bottom:20px;
 }
+
 label{
     display:block;
-    margin-top:15px;
-    margin-bottom:6px;
+    margin-top:18px;
+    margin-bottom:8px;
     font-weight:bold;
 }
-input[type=text],
-input[type=file]{
+
+input[type=text]{
     width:100%;
     padding:12px;
     border:none;
     border-radius:10px;
+    outline:none;
     background:#334155;
-    color:white;
+    color:#fff;
 }
+
+input[type=file]{
+    width:100%;
+    padding:10px;
+    border-radius:10px;
+    background:#334155;
+    color:#fff;
+}
+
 small{
     color:#cbd5e1;
 }
-button{
-    width:100%;
-    margin-top:25px;
-    padding:14px;
-    border:none;
-    border-radius:10px;
-    background:#2563eb;
-    color:white;
-    font-size:16px;
-    cursor:pointer;
-    transition:.3s;
-}
-button:hover{
-    background:#1d4ed8;
-}
+
 .preview{
     display:flex;
     flex-wrap:wrap;
     gap:10px;
-    margin-top:10px;
+    margin-top:15px;
 }
+
 .preview img{
-    width:100px;
-    height:100px;
+    width:120px;
+    height:120px;
     object-fit:cover;
-    border-radius:8px;
+    border-radius:10px;
     border:2px solid #475569;
 }
-video{
+
+.preview video{
     width:100%;
-    margin-top:10px;
     border-radius:10px;
+    margin-top:10px;
 }
+
+button{
+    width:100%;
+    margin-top:25px;
+    padding:15px;
+    border:none;
+    border-radius:10px;
+    background:#2563eb;
+    color:#fff;
+    font-size:17px;
+    cursor:pointer;
+}
+
+button:hover{
+    background:#1d4ed8;
+}
+
+.progress{
+    width:100%;
+    height:14px;
+    background:#334155;
+    border-radius:30px;
+    overflow:hidden;
+    margin-top:20px;
+    display:none;
+}
+
+.progress-bar{
+    width:0%;
+    height:100%;
+    background:#22c55e;
+    transition:.2s;
+}
+
 #status{
-    margin-top:18px;
     text-align:center;
-    font-weight:bold;
+    margin-top:15px;
 }
 </style>
-
 </head>
 <body>
 
@@ -103,26 +137,24 @@ video{
 <label>Nama Produk</label>
 <input
 type="text"
-id="nama"
-name="nama"
+name="productName"
 placeholder="Masukkan nama produk"
 required>
 
 <label>Upload Foto (Maksimal 3)</label>
 <input
 type="file"
-id="foto"
-name="foto"
+id="photos"
+name="photos"
 accept="image/*"
 multiple
 required>
 
-<small>Maksimal 3 foto. antara lain foto resi,foto paket sebelum dan sesudah packing</small>
+<small>Maksimal 3 foto. sebelum dipacking, resi dan sesudah dipacking</small>
 
-<div class="preview" id="fotoPreview"></div>
+<div class="preview" id="photoPreview"></div>
 
-<label>Upload Video proses packing (Maksimal 20 Menit)</label>
-
+<label>Upload Video</label>
 <input
 type="file"
 id="video"
@@ -130,46 +162,47 @@ name="video"
 accept="video/*"
 required>
 
-<small>Video maksimal 20 menit.</small>
+<small>Video maksimal 20 menit. Vidio berisi proses packing produk</small>
 
-<div id="videoPreview"></div>
+<div class="preview" id="videoPreview"></div>
+
+<div class="progress" id="progress">
+<div class="progress-bar" id="bar"></div>
+</div>
+
+<p id="status"></p>
 
 <button type="submit">
-Kirim ke Telegram
+Kirim
 </button>
 
 </form>
 
-<div id="status"></div>
-
 </div>
 
 <script>
-const fotoInput=document.getElementById("foto");
+
+const photoInput=document.getElementById("photos");
 const videoInput=document.getElementById("video");
 
-fotoInput.addEventListener("change",()=>{
+photoInput.addEventListener("change",()=>{
 
-const preview=document.getElementById("fotoPreview");
-preview.innerHTML="";
-
-if(fotoInput.files.length>3){
+if(photoInput.files.length>3){
 alert("Maksimal hanya 3 foto.");
-fotoInput.value="";
+photoInput.value="";
+document.getElementById("photoPreview").innerHTML="";
 return;
 }
 
-Array.from(fotoInput.files).forEach(file=>{
+const preview=document.getElementById("photoPreview");
+preview.innerHTML="";
 
-const reader=new FileReader();
+[...photoInput.files].forEach(file=>{
 
-reader.onload=e=>{
 const img=document.createElement("img");
-img.src=e.target.result;
-preview.appendChild(img);
-}
+img.src=URL.createObjectURL(file);
 
-reader.readAsDataURL(file);
+preview.appendChild(img);
 
 });
 
@@ -177,80 +210,100 @@ reader.readAsDataURL(file);
 
 videoInput.addEventListener("change",()=>{
 
+const preview=document.getElementById("videoPreview");
+preview.innerHTML="";
+
 const file=videoInput.files[0];
 
 if(!file) return;
 
-const container=document.getElementById("videoPreview");
-container.innerHTML="";
-
 const video=document.createElement("video");
+
 video.controls=true;
 video.src=URL.createObjectURL(file);
 
-video.onloadedmetadata=()=>{
-
-if(video.duration>20*60){
-
-alert("Video maksimal 20 menit.");
-
-videoInput.value="";
-container.innerHTML="";
-
-return;
-
-}
-
-}
-
-container.appendChild(video);
+preview.appendChild(video);
 
 });
 
-document.getElementById("uploadForm").addEventListener("submit",async(e)=>{
+document.getElementById("uploadForm").addEventListener("submit",function(e){
 
 e.preventDefault();
 
-const status=document.getElementById("status");
-status.innerHTML="Mengirim...";
-
 const formData=new FormData();
 
-formData.append("nama",document.getElementById("nama").value);
+formData.append(
+"productName",
+this.productName.value
+);
 
-Array.from(fotoInput.files).forEach(f=>{
-formData.append("foto",f);
-});
+for(const file of photoInput.files){
+formData.append("photos",file);
+}
 
 if(videoInput.files[0]){
-formData.append("video",videoInput.files[0]);
+formData.append(
+"video",
+videoInput.files[0]
+);
 }
 
-try{
+const xhr=new XMLHttpRequest();
 
-const res=await fetch("api/upload",{
-method:"POST",
-body:formData
-});
+xhr.open(
+"POST",
+"/api/upload"
+);
 
-const json=await res.json();
+document.getElementById("progress").style.display="block";
 
-if(json.success){
-status.innerHTML="✅ Berhasil dikirim.";
+xhr.upload.onprogress=function(e){
+
+if(e.lengthComputable){
+
+const percent=(e.loaded/e.total)*100;
+
+document.getElementById("bar").style.width=
+percent+"%";
+
+}
+
+};
+
+xhr.onload=function(){
+
+if(xhr.status===200){
+
+document.getElementById("status").innerHTML=
+"✅ Upload berhasil.";
+
+document.getElementById("bar").style.width="100%";
+
 document.getElementById("uploadForm").reset();
-document.getElementById("fotoPreview").innerHTML="";
+
+document.getElementById("photoPreview").innerHTML="";
 document.getElementById("videoPreview").innerHTML="";
+
 }else{
-status.innerHTML="❌ "+(json.message||"Gagal.");
-}
 
-}catch(err){
-
-status.innerHTML="❌ Gagal menghubungi server.";
+document.getElementById("status").innerHTML=
+"❌ Upload gagal.";
 
 }
+
+};
+
+xhr.onerror=function(){
+
+document.getElementById("status").innerHTML=
+"❌ Terjadi kesalahan.";
+
+};
+
+xhr.send(formData);
 
 });
+
 </script>
 
 </body>
