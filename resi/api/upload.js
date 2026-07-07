@@ -1,5 +1,6 @@
 import formidable from "formidable";
 import fs from "fs";
+import FormData from "form-data";
 
 export const config = {
   api: {
@@ -7,22 +8,14 @@ export const config = {
   },
 };
 
-const CHAT_ID = "6317157631";
+const WEBHOOK =
+  "https://discord.com/api/webhooks/1482244992725553164/k6boQq7vBc3184RxiPtG6-obIKDZQWBu0f8cHQnLTevnwo8wFuaUKzhWzRkJ3Hl0_yne";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({
       success: false,
-      message: "Method tidak diizinkan.",
-    });
-  }
-
-  const TOKEN = process.env.TELEGRAM_TOKEN;
-
-  if (!TOKEN) {
-    return res.status(500).json({
-      success: false,
-      message: "Environment TELEGRAM_TOKEN belum diatur.",
+      message: "Method tidak diizinkan",
     });
   }
 
@@ -33,81 +26,70 @@ export default async function handler(req, res) {
 
   form.parse(req, async (err, fields, files) => {
     if (err) {
-      console.error(err);
       return res.status(500).json({
         success: false,
-        message: "Gagal membaca form.",
+        message: "Gagal membaca data.",
       });
     }
 
     try {
+      const data = new FormData();
+
       const nama = Array.isArray(fields.nama)
         ? fields.nama[0]
         : fields.nama || "-";
 
-      // Kirim nama produk
-      await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          chat_id: CHAT_ID,
-          text: `📦 Produk Baru\n\nNama Produk: ${nama}`,
-        }),
-      });
+      data.append(
+        "content",
+        `📦 **Upload Produk Baru**
 
-      // ================= FOTO =================
+**Nama Produk:** ${nama}`
+      );
 
-      let foto = files.foto || [];
+      // Foto
+      if (files.foto) {
+        const fotoFiles = Array.isArray(files.foto)
+          ? files.foto
+          : [files.foto];
 
-      if (!Array.isArray(foto)) {
-        foto = [foto];
+        for (const file of fotoFiles) {
+          data.append(
+            "files[]",
+            fs.createReadStream(file.filepath),
+            file.originalFilename
+          );
+        }
       }
 
-      foto = foto.slice(0, 3);
-
-      for (const file of foto) {
-        const body = new FormData();
-
-        body.append("chat_id", CHAT_ID);
-
-        body.append(
-          "photo",
-          new Blob([fs.readFileSync(file.filepath)]),
-          file.originalFilename
-        );
-
-        await fetch(`https://api.telegram.org/bot${TOKEN}/sendPhoto`, {
-          method: "POST",
-          body,
-        });
-      }
-
-      // ================= VIDEO =================
-
+      // Video
       if (files.video) {
         const video = Array.isArray(files.video)
           ? files.video[0]
           : files.video;
 
-        const body = new FormData();
-
-        body.append("chat_id", CHAT_ID);
-
-        body.append(
-          "video",
-          new Blob([fs.readFileSync(video.filepath)]),
+        data.append(
+          "files[]",
+          fs.createReadStream(video.filepath),
           video.originalFilename
         );
+      }
 
-        await fetch(`https://api.telegram.org/bot${TOKEN}/sendVideo`, {
-          method: "POST",
-          body,
+      const response = await fetch(WEBHOOK, {
+        method: "POST",
+        body: data,
+        headers: data.getHeaders(),
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+
+        return res.status(500).json({
+          success: false,
+          message: text,
         });
       }
 
-      return res.status(200).json({
+      return res.json({
         success: true,
       });
     } catch (e) {
@@ -115,5 +97,8 @@ export default async function handler(req, res) {
 
       return res.status(500).json({
         success: false,
-        message: e.message,
+        message: "Upload gagal.",
       });
+    }
+  });
+}
