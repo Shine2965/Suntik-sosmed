@@ -2,127 +2,109 @@
 <html lang="id">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Upload Bukti Packing</title>
 
 <style>
 *{
-margin:0;
-padding:0;
-box-sizing:border-box;
-font-family:Arial,Helvetica,sans-serif;
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+    font-family:Arial,Helvetica,sans-serif;
 }
 
 body{
-background:#f4f6f9;
-display:flex;
-justify-content:center;
-padding:30px;
+    background:#0f172a;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    min-height:100vh;
+    padding:20px;
 }
 
-.container{
-width:100%;
-max-width:600px;
-background:#fff;
-padding:25px;
-border-radius:15px;
-box-shadow:0 10px 30px rgba(0,0,0,.15);
+.card{
+    width:100%;
+    max-width:500px;
+    background:#1e293b;
+    padding:25px;
+    border-radius:15px;
+    color:#fff;
+    box-shadow:0 0 20px rgba(0,0,0,.4);
 }
 
 h2{
-text-align:center;
-margin-bottom:20px;
-color:#333;
+    text-align:center;
+    margin-bottom:20px;
 }
 
 label{
-display:block;
-margin-top:18px;
-margin-bottom:8px;
-font-weight:bold;
+    display:block;
+    margin-top:15px;
+    margin-bottom:8px;
+    font-weight:bold;
 }
 
-input[type=text],
-select{
-width:100%;
-padding:12px;
-border:1px solid #ccc;
-border-radius:10px;
-font-size:15px;
+input,select{
+    width:100%;
+    padding:12px;
+    border:none;
+    border-radius:8px;
+    outline:none;
 }
 
 input[type=file]{
-width:100%;
-padding:12px;
-border:2px dashed #888;
-border-radius:10px;
-background:#fafafa;
+    background:#fff;
 }
 
-.note{
-margin-top:10px;
-font-size:14px;
-color:#666;
-line-height:22px;
-background:#f5f5f5;
-padding:12px;
-border-radius:10px;
-}
-
-#fileList{
-margin-top:15px;
-}
-
-.file-item{
-padding:8px;
-background:#eef2ff;
-margin-bottom:8px;
-border-radius:8px;
-font-size:14px;
+.info{
+    margin-top:10px;
+    background:#334155;
+    padding:12px;
+    border-radius:8px;
+    font-size:14px;
+    line-height:1.6;
 }
 
 button{
-width:100%;
-margin-top:20px;
-padding:15px;
-border:none;
-background:#2563eb;
-color:#fff;
-font-size:16px;
-border-radius:10px;
-cursor:pointer;
-transition:.3s;
+    width:100%;
+    margin-top:20px;
+    padding:14px;
+    border:none;
+    border-radius:8px;
+    background:#3b82f6;
+    color:#fff;
+    cursor:pointer;
+    font-size:16px;
 }
 
 button:hover{
-background:#1d4ed8;
+    background:#2563eb;
 }
 
 #status{
-margin-top:15px;
-text-align:center;
-font-weight:bold;
+    text-align:center;
+    margin-top:15px;
 }
 </style>
 
 </head>
 <body>
 
-<div class="container">
+<div class="card">
 
-<h2>Form Bukti Packing</h2>
+<h2>Upload Bukti Packing</h2>
 
-<form id="uploadForm">
+<form id="form">
 
 <label>Nama Produk</label>
 <input
 type="text"
-name="produk"
-placeholder="Masukkan nama produk"
-required>
+id="produk"
+required
+placeholder="Masukkan nama produk">
 
 <label>Marketplace</label>
-<select name="marketplace" required>
+<select id="marketplace" required>
 <option value="">Pilih Marketplace</option>
 <option>Shopee</option>
 <option>Lazada</option>
@@ -130,31 +112,24 @@ required>
 <option>TikTok Shop</option>
 </select>
 
-<label>Upload Bukti</label>
-
+<label>Upload File (Wajib)</label>
 <input
 type="file"
-id="files"
-name="files"
+id="file"
 multiple
-accept=".jpg,.jpeg,.png,.webp,.pdf">
+required
+accept="image/*">
 
-<div class="note">
-<b>Wajib melampirkan:</b><br><br>
+<div class="info">
+<b>Wajib menyertakan:</b><br><br>
 
-📸 Foto sebelum packing<br>
-🧾 Foto resi<br>
-📦 Foto sesudah packing<br><br>
-
-Maksimal 5 file.<br>
-Format yang didukung:
-JPG, PNG, JPEG, WEBP, PDF
+📷 Foto sebelum packing<br>
+📦 Foto resi<br>
+📷 Foto sesudah packing
 </div>
 
-<div id="fileList"></div>
-
 <button type="submit">
-Kirim Bukti Packing
+Kirim
 </button>
 
 </form>
@@ -165,85 +140,55 @@ Kirim Bukti Packing
 
 <script>
 
-const filesInput=document.getElementById("files");
-const list=document.getElementById("fileList");
+// GANTI DENGAN WEBHOOK DISCORD ANDA
+const WEBHOOK_URL="https://discord.com/api/webhooks/1482245411325345793/79LyZzxEZxoHVZeW9bgJpf_SmPDQ4uZCO6DO652Hids_7xZjK0gUYuOZrgBqoin-Qez6";
 
-filesInput.addEventListener("change",()=>{
-
-list.innerHTML="";
-
-if(filesInput.files.length>5){
-
-alert("Maksimal hanya 5 file.");
-
-filesInput.value="";
-
-return;
-
-}
-
-[...filesInput.files].forEach(file=>{
-
-const div=document.createElement("div");
-
-div.className="file-item";
-
-div.innerHTML=file.name;
-
-list.appendChild(div);
-
-});
-
-});
-
-document.getElementById("uploadForm").addEventListener("submit",async(e)=>{
+document.getElementById("form").addEventListener("submit",async(e)=>{
 
 e.preventDefault();
 
-const status=document.getElementById("status");
+const produk=document.getElementById("produk").value;
+const marketplace=document.getElementById("marketplace").value;
+const files=document.getElementById("file").files;
 
-const form=new FormData();
-
-form.append("produk",e.target.produk.value);
-
-form.append("marketplace",e.target.marketplace.value);
-
-for(const file of filesInput.files){
-
-form.append("files",file);
-
+if(files.length<3){
+alert("Minimal upload 3 foto.");
+return;
 }
 
-status.innerHTML="Mengirim...";
+const formData=new FormData();
+
+formData.append(
+"content",
+`📦 **Upload Bukti Packing**
+
+**Nama Produk:** ${produk}
+**Marketplace:** ${marketplace}`
+);
+
+for(let i=0;i<files.length;i++){
+formData.append("files["+i+"]",files[i]);
+}
+
+document.getElementById("status").innerHTML="Mengirim...";
 
 try{
 
-const res=await fetch("/api/upload",{
-
+const res=await fetch(WEBHOOK_URL,{
 method:"POST",
-
-body:form
-
+body:formData
 });
 
 if(res.ok){
-
-status.innerHTML="✅ Berhasil dikirim.";
-
-e.target.reset();
-
-list.innerHTML="";
-
+document.getElementById("status").innerHTML="✅ Berhasil dikirim.";
+document.getElementById("form").reset();
 }else{
-
-status.innerHTML="❌ Gagal mengirim.";
-
+document.getElementById("status").innerHTML="❌ Gagal mengirim.";
 }
 
 }catch(err){
-
-status.innerHTML="❌ Tidak dapat terhubung ke server.";
-
+document.getElementById("status").innerHTML=
+"❌ Request diblokir browser (CORS). Gunakan backend/proxy untuk meneruskan data ke Discord Webhook.";
 }
 
 });
