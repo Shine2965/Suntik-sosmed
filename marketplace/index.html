@@ -31,6 +31,9 @@
         .row > div { flex: 1; min-width: 200px; }
         .required { color: #f77878; margin-left: 4px; }
         .keterangan { background: #0d1117; padding: 10px 14px; border-radius: 8px; border-left: 3px solid #58a6ff; margin-top: 6px; color: #8b949e; font-size: 13px; }
+        .hapus-file { color: #f77878; cursor: pointer; margin-left: 8px; font-weight: bold; }
+        .hapus-file:hover { color: #da3633; }
+        .file-icon { margin-right: 4px; }
     </style>
 </head>
 <body>
@@ -39,11 +42,9 @@
         <p class="sub">Lengkapi data produk & upload dokumentasi</p>
 
         <form id="productForm">
-            <!-- Nama Produk -->
             <label>Nama Produk <span class="required">*</span></label>
             <input type="text" id="namaProduk" placeholder="Contoh: Kaos Polos Oversize" required>
 
-            <!-- Marketplace -->
             <label>Marketplace <span class="required">*</span></label>
             <select id="marketplace" required>
                 <option value="">Pilih Marketplace</option>
@@ -53,19 +54,18 @@
                 <option value="TikTok Shop">TikTok Shop</option>
             </select>
 
-            <!-- Upload File -->
-            <label>📸 Upload File Pendukung <span class="required">*</span></label>
+            <label>📎 Upload File Pendukung <span class="required">*</span></label>
             <div class="keterangan">
-                📎 Sertakan: <strong>foto sebelum packing</strong>, <strong>foto resi</strong>, <strong>foto sesudah packing</strong>
-                <br>📄 Format: JPG, PNG, PDF
+                📸 Sertakan: <strong>foto sebelum packing</strong>, <strong>foto resi</strong>, <strong>foto sesudah packing</strong>
+                <br>🎥 Bisa upload <strong>video</strong> juga (MP4, AVI, MOV, MKV, 3GP, WEBM)
+                <br>📄 Format: JPG, PNG, PDF, MP4, AVI, MOV, MKV, 3GP, WEBM
             </div>
             <div class="file-area" id="fileArea">
-                <p>📤 Klik untuk upload (bisa pilih banyak file)</p>
-                <input type="file" id="fileInput" multiple accept=".pdf,.jpg,.jpeg,.png" required>
+                <p>📤 Klik untuk upload (bisa pilih banyak file, akan ditambahkan ke daftar)</p>
+                <input type="file" id="fileInput" multiple accept=".pdf,.jpg,.jpeg,.png,.mp4,.avi,.mov,.mkv,.3gp,.webm">
             </div>
             <div class="file-list" id="fileList"></div>
 
-            <!-- Submit -->
             <button type="submit" class="btn" id="submitBtn">🚀 Kirim ke Telegram</button>
             <p class="note">⚠️ Data akan dikirim melalui bot Telegram</p>
         </form>
@@ -85,40 +85,85 @@
         const submitBtn = document.getElementById('submitBtn');
         const statusDiv = document.getElementById('status');
 
-        // Tampilkan daftar file
-        document.getElementById('fileArea').addEventListener('click', () => fileInput.click());
-        fileInput.addEventListener('change', function() {
+        let selectedFiles = [];
+
+        // Mapping ikon berdasarkan tipe file
+        function getFileIcon(file) {
+            const type = file.type;
+            if (type === 'application/pdf') return '📄';
+            if (type.startsWith('image/')) return '🖼️';
+            if (type.startsWith('video/')) return '🎥';
+            return '📎';
+        }
+
+        function renderFileList() {
             fileList.innerHTML = '';
-            for (let file of this.files) {
-                const icon = file.type === 'application/pdf' ? '📄' : '🖼️';
-                fileList.innerHTML += `<span class="file-tag">${icon} ${file.name} (${(file.size/1024).toFixed(1)} KB)</span>`;
+            if (selectedFiles.length === 0) {
+                fileList.innerHTML = '<span style="color:#8b949e;font-size:13px;">Belum ada file dipilih</span>';
+                return;
             }
+            selectedFiles.forEach((file, index) => {
+                const icon = getFileIcon(file);
+                const tag = document.createElement('span');
+                tag.className = 'file-tag';
+                tag.innerHTML = `${icon} ${file.name} (${(file.size/1024).toFixed(1)} KB) <span class="hapus-file" data-index="${index}">✕</span>`;
+                fileList.appendChild(tag);
+            });
+
+            document.querySelectorAll('.hapus-file').forEach(el => {
+                el.addEventListener('click', function() {
+                    const idx = parseInt(this.dataset.index);
+                    selectedFiles.splice(idx, 1);
+                    renderFileList();
+                    updateFileInput();
+                });
+            });
+        }
+
+        function updateFileInput() {
+            const dt = new DataTransfer();
+            selectedFiles.forEach(f => dt.items.add(f));
+            fileInput.files = dt.files;
+        }
+
+        fileInput.addEventListener('change', function() {
+            const newFiles = Array.from(this.files);
+            if (newFiles.length === 0) return;
+
+            newFiles.forEach(newFile => {
+                const exists = selectedFiles.some(f => f.name === newFile.name && f.size === newFile.size);
+                if (!exists) {
+                    selectedFiles.push(newFile);
+                }
+            });
+
+            renderFileList();
+            updateFileInput();
+            this.value = '';
         });
 
-        // Submit form
+        renderFileList();
+
         form.addEventListener('submit', async function(e) {
             e.preventDefault();
 
             const namaProduk = document.getElementById('namaProduk').value.trim();
             const marketplace = document.getElementById('marketplace').value;
-            const files = fileInput.files;
 
-            if (!namaProduk || !marketplace || files.length === 0) {
+            if (!namaProduk || !marketplace || selectedFiles.length === 0) {
                 showStatus('⚠️ Harap isi semua data dan upload minimal 1 file!', 'error');
                 return;
             }
 
-            // Buat pesan teks
             let caption = `📦 *Form Produk*\n\n`;
             caption += `🆔 Nama Produk: ${namaProduk}\n`;
             caption += `🏪 Marketplace: ${marketplace}\n`;
-            caption += `📎 Jumlah file: ${files.length}`;
+            caption += `📎 Jumlah file: ${selectedFiles.length}`;
 
             showStatus('⏳ Mengirim data ke Telegram...', 'loading');
             submitBtn.disabled = true;
 
             try {
-                // Kirim pesan teks
                 const textResponse = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -128,12 +173,10 @@
                         parse_mode: 'Markdown'
                     })
                 });
-
                 if (!textResponse.ok) throw new Error('Gagal kirim pesan teks');
 
-                // Kirim setiap file (foto/PDF)
-                for (let i = 0; i < files.length; i++) {
-                    const file = files[i];
+                for (let i = 0; i < selectedFiles.length; i++) {
+                    const file = selectedFiles[i];
                     const formData = new FormData();
                     formData.append('chat_id', CHAT_ID);
                     formData.append('document', file);
@@ -143,14 +186,14 @@
                         method: 'POST',
                         body: formData
                     });
-
                     if (!fileResponse.ok) throw new Error(`Gagal kirim file: ${file.name}`);
                 }
 
                 showStatus('✅ Semua data berhasil dikirim ke Telegram!', 'success');
                 form.reset();
-                fileList.innerHTML = '';
-                fileInput.value = '';
+                selectedFiles = [];
+                renderFileList();
+                updateFileInput();
 
             } catch (error) {
                 console.error(error);
