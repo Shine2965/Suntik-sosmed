@@ -7,7 +7,7 @@
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: Arial, sans-serif; }
         body { background: #0d1117; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 20px; }
-        .container { background: #161b22; border-radius: 16px; padding: 30px; max-width: 650px; width: 100%; border: 1px solid #30363d; }
+        .container { background: #161b22; border-radius: 16px; padding: 30px; max-width: 700px; width: 100%; border: 1px solid #30363d; }
         h1 { color: #f0f6fc; font-size: 24px; margin-bottom: 5px; text-align: center; }
         .sub { color: #8b949e; text-align: center; font-size: 14px; margin-bottom: 25px; }
         label { color: #f0f6fc; font-weight: 600; display: block; margin-top: 18px; margin-bottom: 6px; font-size: 14px; }
@@ -17,9 +17,8 @@
         .file-area:hover { border-color: #58a6ff; background: #0d1117; }
         .file-area p { color: #8b949e; font-size: 14px; }
         .file-area input { display: none; }
-        .file-list { margin-top: 10px; font-size: 13px; color: #58a6ff; }
-        .pdf-area { border: 2px solid #1f6feb; background: #0d1117; }
-        .pdf-area:hover { background: #161b22; }
+        .file-list { margin-top: 10px; font-size: 13px; color: #58a6ff; display: flex; flex-wrap: wrap; gap: 8px; }
+        .file-tag { background: #0d1117; padding: 6px 12px; border-radius: 20px; border: 1px solid #30363d; display: inline-block; }
         .btn { width: 100%; padding: 14px; background: #238636; color: #fff; border: none; border-radius: 8px; font-size: 16px; font-weight: 700; margin-top: 25px; cursor: pointer; transition: 0.3s; }
         .btn:hover { background: #2ea043; }
         .btn:disabled { background: #555; cursor: not-allowed; }
@@ -28,19 +27,23 @@
         .status.success { display: block; background: #1a3a2a; color: #7ee787; border: 1px solid #238636; }
         .status.error { display: block; background: #3a1a1a; color: #f77878; border: 1px solid #da3633; }
         .status.loading { display: block; background: #1a2a3a; color: #58a6ff; border: 1px solid #1f6feb; }
-        .label-pdf { color: #58a6ff; font-weight: 700; }
+        .row { display: flex; gap: 15px; flex-wrap: wrap; }
+        .row > div { flex: 1; min-width: 200px; }
         .required { color: #f77878; margin-left: 4px; }
+        .keterangan { background: #0d1117; padding: 10px 14px; border-radius: 8px; border-left: 3px solid #58a6ff; margin-top: 6px; color: #8b949e; font-size: 13px; }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>📦 Form Produk</h1>
-        <p class="sub">Lengkapi data produk dengan benar</p>
+        <p class="sub">Lengkapi data produk & upload dokumentasi</p>
 
         <form id="productForm">
+            <!-- Nama Produk -->
             <label>Nama Produk <span class="required">*</span></label>
             <input type="text" id="namaProduk" placeholder="Contoh: Kaos Polos Oversize" required>
 
+            <!-- Marketplace -->
             <label>Marketplace <span class="required">*</span></label>
             <select id="marketplace" required>
                 <option value="">Pilih Marketplace</option>
@@ -50,23 +53,20 @@
                 <option value="TikTok Shop">TikTok Shop</option>
             </select>
 
-            <!-- ===== UPLOAD 1: FILE PENDUKUNG ===== -->
+            <!-- Upload File -->
             <label>📸 Upload File Pendukung <span class="required">*</span></label>
+            <div class="keterangan">
+                📎 Sertakan: <strong>foto sebelum packing</strong>, <strong>foto resi</strong>, <strong>foto sesudah packing</strong>
+                <br>📄 Format: JPG, PNG, PDF
+            </div>
             <div class="file-area" id="fileArea">
-                <p>📎 Sertakan foto sebelum packing, foto resi, foto sesudah packing</p>
+                <p>📤 Klik untuk upload (bisa pilih banyak file)</p>
                 <input type="file" id="fileInput" multiple accept=".pdf,.jpg,.jpeg,.png" required>
             </div>
             <div class="file-list" id="fileList"></div>
 
-            <!-- ===== UPLOAD 2: PDF KHUSUS ===== -->
-            <label>📄 Upload File PDF Khusus <span class="required">*</span></label>
-            <div class="file-area pdf-area" id="pdfArea">
-                <p>📎 <span class="label-pdf">HANYA PDF</span> — misal: invoice, dokumen pendukung</p>
-                <input type="file" id="pdfInput" accept=".pdf" required>
-            </div>
-            <div class="file-list" id="pdfList"></div>
-
-            <button type="submit" class="btn" id="submitBtn">Kirim ke Telegram</button>
+            <!-- Submit -->
+            <button type="submit" class="btn" id="submitBtn">🚀 Kirim ke Telegram</button>
             <p class="note">⚠️ Data akan dikirim melalui bot Telegram</p>
         </form>
 
@@ -82,54 +82,37 @@
         const form = document.getElementById('productForm');
         const fileInput = document.getElementById('fileInput');
         const fileList = document.getElementById('fileList');
-        const pdfInput = document.getElementById('pdfInput');
-        const pdfList = document.getElementById('pdfList');
         const submitBtn = document.getElementById('submitBtn');
         const statusDiv = document.getElementById('status');
 
-        // ===== EVENT UPLOAD 1 =====
+        // Tampilkan daftar file
         document.getElementById('fileArea').addEventListener('click', () => fileInput.click());
         fileInput.addEventListener('change', function() {
             fileList.innerHTML = '';
             for (let file of this.files) {
-                fileList.innerHTML += `<div>📄 ${file.name} (${(file.size/1024).toFixed(1)} KB)</div>`;
+                const icon = file.type === 'application/pdf' ? '📄' : '🖼️';
+                fileList.innerHTML += `<span class="file-tag">${icon} ${file.name} (${(file.size/1024).toFixed(1)} KB)</span>`;
             }
         });
 
-        // ===== EVENT UPLOAD 2 (PDF) =====
-        document.getElementById('pdfArea').addEventListener('click', () => pdfInput.click());
-        pdfInput.addEventListener('change', function() {
-            pdfList.innerHTML = '';
-            if (this.files.length > 0) {
-                const file = this.files[0];
-                if (file.type !== 'application/pdf') {
-                    alert('❌ Hanya file PDF yang diperbolehkan!');
-                    this.value = '';
-                    return;
-                }
-                pdfList.innerHTML = `<div>📄 ${file.name} (${(file.size/1024).toFixed(1)} KB) ✅ PDF</div>`;
-            }
-        });
-
-        // ===== SUBMIT =====
+        // Submit form
         form.addEventListener('submit', async function(e) {
             e.preventDefault();
 
             const namaProduk = document.getElementById('namaProduk').value.trim();
             const marketplace = document.getElementById('marketplace').value;
             const files = fileInput.files;
-            const pdfFile = pdfInput.files[0];
 
-            if (!namaProduk || !marketplace || files.length === 0 || !pdfFile) {
-                showStatus('Harap isi semua data dan upload semua file!', 'error');
+            if (!namaProduk || !marketplace || files.length === 0) {
+                showStatus('⚠️ Harap isi semua data dan upload minimal 1 file!', 'error');
                 return;
             }
 
-            const caption = `📦 *Form Produk*\n\n` +
-                            `🆔 Nama Produk: ${namaProduk}\n` +
-                            `🏪 Marketplace: ${marketplace}\n` +
-                            `📎 Jumlah file pendukung: ${files.length}\n` +
-                            `📄 File PDF: ${pdfFile.name}`;
+            // Buat pesan teks
+            let caption = `📦 *Form Produk*\n\n`;
+            caption += `🆔 Nama Produk: ${namaProduk}\n`;
+            caption += `🏪 Marketplace: ${marketplace}\n`;
+            caption += `📎 Jumlah file: ${files.length}`;
 
             showStatus('⏳ Mengirim data ke Telegram...', 'loading');
             submitBtn.disabled = true;
@@ -145,38 +128,29 @@
                         parse_mode: 'Markdown'
                     })
                 });
+
                 if (!textResponse.ok) throw new Error('Gagal kirim pesan teks');
 
-                // Kirim file pendukung
-                for (let file of files) {
-                    const fd = new FormData();
-                    fd.append('chat_id', CHAT_ID);
-                    fd.append('document', file);
-                    fd.append('caption', `📎 ${file.name}`);
-                    const res = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendDocument`, {
-                        method: 'POST',
-                        body: fd
-                    });
-                    if (!res.ok) throw new Error(`Gagal kirim: ${file.name}`);
-                }
+                // Kirim setiap file (foto/PDF)
+                for (let i = 0; i < files.length; i++) {
+                    const file = files[i];
+                    const formData = new FormData();
+                    formData.append('chat_id', CHAT_ID);
+                    formData.append('document', file);
+                    formData.append('caption', `📎 File ${i+1}: ${file.name}`);
 
-                // Kirim file PDF khusus
-                const pdfFormData = new FormData();
-                pdfFormData.append('chat_id', CHAT_ID);
-                pdfFormData.append('document', pdfFile);
-                pdfFormData.append('caption', `📄 PDF KHUSUS: ${pdfFile.name}`);
-                const pdfRes = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendDocument`, {
-                    method: 'POST',
-                    body: pdfFormData
-                });
-                if (!pdfRes.ok) throw new Error('Gagal kirim file PDF');
+                    const fileResponse = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendDocument`, {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    if (!fileResponse.ok) throw new Error(`Gagal kirim file: ${file.name}`);
+                }
 
                 showStatus('✅ Semua data berhasil dikirim ke Telegram!', 'success');
                 form.reset();
                 fileList.innerHTML = '';
-                pdfList.innerHTML = '';
                 fileInput.value = '';
-                pdfInput.value = '';
 
             } catch (error) {
                 console.error(error);
