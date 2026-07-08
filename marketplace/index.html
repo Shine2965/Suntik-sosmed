@@ -31,11 +31,12 @@
         .keterangan { background: #0d1117; padding: 10px 14px; border-radius: 8px; border-left: 3px solid #58a6ff; margin-top: 6px; color: #8b949e; font-size: 13px; }
         .hapus-file { color: #f77878; cursor: pointer; margin-left: 8px; font-weight: bold; }
         .hapus-file:hover { color: #da3633; }
+        .badge-multi { background: #1f6feb; color: #fff; font-size: 11px; padding: 2px 10px; border-radius: 12px; margin-left: 8px; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>📦 Form Produk</h1>
+        <h1>📦 Form Produk <span class="badge-multi">Multi-Chat</span></h1>
         <p class="sub">Lengkapi data produk & upload dokumentasi</p>
 
         <form id="productForm">
@@ -49,8 +50,7 @@
                 <option value="Lazada">Lazada</option>
                 <option value="Tokopedia">Tokopedia</option>
                 <option value="TikTok Shop">TikTok Shop</option>
-                 <option value="kuhyon">kuh yon</option>
-               
+                <option value="kuhyon">kuh yon</option>
             </select>
 
             <label>📎 Upload File Pendukung <span class="required">*</span></label>
@@ -64,8 +64,8 @@
             </div>
             <div class="file-list" id="fileList"></div>
 
-            <button type="submit" class="btn" id="submitBtn">🚀 Kirim ke Telegram</button>
-            <p class="note">⚠️ Data akan dikirim melalui bot Telegram</p>
+            <button type="submit" class="btn" id="submitBtn">🚀 Kirim ke Telegram (2 chat)</button>
+            <p class="note">⚠️ Data akan dikirim ke 2 chat ID sekaligus</p>
         </form>
 
         <div id="status" class="status"></div>
@@ -74,7 +74,7 @@
     <script>
         // ========== KONFIGURASI ==========
         const BOT_TOKEN = '8785872128:AAGJApScDjRIjg1VorXB35OvrvtUDCtVr0M';
-        const CHAT_ID = '1199141287';
+        const CHAT_IDS = ['1199141287', '6317157631']; // <-- 2 chat ID
         // ==================================
 
         const form = document.getElementById('productForm');
@@ -124,10 +124,8 @@
             fileInput.files = dt.files;
         }
 
-        // ====== FIX: Event upload pake cara yang lebih aman ======
-        // Klik di area → trigger file input
+        // Klik area → trigger file input
         fileArea.addEventListener('click', function(e) {
-            // Jangan trigger kalo klik di tombol hapus (tapi udah di-stop di atas)
             fileInput.click();
         });
 
@@ -145,11 +143,40 @@
 
             renderFileList();
             updateFileInput();
-            // Reset input biar bisa pilih file yang sama lagi
             this.value = '';
         });
 
         renderFileList();
+
+        // Fungsi kirim ke satu chat ID (teks + file)
+        async function sendToChat(chatId, caption, files) {
+            // Kirim teks
+            const textResponse = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    chat_id: chatId,
+                    text: caption + `\n\n📨 Dikirim ke: ${chatId}`,
+                    parse_mode: 'Markdown'
+                })
+            });
+            if (!textResponse.ok) throw new Error(`Gagal kirim pesan ke ${chatId}`);
+
+            // Kirim file
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                const formData = new FormData();
+                formData.append('chat_id', chatId);
+                formData.append('document', file);
+                formData.append('caption', `📎 File ${i+1}: ${file.name}`);
+
+                const fileResponse = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendDocument`, {
+                    method: 'POST',
+                    body: formData
+                });
+                if (!fileResponse.ok) throw new Error(`Gagal kirim file ke ${chatId}: ${file.name}`);
+            }
+        }
 
         // Submit form
         form.addEventListener('submit', async function(e) {
@@ -166,38 +193,20 @@
             let caption = `📦 *Form Produk*\n\n`;
             caption += `🆔 Nama Produk: ${namaProduk}\n`;
             caption += `🏪 Marketplace: ${marketplace}\n`;
-            caption += `📎 Jumlah file: ${selectedFiles.length}`;
+            caption += `📎 Jumlah file: ${selectedFiles.length}\n`;
+            caption += `📨 Dikirim ke ${CHAT_IDS.length} chat ID`;
 
-            showStatus('⏳ Mengirim data ke Telegram...', 'loading');
+            showStatus(`⏳ Mengirim ke ${CHAT_IDS.length} chat...`, 'loading');
             submitBtn.disabled = true;
 
             try {
-                const textResponse = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        chat_id: CHAT_ID,
-                        text: caption,
-                        parse_mode: 'Markdown'
-                    })
-                });
-                if (!textResponse.ok) throw new Error('Gagal kirim pesan teks');
+                // Kirim ke semua chat ID secara paralel
+                const promises = CHAT_IDS.map(chatId => 
+                    sendToChat(chatId, caption, selectedFiles)
+                );
+                await Promise.all(promises);
 
-                for (let i = 0; i < selectedFiles.length; i++) {
-                    const file = selectedFiles[i];
-                    const formData = new FormData();
-                    formData.append('chat_id', CHAT_ID);
-                    formData.append('document', file);
-                    formData.append('caption', `📎 File ${i+1}: ${file.name}`);
-
-                    const fileResponse = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendDocument`, {
-                        method: 'POST',
-                        body: formData
-                    });
-                    if (!fileResponse.ok) throw new Error(`Gagal kirim file: ${file.name}`);
-                }
-
-                showStatus('✅ Semua data berhasil dikirim ke Telegram!', 'success');
+                showStatus(`✅ Berhasil dikirim ke ${CHAT_IDS.length} chat!`, 'success');
                 form.reset();
                 selectedFiles = [];
                 renderFileList();
