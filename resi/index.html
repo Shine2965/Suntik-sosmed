@@ -130,29 +130,45 @@ required>
 <option>TikTok Shop</option>
 </select>
 
-<label>Upload Bukti</label>
+<label>Upload Bukti Packing</label>
 
 <input
 type="file"
-id="files"
-name="files"
+id="files1"
+name="files1"
 multiple
 accept=".jpg,.jpeg,.png,.webp,.pdf">
 
 <div class="note">
-<b>Wajib melampirkan:</b><br><br>
-
+<b>Bukti Packing</b><br><br>
 📸 Foto sebelum packing<br>
 🧾 Foto resi<br>
 📦 Foto sesudah packing<br><br>
 
-Maksimal 5 file.<br>
-Format yang didukung:
-JPG, PNG, JPEG, WEBP, PDF
+Maksimal 5 file.
 </div>
 
-<div id="fileList"></div>
+<div id="fileList1"></div>
 
+<br>
+
+<label>Upload Dokumen Tambahan (Opsional)</label>
+
+<input
+type="file"
+id="files2"
+name="files2"
+multiple
+accept=".jpg,.jpeg,.png,.webp,.pdf">
+
+<div class="note">
+Bagian ini opsional.<br>
+Dapat digunakan untuk mengunggah foto atau dokumen tambahan.<br><br>
+
+Maksimal 5 file.
+</div>
+
+<div id="fileList2"></div>
 <button type="submit">
 Kirim Bukti Packing
 </button>
@@ -164,35 +180,40 @@ Kirim Bukti Packing
 </div>
 
 <script>
+const fileInputs = [
+    {
+        input: document.getElementById("files1"),
+        list: document.getElementById("fileList1")
+    },
+    {
+        input: document.getElementById("files2"),
+        list: document.getElementById("fileList2")
+    }
+];
 
-const filesInput=document.getElementById("files");
-const list=document.getElementById("fileList");
+fileInputs.forEach(item => {
 
-filesInput.addEventListener("change",()=>{
+    item.input.addEventListener("change", () => {
 
-list.innerHTML="";
+        item.list.innerHTML = "";
 
-if(filesInput.files.length>5){
+        if (item.input.files.length > 5) {
+            alert("Maksimal 5 file setiap bagian.");
+            item.input.value = "";
+            return;
+        }
 
-alert("Maksimal hanya 5 file.");
+        [...item.input.files].forEach(file => {
 
-filesInput.value="";
+            const div = document.createElement("div");
+            div.className = "file-item";
+            div.textContent = file.name;
 
-return;
+            item.list.appendChild(div);
 
-}
+        });
 
-[...filesInput.files].forEach(file=>{
-
-const div=document.createElement("div");
-
-div.className="file-item";
-
-div.innerHTML=file.name;
-
-list.appendChild(div);
-
-});
+    });
 
 });
 
@@ -201,17 +222,19 @@ document.getElementById("uploadForm").addEventListener("submit",async(e)=>{
 e.preventDefault();
 
 const status=document.getElementById("status");
+const form = new FormData();
 
-const form=new FormData();
+form.append("produk", e.target.produk.value);
+form.append("marketplace", e.target.marketplace.value);
 
-form.append("produk",e.target.produk.value);
+// Upload pertama
+for (const file of document.getElementById("files1").files) {
+    form.append("files1", file);
+}
 
-form.append("marketplace",e.target.marketplace.value);
-
-for(const file of filesInput.files){
-
-form.append("files",file);
-
+// Upload kedua
+for (const file of document.getElementById("files2").files) {
+    form.append("files2", file);
 }
 
 status.innerHTML="Mengirim...";
