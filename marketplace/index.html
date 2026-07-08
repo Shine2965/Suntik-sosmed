@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Form Upload Produk</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #1e1e2f;
+            color: #fff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            background: #2a2a40;
+            padding: 30px;
+            border-radius: 16px;
+            max-width: 700px;
+            width: 100%;
+            box-shadow: 0 0 30px rgba(0,0,0,0.7);
+        }
+        h2 {
+            text-align: center;
+            margin-bottom: 24px;
+            color: #f0c27f;
+        }
+        label {
+            font-weight: bold;
+            display: block;
+            margin-top: 18px;
+        }
+        input, select, textarea {
+            width: 100%;
+            padding: 12px;
+            margin-top: 6px;
+            border: none;
+            border-radius: 10px;
+            background: #3b3b5a;
+            color: #fff;
+            font-size: 15px;
+            box-sizing: border-box;
+        }
+        input[type="file"] {
+            padding: 10px;
+            background: #3b3b5a;
+            border: 1px dashed #aaa;
+        }
+        .file-group {
+            margin-top: 14px;
+            background: #25253b;
+            padding: 16px;
+            border-radius: 12px;
+        }
+        button {
+            width: 100%;
+            padding: 14px;
+            margin-top: 28px;
+            background: #f0c27f;
+            color: #1e1e2f;
+            font-weight: bold;
+            font-size: 18px;
+            border: none;
+            border-radius: 30px;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        button:hover {
+            background: #e6b064;
+        }
+        .note {
+            font-size: 13px;
+            color: #aaa;
+            margin-top: 4px;
+        }
+        #status {
+            margin-top: 18px;
+            text-align: center;
+            font-weight: bold;
+            color: #b5e6b5;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h2>📦 Form Kirim Produk</h2>
+    <form id="productForm">
+        <!-- Nama Produk -->
+        <label>Nama Produk</label>
+        <input type="text" id="namaProduk" placeholder="Contoh: Kaos Oblong Premium" required>
+
+        <!-- Marketplace -->
+        <label>Marketplace</label>
+        <select id="marketplace" required>
+            <option value="">Pilih Marketplace</option>
+            <option value="shopee">Shopee</option>
+            <option value="lazada">Lazada</option>
+            <option value="tokopedia">Tokopedia</option>
+            <option value="tiktok">TikTok Shop</option>
+        </select>
+
+        <!-- Upload File 1 -->
+        <div class="file-group">
+            <label>📸 Foto Sebelum Packing</label>
+            <input type="file" id="fotoSebelum" accept="image/*" required>
+            <div class="note">Sertakan foto sebelum packing</div>
+        </div>
+
+        <!-- Upload File 2 -->
+        <div class="file-group">
+            <label>📸 Foto Resi</label>
+            <input type="file" id="fotoResi" accept="image/*" required>
+            <div class="note">Sertakan foto resi</div>
+        </div>
+
+        <!-- Upload File 3 -->
+        <div class="file-group">
+            <label>📸 Foto Sesudah Packing</label>
+            <input type="file" id="fotoSesudah" accept="image/*" required>
+            <div class="note">Sertakan foto sesudah packing</div>
+        </div>
+
+        <!-- Upload PDF -->
+        <div class="file-group">
+            <label>📄 File PDF (opsional)</label>
+            <input type="file" id="filePdf" accept=".pdf">
+            <div class="note">Upload file PDF jika diperlukan</div>
+        </div>
+
+        <button type="submit">🚀 Kirim ke Discord</button>
+    </form>
+    <div id="status"></div>
+</div>
+
+<script>
+document.getElementById('productForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const statusDiv = document.getElementById('status');
+    statusDiv.innerHTML = '⏳ Mengirim...';
+
+    const nama = document.getElementById('namaProduk').value;
+    const marketplace = document.getElementById('marketplace').value;
+    const fotoSebelum = document.getElementById('fotoSebelum').files[0];
+    const fotoResi = document.getElementById('fotoResi').files[0];
+    const fotoSesudah = document.getElementById('fotoSesudah').files[0];
+    const filePdf = document.getElementById('filePdf').files[0];
+
+    // Validasi minimal
+    if (!nama || !marketplace || !fotoSebelum || !fotoResi || !fotoSesudah) {
+        statusDiv.innerHTML = '❌ Semua file wajib diisi (kecuali PDF)';
+        return;
+    }
+
+    // Baca file sebagai base64
+    const toBase64 = (file) => new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result.split(',')[1]);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
+
+    try {
+        const baseSebelum = await toBase64(fotoSebelum);
+        const baseResi = await toBase64(fotoResi);
+        const baseSesudah = await toBase64(fotoSesudah);
+        let basePdf = null;
+        if (filePdf) basePdf = await toBase64(filePdf);
+
+        // Webhook Discord (ganti dengan URL webhook mu)
+        const webhookUrl = 'https://discord.com/api/webhooks/1482245411325345793/79LyZzxEZxoHVZeW9bgJpf_SmPDQ4uZCO6DO652Hids_7xZjK0gUYuOZrgBqoin-Qez6';
+
+        const payload = {
+            content: `📦 **Produk:** ${nama}\n🛒 **Marketplace:** ${marketplace}`,
+            embeds: [
+                {
+                    title: '📸 Foto Sebelum Packing',
+                    image: { url: `attachment://sebelum.png` }
+                },
+                {
+                    title: '📸 Foto Resi',
+                    image: { url: `attachment://resi.png` }
+                },
+                {
+                    title: '📸 Foto Sesudah Packing',
+                    image: { url: `attachment://sesudah.png` }
+                }
+            ]
+        };
+
+        // Tambahkan PDF jika ada
+        let attachments = [
+            { id: 'sebelum', filename: 'sebelum.png', data: baseSebelum },
+            { id: 'resi', filename: 'resi.png', data: baseResi },
+            { id: 'sesudah', filename: 'sesudah.png', data: baseSesudah }
+        ];
+
+        if (basePdf) {
+            payload.embeds.push({
+                title: '📄 File PDF',
+                description: 'PDF terlampir'
+            });
+            attachments.push({
+                id: 'pdf',
+                filename: 'dokumen.pdf',
+                data: basePdf
+            });
+        }
+
+        const formData = new FormData();
+        formData.append('payload_json', JSON.stringify(payload));
+        attachments.forEach(att => {
+            const blob = base64ToBlob(att.data, 'image/png');
+            const ext = att.filename.endsWith('.pdf') ? 'application/pdf' : 'image/png';
+            const blob2 = att.filename.endsWith('.pdf') ? base64ToBlob(att.data, 'application/pdf') : blob;
+            formData.append('file', blob2, att.filename);
+        });
+
+        const response = await fetch(webhookUrl, {
+            method: 'POST',
+            body: formData
+        });
+
+        if (response.ok) {
+            statusDiv.innerHTML = '✅ Berhasil dikirim ke Discord!';
+        } else {
+            statusDiv.innerHTML = '❌ Gagal kirim. Cek webhook URL atau ukuran file.';
+        }
+    } catch (err) {
+        statusDiv.innerHTML = '❌ Error: ' + err.message;
+    }
+});
+
+function base64ToBlob(base64, mimeType = 'image/png') {
+    const byteCharacters = atob(base64);
+    const byteNumbers = new Array(byteCharacters.length);
+    for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+    }
+    const byteArray = new Uint8Array(byteNumbers);
+    return new Blob([byteArray], { type: mimeType });
+}
+</script>
+</body>
+</html>
