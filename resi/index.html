@@ -4,53 +4,42 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<title>Form Bukti Packing</title>
+<title>Upload Bukti Packing</title>
 
 <style>
-*{
-    margin:0;
-    padding:0;
-    box-sizing:border-box;
-    font-family:Arial,Helvetica,sans-serif;
-}
-
 body{
-    background:linear-gradient(135deg,#5865F2,#7289DA);
-    min-height:100vh;
-    display:flex;
-    justify-content:center;
-    align-items:center;
+    font-family:Arial,Helvetica,sans-serif;
+    background:#f5f5f5;
+    margin:0;
     padding:20px;
 }
 
-.card{
+.container{
+    max-width:500px;
+    margin:auto;
     background:#fff;
-    width:100%;
-    max-width:550px;
-    border-radius:15px;
-    padding:25px;
-    box-shadow:0 10px 30px rgba(0,0,0,.25);
+    padding:20px;
+    border-radius:12px;
+    box-shadow:0 5px 20px rgba(0,0,0,.1);
 }
 
-h1{
+h2{
     text-align:center;
-    color:#5865F2;
     margin-bottom:20px;
 }
 
 label{
     display:block;
     margin-top:15px;
-    margin-bottom:8px;
     font-weight:bold;
 }
 
 input,select{
     width:100%;
     padding:12px;
-    border-radius:10px;
+    border-radius:8px;
     border:1px solid #ccc;
-    font-size:15px;
+    margin-top:6px;
 }
 
 input[type=file]{
@@ -58,63 +47,42 @@ input[type=file]{
 }
 
 .info{
-    margin-top:20px;
-    background:#FFF7D6;
-    border-left:5px solid orange;
-    padding:15px;
-    border-radius:10px;
-}
-
-.info ul{
-    margin-left:20px;
-    margin-top:8px;
+    background:#eef7ff;
+    padding:12px;
+    border-radius:8px;
+    margin-top:10px;
+    color:#004b87;
+    font-size:14px;
 }
 
 button{
-    margin-top:25px;
     width:100%;
-    padding:15px;
+    margin-top:20px;
+    padding:14px;
     border:none;
-    border-radius:10px;
-    background:#5865F2;
-    color:white;
+    background:#2196F3;
+    color:#fff;
     font-size:16px;
+    border-radius:8px;
     cursor:pointer;
-    transition:.3s;
 }
 
 button:hover{
-    background:#4752C4;
-}
-
-.preview{
-    display:grid;
-    grid-template-columns:repeat(auto-fill,minmax(90px,1fr));
-    gap:10px;
-    margin-top:15px;
-}
-
-.preview img{
-    width:100%;
-    height:90px;
-    object-fit:cover;
-    border-radius:10px;
-    border:2px solid #ddd;
+    background:#1976D2;
 }
 
 #status{
     margin-top:15px;
     text-align:center;
-    font-weight:bold;
 }
 </style>
 
 </head>
 <body>
 
-<div class="card">
+<div class="container">
 
-<h1>📦 Form Bukti Packing</h1>
+<h2>Upload Bukti Packing</h2>
 
 <form id="packingForm">
 
@@ -122,160 +90,103 @@ button:hover{
 <input
 type="text"
 name="produk"
-placeholder="Masukkan nama produk"
 required>
 
 <label>Marketplace</label>
+
 <select name="marketplace" required>
 <option value="">Pilih Marketplace</option>
-<option value="Shopee">Shopee</option>
-<option value="Lazada">Lazada</option>
-<option value="Tokopedia">Tokopedia</option>
-<option value="TikTok Shop">TikTok Shop</option>
+<option>Shopee</option>
+<option>Lazada</option>
+<option>Tokopedia</option>
+<option>TikTok Shop</option>
 </select>
 
-<label>Upload Foto (Maksimal 5)</label>
+<label>Upload Bukti (Maksimal 5 File)</label>
 
 <input
-    type="file"
-    id="file"
-    name="file"
-    accept="image/*,.pdf,application/pdf"
-    multiple
-    required>
-<div class="preview" id="preview"></div>
+type="file"
+name="files"
+id="files"
+multiple
+accept="image/*"
+required>
 
 <div class="info">
-<b>📌 Wajib Melampirkan:</b>
+<b>Wajib menyertakan:</b>
 <ul>
-    <li>Foto sebelum packing</li>
-    <li>Foto resi</li>
-    <li>Foto sesudah packing</li>
-    <li>dokumen Resi PDF</li>
+<li>Foto sebelum packing</li>
+<li>Foto resi</li>
+<li>Foto sesudah packing</li>
 </ul>
 
-<p style="margin-top:10px;">
-Maksimal <b>5 file</b>.<br>
-Format yang didukung:
-<b>JPG, JPEG, PNG, WEBP, PDF</b>.
-</p>
+Maksimal 5 file.
 </div>
-    <p style="margin-top:10px;">
-Minimal <b>3 foto</b> dan maksimal <b>5 foto</b>.
-</p>
 
 <button type="submit">
-Kirim Bukti Packing
+Kirim
 </button>
 
-<div id="status"></div>
-
 </form>
+
+<div id="status"></div>
 
 </div>
 
 <script>
 
-const fileInput = document.getElementById("file");
-const preview = document.getElementById("preview");
+const form=document.getElementById("packingForm");
 
-fileInput.addEventListener("change", () => {
+form.addEventListener("submit",async(e)=>{
 
-    preview.innerHTML = "";
+e.preventDefault();
 
-    if (fileInput.files.length > 5) {
-        alert("Maksimal 5 file.");
-        fileInput.value = "";
-        return;
-    }
+const input=document.getElementById("files");
 
-    Array.from(fileInput.files).forEach(file => {
+if(input.files.length>5){
 
-        if (file.type.startsWith("image/")) {
+alert("Maksimal hanya 5 file.");
 
-            const reader = new FileReader();
+return;
 
-            reader.onload = e => {
-
-                const img = document.createElement("img");
-                img.src = e.target.result;
-                preview.appendChild(img);
-
-            };
-
-            reader.readAsDataURL(file);
-
-        } else if (file.type === "application/pdf") {
-
-            const div = document.createElement("div");
-
-            div.style.padding = "10px";
-            div.style.border = "2px solid #ccc";
-            div.style.borderRadius = "10px";
-            div.style.textAlign = "center";
-            div.innerHTML = "📄<br>" + file.name;
-
-            preview.appendChild(div);
-
-        }
-
-    });
-
-});
-    const files = fileInput.files;
-
-if (files.length < 3) {
-    alert("Minimal upload 3 file.");
-    return;
 }
 
-if (files.length > 5) {
-    alert("Maksimal upload 5 file.");
-    return;
+const fd=new FormData(form);
+
+for(const f of input.files){
+
+fd.append("attachments",f);
+
 }
 
-document.getElementById("packingForm").addEventListener("submit", async function(e){
-
-    e.preventDefault();
-
-    const status = document.getElementById("status");
-
-    const formData = new FormData(this);
-
-    
-});
-    
-const formData=new FormData(this);
-
-status.style.color="blue";
-status.innerHTML="⏳ Mengirim data...";
+document.getElementById("status").innerHTML="Mengirim...";
 
 try{
 
 const res=await fetch("/api/upload",{
+
 method:"POST",
-body:formData
+body:fd
+
 });
 
-if(res.ok){
+const data=await res.json();
 
-status.style.color="green";
-status.innerHTML="✅ Data berhasil dikirim.";
+if(data.success){
 
-this.reset();
-preview.innerHTML="";
+document.getElementById("status").innerHTML="✅ Berhasil dikirim.";
+
+form.reset();
 
 }else{
 
-status.style.color="red";
-status.innerHTML="❌ Gagal mengirim data.";
+document.getElementById("status").innerHTML="❌ Gagal.";
 
 }
 
-}catch(err){
+}catch{
 
-status.style.color="red";
-status.innerHTML="❌ Tidak dapat terhubung ke server.";
+document.getElementById("status").innerHTML="❌ Terjadi kesalahan.";
 
 }
 
