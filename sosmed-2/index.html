@@ -17,7 +17,9 @@
   --accent2: #06b6d4;  
   --text: #f1f5f9;  
   --text-muted: #94a3b8;
-  --danger: #f87171; /* Merah soft untuk dark mode */
+  --danger: #f87171;
+  --discount-bg: #f59e0b;
+  --discount-text: #090d16;
 }  
   
 /* ===============================  
@@ -264,7 +266,33 @@ input:focus, select:focus {
   color: var(--text-muted);
   line-height: 1.5;
 }  
-  
+
+.discount-badge {
+  display: inline-block;
+  background: var(--discount-bg);
+  color: var(--discount-text);
+  padding: 2px 12px;
+  border-radius: 20px;
+  font-weight: 700;
+  font-size: 12px;
+  margin-left: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.price-strike {
+  text-decoration: line-through;
+  color: var(--text-muted);
+  font-size: 13px;
+  margin-right: 8px;
+}
+
+.price-discount {
+  color: var(--discount-bg);
+  font-weight: 700;
+  font-size: 15px;
+}
+
 button {  
   width: 100%;  
   padding: 16px;  
@@ -325,7 +353,7 @@ p {
   </header>  
   
   <ul class="menu-list">  
-    <li><a href="/home2/">🏠 Home</a>/</li>
+    <li><a href="/index.html/">🏠 Home</a>/</li>
 	<li><a href="/sosmed-1/">⚜️ Suntik Sosmed 1</a></li>  
      </ul>  
 </nav>  
@@ -438,11 +466,16 @@ window.addEventListener("load", loadData);
   const layanan=document.getElementById("layanan");  
   layanan.innerHTML="<option value=''>-- Pilih Layanan --</option>";  
   
-  if(kategori){  
+  if(kategori && layananData[kategori]){  
     layananData[kategori].forEach(l=>{  
       let opt=document.createElement("option");  
       opt.value=l.id;  
-      opt.textContent=l.name+" (ID: "+l.id+")";  
+      // Tampilkan nama + diskon jika ada
+      let label = l.name + " (ID: "+l.id+")";
+      if(l.diskon && l.diskon < l.pricePerFollower) {
+        label += " 🔥 DISKON";
+      }
+      opt.textContent = label;
       layanan.appendChild(opt);  
     });  
   }  
@@ -455,22 +488,42 @@ function showInfo(){
   const layananID=document.getElementById("layanan").value;  
   
   selectedService=layananData[kategori].find(l=>l.id==layananID);  
+  if(!selectedService) return;
+  
+  let priceDisplay = '';
+  let diskonDisplay = '';
+  
+  // Cek diskon
+  if(selectedService.diskon && selectedService.diskon < selectedService.pricePerFollower) {
+    priceDisplay = `<span class="price-strike">Rp${selectedService.pricePerFollower}</span> <span class="price-discount">Rp${selectedService.diskon}</span> <span class="discount-badge">Diskon</span>`;
+    diskonDisplay = `<br>Harga Diskon: Rp${selectedService.diskon}/unit (hemat Rp${selectedService.pricePerFollower - selectedService.diskon})`;
+  } else {
+    priceDisplay = `Rp${selectedService.pricePerFollower}/unit`;
+  }
+  
   document.getElementById("infoLayanan").innerHTML=  
   `<b>${selectedService.name}</b><br>  
    ID Produk: ${selectedService.id}<br>  
-   Harga: Rp${selectedService.pricePerFollower}/unit<br>  
+   Harga: ${priceDisplay}<br>  
+   ${diskonDisplay}
    Min: ${selectedService.min} | Max: ${selectedService.max}<br>  
-   ${selectedService.desc}`;  
+   ${selectedService.desc || ''}`;  
 }  
   
 function hitungTotal(){  
-  if(!selectedService)return;  
+  if(!selectedService) return;  
   const jumlah=parseInt(document.getElementById("jumlah").value||"0");  
   if(jumlah < selectedService.min || jumlah > selectedService.max){  
     document.getElementById("total").value="Jumlah tidak valid!";  
     return;  
-  }  
-  document.getElementById("total").value=jumlah * selectedService.pricePerFollower;  
+  }
+  
+  // Pake harga diskon jika ada, kalo ga ada pake harga normal
+  const hargaAktif = (selectedService.diskon && selectedService.diskon < selectedService.pricePerFollower) 
+    ? selectedService.diskon 
+    : selectedService.pricePerFollower;
+  
+  document.getElementById("total").value=jumlah * hargaAktif;  
 }  
   
 function generateTransactionID(){  
@@ -507,19 +560,17 @@ function lanjutPembayaran(){
   const trxID=generateTransactionID();  
   const kategori=document.getElementById("kategori").value;  
   const target=document.getElementById("target").value;  
-  const total=jumlah * selectedService.pricePerFollower;  
   
-  window.location.href=`payment/?trx=${trxID}&kategori=${kategori}&layanan=${selectedService.name}&id=${selectedService.id}&jumlah=${jumlah}&total=${total}&target=${encodeURIComponent(target)}`;  
-}  
+  // Pake harga diskon jika ada
+  const hargaAktif = (selectedService.diskon && selectedService.diskon < selectedService.pricePerFollower) 
+    ? selectedService.diskon 
+    : selectedService.pricePerFollower;
   
-// MAINTENANCE REDIRECT  
-const isMaintenance=false;  
-if(isMaintenance){  
-  window.location.href="/sosmed-2/";  
+  const total=jumlah * hargaAktif;  
+  
+  window.location.href=`payment/?trx=${trxID}&kategori=${kategori}&layanan=${selectedService.name}&id=${selectedService.id}&jumlah=${jumlah}&total=${total}&target=${encodeURIComponent(target)}&diskon=${diskon}`;  
 }  
-	  
-/* 🔒 ANTI DEVTOOLS (tidak ganggu mobile) */
-
+   
 document.addEventListener("keydown", function(e){
   // F12
   if(e.key === "F12") e.preventDefault();
@@ -531,8 +582,6 @@ document.addEventListener("keydown", function(e){
   // Ctrl + U
   if(e.ctrlKey && e.key === "u") e.preventDefault();
 });
-
-// Deteksi DevTools (lebih aman, tidak pakai resize hack)
 setInterval(() => {
   const threshold = 160;
   if (window.devtoolsOpen) return;
@@ -548,6 +597,4 @@ setInterval(() => {
 </script>  
   
 </body>  
-</html>  
-  
- 
+	</html>
