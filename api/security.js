@@ -3,7 +3,7 @@ let burst = {};
 let blacklist = new Set();
 
 // ===== CONFIG =====
-const MAX_REQUEST = 1;              // Maksimal request per menit
+const MAX_REQUEST = 2;              // Maksimal request per menit
 const WINDOW_MS = 10 * 1000;         // 1 menit
 
 const BURST_LIMIT = 2;              // Maksimal request cepat
