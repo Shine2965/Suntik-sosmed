@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shine Shop CS Bot</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0a0a0a;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .chat-container {
+            width: 420px;
+            max-height: 750px;
+            background: #1a1a1a;
+            border-radius: 20px;
+            box-shadow: 0 0 40px rgba(0,255,200,0.15);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            border: 1px solid #00ffaa33;
+        }
+        .chat-header {
+            background: #00ffaa22;
+            padding: 18px 20px;
+            text-align: center;
+            border-bottom: 1px solid #00ffaa44;
+        }
+        .chat-header h2 {
+            color: #00ffaa;
+            font-size: 20px;
+            letter-spacing: 1px;
+            text-shadow: 0 0 10px #00ffaa66;
+        }
+        .chat-header small {
+            color: #888;
+            font-size: 12px;
+        }
+        .chat-messages {
+            flex: 1;
+            padding: 15px 18px;
+            overflow-y: auto;
+            max-height: 400px;
+            background: #111;
+        }
+        .chat-messages::-webkit-scrollbar {
+            width: 4px;
+        }
+        .chat-messages::-webkit-scrollbar-thumb {
+            background: #00ffaa66;
+            border-radius: 10px;
+        }
+        .msg {
+            margin: 10px 0;
+            padding: 12px 16px;
+            border-radius: 16px;
+            max-width: 88%;
+            font-size: 14px;
+            line-height: 1.5;
+            animation: fadeIn 0.3s ease;
+        }
+        .msg-bot {
+            background: #00ffaa15;
+            color: #d0d0d0;
+            border-left: 3px solid #00ffaa;
+            align-self: flex-start;
+            margin-right: auto;
+        }
+        .msg-user {
+            background: #00ffaa25;
+            color: #fff;
+            border-right: 3px solid #00ffaa;
+            align-self: flex-end;
+            margin-left: auto;
+            text-align: right;
+        }
+        .chat-input-area {
+            padding: 14px 18px;
+            background: #0d0d0d;
+            border-top: 1px solid #00ffaa22;
+            display: flex;
+            gap: 10px;
+        }
+        .chat-input-area input {
+            flex: 1;
+            padding: 12px 16px;
+            border: none;
+            border-radius: 30px;
+            background: #222;
+            color: #fff;
+            font-size: 14px;
+            outline: 1px solid #00ffaa44;
+        }
+        .chat-input-area input:focus {
+            outline: 2px solid #00ffaa;
+        }
+        .chat-input-area input:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .chat-input-area button {
+            padding: 12px 24px;
+            background: #00ffaa;
+            border: none;
+            border-radius: 30px;
+            font-weight: bold;
+            color: #0a0a0a;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .chat-input-area button:hover:not(:disabled) {
+            background: #00dd99;
+            transform: scale(0.96);
+        }
+        .chat-input-area button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .btn-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin: 10px 0;
+        }
+        .btn-group button {
+            background: #00ffaa22;
+            color: #00ffaa;
+            border: 1px solid #00ffaa55;
+            padding: 8px 16px;
+            border-radius: 30px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: 0.2s;
+            flex: 1 1 auto;
+            min-width: 120px;
+        }
+        .btn-group button:hover {
+            background: #00ffaa55;
+            color: #fff;
+        }
+        .quick-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            padding: 8px 18px 12px;
+            background: #0d0d0d;
+            border-top: 1px solid #00ffaa22;
+        }
+        .quick-buttons button {
+            background: #00ffaa15;
+            color: #00ffaa;
+            border: 1px solid #00ffaa33;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 11px;
+            cursor: pointer;
+            transition: 0.2s;
+            flex: 1;
+        }
+        .quick-buttons button:hover {
+            background: #00ffaa44;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .typing {
+            color: #888;
+            font-size: 13px;
+            padding: 8px 16px;
+            font-style: italic;
+        }
+        #gmail-warning {
+            color: #ff4444;
+            font-weight: bold;
+            font-size: 13px;
+            padding: 10px 18px;
+            background: #ff000011;
+            border-bottom: 1px solid #ff444466;
+            text-align: center;
+        }
+
+        /* MODAL POPUP */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.85);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            backdrop-filter: blur(8px);
+        }
+        .modal-box {
+            background: #1a1a1a;
+            border: 2px solid #00ffaa66;
+            border-radius: 24px;
+            padding: 40px 35px;
+            max-width: 420px;
+            width: 90%;
+            box-shadow: 0 0 60px rgba(0,255,170,0.2);
+            animation: modalPop 0.4s ease;
+        }
+        @keyframes modalPop {
+            from { transform: scale(0.8); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+        .modal-box h2 {
+            color: #00ffaa;
+            text-align: center;
+            font-size: 24px;
+            margin-bottom: 8px;
+        }
+        .modal-box .sub {
+            color: #888;
+            text-align: center;
+            font-size: 14px;
+            margin-bottom: 25px;
+        }
+        .modal-box .warning-text {
+            color: #ff4444;
+            text-align: center;
+            font-size: 13px;
+            background: #ff000015;
+            padding: 12px;
+            border-radius: 12px;
+            border: 1px solid #ff444455;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+        .modal-box input {
+            width: 100%;
+            padding: 14px 18px;
+            border: 2px solid #00ffaa44;
+            border-radius: 30px;
+            background: #0d0d0d;
+            color: #fff;
+            font-size: 15px;
+            outline: none;
+            transition: 0.3s;
+        }
+        .modal-box input:focus {
+            border-color: #00ffaa;
+            box-shadow: 0 0 20px rgba(0,255,170,0.15);
+        }
+        .modal-box button {
+            width: 100%;
+            margin-top: 16px;
+            padding: 14px;
+            background: #00ffaa;
+            border: none;
+            border-radius: 30px;
+            font-weight: bold;
+            font-size: 16px;
+            color: #0a0a0a;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        .modal-box button:hover {
+            background: #00dd99;
+            transform: scale(0.97);
+        }
+        .modal-box .error-msg {
+            color: #ff6666;
+            font-size: 13px;
+            margin-top: 10px;
+            text-align: center;
+            min-height: 20px;
+        }
+        .voucher-code {
+            background: #00ffaa15;
+            border: 1px solid #00ffaa55;
+            border-radius: 12px;
+            padding: 12px;
+            margin: 10px 0;
+            text-align: center;
+            font-size: 18px;
+            font-weight: bold;
+            color: #00ffaa;
+            letter-spacing: 2px;
+        }
+        .link-button {
+            display: inline-block;
+            background: #00ffaa22;
+            color: #00ffaa;
+            padding: 10px 20px;
+            border-radius: 12px;
+            text-decoration: none;
+            margin: 8px 0;
+            border: 1px solid #00ffaa44;
+            transition: 0.3s;
+        }
+        .link-button:hover {
+            background: #00ffaa44;
+        }
+    </style>
+</head>
+<body>
+
+<!-- MODAL POPUP GMAIL -->
+<div class="modal-overlay" id="gmailModal">
+    <div class="modal-box">
+        <h2>🛸 Shine Shop CS</h2>
+        <div class="sub">Powered by Dragon V1</div>
+        <div class="warning-text">⚠ PESAN ANDA AKAN DIBACA OTOMATIS & DIBALAS VIA GMAIL ⚠</div>
+        <input type="email" id="modalEmailInput" placeholder="Masukkan alamat Gmail Anda..." autocomplete="email">
+        <button id="modalSubmitBtn">✅ Lanjutkan</button>
+        <div class="error-msg" id="modalError"></div>
+    </div>
+</div>
+
+<div class="chat-container" id="app">
+    <div class="chat-header">
+        <h2>🛸 Shine Shop CS</h2>
+        <small>Powered by Dragon V1</small>
+    </div>
+    <div id="gmail-warning">⚠ PESAN ANDA AKAN DIBACA OTOMATIS & DIBALAS VIA GMAIL ⚠</div>
+    <div class="chat-messages" id="chatMessages"></div>
+    
+    <!-- Quick Reply Buttons -->
+    <div class="quick-buttons" id="quickButtons">
+        <button onclick="quickReply('Cek Transaksi')">📦 Cek Transaksi</button>
+        <button onclick="quickReply('Refund')">💰 Refund</button>
+        <button onclick="quickReply('Tutorial Beli')">📖 Tutorial Beli</button>
+        <button onclick="quickReply('Halo')">👋 Sapaan</button>
+    </div>
+    
+    <div class="chat-input-area">
+        <input type="text" id="chatInput" placeholder="Ketik pesan..." autocomplete="off">
+        <button id="sendBtn">Kirim</button>
+    </div>
+</div>
+
+<script>
+    // ===================== KONFIGURASI =====================
+    const TELEGRAM_TOKEN = '8785872128:AAGJApScDjRIjg1VorXB35OvrvtUDCtVr0M';
+    const TELEGRAM_CHAT_ID = '6317157631';
+    const USER_ID_KEY = 'user_id';
+    const BOT_NAME = 'Dragon CS';
+    const TUTORIAL_LINK = 'https://drive.google.com/file/d/1QI6X9ocYgLcpGFufYCoL_BNks6Rx_ML6/view?usp=drivesdk';
+
+    // ===================== STATE =====================
+    let userId = localStorage.getItem(USER_ID_KEY);
+    if (!userId) {
+        userId = 'user-' + Math.random().toString(36).substring(2, 10) + '-' + Math.random().toString(36).substring(2, 8);
+        localStorage.setItem(USER_ID_KEY, userId);
+    }
+
+    let currentStep = 'idle';
+    let pendingTrxId = null;
+    let allTransactions = {};
+    let isEmailValidated = false;
+
+    // ===================== DOM =====================
+    const messagesEl = document.getElementById('chatMessages');
+    const inputEl = document.getElementById('chatInput');
+    const sendBtn = document.getElementById('sendBtn');
+    const modalOverlay = document.getElementById('gmailModal');
+    const modalEmailInput = document.getElementById('modalEmailInput');
+    const modalSubmitBtn = document.getElementById('modalSubmitBtn');
+    const modalError = document.getElementById('modalError');
+
+    function addMessage(text, sender, extraClass = '') {
+        const div = document.createElement('div');
+        div.className = `msg ${sender === 'bot' ? 'msg-bot' : 'msg-user'} ${extraClass}`;
+        div.innerHTML = text;
+        messagesEl.appendChild(div);
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    function addTyping() {
+        const div = document.createElement('div');
+        div.className = 'typing';
+        div.id = 'typingIndicator';
+        div.textContent = '💬 Bot sedang mengetik...';
+        messagesEl.appendChild(div);
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    function removeTyping() {
+        const el = document.getElementById('typingIndicator');
+        if (el) el.remove();
+    }
+
+    function addButtons(buttons) {
+        const div = document.createElement('div');
+        div.className = 'btn-group';
+        buttons.forEach((btn) => {
+            const b = document.createElement('button');
+            b.textContent = btn.label;
+            b.onclick = () => {
+                handleUserInput(btn.value);
+            };
+            div.appendChild(b);
+        });
+        messagesEl.appendChild(div);
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    // ===================== QUICK REPLY =====================
+    window.quickReply = function(text) {
+        handleUserInput(text);
+    };
+
+    // ===================== TELEGRAM =====================
+    async function sendToTelegram(message) {
+        if (!TELEGRAM_TOKEN) {
+            console.warn('TELEGRAM_TOKEN tidak diset!');
+            return;
+        }
+        try {
+            const payload = {
+                chat_id: TELEGRAM_CHAT_ID,
+                text: `📨 **Pesan CS**\n👤 User: ${userId}\n✉️ Gmail: ${localStorage.getItem('customer_email') || 'belum diisi'}\n💬 ${message}`,
+                parse_mode: 'Markdown'
+            };
+            await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+        } catch (e) {
+            console.error('Gagal kirim ke Telegram:', e);
+        }
+    }
+
+    // ===================== LOAD DATA JSON =====================
+    async function loadAllTransactions() {
+        const files = [
+            '/riwayat/data.json',
+            '/riwayat/data-juli-2026.json',
+            '/riwayat/agustus-2026.json'
+        ];
+
+        let mergedData = {};
+
+        for (const file of files) {
+            try {
+                const response = await fetch(file);
+                if (!response.ok) {
+                    console.warn(`Gagal load ${file}: ${response.status}`);
+                    continue;
+                }
+                const data = await response.json();
+                mergedData = { ...mergedData, ...data };
+                console.log(`✅ Loaded ${file}: ${Object.keys(data).length} entries`);
+            } catch (e) {
+                console.error(`Error loading ${file}:`, e);
+            }
+        }
+
+        return mergedData;
+    }
+
+    // ===================== BOT LOGIC =====================
+    function getCustomerEmail() {
+        return localStorage.getItem('customer_email');
+    }
+
+    function setCustomerEmail(email) {
+        localStorage.setItem('customer_email', email);
+    }
+
+    async function handleBotLogic(input) {
+        const lower = input.toLowerCase().trim();
+
+        // STEP 1: Cek email
+        if (!isEmailValidated) {
+            addMessage('⚠️ Mohon masukkan Gmail Anda melalui popup terlebih dahulu.', 'bot');
+            return;
+        }
+
+        // STEP 2: Handle perintah khusus
+        if (['oy', 'hai', 'hi', 'halo', 'p', 'hay'].includes(lower)) {
+            addMessage('Halo ka, ada yang bisa saya bantu?', 'bot');
+            sendToTelegram(`Pesan: ${input}`);
+            return;
+        }
+
+        // Tutorial / Cara Beli
+        if (lower.includes('tutorial') || lower.includes('cara beli') || lower.includes('cara order') || 
+            lower.includes('tutor') || lower.includes('beli') && !lower.includes('transaksi')) {
+            addMessage(`📖 Berikut tutorial pembelian/transaksi di Shine Shop:<br><br>
+            <a href="${TUTORIAL_LINK}" target="_blank" class="link-button">📹 Klik untuk melihat tutorial</a><br><br>
+            Atau salin link ini: <br><code style="font-size:11px;word-break:break-all;">${TUTORIAL_LINK}</code>`, 'bot');
+            sendToTelegram(`Minta tutorial: ${input}`);
+            return;
+        }
+
+        // Cek Transaksi / Pesanan
+        if (lower.includes('transaksi') || lower.includes('pesanan') || lower.includes('cek') && lower.includes('trx')) {
+            addMessage('Baik, boleh dibantu id transaksi Kaka yang dimaksud?', 'bot');
+            currentStep = 'waiting_trx';
+            sendToTelegram(`Pesan: ${input} (menunggu TRX)`);
+            return;
+        }
+
+        // Refund
+        if (lower.includes('refund') || lower.includes('dibatalkan') || lower.includes('batal') || 
+            lower.includes('pengembalian') || lower.includes('uang kembali')) {
+            addMessage('Baik, boleh dibantu id transaksi nya kak?', 'bot');
+            currentStep = 'waiting_refund_trx';
+            sendToTelegram(`Pesan: ${input} (menunggu TRX refund)`);
+            return;
+        }
+
+        // STEP 3: Cek apakah input adalah TRX
+        if (input.startsWith('TRX')) {
+            if (currentStep === 'waiting_refund_trx') {
+                await handleRefundTrx(input);
+                return;
+            } else if (currentStep === 'waiting_trx' || currentStep === 'idle') {
+                await handleTransactionCheck(input);
+                return;
+            }
+        }
+
+        // STEP 4: Handle input refund rekening
+        if (currentStep === 'waiting_refund_rek') {
+            await handleRefundRek(input);
+            return;
+        }
+
+        // Fallback dengan tombol bantuan
+        addMessage('Maaf ka, saya kurang paham. Silakan pilih salah satu tombol di bawah ini:', 'bot');
+        addButtons([
+            { label: '📦 Cek Transaksi', value: 'Cek Transaksi' },
+            { label: '💰 Refund', value: 'Refund' },
+            { label: '📖 Tutorial', value: 'Tutorial Beli' }
+        ]);
+        sendToTelegram(`Pesan tidak dikenali: ${input}`);
+    }
+
+    async function handleTransactionCheck(trxId) {
+        addTyping();
+        currentStep = 'idle';
+
+        if (Object.keys(allTransactions).length === 0) {
+            allTransactions = await loadAllTransactions();
+        }
+
+        const data = allTransactions[trxId];
+        removeTyping();
+
+        if (!data) {
+            addMessage(`❌ Transaksi dengan ID ${trxId} tidak ditemukan. Coba periksa kembali kode transaksi Anda.`, 'bot');
+            sendToTelegram(`TRX ${trxId} tidak ditemukan`);
+            return;
+        }
+
+        let statusText = data.status;
+        let statusEmoji = '📦';
+        if (statusText.toLowerCase() === 'sukses') statusEmoji = '✅';
+        else if (statusText.toLowerCase() === 'pending') statusEmoji = '⏳';
+        else if (statusText.toLowerCase() === 'dibatalkan') statusEmoji = '❌';
+
+        let reply = `Halo kak, pesanan anda dengan id transaksi <b>${trxId}</b><br>
+📦 <b>Produk:</b> ${data.produk || '-'}<br>
+📅 <b>Waktu:</b> ${data.waktu || '-'}<br>
+🔢 <b>Jumlah:</b> ${data.jumlah || '-'}<br>
+<b>Status:</b> ${statusEmoji} ${statusText}`;
+
+        if (data.pesan) {
+            reply += `<br><br>📝 <b>Catatan:</b> ${data.pesan}`;
+        }
+
+        // CEK KODE VOUCHER
+        if (data.kodevoucher) {
+            reply += `<br><br>🎫 <b>Kode Voucher:</b> <span class="voucher-code">${data.kodevoucher}</span><br>
+            <small>💰 Transaksi ini di bawah 1K, voucher bisa digunakan untuk transaksi berikutnya di Shine Shop.</small>`;
+            addMessage(reply, 'bot');
+            sendToTelegram(`TRX ${trxId} -> Voucher: ${data.kodevoucher}`);
+            return;
+        }
+
+        if (statusText.toLowerCase() === 'dibatalkan') {
+            const nominal = parseInt(data.jumlah) || 0;
+            if (nominal < 1000) {
+                if (data.kodevoucher) {
+                    reply += `<br><br>🎫 <b>Kode Voucher:</b> <span class="voucher-code">${data.kodevoucher}</span><br>
+                    <small>💰 Transaksi di bawah 1K, voucher otomatis diberikan.</small>`;
+                    addMessage(reply, 'bot');
+                    sendToTelegram(`Refund ${trxId} -> Voucher: ${data.kodevoucher}`);
+                } else {
+                    reply += `<br><br>🎫 Karena transaksi di bawah 1K, refund akan dikonversi ke <b>kode voucher</b> yang dikirim via Gmail oleh admin.`;
+                    addMessage(reply, 'bot');
+                    sendToTelegram(`Refund ${trxId} -> voucher (dibawah 1K)`);
+                }
+                currentStep = 'idle';
+            } else {
+                reply += `<br><br>⚠️ Pesanan dibatalkan. Silakan kirim nomor rekening e-wallet (DANA/OVO/GoPay) untuk refund.`;
+                addMessage(reply, 'bot');
+                addMessage('📱 Ketik nomor e-wallet Anda (contoh: 081234567890)', 'bot');
+                currentStep = 'waiting_refund_rek';
+                pendingTrxId = trxId;
+                sendToTelegram(`Refund untuk ${trxId} - menunggu rekening`);
+            }
+            return;
+        }
+
+        addMessage(reply, 'bot');
+        sendToTelegram(`Cek transaksi ${trxId}: ${statusText}`);
+    }
+
+    async function handleRefundTrx(trxId) {
+        addTyping();
+        
+        if (Object.keys(allTransactions).length === 0) {
+            allTransactions = await loadAllTransactions();
+        }
+
+        const data = allTransactions[trxId];
+        removeTyping();
+
+        if (!data) {
+            addMessage(`❌ Transaksi ${trxId} tidak ditemukan.`, 'bot');
+            currentStep = 'idle';
+            return;
+        }
+
+        if (data.status.toLowerCase() !== 'dibatalkan') {
+            addMessage(`ℹ️ Transaksi ${trxId} statusnya <b>${data.status}</b>, bukan dibatalkan. Tidak bisa refund.`, 'bot');
+            currentStep = 'idle';
+            return;
+        }
+
+        let reply = `🔁 Refund untuk ${trxId}:<br>📦 ${data.produk || '-'}<br>💰 Jumlah: ${data.jumlah || '-'}<br>📅 ${data.waktu || '-'}`;
+        const nominal = parseInt(data.jumlah) || 0;
+        
+        // CEK KODE VOUCHER DULU
+        if (data.kodevoucher) {
+            reply += `<br><br>🎫 <b>Kode Voucher sudah tersedia:</b> <span class="voucher-code">${data.kodevoucher}</span><br>
+            <small>💰 Transaksi ini di bawah 1K, voucher bisa digunakan untuk transaksi berikutnya.</small>`;
+            addMessage(reply, 'bot');
+            sendToTelegram(`Refund ${trxId} -> Voucher: ${data.kodevoucher}`);
+            currentStep = 'idle';
+            return;
+        }
+
+        if (nominal < 1000) {
+            reply += `<br><br>🎫 Karena transaksi di bawah 1K, refund akan dikonversi ke <b>kode voucher</b> yang dikirim via Gmail oleh admin.`;
+            addMessage(reply, 'bot');
+            sendToTelegram(`Refund ${trxId} -> voucher (dibawah 1K)`);
+            currentStep = 'idle';
+        } else {
+            reply += `<br><br>💳 Silakan kirim nomor rekening e-wallet Anda (DANA/OVO/GoPay) untuk diproses.`;
+            addMessage(reply, 'bot');
+            addMessage('📱 Ketik nomor e-wallet Anda:', 'bot');
+            currentStep = 'waiting_refund_rek';
+            pendingTrxId = trxId;
+            sendToTelegram(`Refund ${trxId} - menunggu rekening`);
+        }
+    }
+
+    async function handleRefundRek(input) {
+        let rek = input.trim();
+        if (rek.length < 8) {
+            addMessage('❌ Nomor rekening terlalu pendek. Masukkan nomor yang valid (min 8 digit).', 'bot');
+            return;
+        }
+
+        addMessage(`✅ Rekening ${rek} sudah dicatat. Refund akan diproses admin dalam 1x24 jam.`, 'bot');
+        await sendToTelegram(`Refund untuk ${pendingTrxId || 'unknown'} -> Rek: ${rek}`);
+        currentStep = 'idle';
+        pendingTrxId = null;
+    }
+
+    // ===================== HANDLE USER INPUT =====================
+    function handleUserInput(input) {
+        if (!input.trim()) return;
+        addMessage(input, 'user');
+        sendToTelegram(`🧑 User: ${input}`);
+        handleBotLogic(input);
+        inputEl.value = '';
+    }
+
+    // ===================== MODAL LOGIC =====================
+    function validateEmail(email) {
+        return email.includes('@') && email.includes('.') && email.length > 5;
+    }
+
+    function handleModalSubmit() {
+        const email = modalEmailInput.value.trim();
+        if (!validateEmail(email)) {
+            modalError.textContent = '❌ Format Gmail tidak valid. Contoh: user@gmail.com';
+            return;
+        }
+
+        setCustomerEmail(email);
+        isEmailValidated = true;
+        modalOverlay.style.display = 'none';
+        
+        addMessage(`✅ Gmail ${email} tersimpan. Ada yang bisa saya bantu?`, 'bot');
+        addMessage('💬 Silakan ketik pesan atau pilih tombol cepat di bawah.', 'bot');
+        sendToTelegram(`Gmail terdaftar: ${email}`);
+        currentStep = 'idle';
+        
+        // Enable input
+        inputEl.disabled = false;
+        sendBtn.disabled = false;
+        inputEl.focus();
+    }
+
+    // Enter di modal
+    modalEmailInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            handleModalSubmit();
+        }
+    });
+
+    modalSubmitBtn.addEventListener('click', handleModalSubmit);
+
+    // ===================== EVENT LISTENER =====================
+    sendBtn.addEventListener('click', () => {
+        handleUserInput(inputEl.value);
+    });
+
+    inputEl.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            handleUserInput(inputEl.value);
+        }
+    });
+
+    // ===================== STARTUP =====================
+    // Disable input dulu sampe email divalidasi
+    inputEl.disabled = true;
+    sendBtn.disabled = true;
+
+    // Cek apakah udah ada email di localStorage
+    const savedEmail = localStorage.getItem('customer_email');
+    if (savedEmail && validateEmail(savedEmail)) {
+        isEmailValidated = true;
+        modalOverlay.style.display = 'none';
+        inputEl.disabled = false;
+        sendBtn.disabled = false;
+        addMessage(`✅ Gmail ${savedEmail} tersimpan. Ada yang bisa saya bantu?`, 'bot');
+        addMessage('💬 Silakan ketik pesan atau pilih tombol cepat di bawah.', 'bot');
+        currentStep = 'idle';
+        inputEl.focus();
+    } else {
+        // Tampilkan modal
+        modalOverlay.style.display = 'flex';
+        modalEmailInput.focus();
+    }
+
+    // Preload data JSON
+    (async () => {
+        addMessage('📂 Memuat data transaksi...', 'bot');
+        allTransactions = await loadAllTransactions();
+        const total = Object.keys(allTransactions).length;
+        addMessage(`✅ ${total} data transaksi berhasil dimuat.`, 'bot');
+        console.log('📊 Total transaksi:', total);
+        console.log('📋 Sample:', Object.keys(allTransactions).slice(0, 3));
+    })();
+
+    console.log('🚀 Dragon CS Bot siap! User ID:', userId);
+    console.log('📌 TELEGRAM_TOKEN:', TELEGRAM_TOKEN ? '✅ Terdeteksi' : '❌ Tidak ada');
+    console.log('📌 Chat ID:', TELEGRAM_CHAT_ID);
+</script>
+</body>
+</html>
