@@ -20,7 +20,7 @@
         }
         .chat-container {
             width: 420px;
-            max-height: 700px;
+            max-height: 750px;
             background: #1a1a1a;
             border-radius: 20px;
             box-shadow: 0 0 40px rgba(0,255,200,0.15);
@@ -49,7 +49,7 @@
             flex: 1;
             padding: 15px 18px;
             overflow-y: auto;
-            max-height: 450px;
+            max-height: 400px;
             background: #111;
         }
         .chat-messages::-webkit-scrollbar {
@@ -132,10 +132,35 @@
             font-size: 12px;
             cursor: pointer;
             transition: 0.2s;
+            flex: 1;
+            min-width: 120px;
         }
         .btn-group button:hover {
             background: #00ffaa55;
             color: #fff;
+        }
+        .quick-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            padding: 8px 18px;
+            background: #0d0d0d;
+            border-top: 1px solid #00ffaa22;
+        }
+        .quick-buttons button {
+            background: #00ffaa15;
+            color: #00ffaa;
+            border: 1px solid #00ffaa33;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 11px;
+            cursor: pointer;
+            transition: 0.2s;
+            flex: 1;
+            min-width: 80px;
+        }
+        .quick-buttons button:hover {
+            background: #00ffaa44;
         }
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(8px); }
@@ -270,6 +295,12 @@
     </div>
     <div id="gmail-warning">⚠ PESAN ANDA AKAN DIBACA OTOMATIS & DIBALAS VIA GMAIL ⚠</div>
     <div class="chat-messages" id="chatMessages"></div>
+    <div class="quick-buttons" id="quickButtons">
+        <button onclick="quickReply('transaksi')">📦 Cek Transaksi</button>
+        <button onclick="quickReply('refund')">💰 Refund</button>
+        <button onclick="quickReply('tutorial')">📚 Tutorial</button>
+        <button onclick="quickReply('halo')">👋 Halo</button>
+    </div>
     <div class="chat-input-area">
         <input type="text" id="chatInput" placeholder="Ketik pesan..." autocomplete="off">
         <button id="sendBtn">Kirim</button>
@@ -278,7 +309,8 @@
 
 <script>
     // ===================== KONFIGURASI =====================
-    const TELEGRAM_TOKEN = '8785872128:AAGJApScDjRIjg1VorXB35OvrvtUDCtVr0M';
+    // Ambil token dari environment variable Vercel
+    const TELEGRAM_TOKEN = '<?php echo getenv("TELEGRAM_TOKEN") ?: "8785872128:AAGJApScDjRIjg1VorXB35OvrvtUDCtVr0M"; ?>';
     const TELEGRAM_CHAT_ID = '6317157631';
     const USER_ID_KEY = 'user_id';
     const BOT_NAME = 'Dragon CS';
@@ -328,7 +360,7 @@
 
     // ===================== TELEGRAM =====================
     async function sendToTelegram(message) {
-        if (!TELEGRAM_TOKEN) {
+        if (!TELEGRAM_TOKEN || TELEGRAM_TOKEN === '') {
             console.warn('TELEGRAM_TOKEN tidak diset!');
             return;
         }
@@ -385,6 +417,31 @@
         localStorage.setItem('customer_email', email);
     }
 
+    // Quick reply function
+    window.quickReply = function(type) {
+        if (!isEmailValidated) {
+            addMessage('⚠️ Mohon masukkan Gmail Anda melalui popup terlebih dahulu.', 'bot');
+            return;
+        }
+        
+        switch(type) {
+            case 'transaksi':
+                handleUserInput('transaksi');
+                break;
+            case 'refund':
+                handleUserInput('refund');
+                break;
+            case 'tutorial':
+                handleUserInput('tutorial');
+                break;
+            case 'halo':
+                handleUserInput('halo');
+                break;
+            default:
+                break;
+        }
+    };
+
     async function handleBotLogic(input) {
         const lower = input.toLowerCase().trim();
 
@@ -401,7 +458,14 @@
             return;
         }
 
-        if (lower.includes('transaksi') || lower.includes('pesanan') || lower.includes('beli') || lower.includes('order')) {
+        // Tutorial
+        if (lower.includes('tutorial') || lower.includes('cara') || lower.includes('beli') || lower.includes('order') && !lower.includes('transaksi')) {
+            addMessage(`📚 Berikut tutorial pembelian/transaksi di Shine Shop:<br><br>🔗 <a href="https://drive.google.com/file/d/1QI6X9ocYgLcpGFufYCoL_BNks6Rx_ML6/view?usp=drivesdk" target="_blank" style="color: #00ffaa;">Klik disini untuk melihat tutorial</a><br><br>Silakan dipelajari ya ka! 😊`, 'bot');
+            sendToTelegram(`Mengirim tutorial ke customer`);
+            return;
+        }
+
+        if (lower.includes('transaksi') || lower.includes('pesanan') || lower.includes('order')) {
             addMessage('Baik, boleh dibantu id transaksi Kaka yang dimaksud?', 'bot');
             currentStep = 'waiting_trx';
             sendToTelegram(`Pesan: ${input} (menunggu TRX)`);
@@ -470,12 +534,17 @@
             reply += `<br><br>📝 <b>Catatan:</b> ${data.pesan}`;
         }
 
+        // Cek voucher
+        if (data.kodevoucher) {
+            reply += `<br><br>🎫 <b>Kode Voucher:</b> ${data.kodevoucher}`;
+        }
+
         if (statusText.toLowerCase() === 'dibatalkan') {
-            const nominal = parseInt(data.jumlah) || 0;
-            if (nominal < 1000) {
-                reply += `<br><br>🎫 Karena transaksi di bawah 1K, refund akan dikonversi ke <b>kode voucher</b> yang dikirim via Gmail oleh admin.`;
+            // Cek apakah ada kode voucher
+            if (data.kodevoucher && data.kodevoucher !== 'tidak ada') {
+                reply += `<br><br>🎫 Karena transaksi di bawah 1K, refund dikonversi ke <b>kode voucher</b>.<br>🔑 <b>Kode Voucher Anda:</b> ${data.kodevoucher}<br>📧 Voucher sudah dikirim ke Gmail Anda.`;
                 addMessage(reply, 'bot');
-                sendToTelegram(`Refund ${trxId} -> voucher (dibawah 1K)`);
+                sendToTelegram(`Refund ${trxId} -> voucher: ${data.kodevoucher}`);
                 currentStep = 'idle';
             } else {
                 reply += `<br><br>⚠️ Pesanan dibatalkan. Silakan kirim nomor rekening e-wallet (DANA/OVO/GoPay) untuk refund.`;
@@ -515,12 +584,12 @@
         }
 
         let reply = `🔁 Refund untuk ${trxId}:<br>📦 ${data.produk || '-'}<br>💰 Jumlah: ${data.jumlah || '-'}<br>📅 ${data.waktu || '-'}`;
-        const nominal = parseInt(data.jumlah) || 0;
         
-        if (nominal < 1000) {
-            reply += `<br><br>🎫 Karena transaksi di bawah 1K, refund akan dikonversi ke <b>kode voucher</b> yang dikirim via Gmail oleh admin.`;
+        // Cek voucher
+        if (data.kodevoucher && data.kodevoucher !== 'tidak ada') {
+            reply += `<br><br>🎫 Refund dikonversi ke <b>kode voucher</b>.<br>🔑 <b>Kode Voucher:</b> ${data.kodevoucher}<br>📧 Voucher sudah dikirim ke Gmail Anda.`;
             addMessage(reply, 'bot');
-            sendToTelegram(`Refund ${trxId} -> voucher (dibawah 1K)`);
+            sendToTelegram(`Refund ${trxId} -> voucher: ${data.kodevoucher}`);
             currentStep = 'idle';
         } else {
             reply += `<br><br>💳 Silakan kirim nomor rekening e-wallet Anda (DANA/OVO/GoPay) untuk diproses.`;
@@ -615,7 +684,7 @@
         inputEl.disabled = false;
         sendBtn.disabled = false;
         addMessage(`✅ Gmail ${savedEmail} tersimpan. Ada yang bisa saya bantu?`, 'bot');
-        addMessage('💬 Silakan ketik pesan Anda.', 'bot');
+        addMessage('💬 Silakan ketik pesan atau pilih tombol cepat di bawah.', 'bot');
         currentStep = 'idle';
         inputEl.focus();
     } else {
@@ -637,6 +706,7 @@
     console.log('🚀 Dragon CS Bot siap! User ID:', userId);
     console.log('📌 TELEGRAM_TOKEN:', TELEGRAM_TOKEN ? '✅ Terdeteksi' : '❌ Tidak ada');
     console.log('📌 Chat ID:', TELEGRAM_CHAT_ID);
+    console.log('📌 Mode:', TELEGRAM_TOKEN === '<?php echo getenv("TELEGRAM_TOKEN") ?: "8785872128:AAGJApScDjRIjg1VorXB35OvrvtUDCtVr0M"; ?>' ? 'Hardcode' : 'Environment Variable');
 </script>
 </body>
 </html>
