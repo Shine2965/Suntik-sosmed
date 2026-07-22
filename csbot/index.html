@@ -31,9 +31,10 @@
         }
         .chat-header {
             background: #00ffaa22;
-            padding: 18px 20px;
+            padding: 14px 20px;
             text-align: center;
             border-bottom: 1px solid #00ffaa44;
+            position: relative;
         }
         .chat-header h2 {
             color: #00ffaa;
@@ -44,12 +45,30 @@
         .chat-header small {
             color: #888;
             font-size: 12px;
+            display: block;
+        }
+        .chat-header .change-email-btn {
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: #00ffaa22;
+            color: #00ffaa;
+            border: 1px solid #00ffaa55;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        .chat-header .change-email-btn:hover {
+            background: #00ffaa55;
         }
         .chat-messages {
             flex: 1;
             padding: 15px 18px;
             overflow-y: auto;
-            max-height: 400px;
+            max-height: 380px;
             background: #111;
         }
         .chat-messages::-webkit-scrollbar {
@@ -187,6 +206,14 @@
             background: #ff000011;
             border-bottom: 1px solid #ff444466;
             text-align: center;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        #gmail-warning .email-display {
+            color: #00ffaa;
+            font-weight: normal;
+            font-size: 12px;
         }
 
         /* MODAL POPUP */
@@ -279,6 +306,12 @@
             text-align: center;
             min-height: 20px;
         }
+        .modal-box .info-text {
+            color: #888;
+            font-size: 12px;
+            text-align: center;
+            margin-top: 12px;
+        }
         .voucher-code {
             background: #00ffaa15;
             border: 1px solid #00ffaa55;
@@ -305,6 +338,14 @@
         .link-button:hover {
             background: #00ffaa44;
         }
+        .btn-ubah-email {
+            background: #ff444422 !important;
+            border-color: #ff444466 !important;
+            color: #ff6666 !important;
+        }
+        .btn-ubah-email:hover {
+            background: #ff444466 !important;
+        }
     </style>
 </head>
 <body>
@@ -318,6 +359,7 @@
         <input type="email" id="modalEmailInput" placeholder="Masukkan alamat Gmail Anda..." autocomplete="email">
         <button id="modalSubmitBtn">✅ Lanjutkan</button>
         <div class="error-msg" id="modalError"></div>
+        <div class="info-text" id="modalInfo"></div>
     </div>
 </div>
 
@@ -325,8 +367,12 @@
     <div class="chat-header">
         <h2>🛸 Shine Shop CS</h2>
         <small>Powered by Shine Shop - Beta Test</small>
+        <button class="change-email-btn" id="changeEmailBtn">✏️ Ubah Email</button>
     </div>
-    <div id="gmail-warning">⚠ PESAN ANDA AKAN DIBACA OTOMATIS & DIBALAS VIA GMAIL ⚠</div>
+    <div id="gmail-warning">
+        ⚠ PESAN ANDA AKAN DIBACA OTOMATIS & DIBALAS VIA GMAIL
+        <span class="email-display" id="emailDisplay"></span>
+    </div>
     <div class="chat-messages" id="chatMessages"></div>
     
     <!-- Quick Reply Buttons -->
@@ -371,6 +417,9 @@
     const modalEmailInput = document.getElementById('modalEmailInput');
     const modalSubmitBtn = document.getElementById('modalSubmitBtn');
     const modalError = document.getElementById('modalError');
+    const modalInfo = document.getElementById('modalInfo');
+    const changeEmailBtn = document.getElementById('changeEmailBtn');
+    const emailDisplay = document.getElementById('emailDisplay');
 
     function addMessage(text, sender, extraClass = '') {
         const div = document.createElement('div');
@@ -471,8 +520,34 @@
 
     function setCustomerEmail(email) {
         localStorage.setItem('customer_email', email);
+        updateEmailDisplay();
     }
 
+    function updateEmailDisplay() {
+        const email = getCustomerEmail();
+        if (email) {
+            emailDisplay.textContent = '📧 ' + email;
+            emailDisplay.style.display = 'inline';
+        } else {
+            emailDisplay.textContent = '';
+            emailDisplay.style.display = 'none';
+        }
+    }
+
+    // ===================== SHOW CHANGE EMAIL MODAL =====================
+    function showChangeEmailModal() {
+        const currentEmail = getCustomerEmail();
+        modalInfo.textContent = currentEmail ? `Email saat ini: ${currentEmail}` : 'Belum ada email terdaftar';
+        modalInfo.style.color = '#888';
+        modalEmailInput.value = currentEmail || '';
+        modalEmailInput.placeholder = 'Masukkan Gmail baru...';
+        modalSubmitBtn.textContent = '🔄 Update Email';
+        modalOverlay.style.display = 'flex';
+        modalEmailInput.focus();
+        modalError.textContent = '';
+    }
+
+    // ===================== HANDLE BOT LOGIC =====================
     async function handleBotLogic(input) {
         const lower = input.toLowerCase().trim();
 
@@ -692,19 +767,30 @@
             return;
         }
 
+        const oldEmail = getCustomerEmail();
         setCustomerEmail(email);
-        isEmailValidated = true;
+        
+        // Cek apakah ini update atau baru
+        if (oldEmail) {
+            addMessage(`✅ Gmail berhasil diubah dari <b>${oldEmail}</b> menjadi <b>${email}</b>`, 'bot');
+            sendToTelegram(`Gmail diubah: ${oldEmail} -> ${email}`);
+        } else {
+            isEmailValidated = true;
+            addMessage(`✅ Gmail ${email} tersimpan. Ada yang bisa saya bantu?`, 'bot');
+            addMessage('💬 Silakan ketik pesan atau pilih tombol cepat di bawah.', 'bot');
+            sendToTelegram(`Gmail terdaftar: ${email}`);
+            // Enable input
+            inputEl.disabled = false;
+            sendBtn.disabled = false;
+            inputEl.focus();
+        }
+        
         modalOverlay.style.display = 'none';
-        
-        addMessage(`✅ Gmail ${email} tersimpan. Ada yang bisa saya bantu?`, 'bot');
-        addMessage('💬 Silakan ketik pesan atau pilih tombol cepat di bawah.', 'bot');
-        sendToTelegram(`Gmail terdaftar: ${email}`);
         currentStep = 'idle';
-        
-        // Enable input
-        inputEl.disabled = false;
-        sendBtn.disabled = false;
-        inputEl.focus();
+        modalEmailInput.value = '';
+        modalInfo.textContent = '';
+        modalSubmitBtn.textContent = '✅ Lanjutkan';
+        modalError.textContent = '';
     }
 
     // Enter di modal
@@ -729,10 +815,16 @@
         }
     });
 
+    // Tombol ubah email
+    changeEmailBtn.addEventListener('click', function() {
+        showChangeEmailModal();
+    });
+
     // ===================== STARTUP =====================
     // Disable input dulu sampe email divalidasi
     inputEl.disabled = true;
     sendBtn.disabled = true;
+    updateEmailDisplay();
 
     // Cek apakah udah ada email di localStorage
     const savedEmail = localStorage.getItem('customer_email');
@@ -749,6 +841,8 @@
         // Tampilkan modal
         modalOverlay.style.display = 'flex';
         modalEmailInput.focus();
+        modalInfo.textContent = 'Silakan masukkan Gmail untuk memulai chat';
+        modalInfo.style.color = '#888';
     }
 
     // Preload data JSON
