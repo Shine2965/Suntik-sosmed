@@ -366,7 +366,7 @@
 <div class="chat-container" id="app">
     <div class="chat-header">
         <h2>🛸 Shine Shop CS</h2>
-        <small>Powered by Shine Shop - Beta Test</small>
+        <small id="botNameDisplay">Powered by Shine Shop - Beta Test</small>
         <button class="change-email-btn" id="changeEmailBtn">✏️ Ubah Email</button>
     </div>
     <div id="gmail-warning">
@@ -379,6 +379,7 @@
     <div class="quick-buttons" id="quickButtons">
         <button onclick="quickReply('Cek Transaksi')">📦 Cek Transaksi</button>
         <button onclick="quickReply('Refund')">💰 Refund</button>
+        <button onclick="quickReply('Refill')">🔄 Refill</button>
         <button onclick="quickReply('Tutorial Beli')">📖 Tutorial Beli</button>
         <button onclick="quickReply('Halo')">👋 Sapaan</button>
     </div>
@@ -396,6 +397,11 @@
     const USER_ID_KEY = 'user_id';
     const TUTORIAL_LINK = 'https://drive.google.com/file/d/1QI6X9ocYgLcpGFufYCoL_BNks6Rx_ML6/view?usp=drivesdk';
     const PERATURAN_LINK = 'https://shinedomain.my.id';
+
+    // ===================== RANDOM BOT NAME =====================
+    const BOT_NAMES = ['Onivla', 'Theresa', 'Gaby', 'Olive', 'Eko'];
+    let botName = BOT_NAMES[Math.floor(Math.random() * BOT_NAMES.length)];
+    document.getElementById('botNameDisplay').textContent = `🤖 ${botName} - Shine Shop CS`;
 
     // ===================== STATE =====================
     let userId = localStorage.getItem(USER_ID_KEY);
@@ -559,7 +565,7 @@
 
         // STEP 2: Handle perintah khusus
         if (['oy', 'hai', 'hi', 'halo', 'p', 'hay', 'oyy', 'pp', 'woy', 'woyy'].includes(lower)) {
-            addMessage(`Halo ka, perkenalkan saya Onivla selaku Customer Service yang akan menemani kaka selama berkomunikasi, ada yang bisa saya bantu kak? <br><br> sebelum memulai chat pastikan sudah membaca syarat dan ketentuan berlaku <br><br> <a href="${PERATURAN_LINK}" target="_blank" class="link-button">📋 Klik untuk melihat syarat dan ketentuan</a><br><br>
+            addMessage(`Halo ka, perkenalkan saya ${botName} selaku Customer Service yang akan menemani kaka selama berkomunikasi, ada yang bisa saya bantu kak? <br><br> sebelum memulai chat pastikan sudah membaca syarat dan ketentuan berlaku <br><br> <a href="${PERATURAN_LINK}" target="_blank" class="link-button">📋 Klik untuk melihat syarat dan ketentuan</a><br><br>
             Atau salin link ini: <br><code style="font-size:11px;word-break:break-all;">${PERATURAN_LINK}</code>`, 'bot');
             sendToTelegram(`Pesan: ${input}`);
             return;
@@ -575,289 +581,9 @@
             return;
         }
 
-        // Cek Transaksi / Pesanan
-        if (lower.includes('transaksi') || lower.includes('pesanan') || (lower.includes('cek') && lower.includes('trx'))) {
-            addMessage('Baik, boleh dibantu id transaksi Kaka yang dimaksud?', 'bot');
-            currentStep = 'waiting_trx';
-            sendToTelegram(`Pesan: ${input} (menunggu TRX)`);
-            return;
-        }
-
-        // Refund
-        if (lower.includes('refund') || lower.includes('dibatalkan') || lower.includes('batal') || 
-            lower.includes('pengembalian') || lower.includes('uang kembali')) {
-            addMessage('Baik, boleh dibantu id transaksi nya kak?', 'bot');
-            currentStep = 'waiting_refund_trx';
-            sendToTelegram(`Pesan: ${input} (menunggu TRX refund)`);
-            return;
-        }
-
-        // STEP 3: Cek apakah input adalah TRX
-        if (input.startsWith('TRX')) {
-            if (currentStep === 'waiting_refund_trx') {
-                await handleRefundTrx(input);
-                return;
-            } else if (currentStep === 'waiting_trx' || currentStep === 'idle') {
-                await handleTransactionCheck(input);
-                return;
-            }
-        }
-
-        // STEP 4: Handle input refund rekening
-        if (currentStep === 'waiting_refund_rek') {
-            await handleRefundRek(input);
-            return;
-        }
-
-        // Fallback dengan tombol bantuan
-        addMessage('Maaf ka, saya kurang paham. Silakan pilih salah satu tombol di bawah ini:', 'bot');
-        addButtons([
-            { label: '📦 Cek Transaksi', value: 'Cek Transaksi' },
-            { label: '💰 Refund', value: 'Refund' },
-            { label: '📖 Tutorial', value: 'Tutorial Beli' }
-        ]);
-        sendToTelegram(`Pesan tidak dikenali: ${input}`);
-    }
-
-    async function handleTransactionCheck(trxId) {
-        addTyping();
-        currentStep = 'idle';
-
-        if (Object.keys(allTransactions).length === 0) {
-            allTransactions = await loadAllTransactions();
-        }
-
-        const data = allTransactions[trxId];
-        removeTyping();
-
-        if (!data) {
-            addMessage(`❌ Transaksi dengan ID ${trxId} tidak ditemukan. Coba periksa kembali kode transaksi Anda.`, 'bot');
-            sendToTelegram(`TRX ${trxId} tidak ditemukan`);
-            return;
-        }
-
-        let statusText = data.status;
-        let statusEmoji = '📦';
-        if (statusText.toLowerCase() === 'sukses') statusEmoji = '✅';
-        else if (statusText.toLowerCase() === 'pending') statusEmoji = '⏳';
-        else if (statusText.toLowerCase() === 'dibatalkan') statusEmoji = '❌';
-
-        let reply = `Halo kak, pesanan anda dengan id transaksi <b>${trxId}</b><br>
-📦 <b>Produk:</b> ${data.produk || '-'}<br>
-📅 <b>Waktu:</b> ${data.waktu || '-'}<br>
-🔢 <b>Jumlah:</b> ${data.jumlah || '-'}<br>
-<b>Status:</b> ${statusEmoji} ${statusText}`;
-
-        if (data.pesan) {
-            reply += `<br><br>📝 <b>Catatan:</b> ${data.pesan}`;
-        }
-
-        // CEK KODE VOUCHER
-        if (data.kodevoucher) {
-            reply += `<br><br>🎫 <b>Kode Voucher:</b> <span class="voucher-code">${data.kodevoucher}</span><br>
-            <small>💰 Transaksi ini di bawah 1K, voucher bisa digunakan untuk transaksi berikutnya di Shine Shop.</small>`;
-            addMessage(reply, 'bot');
-            sendToTelegram(`TRX ${trxId} -> Voucher: ${data.kodevoucher}`);
-            return;
-        }
-
-        if (statusText.toLowerCase() === 'dibatalkan') {
-            const nominal = parseInt(data.jumlah) || 0;
-            if (nominal < 1000) {
-                reply += `<br><br>🎫 Karena transaksi di bawah 1K, refund akan dikonversi ke <b>kode voucher</b> yang dikirim via Gmail oleh admin.`;
-                addMessage(reply, 'bot');
-                sendToTelegram(`Refund ${trxId} -> voucher (dibawah 1K)`);
-                currentStep = 'idle';
-            } else {
-                reply += `<br><br>⚠️ Pesanan dibatalkan. Silakan kirim nomor rekening e-wallet (DANA/OVO/GoPay) untuk refund.`;
-                addMessage(reply, 'bot');
-                addMessage('📱 Ketik nomor e-wallet Anda (contoh: 081234567890)', 'bot');
-                currentStep = 'waiting_refund_rek';
-                pendingTrxId = trxId;
-                sendToTelegram(`Refund untuk ${trxId} - menunggu rekening`);
-            }
-            return;
-        }
-
-        addMessage(reply, 'bot');
-        sendToTelegram(`Cek transaksi ${trxId}: ${statusText}`);
-    }
-
-    async function handleRefundTrx(trxId) {
-        addTyping();
-        
-        if (Object.keys(allTransactions).length === 0) {
-            allTransactions = await loadAllTransactions();
-        }
-
-        const data = allTransactions[trxId];
-        removeTyping();
-
-        if (!data) {
-            addMessage(`❌ Transaksi ${trxId} tidak ditemukan.`, 'bot');
-            currentStep = 'idle';
-            return;
-        }
-
-        if (data.status.toLowerCase() !== 'dibatalkan') {
-            addMessage(`ℹ️ Transaksi ${trxId} statusnya <b>${data.status}</b>, bukan dibatalkan. Tidak bisa refund.`, 'bot');
-            currentStep = 'idle';
-            return;
-        }
-
-        let reply = `🔁 Refund untuk ${trxId}:<br>📦 ${data.produk || '-'}<br>💰 Jumlah: ${data.jumlah || '-'}<br>📅 ${data.waktu || '-'}`;
-        const nominal = parseInt(data.jumlah) || 0;
-        
-        // CEK KODE VOUCHER DULU
-        if (data.kodevoucher) {
-            reply += `<br><br>🎫 <b>Kode Voucher sudah tersedia:</b> <span class="voucher-code">${data.kodevoucher}</span><br>
-            <small>💰 Transaksi ini di bawah 1K, voucher bisa digunakan untuk transaksi berikutnya.</small>`;
-            addMessage(reply, 'bot');
-            sendToTelegram(`Refund ${trxId} -> Voucher: ${data.kodevoucher}`);
-            currentStep = 'idle';
-            return;
-        }
-
-        if (nominal < 1000) {
-            reply += `<br><br>🎫 Karena transaksi di bawah 1K, refund akan dikonversi ke <b>kode voucher</b> yang dikirim via Gmail oleh admin.`;
-            addMessage(reply, 'bot');
-            sendToTelegram(`Refund ${trxId} -> voucher (dibawah 1K)`);
-            currentStep = 'idle';
-        } else {
-            reply += `<br><br>💳 Silakan kirim nomor rekening e-wallet Anda (DANA/OVO/GoPay) untuk diproses.`;
-            addMessage(reply, 'bot');
-            addMessage('📱 Ketik nomor e-wallet Anda:', 'bot');
-            currentStep = 'waiting_refund_rek';
-            pendingTrxId = trxId;
-            sendToTelegram(`Refund ${trxId} - menunggu rekening`);
-        }
-    }
-
-    async function handleRefundRek(input) {
-        let rek = input.trim();
-        if (rek.length < 8) {
-            addMessage('❌ Nomor rekening terlalu pendek. Masukkan nomor yang valid (min 8 digit).', 'bot');
-            return;
-        }
-
-        addMessage(`✅ Rekening ${rek} sudah dicatat. Refund akan diproses admin dalam 1x24 jam.`, 'bot');
-        await sendToTelegram(`Refund untuk ${pendingTrxId || 'unknown'} -> Rek: ${rek}`);
-        currentStep = 'idle';
-        pendingTrxId = null;
-    }
-
-    // ===================== HANDLE USER INPUT =====================
-    function handleUserInput(input) {
-        if (!input.trim()) return;
-        addMessage(input, 'user');
-        sendToTelegram(`🧑 User: ${input}`);
-        handleBotLogic(input);
-        inputEl.value = '';
-    }
-
-    // ===================== MODAL LOGIC =====================
-    function validateEmail(email) {
-        return email.includes('@') && email.includes('.') && email.length > 5;
-    }
-
-    function handleModalSubmit() {
-        const email = modalEmailInput.value.trim();
-        if (!validateEmail(email)) {
-            modalError.textContent = '❌ Format Gmail tidak valid. Contoh: user@gmail.com';
-            return;
-        }
-
-        const oldEmail = getCustomerEmail();
-        setCustomerEmail(email);
-        
-        // Cek apakah ini update atau baru
-        if (oldEmail) {
-            addMessage(`✅ Gmail berhasil diubah dari <b>${oldEmail}</b> menjadi <b>${email}</b>`, 'bot');
-            sendToTelegram(`Gmail diubah: ${oldEmail} -> ${email}`);
-        } else {
-            isEmailValidated = true;
-            addMessage(`✅ Gmail ${email} tersimpan. Ada yang bisa saya bantu?`, 'bot');
-            addMessage('💬 Silakan ketik pesan atau pilih tombol cepat di bawah.', 'bot');
-            sendToTelegram(`Gmail terdaftar: ${email}`);
-            // Enable input
-            inputEl.disabled = false;
-            sendBtn.disabled = false;
-            inputEl.focus();
-        }
-        
-        modalOverlay.style.display = 'none';
-        currentStep = 'idle';
-        modalEmailInput.value = '';
-        modalInfo.textContent = '';
-        modalSubmitBtn.textContent = '✅ Lanjutkan';
-        modalError.textContent = '';
-    }
-
-    // Enter di modal
-    modalEmailInput.addEventListener('keydown', function(e) {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            handleModalSubmit();
-        }
-    });
-
-    modalSubmitBtn.addEventListener('click', handleModalSubmit);
-
-    // ===================== EVENT LISTENER =====================
-    sendBtn.addEventListener('click', function() {
-        handleUserInput(inputEl.value);
-    });
-
-    inputEl.addEventListener('keydown', function(e) {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            handleUserInput(inputEl.value);
-        }
-    });
-
-    // Tombol ubah email
-    changeEmailBtn.addEventListener('click', function() {
-        showChangeEmailModal();
-    });
-
-    // ===================== STARTUP =====================
-    // Disable input dulu sampe email divalidasi
-    inputEl.disabled = true;
-    sendBtn.disabled = true;
-    updateEmailDisplay();
-
-    // Cek apakah udah ada email di localStorage
-    const savedEmail = localStorage.getItem('customer_email');
-    if (savedEmail && validateEmail(savedEmail)) {
-        isEmailValidated = true;
-        modalOverlay.style.display = 'none';
-        inputEl.disabled = false;
-        sendBtn.disabled = false;
-        addMessage(`✅ Gmail ${savedEmail} tersimpan. Ada yang bisa saya bantu?`, 'bot');
-        addMessage('💬 Silakan ketik pesan atau pilih tombol cepat di bawah.', 'bot');
-        currentStep = 'idle';
-        inputEl.focus();
-    } else {
-        // Tampilkan modal
-        modalOverlay.style.display = 'flex';
-        modalEmailInput.focus();
-        modalInfo.textContent = 'Silakan masukkan Gmail untuk memulai chat';
-        modalInfo.style.color = '#888';
-    }
-
-    // Preload data JSON
-    (async function() {
-        addMessage('📂 Memuat data transaksi...', 'bot');
-        allTransactions = await loadAllTransactions();
-        const total = Object.keys(allTransactions).length;
-        addMessage(`✅ ${total} data transaksi berhasil dimuat.`, 'bot');
-        console.log('📊 Total transaksi:', total);
-        console.log('📋 Sample:', Object.keys(allTransactions).slice(0, 3));
-    })();
-
-    console.log('🚀 Dragon CS Bot siap! User ID:', userId);
-    console.log('📌 TELEGRAM_TOKEN:', TELEGRAM_TOKEN ? '✅ Terdeteksi' : '❌ Tidak ada');
-    console.log('📌 Chat ID:', TELEGRAM_CHAT_ID);
-</script>
-</body>
-</html>
+        // ========== REFILL ==========
+        if (lower.includes('refill') || lower.includes('isi ulang') || lower.includes('topup') || 
+            lower.includes('top up') || lower.includes('refil')) {
+            addMessage(`Baik kak, boleh dibantu id transaksi nya?`, 'bot');
+            currentStep = 'waiting_refill_trx';
+            sendToTelegram(`Pesan: ${input} 
