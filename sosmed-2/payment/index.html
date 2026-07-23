@@ -169,28 +169,27 @@ function generateUniqueCode() {
   return Math.floor(Math.random() * 200) + 1; // 1-200
 }
 
-// Cek apakah transaksi sudah dikonfirmasi sebelumnya
-async function checkTransactionLock() {
+// ================= LOCK MENGGUNAKAN LOCAL STORAGE =================
+// Cek apakah transaksi sudah dikonfirmasi sebelumnya (via LocalStorage)
+function checkTransactionLockLocal() {
   try {
-    const res = await fetch(`/sosmed-2/payment/confirmed.json?trx=${trx}`, { cache: "no-store" });
-    if (!res.ok) return false;
-    const data = await res.json();
-    return data.confirmed === true;
+    const confirmedTransactions = JSON.parse(localStorage.getItem('confirmed_transactions') || '[]');
+    return confirmedTransactions.includes(trx);
   } catch {
     return false;
   }
 }
 
-// Simpan status konfirmasi
-async function saveTransactionLock() {
+// Simpan status konfirmasi ke LocalStorage
+function saveTransactionLockLocal() {
   try {
-    await fetch("/sosmed-2/payment/confirmed.json", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ trx, confirmed: true, timestamp: Date.now() })
-    });
+    const confirmedTransactions = JSON.parse(localStorage.getItem('confirmed_transactions') || '[]');
+    if (!confirmedTransactions.includes(trx)) {
+      confirmedTransactions.push(trx);
+      localStorage.setItem('confirmed_transactions', JSON.stringify(confirmedTransactions));
+    }
   } catch(e) {
-    console.error("Gagal simpan lock:", e);
+    console.error("Gagal simpan lock ke LocalStorage:", e);
   }
 }
 
@@ -272,8 +271,8 @@ applyVoucher.onclick = async()=>{
 };
 
 confirmBtn.onclick = async()=>{
-  // Cek lock transaksi
-  const isLocked = await checkTransactionLock();
+  // Cek lock transaksi via LocalStorage
+  const isLocked = checkTransactionLockLocal();
   if (isLocked) {
     return Swal.fire("Gagal", "Transaksi ini sudah dikonfirmasi sebelumnya!", "error");
   }
@@ -317,15 +316,20 @@ Order sekarang di shinedomain.my.id`
     })
   });
 
-  // Lock transaksi
-  await saveTransactionLock();
+  // Lock transaksi ke LocalStorage
+  saveTransactionLockLocal();
 
   Swal.fire("Berhasil", "Konfirmasi pembayaran berhasil dikirim!", "success");
+  
+  // Disable tombol setelah konfirmasi
+  document.getElementById('confirmBtn').disabled = true;
+  document.getElementById('confirmBtn').style.opacity = '0.5';
+  document.getElementById('confirmBtn').textContent = 'Transaksi Sudah Dikonfirmasi';
 };
 
-// Load transaksi status saat awal
+// Load transaksi status saat awal (via LocalStorage)
 (async function() {
-  const isLocked = await checkTransactionLock();
+  const isLocked = checkTransactionLockLocal();
   if (isLocked) {
     transactionLocked = true;
     document.getElementById('confirmBtn').disabled = true;
