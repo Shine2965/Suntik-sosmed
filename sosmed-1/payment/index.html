@@ -1,10 +1,13 @@
-<!DOCTYPE html><html lang="id">
+<!DOCTYPE html>
+<html lang="id">
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Pembayaran QRIS - Shine Shop</title><link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+<title>Pembayaran QRIS - Shine Shop</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script><style>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
+<style>
 *{box-sizing:border-box}
 body{
   font-family:'Poppins',sans-serif;
@@ -37,14 +40,6 @@ h2{margin:0;font-size:22px;font-weight:700}
   margin:18px auto;
   width:fit-content
 }
- p {
-  color: red; /* Warna merah */
-  font-family: 'Verdana', sans-serif;
-  font-size: 10px; /* Ukuran font 10px */
-  line-height: 1.6;
-  margin-bottom: 20px;
-}
-
 .details{font-size:13.5px;line-height:1.7}
 input{
   width:100%;
@@ -53,6 +48,13 @@ input{
   border:none;
   margin-top:10px;
   font-size:13px
+}
+p {
+  color: red;
+  font-family: 'Verdana', sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  margin-bottom: 20px;
 }
 .btn{
   width:100%;
@@ -67,7 +69,18 @@ input{
   cursor:pointer
 }
 .muted{text-align:center;font-size:12px;color:#cbd5e1;margin-top:12px}
-</style><script>
+.unique-code {
+  background: #1e293b;
+  padding: 10px;
+  border-radius: 12px;
+  text-align: center;
+  font-size: 18px;
+  font-weight: 700;
+  color: #facc15;
+  margin: 10px 0;
+}
+</style>
+  <script>
 // ================= USER ID RANDOM =================
 function generateUserID(){
   return 'user-' + Math.random().toString(36).substring(2,10) + '-' + Date.now().toString(36);
@@ -86,16 +99,12 @@ async function getUserID(){
 async function checkUserBan(){
   try{
     const userID = await getUserID();
-
     const res = await fetch("/sosmed-2/payment/user.json",{cache:"no-store"});
     if(!res.ok) return;
-
     const list = await res.json();
     const banned = list.find(x => x.user === userID);
-
     if(banned){
       const reason = banned.reason || "Tidak ada keterangan";
-
       document.body.innerHTML = `
       <div style="display:flex;align-items:center;justify-content:center;height:100vh;background:linear-gradient(135deg,#0f2027,#203a43,#2c5364);color:white;text-align:center;">
       <div style="max-width:420px;background:rgba(255,255,255,.12);padding:30px;border-radius:22px;">
@@ -105,7 +114,6 @@ async function checkUserBan(){
       <br>
       <small>User ID: ${userID}</small>
       </div></div>`;
-
       throw new Error("USER_BANNED");
     }
   }catch(e){
@@ -113,97 +121,108 @@ async function checkUserBan(){
   }
 }
 checkUserBan();
-</script></head><body>
+</script>
+</head>
+<body>
 <div class="card">
 <h2>Pembayaran QRIS Shine Shop - Sosmed 1</h2>
-<div class="subtitle">Scan QR untuk menyelesaikan pembayaran</div><div class="qr-wrapper">
+<div class="subtitle">Scan QR untuk menyelesaikan pembayaran</div>
+<div class="qr-wrapper">
 <canvas id="qrisCanvas" width="240" height="240"></canvas>
-</div><div class="details" id="orderDetails"></div><input type="text" id="namaInput" placeholder="Nama Lengkap">
+</div>
+<div class="unique-code">🔑 Kode Unik: <span id="uniqueCode">-</span></div>
+<div class="details" id="orderDetails"></div>
+<input type="text" id="namaInput" placeholder="Nama Lengkap">
 <input type="email" id="gmailInput" placeholder="Gmail Aktif">
 <input type="text" id="voucherInput" placeholder="Kode Voucher (opsional)">
 <button id="applyVoucher" class="btn" style="margin-top:10px;background:#22c55e;">Gunakan Voucher</button>
-<input type="file" id="buktiInput" accept="image/*">
-<button id="confirmBtn" class="btn">Konfirmasi Pembayaran</button><div class="muted">Admin memproses maksimal 72 jam</div>
-  <p>Screenshot seluruh transaksi serta bukti transfer untuk berjaga jaga jika terdapat kendala anda bisa menghubungi admin melalui telegram atau discord</p>
+<button id="confirmBtn" class="btn">Cek status Pembayaran</button>
+<div class="muted">Admin memproses maksimal 72 jam</div>
+<p>Screenshot seluruh transaksi serta bukti transfer untuk berjaga jaga jika terdapat kendala anda bisa menghubungi admin melalui CS Bot</p>
 </div>
-  <script>
-    async function securityCheck() {
-  try {
-    const res = await fetch("/api/security");
 
-    if (!res.ok) {
-      document.body.innerHTML =
-      "<h1 style='text-align:center;color:red;margin-top:40vh'>🚫 Akses Ditolak</h1>";
-      return;
-    }
+<script>
 
-    const data = await res.json();
-
-    if (data.status !== "ok") {
-      document.body.innerHTML =
-      "<h1 style='text-align:center;color:red;margin-top:40vh'>🚫 IP Diblokir</h1>";
-      return;
-    }
-
-    console.log("Security OK", data.ip);
-
-  } catch (e) {
-    document.body.innerHTML =
-    "<h1 style='text-align:center;color:red;margin-top:40vh'>Server Error</h1>";
-  }
-}
-
-securityCheck();
-    const discordWebhook = "https://discord.com/api/webhooks/1482244989021851748/oq__kcKXWHJILOG96lbfFxfZKoKCLEqkLJrlSS_rTQ6YEhgSTnFL_Guu8ZulERNEmCZV";
-const discordWebhookTransaksi = "https://discord.com/api/webhooks/1482245411325345793/79LyZzxEZxoHVZeW9bgJpf_SmPDQ4uZCO6DO652Hids_7xZjK0gUYuOZrgBqoin-Qez6";
-
+const discordWebhook = "https://discord.com/api/webhooks/1482244989021851748/oq__kcKXWHJILOG96lbfFxfZKoKCLEqkLJrlSS_rTQ6YEhgSTnFL_Guu8ZulERNEmCZV";
 const p = new URLSearchParams(location.search);
-    
 const trx = p.get("trx") || "-";
 const layanan = p.get("layanan") || "-";
 const total = Number(p.get("total") || 0);
 const target = p.get("target") || "-";
-      function maskID(id) {
+const diskon = p.get("diskon") || "Tidak Ada diskon";
+
+function maskID(id) {
   id = String(id || "-");
-
   if (id.length <= 4) return id;
-
   return id.slice(0, 2) + "**" + id.slice(-2);
-    }
-    const maskedTrx = maskID(trx);
-    
+}
+const maskedTrx = maskID(trx);
 
 let originalTotal = total;
 let finalTotal = total;
 let appliedVoucher = null;
+let uniqueCode = 0;
+let transactionLocked = false;
 
-// Fungsi pembantu untuk mencegah error jika fungsi asli getUserID tidak ada
+// Generate unique code 1-200 (langsung tanpa desimal)
+function generateUniqueCode() {
+  return Math.floor(Math.random() * 200) + 1; // 1-200
+}
+
+// ================= LOCK MENGGUNAKAN LOCAL STORAGE =================
+// Cek apakah transaksi sudah dikonfirmasi sebelumnya (via LocalStorage)
+function checkTransactionLockLocal() {
+  try {
+    const confirmedTransactions = JSON.parse(localStorage.getItem('confirmed_transactions') || '[]');
+    return confirmedTransactions.includes(trx);
+  } catch {
+    return false;
+  }
+}
+
+// Simpan status konfirmasi ke LocalStorage
+function saveTransactionLockLocal() {
+  try {
+    const confirmedTransactions = JSON.parse(localStorage.getItem('confirmed_transactions') || '[]');
+    if (!confirmedTransactions.includes(trx)) {
+      confirmedTransactions.push(trx);
+      localStorage.setItem('confirmed_transactions', JSON.stringify(confirmedTransactions));
+    }
+  } catch(e) {
+    console.error("Gagal simpan lock ke LocalStorage:", e);
+  }
+}
+
 async function getUserID() {
   return localStorage.getItem('user_id') || "-";
 }
 
 function updateDisplay(){
+  uniqueCode = generateUniqueCode();
+  document.getElementById('uniqueCode').textContent = uniqueCode;
+  
+  // Total bayar = finalTotal + uniqueCode (langsung tanpa desimal)
+  const totalDenganUnik = finalTotal + uniqueCode;
+  
   orderDetails.innerHTML = `
-  <strong>ID Transaksi:</strong> ${trx}<br>  <strong>Layanan:</strong> ${layanan}<br>
+  <strong>ID Transaksi:</strong> ${trx}<br>
+  <strong>Layanan:</strong> ${layanan}<br>
   <strong>Target:</strong> ${target}<br>
   <strong>Total:</strong> <s>Rp ${originalTotal.toLocaleString("id-ID")}</s><br>
-  <strong>Total Bayar:</strong> Rp ${finalTotal.toLocaleString("id-ID")}
+  <strong>Total Bayar:</strong> Rp ${totalDenganUnik.toLocaleString("id-ID")}
   `;
-  QRCode.toCanvas(qrisCanvas, buildQR(finalTotal), { width:240 }, function(err){
+  
+  QRCode.toCanvas(qrisCanvas, buildQR(totalDenganUnik), { width:240 }, function(err){
     if(err) return console.error(err);
-
     const ctx = qrisCanvas.getContext("2d");
     const logo = new Image();
     logo.src = "/home/logo.png";
-
     logo.onload = function(){
       const size = 50;
       const x = (qrisCanvas.width - size)/2;
       const y = (qrisCanvas.height - size)/2;
-
       ctx.fillStyle = "#fff";
       ctx.fillRect(x-5,y-5,size+10,size+10);
-
       ctx.drawImage(logo,x,y,size,size);
     };
   });
@@ -240,14 +259,11 @@ async function loadVoucher(){
 applyVoucher.onclick = async()=>{
   const code = voucherInput.value.trim().toUpperCase();
   if(!code) return Swal.fire("Isi kode voucher","","warning");
-
   const list = await loadVoucher();
   const v = list.find(x => x.code === code);
   if(!v) return Swal.fire("Voucher tidak valid","","error");
-
   let discount = v.type==="percent" ? originalTotal * v.value / 100 : v.value;
   if(v.max_discount) discount = Math.min(discount, v.max_discount);
-
   finalTotal = Math.max(originalTotal - discount,0);
   appliedVoucher = v.code;
   updateDisplay();
@@ -255,91 +271,103 @@ applyVoucher.onclick = async()=>{
 };
 
 confirmBtn.onclick = async()=>{
+  // Cek lock transaksi via LocalStorage
+  const isLocked = checkTransactionLockLocal();
+  if (isLocked) {
+    return Swal.fire("Gagal", "Transaksi ini sudah dikonfirmasi sebelumnya!", "error");
+  }
+  
   const nama = namaInput.value;
   const gmail = gmailInput.value;
-  const file = buktiInput.files[0];
   const userID = await getUserID();
   const maskedUserID = maskID(userID);
-  const refCode = localStorage.getItem('referral_code') || "-"; // Mengambil kode referral dengan aman
+  const refCode = localStorage.getItem('referral_code') || "-";
 
-  if(!nama||!gmail||!file){
-    return Swal.fire("Lengkapi data","","warning");
+  if(!nama||!gmail){
+    return Swal.fire("Lengkapi data nama dan email","","warning");
   }
 
   Swal.fire({title:"Mengirim...",didOpen:()=>Swal.showLoading()});
   
+  const totalDenganUnik = finalTotal + uniqueCode;
+  
   await fetch("/api/send-telegram",{
-  method:"POST",
-  headers:{
-    "Content-Type":"application/json"
-  },
-  body:JSON.stringify({
-    chat_id:"-1002112920606",
-    text:`
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({
+      chat_id:"-1002112920606",
+      text:`
 🆕 Transaksi Baru Sosmed 1
 ID TRANSAKSI: ${maskedTrx}
 Layanan: ${layanan}
 Harga asli: Rp${originalTotal.toLocaleString("id-ID")}
-Total Bayar: Rp ${finalTotal.toLocaleString("id-ID")}
+Total Bayar: Rp ${totalDenganUnik.toLocaleString("id-ID")}
 User ID: ${maskedUserID}
-Order sekarang di
-shinedomain.my.id`
-  })
-});    
-    
+Referal Code: ${refCode}
+Order sekarang di shinedomain.my.id`
+    })
+  });
+  
   await fetch(discordWebhook,{
     method:"POST",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify({
-      content:`💰 Pembayaran Baru SOSMED 1\nID: ${trx}\nLayanan: ${layanan}\nHarga Asli: Rp${originalTotal.toLocaleString("id-ID")}\nTotal Bayar: Rp ${finalTotal.toLocaleString("id-ID")}\nTarget: ${target}\nVoucher: ${appliedVoucher || "-"}\nNama: ${nama}\nGmail: ${gmail}\nUser ID: ${userID}\nReferral: ${refCode}`
+      content:`💰 Pembayaran Baru SOSMED 1\nID: ${trx}\nLayanan: ${layanan}\nHarga Asli: Rp${originalTotal.toLocaleString("id-ID")}\nTotal Bayar: Rp ${totalDenganUnik.toLocaleString("id-ID")}\nKode Unik: ${uniqueCode}\nTarget: ${target}\nVoucher: ${appliedVoucher || "-"}\nNama: ${nama}\nGmail: ${gmail}\nUser ID: ${userID}\nReferral: ${refCode}`
     })
   });
 
-  let form = new FormData();
-  form.append("file",file);
-  await fetch(discordWebhook,{method:"POST",body:form});
+  // Lock transaksi ke LocalStorage
+  saveTransactionLockLocal();
 
-  Swal.fire("Berhasil","Terkirim","success");
+  Swal.fire("Berhasil", "Konfirmasi pembayaran berhasil dikirim!", "success");
+  
+  // Disable tombol setelah konfirmasi
+  document.getElementById('confirmBtn').disabled = true;
+  document.getElementById('confirmBtn').style.opacity = '0.5';
+  document.getElementById('confirmBtn').textContent = 'Transaksi Sudah Dikonfirmasi';
 };
 
+// Load transaksi status saat awal (via LocalStorage)
+(async function() {
+  const isLocked = checkTransactionLockLocal();
+  if (isLocked) {
+    transactionLocked = true;
+    document.getElementById('confirmBtn').disabled = true;
+    document.getElementById('confirmBtn').style.opacity = '0.5';
+    document.getElementById('confirmBtn').textContent = 'Transaksi Sudah Dikonfirmasi';
+  }
+})();
+
 updateDisplay();
-  
-  function ambilReferral() {
-    const savedRef = localStorage.getItem('referral_code');
-    const statusElement = document.getElementById('status-ref');
-    if (statusElement) {
-        if (savedRef) {
-            statusElement.innerHTML = `Terdeteksi! Kode referral Anda adalah: <strong>${savedRef}</strong>`;
-        } else {
-            statusElement.innerHTML = `Tidak ada kode referral yang tersimpan.`;
-        }
+
+function ambilReferral() {
+  const savedRef = localStorage.getItem('referral_code');
+  const statusElement = document.getElementById('status-ref');
+  if (statusElement) {
+    if (savedRef) {
+      statusElement.innerHTML = `Terdeteksi! Kode referral Anda adalah: <strong>${savedRef}</strong>`;
+    } else {
+      statusElement.innerHTML = `Tidak ada kode referral yang tersimpan.`;
     }
-    return savedRef;
+  }
+  return savedRef;
 }
-ambilReferral();     
-      
+ambilReferral();
+
 document.addEventListener("keydown", function(e){
-  // F12
   if(e.key === "F12") e.preventDefault();
-
-  // Ctrl + Shift + I/C/J
-  if(e.ctrlKey && e.shiftKey &&
-    ["I","C","J"].includes(e.key)) e.preventDefault();
-
-  // Ctrl + U
+  if(e.ctrlKey && e.shiftKey && ["I","C","J"].includes(e.key)) e.preventDefault();
   if(e.ctrlKey && e.key === "u") e.preventDefault();
 });
+
 setInterval(() => {
   const threshold = 160;
   if (window.devtoolsOpen) return;
-
   const widthThreshold = window.outerWidth - window.innerWidth > threshold;
-
   if (widthThreshold && !/Android|iPhone|iPad/i.test(navigator.userAgent)) {
-    document.body.innerHTML =
-      "<h1 style='color:gold;text-align:center;margin-top:40vh;'>🚫 Developer Tools Terdeteksi</h1>";
+    document.body.innerHTML = "<h1 style='color:gold;text-align:center;margin-top:40vh;'>🚫 Developer Tools Terdeteksi</h1>";
   }
-}, 2000); 
-  
-</script></body>
+}, 2000);
+</script>
+</body>
 </html>
