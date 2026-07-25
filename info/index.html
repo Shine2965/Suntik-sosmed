@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Check Saldo - Shine Shop</title>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0a0a0a;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .container {
+            background: #1a1a1a;
+            padding: 40px 35px;
+            border-radius: 24px;
+            border: 1px solid #00ffaa44;
+            box-shadow: 0 0 60px rgba(0, 255, 170, 0.08);
+            max-width: 500px;
+            width: 100%;
+            text-align: center;
+        }
+        .container h1 {
+            color: #00ffaa;
+            font-size: 26px;
+            margin-bottom: 8px;
+        }
+        .container .sub {
+            color: #888;
+            font-size: 14px;
+            margin-bottom: 25px;
+        }
+        .container input {
+            width: 100%;
+            padding: 14px 18px;
+            border: 2px solid #00ffaa44;
+            border-radius: 30px;
+            background: #0d0d0d;
+            color: #fff;
+            font-size: 15px;
+            outline: none;
+            transition: 0.3s;
+            margin-bottom: 14px;
+        }
+        .container input:focus {
+            border-color: #00ffaa;
+            box-shadow: 0 0 20px rgba(0, 255, 170, 0.1);
+        }
+        .container input::placeholder {
+            color: #555;
+        }
+        .container button {
+            width: 100%;
+            padding: 14px;
+            background: #00ffaa;
+            border: none;
+            border-radius: 30px;
+            font-weight: bold;
+            font-size: 16px;
+            color: #0a0a0a;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        .container button:hover {
+            background: #00dd99;
+            transform: scale(0.97);
+        }
+        .container .error-msg {
+            color: #ff6666;
+            font-size: 14px;
+            margin-top: 10px;
+            min-height: 24px;
+        }
+        .saldo-box {
+            background: #00ffaa12;
+            border: 1px solid #00ffaa44;
+            border-radius: 20px;
+            padding: 25px;
+            margin: 20px 0;
+        }
+        .saldo-box .label {
+            color: #888;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+        .saldo-box .amount {
+            font-size: 42px;
+            font-weight: 800;
+            color: #00ffaa;
+            margin: 8px 0;
+            text-shadow: 0 0 30px rgba(0, 255, 170, 0.2);
+        }
+        .saldo-box .gmail {
+            color: #aaa;
+            font-size: 14px;
+        }
+        .logout-btn {
+            background: #ff4444 !important;
+            margin-top: 10px;
+        }
+        .logout-btn:hover {
+            background: #dd3333 !important;
+        }
+        .hidden {
+            display: none !important;
+        }
+        .footer {
+            color: #555;
+            font-size: 11px;
+            margin-top: 20px;
+        }
+        .footer span {
+            color: #00ffaa;
+        }
+        .master-btn {
+            background: #8b5cf6 !important;
+            margin-top: 10px;
+        }
+        .master-btn:hover {
+            background: #7c3aed !important;
+        }
+        .account-card {
+            background: #0d0d0d;
+            border: 1px solid #00ffaa33;
+            border-radius: 16px;
+            padding: 16px;
+            margin: 12px 0;
+            text-align: left;
+        }
+        .account-card .acc-gmail {
+            color: #00ffaa;
+            font-weight: 600;
+            font-size: 15px;
+        }
+        .account-card .acc-saldo {
+            color: #facc15;
+            font-weight: 700;
+            font-size: 18px;
+        }
+        .account-card .acc-payment {
+            color: #94a3b8;
+            font-size: 12px;
+            margin-top: 6px;
+            word-break: break-all;
+        }
+        .account-card .acc-payment strong {
+            color: #e2e8f0;
+        }
+        .qr-container {
+            background: white;
+            padding: 12px;
+            border-radius: 12px;
+            display: inline-block;
+            margin-top: 8px;
+        }
+        .qr-container canvas {
+            display: block;
+        }
+        .divider {
+            height: 1px;
+            background: #00ffaa22;
+            margin: 20px 0;
+        }
+        .scrollable {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .scrollable::-webkit-scrollbar {
+            width: 4px;
+        }
+        .scrollable::-webkit-scrollbar-thumb {
+            background: #00ffaa66;
+            border-radius: 10px;
+        }
+        .badge-master {
+            background: #8b5cf6;
+            color: white;
+            font-size: 10px;
+            padding: 2px 10px;
+            border-radius: 20px;
+            margin-left: 8px;
+            display: inline-block;
+        }
+        .badge-user {
+            background: #475569;
+            color: white;
+            font-size: 10px;
+            padding: 2px 10px;
+            border-radius: 20px;
+            margin-left: 8px;
+            display: inline-block;
+        }
+    </style>
+</head>
+<body>
+
+<!-- ===== LOGIN CONTAINER ===== -->
+<div class="container" id="loginContainer">
+    <h1>🔐 Check Saldo</h1>
+    <div class="sub">Masukkan Gmail & Password untuk melihat saldo</div>
+    
+    <input type="email" id="loginGmail" placeholder="Gmail" autocomplete="email">
+    <input type="password" id="loginPassword" placeholder="Password" autocomplete="current-password">
+    
+    <button id="loginBtn">✅ Login</button>
+    <div class="error-msg" id="loginError"></div>
+    
+    <div class="footer">© <span>Shine Shop</span> · 2025</div>
+</div>
+
+<!-- ===== DASHBOARD CONTAINER ===== -->
+<div class="container hidden" id="dashboardContainer">
+    <h1>💰 Saldo dari komisi Anda</h1>
+    <div class="sub" id="dashboardGmail">-</div>
+    
+    <div class="saldo-box">
+        <div class="label">Total Saldo komisi</div>
+        <div class="amount" id="dashboardSaldo">Rp 0</div>
+    </div>
+    
+    <!-- Payment Info -->
+    <div id="paymentInfo" class="hidden">
+        <div class="divider"></div>
+        <h3 style="color:#00ffaa;font-size:16px;margin-bottom:12px;">💳 Payment Method</h3>
+        <div id="qrisDisplay" class="hidden">
+            <div class="qr-container" id="qrContainer">
+                <canvas id="qrisCanvas" width="180" height="180"></canvas>
+            </div>
+            <div style="color:#94a3b8;font-size:12px;margin-top:6px;">Scan QRIS untuk pembayaran</div>
+        </div>
+        <div id="danaDisplay" style="color:#e2e8f0;font-size:14px;margin-top:8px;"></div>
+    </div>
+    
+    <!-- Master: Tombol Lihat Semua Akun -->
+    <button class="master-btn hidden" id="showAllAccountsBtn">👑 Lihat Semua Akun & Payment</button>
+    
+    <!-- Master: Daftar Semua Akun -->
+    <div id="allAccountsContainer" class="hidden scrollable" style="margin-top:16px;"></div>
+    
+    <button class="logout-btn" id="logoutBtn">🚪 Logout</button>
+    <div class="footer">© <span>Shine Shop</span> · 2023</div>
+</div>
+
+<script>
+    // ===================== KONFIGURASI =====================
+    const API_URL = '/api/saldo.php';
+    let currentUser = null;
+    let allAccountsData = [];
+
+    // ===================== DOM =====================
+    const loginContainer = document.getElementById('loginContainer');
+    const dashboardContainer = document.getElementById('dashboardContainer');
+    const loginGmail = document.getElementById('loginGmail');
+    const loginPassword = document.getElementById('loginPassword');
+    const loginBtn = document.getElementById('loginBtn');
+    const loginError = document.getElementById('loginError');
+    const dashboardGmail = document.getElementById('dashboardGmail');
+    const dashboardSaldo = document.getElementById('dashboardSaldo');
+    const logoutBtn = document.getElementById('logoutBtn');
+    const paymentInfo = document.getElementById('paymentInfo');
+    const qrisDisplay = document.getElementById('qrisDisplay');
+    const danaDisplay = document.getElementById('danaDisplay');
+    const qrisCanvas = document.getElementById('qrisCanvas');
+    const showAllAccountsBtn = document.getElementById('showAllAccountsBtn');
+    const allAccountsContainer = document.getElementById('allAccountsContainer');
+
+    // ===================== FUNGSI QRIS =====================
+    function crc16(s){
+        let c=0xFFFF;
+        for(let i=0;i<s.length;i++){
+            c^=s.charCodeAt(i)<<8;
+            for(let j=0;j<8;j++){
+                c=c&0x8000?(c<<1)^0x1021:c<<1;
+            }
+        }
+        return (c&0xFFFF).toString(16).toUpperCase().padStart(4,'0');
+    }
+
+    function buildQR(qrisData){
+        if (!qrisData || qrisData === '') return;
+        QRCode.toCanvas(qrisCanvas, qrisData, { width:180 }, function(err){
+            if(err) return console.error('QR Error:', err);
+            const ctx = qrisCanvas.getContext('2d');
+            const logo = new Image();
+            logo.src = '/home/logo.png';
+            logo.onload = function(){
+                const size = 36;
+                const x = (qrisCanvas.width - size)/2;
+                const y = (qrisCanvas.height - size)/2;
+                ctx.fillStyle = '#fff';
+                ctx.fillRect(x-4,y-4,size+8,size+8);
+                ctx.drawImage(logo,x,y,size,size);
+            };
+        });
+    }
+
+    // ===================== CHECK SESSION =====================
+    function checkSession() {
+        const savedGmail = localStorage.getItem('saldo_gmail');
+        const savedData = localStorage.getItem('saldo_data');
+        
+        if (savedGmail && savedData) {
+            try {
+                const data = JSON.parse(savedData);
+                currentUser = data;
+                showDashboard(savedGmail, data.Saldo, data.Role, data.QRIS, data.Dana);
+                return true;
+            } catch (e) {
+                localStorage.removeItem('saldo_gmail');
+                localStorage.removeItem('saldo_data');
+                return false;
+            }
+        }
+        return false;
+    }
+
+    // ===================== SHOW DASHBOARD =====================
+    function showDashboard(gmail, saldo, role, qris, dana) {
+        loginContainer.classList.add('hidden');
+        dashboardContainer.classList.remove('hidden');
+        dashboardGmail.textContent = '📧 ' + gmail;
+        
+        const numericSaldo = parseInt(saldo) || 0;
+        dashboardSaldo.textContent = 'Rp ' + numericSaldo.toLocaleString('id-ID');
+
+        // Tampilkan payment info jika ada
+        paymentInfo.classList.remove('hidden');
+        
+        // QRIS
+        if (qris && qris !== '') {
+            qrisDisplay.classList.remove('hidden');
+            buildQR(qris);
+        } else {
+            qrisDisplay.classList.add('hidden');
+        }
+        
+        // Dana
+        if (dana && dana !== '') {
+            danaDisplay.innerHTML = '📱 <strong>Dana:</strong> ' + dana;
+            danaDisplay.style.display = 'block';
+        } else {
+            danaDisplay.style.display = 'none';
+        }
+
+        // Cek apakah user adalah master
+        const isMaster = role === 'master';
+        if (isMaster) {
+            showAllAccountsBtn.classList.remove('hidden');
+            // Tampilkan tombol show all accounts
+        } else {
+            showAllAccountsBtn.classList.add('hidden');
+            allAccountsContainer.classList.add('hidden');
+            allAccountsContainer.innerHTML = '';
+        }
+    }
+
+    // ===================== SHOW ALL ACCOUNTS (MASTER ONLY) =====================
+    async function loadAllAccounts() {
+        if (!currentUser) return;
+        
+        const gmail = currentUser.Gmail;
+        
+        try {
+            const response = await fetch(`${API_URL}?action=all-accounts&gmail=${encodeURIComponent(gmail)}`);
+            const result = await response.json();
+            
+            if (result.status === 'success') {
+                allAccountsData = result.data;
+                renderAllAccounts(allAccountsData);
+                allAccountsContainer.classList.remove('hidden');
+            } else {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Gagal',
+                    text: result.message || 'Gagal memuat data akun'
+                });
+            }
+        } catch (error) {
+            console.error('Error loading all accounts:', error);
+            Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: 'Gagal terhubung ke server'
+            });
+        }
+    }
+
+    function renderAllAccounts(accounts) {
+        if (!accounts || accounts.length === 0) {
+            allAccountsContainer.innerHTML = '<p style="color:#888;text-align:center;">Tidak ada akun</p>';
+            return;
+        }
+        
+        let html = '<h4 style="color:#00ffaa;margin-bottom:12px;">👑 Semua Akun & Payment</h4>';
+        
+        accounts.forEach((acc, index) => {
+            const isMaster = acc.Role === 'master';
+            const badge = isMaster ? '<span class="badge-master">👑 MASTER</span>' : '<span class="badge-user">👤 USER</span>';
+            
+            html += `
+                <div class="account-card">
+                    <div class="acc-gmail">📧 ${acc.Gmail} ${badge}</div>
+                    <div class="acc-saldo">💰 Rp ${parseInt(acc.Saldo || 0).toLocaleString('id-ID')}</div>
+                    <div class="acc-payment">
+                        <strong>QRIS:</strong> ${acc.QRIS ? '✅ Tersedia' : '❌ Tidak ada'}<br>
+                        <strong>Dana:</strong> ${acc.Dana || '❌ Tidak ada'}
+                    </div>
+                    ${acc.QRIS ? `<div class="qr-container" style="margin-top:8px;"><canvas id="qrMini_${index}" width="100" height="100"></canvas></div>` : ''}
+                    <div style="border-top:1px solid #00ffaa22;margin-top:8px;padding-top:8px;font-size:11px;color:#64748b;">
+                        Role: ${acc.Role || 'user'}
+                    </div>
+                </div>
+            `;
+        });
+        
+        allAccountsContainer.innerHTML = html;
+        
+        // Render QRIS mini untuk setiap akun
+        accounts.forEach((acc, index) => {
+            if (acc.QRIS) {
+                const canvas = document.getElementById(`qrMini_${index}`);
+                if (canvas) {
+                    QRCode.toCanvas(canvas, acc.QRIS, { width:100 }, function(err){
+                        if(err) console.error('QR Mini error:', err);
+                    });
+                }
+            }
+        });
+    }
+
+    // ===================== LOGIN =====================
+    async function handleLogin() {
+        const gmail = loginGmail.value.trim();
+        const password = loginPassword.value.trim();
+
+        if (!gmail || !password) {
+            loginError.textContent = '❌ Gmail dan password wajib diisi!';
+            return;
+        }
+
+        loginError.textContent = '⏳ Memproses...';
+        loginBtn.disabled = true;
+
+        try {
+            const response = await fetch(`${API_URL}?action=login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ gmail, password })
+            });
+
+            const result = await response.json();
+
+            if (result.status === 'success') {
+                const data = result.data;
+                currentUser = data;
+                
+                localStorage.setItem('saldo_gmail', data.Gmail);
+                localStorage.setItem('saldo_data', JSON.stringify(data));
+                
+                showDashboard(data.Gmail, data.Saldo, data.Role, data.QRIS, data.Dana);
+                loginError.textContent = '';
+                
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Login Berhasil!',
+                    text: `Saldo: Rp ${parseInt(data.Saldo).toLocaleString('id-ID')}`,
+                    timer: 1500,
+                    showConfirmButton: false
+                });
+            } else {
+                loginError.textContent = '❌ ' + result.message;
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Login Gagal',
+                    text: result.message
+                });
+            }
+        } catch (error) {
+            loginError.textContent = '❌ Gagal terhubung ke server!';
+            console.error('Login error:', error);
+        }
+
+        loginBtn.disabled = false;
+    }
+
+    // ===================== LOGOUT =====================
+    function handleLogout() {
+        localStorage.removeItem('saldo_gmail');
+        localStorage.removeItem('saldo_data');
+        currentUser = null;
+        allAccountsData = [];
+        
+        dashboardContainer.classList.add('hidden');
+        loginContainer.classList.remove('hidden');
+        loginGmail.value = '';
+        loginPassword.value = '';
+        loginError.textContent = '';
+        allAccountsContainer.innerHTML = '';
+        allAccountsContainer.classList.add('hidden');
+        showAllAccountsBtn.classList.add('hidden');
+        
+        Swal.fire({
+            icon: 'info',
+            title: 'Logout Berhasil',
+            timer: 1000,
+            showConfirmButton: false
+        });
+    }
+
+    // ===================== EVENT LISTENERS =====================
+    loginBtn.addEventListener('click', handleLogin);
+    logoutBtn.addEventListener('click', handleLogout);
+    showAllAccountsBtn.addEventListener('click', loadAllAccounts);
+
+    loginPassword.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') handleLogin();
+    });
+    loginGmail.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') handleLogin();
+    });
+
+    // ===================== STARTUP =====================
+    if (!checkSession()) {
+        loginContainer.classList.remove('hidden');
+        dashboardContainer.classList.add('hidden');
+    }
+</script>
+</body>
+      </html>
