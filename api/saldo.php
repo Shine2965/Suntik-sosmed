@@ -6,7 +6,7 @@ header('Access-Control-Allow-Headers: Content-Type');
 
 // Fungsi baca data dari /info/accounts.json
 function getAccounts() {
-    $file = __DIR__ . '/info/accounts.json';
+    $file = __DIR__ . '/../info/accounts.json';
     if (!file_exists($file)) {
         return ['error' => 'File accounts.json tidak ditemukan'];
     }
@@ -27,7 +27,7 @@ function findAccount($gmail, $password) {
     return null;
 }
 
-// Fungsi cari akun berdasarkan Gmail saja (untuk master)
+// Fungsi cari akun berdasarkan Gmail saja (untuk admin)
 function findAccountByGmail($gmail) {
     $accounts = getAccounts();
     if (isset($accounts['error'])) return null;
@@ -60,7 +60,7 @@ if ($action === 'login') {
     
     $account = findAccount($gmail, $password);
     if ($account) {
-        // Kirim data (tanpa password, tapi dengan role)
+        // Kirim data saldo + role (tanpa password)
         echo json_encode([
             'status' => 'success',
             'message' => 'Login berhasil',
@@ -68,8 +68,8 @@ if ($action === 'login') {
                 'Gmail' => $account['Gmail'],
                 'Saldo' => $account['Saldo'],
                 'Role' => $account['Role'] ?? 'user',
-                'QRIS' => $account['QRIS'] ?? null,
-                'Dana' => $account['Dana'] ?? null
+                'qr_data' => $account['qr_data'] ?? null,
+                'dana' => $account['dana'] ?? null
             ]
         ]);
     } else {
@@ -85,36 +85,42 @@ if ($action === 'saldo') {
         exit;
     }
     
-    $account = findAccountByGmail($gmail);
-    if ($account) {
-        echo json_encode([
-            'status' => 'success',
-            'data' => [
-                'Gmail' => $account['Gmail'],
-                'Saldo' => $account['Saldo'],
-                'Role' => $account['Role'] ?? 'user',
-                'QRIS' => $account['QRIS'] ?? null,
-                'Dana' => $account['Dana'] ?? null
-            ]
-        ]);
-    } else {
-        echo json_encode(['status' => 'error', 'message' => 'Akun tidak ditemukan']);
+    $accounts = getAccounts();
+    if (isset($accounts['error'])) {
+        echo json_encode(['status' => 'error', 'message' => $accounts['error']]);
+        exit;
     }
+    
+    foreach ($accounts as $acc) {
+        if ($acc['Gmail'] === $gmail) {
+            echo json_encode([
+                'status' => 'success',
+                'data' => [
+                    'Gmail' => $acc['Gmail'],
+                    'Saldo' => $acc['Saldo'],
+                    'Role' => $acc['Role'] ?? 'user'
+                ]
+            ]);
+            exit;
+        }
+    }
+    
+    echo json_encode(['status' => 'error', 'message' => 'Akun tidak ditemukan']);
     exit;
 }
 
-// ========== NEW: GET ALL ACCOUNTS (khusus master) ==========
-if ($action === 'all-accounts') {
+// ========== FITUR BARU: GET ALL PAYMENT DATA (khusus admin) ==========
+if ($action === 'all_payments') {
     $gmail = $_GET['gmail'] ?? '';
     if (empty($gmail)) {
         echo json_encode(['status' => 'error', 'message' => 'Gmail wajib diisi']);
         exit;
     }
     
-    // Cek apakah user adalah master
+    // Cek apakah user adalah admin
     $account = findAccountByGmail($gmail);
-    if (!$account || ($account['Role'] ?? 'user') !== 'master') {
-        echo json_encode(['status' => 'error', 'message' => 'Akses ditolak. Hanya master yang bisa melihat semua akun.']);
+    if (!$account || ($account['Role'] ?? 'user') !== 'admin') {
+        echo json_encode(['status' => 'error', 'message' => 'Akses ditolak. Hanya admin yang bisa melihat semua payment.']);
         exit;
     }
     
@@ -124,15 +130,21 @@ if ($action === 'all-accounts') {
         exit;
     }
     
-    // Hapus password dari response
-    $safeAccounts = array_map(function($acc) {
-        unset($acc['Password']);
-        return $acc;
-    }, $accounts);
+    // Kirim semua data payment (tanpa password)
+    $paymentData = [];
+    foreach ($accounts as $acc) {
+        $paymentData[] = [
+            'Gmail' => $acc['Gmail'],
+            'Saldo' => $acc['Saldo'],
+            'Role' => $acc['Role'] ?? 'user',
+            'qr_data' => $acc['qr_data'] ?? null,
+            'dana' => $acc['dana'] ?? null
+        ];
+    }
     
     echo json_encode([
         'status' => 'success',
-        'data' => $safeAccounts
+        'data' => $paymentData
     ]);
     exit;
 }
