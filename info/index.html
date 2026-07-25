@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Info Saldo</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0a0a0a;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: radial-gradient(circle at 30% 20%, #0a1628, #000000);
+        }
+        .login-container {
+            background: rgba(255,255,255,0.05);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(0, 255, 170, 0.15);
+            border-radius: 28px;
+            padding: 45px 35px;
+            max-width: 400px;
+            width: 90%;
+            box-shadow: 0 30px 80px rgba(0,0,0,0.8), 0 0 60px rgba(0,255,170,0.05);
+            transition: 0.3s;
+        }
+        .login-container:hover {
+            border-color: rgba(0, 255, 170, 0.3);
+            box-shadow: 0 30px 80px rgba(0,0,0,0.8), 0 0 80px rgba(0,255,170,0.08);
+        }
+        .logo {
+            text-align: center;
+            font-size: 48px;
+            margin-bottom: 8px;
+        }
+        h1 {
+            color: #00ffaa;
+            text-align: center;
+            font-size: 26px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            margin-bottom: 6px;
+        }
+        .subtitle {
+            text-align: center;
+            color: #888;
+            font-size: 13px;
+            margin-bottom: 30px;
+        }
+        .input-group {
+            margin-bottom: 18px;
+        }
+        .input-group label {
+            display: block;
+            color: #aaa;
+            font-size: 13px;
+            font-weight: 500;
+            margin-bottom: 6px;
+            letter-spacing: 0.5px;
+        }
+        .input-group input {
+            width: 100%;
+            padding: 14px 18px;
+            border: 2px solid rgba(255,255,255,0.08);
+            border-radius: 16px;
+            background: rgba(255,255,255,0.04);
+            color: #fff;
+            font-size: 15px;
+            transition: 0.3s;
+            outline: none;
+        }
+        .input-group input:focus {
+            border-color: #00ffaa;
+            background: rgba(255,255,255,0.06);
+            box-shadow: 0 0 30px rgba(0,255,170,0.06);
+        }
+        .input-group input::placeholder {
+            color: #555;
+        }
+        .btn-login {
+            width: 100%;
+            padding: 16px;
+            background: linear-gradient(135deg, #00ffaa, #00cc88);
+            border: none;
+            border-radius: 16px;
+            font-size: 16px;
+            font-weight: 700;
+            color: #0a0a0a;
+            cursor: pointer;
+            transition: 0.3s;
+            margin-top: 6px;
+        }
+        .btn-login:hover {
+            transform: scale(0.97);
+            box-shadow: 0 0 40px rgba(0,255,170,0.2);
+        }
+        .btn-login:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .error-msg {
+            color: #ff5555;
+            font-size: 13px;
+            text-align: center;
+            margin-top: 14px;
+            min-height: 22px;
+            font-weight: 500;
+        }
+        .loading-text {
+            color: #00ffaa;
+            font-size: 13px;
+            text-align: center;
+            margin-top: 12px;
+            display: none;
+        }
+        .footer {
+            text-align: center;
+            color: #333;
+            font-size: 11px;
+            margin-top: 24px;
+            letter-spacing: 0.5px;
+        }
+        .footer span {
+            color: #00ffaa;
+        }
+        .divider {
+            width: 40px;
+            height: 2px;
+            margin: 10px auto 20px;
+            background: linear-gradient(90deg, transparent, rgba(0,255,170,0.3), transparent);
+        }
+    </style>
+</head>
+<body>
+
+<div class="login-container">
+    <div class="logo">💰</div>
+    <h1>Info Saldo</h1>
+    <div class="subtitle">Login untuk melihat saldo akun</div>
+    <div class="divider"></div>
+
+    <div class="input-group">
+        <label>📧 Gmail</label>
+        <input type="email" id="loginEmail" placeholder="Masukkan Gmail..." autocomplete="email">
+    </div>
+
+    <div class="input-group">
+        <label>🔑 Password</label>
+        <input type="password" id="loginPassword" placeholder="Masukkan password..." autocomplete="current-password">
+    </div>
+
+    <button class="btn-login" id="loginBtn">🚀 Login</button>
+    <div class="error-msg" id="loginError"></div>
+    <div class="loading-text" id="loadingText">⏳ Memeriksa akun...</div>
+
+    <div class="footer">© <span>Shine Shop</span> · 2025</div>
+</div>
+
+<script>
+    const loginEmail = document.getElementById('loginEmail');
+    const loginPassword = document.getElementById('loginPassword');
+    const loginBtn = document.getElementById('loginBtn');
+    const loginError = document.getElementById('loginError');
+    const loadingText = document.getElementById('loadingText');
+
+    // === LOAD ACCOUNTS FROM JSON ===
+    async function loadAccounts() {
+        try {
+            const res = await fetch('/info/accounts.json?cache=' + Date.now());
+            if (!res.ok) throw new Error('Gagal load accounts.json');
+            return await res.json();
+        } catch (e) {
+            console.error('Error load accounts:', e);
+            return [];
+        }
+    }
+
+    // === LOGIN HANDLER ===
+    async function handleLogin() {
+        const email = loginEmail.value.trim();
+        const password = loginPassword.value.trim();
+
+        // Validasi kosong
+        if (!email || !password) {
+            loginError.textContent = '❌ Masukkan Gmail dan password!';
+            return;
+        }
+
+        // Validasi format email
+        if (!email.includes('@') || !email.includes('.')) {
+            loginError.textContent = '❌ Format Gmail tidak valid!';
+            return;
+        }
+
+        loginError.textContent = '';
+        loginBtn.disabled = true;
+        loadingText.style.display = 'block';
+
+        try {
+            const accounts = await loadAccounts();
+            
+            // Cari akun yang cocok
+            const found = accounts.find(acc => 
+                acc.Gmail && acc.Gmail.toLowerCase() === email.toLowerCase() &&
+                acc.Password && acc.Password === password
+            );
+
+            if (found) {
+                // Simpan session ke localStorage
+                localStorage.setItem('info_session_email', email);
+                localStorage.setItem('info_session_password', password);
+                
+                // Redirect ke dashboard
+                window.location.href = '/info/dashboard/index.html';
+            } else {
+                loginError.textContent = '❌ Gmail atau password salah!';
+                loginBtn.disabled = false;
+                loadingText.style.display = 'none';
+            }
+
+        } catch (e) {
+            loginError.textContent = '❌ Terjadi kesalahan, coba lagi.';
+            loginBtn.disabled = false;
+            loadingText.style.display = 'none';
+            console.error(e);
+        }
+    }
+
+    // === EVENT LISTENERS ===
+    loginBtn.addEventListener('click', handleLogin);
+
+    // Enter key
+    loginEmail.addEventListener('keydown', (e) => { if (e.key === 'Enter') handleLogin(); });
+    loginPassword.addEventListener('keydown', (e) => { if (e.key === 'Enter') handleLogin(); });
+
+    // Cek session aktif, langsung redirect ke dashboard
+    (function checkSession() {
+        const sessionEmail = localStorage.getItem('info_session_email');
+        const sessionPass = localStorage.getItem('info_session_password');
+        if (sessionEmail && sessionPass) {
+            // Coba verifikasi ulang ke accounts.json
+            fetch('/info/accounts.json?cache=' + Date.now())
+                .then(res => res.json())
+                .then(accounts => {
+                    const found = accounts.find(acc => 
+                        acc.Gmail && acc.Gmail.toLowerCase() === sessionEmail.toLowerCase() &&
+                        acc.Password && acc.Password === sessionPass
+                    );
+                    if (found) {
+                        window.location.href = '/info/dashboard/index.html';
+                    } else {
+                        localStorage.removeItem('info_session_email');
+                        localStorage.removeItem('info_session_password');
+                    }
+                })
+                .catch(() => {});
+        }
+    })();
+
+    console.log('🔐 Login page ready.');
+</script>
+</body>
+</html>
