@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Info Saldo</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0a0a0a;
+            min-height: 100vh;
+            padding: 24px;
+            background: radial-gradient(circle at 30% 20%, #0a1628, #000000);
+        }
+        .container {
+            max-width: 700px;
+            margin: 0 auto;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 24px;
+            background: rgba(255,255,255,0.04);
+            backdrop-filter: blur(16px);
+            border-radius: 20px;
+            border: 1px solid rgba(255,255,255,0.06);
+            margin-bottom: 24px;
+        }
+        .header h1 {
+            color: #00ffaa;
+            font-size: 22px;
+            font-weight: 700;
+        }
+        .header .user-info {
+            color: #aaa;
+            font-size: 13px;
+            text-align: right;
+        }
+        .header .user-info strong {
+            color: #fff;
+            display: block;
+            font-size: 14px;
+        }
+        .header .logout-btn {
+            background: rgba(255, 68, 68, 0.15);
+            color: #ff5555;
+            border: 1px solid rgba(255, 68, 68, 0.2);
+            padding: 8px 18px;
+            border-radius: 30px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: 0.3s;
+            font-weight: 600;
+            margin-left: 12px;
+        }
+        .header .logout-btn:hover {
+            background: rgba(255, 68, 68, 0.3);
+        }
+
+        .card {
+            background: rgba(255,255,255,0.04);
+            backdrop-filter: blur(16px);
+            border-radius: 20px;
+            border: 1px solid rgba(255,255,255,0.06);
+            padding: 24px 28px;
+            margin-bottom: 18px;
+            transition: 0.3s;
+        }
+        .card:hover {
+            border-color: rgba(0, 255, 170, 0.1);
+        }
+        .card-title {
+            color: #888;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            font-weight: 600;
+            margin-bottom: 6px;
+        }
+        .card-value {
+            color: #fff;
+            font-size: 32px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+        .card-value small {
+            font-size: 16px;
+            font-weight: 400;
+            color: #888;
+            margin-left: 6px;
+        }
+        .card-sub {
+            color: #666;
+            font-size: 13px;
+            margin-top: 4px;
+        }
+
+        .divider {
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.06), transparent);
+            margin: 18px 0;
+        }
+
+        .account-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 14px;
+        }
+        .account-item {
+            background: rgba(255,255,255,0.03);
+            border-radius: 16px;
+            padding: 18px 20px;
+            border: 1px solid rgba(255,255,255,0.04);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+            transition: 0.3s;
+        }
+        .account-item:hover {
+            border-color: rgba(0, 255, 170, 0.08);
+            background: rgba(255,255,255,0.05);
+        }
+        .account-item .email {
+            color: #fff;
+            font-weight: 500;
+            font-size: 14px;
+        }
+        .account-item .saldo {
+            color: #00ffaa;
+            font-weight: 700;
+            font-size: 18px;
+        }
+        .account-item .qris-info {
+            color: #facc15;
+            font-size: 13px;
+            background: rgba(250, 204, 21, 0.1);
+            padding: 4px 12px;
+            border-radius: 30px;
+            border: 1px solid rgba(250, 204, 21, 0.15);
+            font-weight: 500;
+        }
+        .account-item .qris-info span {
+            font-family: monospace;
+            letter-spacing: 1px;
+        }
+        .account-item .badge-owner {
+            background: rgba(0, 255, 170, 0.15);
+            color: #00ffaa;
+            font-size: 10px;
+            padding: 2px 10px;
+            border-radius: 30px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border: 1px solid rgba(0, 255, 170, 0.15);
+        }
+
+        .empty-state {
+            color: #555;
+            text-align: center;
+            padding: 30px 0;
+            font-size: 14px;
+        }
+
+        .footer {
+            text-align: center;
+            color: #333;
+            font-size: 11px;
+            margin-top: 30px;
+            letter-spacing: 0.5px;
+        }
+        .footer span {
+            color: #00ffaa;
+        }
+
+        .loading-spinner {
+            text-align: center;
+            color: #888;
+            padding: 40px 0;
+            font-size: 14px;
+        }
+
+        @media (max-width: 600px) {
+            .header {
+                flex-direction: column;
+                gap: 12px;
+                text-align: center;
+            }
+            .header .user-info {
+                text-align: center;
+            }
+            .account-item {
+                flex-direction: column;
+                align-items: stretch;
+                text-align: center;
+            }
+            .card-value {
+                font-size: 26px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <!-- HEADER -->
+    <div class="header">
+        <h1>💰 Info Saldo</h1>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <div class="user-info">
+                <strong id="userEmailDisplay">-</strong>
+                <span id="userRoleDisplay">Loading...</span>
+            </div>
+            <button class="logout-btn" id="logoutBtn">🚪 Logout</button>
+        </div>
+    </div>
+
+    <!-- TOTAL SALDO CARD -->
+    <div class="card">
+        <div class="card-title">Total Saldo Semua Akun</div>
+        <div class="card-value" id="totalSaldo">Rp 0</div>
+        <div class="card-sub">Gabungan dari semua akun yang terdaftar</div>
+    </div>
+
+    <!-- DAFTAR AKUN -->
+    <div class="card">
+        <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;">
+            <span>📋 Daftar Akun</span>
+            <span style="font-weight:400;text-transform:none;letter-spacing:0;color:#555;font-size:11px;" id="accountCount">0 akun</span>
+        </div>
+        <div class="divider"></div>
+        <div id="accountList">
+            <div class="loading-spinner">⏳ Memuat data...</div>
+        </div>
+    </div>
+
+    <!-- FOOTER -->
+    <div class="footer">© <span>Shine Shop</span> · 2025</div>
+</div>
+
+<script>
+    // ===================== KONFIGURASI =====================
+    const ACCOUNTS_URL = '/info/accounts.json';
+    const SESSION_EMAIL_KEY = 'info_session_email';
+    const SESSION_PASS_KEY = 'info_session_password';
+
+    // ===================== DOM =====================
+    const userEmailDisplay = document.getElementById('userEmailDisplay');
+    const userRoleDisplay = document.getElementById('userRoleDisplay');
+    const totalSaldoEl = document.getElementById('totalSaldo');
+    const accountListEl = document.getElementById('accountList');
+    const accountCountEl = document.getElementById('accountCount');
+    const logoutBtn = document.getElementById('logoutBtn');
+
+    // ===================== SESSION CHECK =====================
+    function getSessionEmail() {
+        return localStorage.getItem(SESSION_EMAIL_KEY);
+    }
+
+    function getSessionPassword() {
+        return localStorage.getItem(SESSION_PASS_KEY);
+    }
+
+    function clearSession() {
+        localStorage.removeItem(SESSION_EMAIL_KEY);
+        localStorage.removeItem(SESSION_PASS_KEY);
+    }
+
+    // ===================== LOAD ACCOUNTS =====================
+    async function loadAccounts() {
+        try {
+            const res = await fetch(ACCOUNTS_URL + '?cache=' + Date.now());
+            if (!res.ok) throw new Error('Gagal load accounts.json');
+            return await res.json();
+        } catch (e) {
+            console.error('Error load accounts:', e);
+            return [];
+        }
+    }
+
+    // ===================== CUSTOMER =====================
+    function isSpecialUser(email) {
+        // USER YANG BISA MELIHAT SEMUA QRIS/NOMOR PAYMENT
+        return email && email.toLowerCase() === 'alvinojeremy67@gmail.com';
+    }
+
+    // ===================== RENDER DASHBOARD =====================
+    async function renderDashboard() {
+        const sessionEmail = getSessionEmail();
+        if (!sessionEmail) {
+            window.location.href = '/info/index.html';
+            return;
+        }
+
+        userEmailDisplay.textContent = sessionEmail;
+
+        try {
+            const accounts = await loadAccounts();
+
+            // Verifikasi session
+            const found = accounts.find(acc => 
+                acc.Gmail && acc.Gmail.toLowerCase() === sessionEmail.toLowerCase() &&
+                acc.Password && acc.Password === getSessionPassword()
+            );
+
+            if (!found) {
+                clearSession();
+                window.location.href = '/info/index.html';
+                return;
+            }
+
+            // Tampilkan role
+            const isSpecial = isSpecialUser(sessionEmail);
+            userRoleDisplay.textContent = isSpecial ? '👑 Admin (Full Access)' : '👤 User';
+
+            // Hitung total saldo
+            let totalSaldo = 0;
+            accounts.forEach(acc => {
+                const saldo = parseFloat(String(acc.Saldo || '0').replace(/\./g, '').replace(',', '.'));
+                if (!isNaN(saldo)) totalSaldo += saldo;
+            });
+            totalSaldoEl.textContent = 'Rp ' + totalSaldo.toLocaleString('id-ID');
+
+            // Render daftar akun
+            if (accounts.length === 0) {
+                accountListEl.innerHTML = `<div class="empty-state">Belum ada akun terdaftar.</div>`;
+                accountCountEl.textContent = '0 akun';
+                return;
+            }
+
+            accountCountEl.textContent = accounts.length + ' akun';
+
+            let html = '<div class="account-grid">';
+            accounts.forEach((acc, index) => {
+                const email = acc.Gmail || '-';
+                const password = acc.Password || '-';
+                const saldo = acc.Saldo || '0';
+                const qris = acc.qris || null;
+                const dana = acc.Dana || null;
+
+                // Tentukan apakah user ini bisa melihat QRIS/nomor payment
+                const canSeePayment = isSpecialUser(sessionEmail);
+
+                // Format saldo
+                let saldoDisplay = saldo;
+                if (!isNaN(parseFloat(saldo))) {
+                    saldoDisplay = 'Rp ' + parseFloat(saldo).toLocaleString('id-ID');
+                }
+
+                // Tampilkan QRIS / Dana jika ada dan user punya akses
+                let paymentInfo = '';
+                if (canSeePayment) {
+                    if (qris) {
+                        paymentInfo += `<span class="qris-info">📱 QRIS: <span>${qris}</span></span> `;
+                    }
+                    if (dana) {
+                        paymentInfo += `<span class="qris-info">💳 Dana: <span>${dana}</span></span> `;
+                    }
+                    if (!qris && !dana) {
+                        paymentInfo = `<span class="qris-info" style="color:#555;border-color:#333;">Tidak ada data payment</span>`;
+                    }
+                } else {
+                    // User biasa hanya lihat QRIS/Dana miliknya sendiri
+                    if (email.toLowerCase() === sessionEmail.toLowerCase()) {
+                        if (qris) {
+                            paymentInfo += `<span class="qris-info">📱 QRIS: <span>${qris}</span></span> `;
+                        }
+                        if (dana) {
+                            paymentInfo += `<span class="qris-info">💳 Dana: <span>${dana}</span></span> `;
+                        }
+                        if (!qris && !dana) {
+                            paymentInfo = `<span class="qris-info" style="color:#555;border-color:#333;">Tidak ada data payment</span>`;
+                        }
+                    } else {
+                        paymentInfo = `<span class="qris-info" style="color:#555;border-color:#333;">🔒 Terkunci</span>`;
+                    }
+                }
+
+                // Badge owner jika ini akun yang login
+                const isOwner = email.toLowerCase() === sessionEmail.toLowerCase();
+                const ownerBadge = isOwner ? `<span class="badge-owner">🔑 Anda</span>` : '';
+
+                html += `
+                    <div class="account-item">
+                        <div style="display:flex;flex-direction:column;gap:4px;flex:1;">
+                            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                                <span class="email">${email}</span>
+                                ${ownerBadge}
+                            </div>
+                            <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;">
+                                ${paymentInfo}
+                            </div>
+                        </div>
+                        <div class="saldo">${saldoDisplay}</div>
+                    </div>
+                `;
+            });
+            html += '</div>';
+            accountListEl.innerHTML = html;
+
+        } catch (e) {
+            console.error('Render error:', e);
+            accountListEl.innerHTML = `<div class="empty-state">❌ Gagal memuat data. Coba refresh.</div>`;
+        }
+    }
+
+    // ===================== LOGOUT =====================
+    logoutBtn.addEventListener('click', function() {
+        clearSession();
+        window.location.href = '/info/index.html';
+    });
+
+    // ===================== STARTUP =====================
+    renderDashboard();
+
+    // Auto refresh setiap 30 detik (update saldo)
+    setInterval(() => {
+        renderDashboard();
+    }, 30000);
+
+    console.log('📊 Dashboard ready.');
+    console.log('👤 User:', getSessionEmail());
+    console.log('🔑 Special user (alvinojeremy67@gmail.com) can see all QRIS/payment data.');
+</script>
+</body>
+</html>
