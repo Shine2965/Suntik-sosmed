@@ -27,11 +27,23 @@ function findAccount($gmail, $password) {
     return null;
 }
 
+// Fungsi cari akun berdasarkan Gmail saja (untuk master)
+function findAccountByGmail($gmail) {
+    $accounts = getAccounts();
+    if (isset($accounts['error'])) return null;
+    
+    foreach ($accounts as $acc) {
+        if ($acc['Gmail'] === $gmail) {
+            return $acc;
+        }
+    }
+    return null;
+}
+
 // ========== ROUTING ==========
 $action = $_GET['action'] ?? '';
 
 if ($action === 'login') {
-    // Method POST untuk login
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
         echo json_encode(['status' => 'error', 'message' => 'Method harus POST']);
         exit;
@@ -48,13 +60,16 @@ if ($action === 'login') {
     
     $account = findAccount($gmail, $password);
     if ($account) {
-        // Kirim data saldo (tanpa password)
+        // Kirim data (tanpa password, tapi dengan role)
         echo json_encode([
             'status' => 'success',
             'message' => 'Login berhasil',
             'data' => [
                 'Gmail' => $account['Gmail'],
-                'Saldo' => $account['Saldo']
+                'Saldo' => $account['Saldo'],
+                'Role' => $account['Role'] ?? 'user',
+                'QRIS' => $account['QRIS'] ?? null,
+                'Dana' => $account['Dana'] ?? null
             ]
         ]);
     } else {
@@ -64,10 +79,42 @@ if ($action === 'login') {
 }
 
 if ($action === 'saldo') {
-    // Method GET untuk ambil saldo berdasarkan Gmail (dengan session/token sederhana)
     $gmail = $_GET['gmail'] ?? '';
     if (empty($gmail)) {
         echo json_encode(['status' => 'error', 'message' => 'Gmail wajib diisi']);
+        exit;
+    }
+    
+    $account = findAccountByGmail($gmail);
+    if ($account) {
+        echo json_encode([
+            'status' => 'success',
+            'data' => [
+                'Gmail' => $account['Gmail'],
+                'Saldo' => $account['Saldo'],
+                'Role' => $account['Role'] ?? 'user',
+                'QRIS' => $account['QRIS'] ?? null,
+                'Dana' => $account['Dana'] ?? null
+            ]
+        ]);
+    } else {
+        echo json_encode(['status' => 'error', 'message' => 'Akun tidak ditemukan']);
+    }
+    exit;
+}
+
+// ========== NEW: GET ALL ACCOUNTS (khusus master) ==========
+if ($action === 'all-accounts') {
+    $gmail = $_GET['gmail'] ?? '';
+    if (empty($gmail)) {
+        echo json_encode(['status' => 'error', 'message' => 'Gmail wajib diisi']);
+        exit;
+    }
+    
+    // Cek apakah user adalah master
+    $account = findAccountByGmail($gmail);
+    if (!$account || ($account['Role'] ?? 'user') !== 'master') {
+        echo json_encode(['status' => 'error', 'message' => 'Akses ditolak. Hanya master yang bisa melihat semua akun.']);
         exit;
     }
     
@@ -77,20 +124,16 @@ if ($action === 'saldo') {
         exit;
     }
     
-    foreach ($accounts as $acc) {
-        if ($acc['Gmail'] === $gmail) {
-            echo json_encode([
-                'status' => 'success',
-                'data' => [
-                    'Gmail' => $acc['Gmail'],
-                    'Saldo' => $acc['Saldo']
-                ]
-            ]);
-            exit;
-        }
-    }
+    // Hapus password dari response
+    $safeAccounts = array_map(function($acc) {
+        unset($acc['Password']);
+        return $acc;
+    }, $accounts);
     
-    echo json_encode(['status' => 'error', 'message' => 'Akun tidak ditemukan']);
+    echo json_encode([
+        'status' => 'success',
+        'data' => $safeAccounts
+    ]);
     exit;
 }
 
