@@ -6,7 +6,7 @@ header('Access-Control-Allow-Headers: Content-Type');
 
 // Fungsi baca data dari /info/accounts.json
 function getAccounts() {
-    $file = __DIR__ . '/../info/accounts.json';
+    $file = __DIR__ . '/info/accounts.json';
     if (!file_exists($file)) {
         return ['error' => 'File accounts.json tidak ditemukan'];
     }
