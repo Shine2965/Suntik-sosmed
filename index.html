@@ -509,121 +509,161 @@ h1 {
 <div id="userBubble" class="user-bubble"></div>
 
 <script>
-// ========== EXISTING SCRIPTS (DIAMANKAN / TIDAK DIUBAH) ==========
-async function securityCheck() {
-  try {
-    const res = await fetch("/api/security");
-    if (!res.ok) {
-      document.body.innerHTML = "<h1 style='text-align:center;color:red;margin-top:40vh'>🚫 Akses Ditolak</h1>";
+// ============================================================
+// 🔒 DRAGON PROTOCOL: PERSISTENT USER ID & REFERRAL CODE
+// ============================================================
+
+// ---------- USER ID (IMMUTABLE) ----------
+function generateUserID() {
+  return 'user-' + Math.random().toString(36).substring(2, 10) + '-' + Date.now().toString(36);
+}
+
+function getOrCreateUserID() {
+  let id = localStorage.getItem('user_id');
+  if (!id) {
+    id = generateUserID();
+    localStorage.setItem('user_id', id);
+  }
+  return id;
+}
+
+const userID = getOrCreateUserID();
+
+// ---------- REFERRAL CODE (IMMUTABLE ONCE SET) ----------
+function getReferralFromURL() {
+  const params = new URLSearchParams(window.location.search);
+  return params.get('ref') || null;
+}
+
+function getStoredReferral() {
+  return localStorage.getItem('referral_code') || null;
+}
+
+function setReferralIfNotExists(code) {
+  if (!code) return false;
+  const existing = getStoredReferral();
+  if (!existing) {
+    localStorage.setItem('referral_code', code);
+    return true;
+  }
+  return false; // already exists, ignore new one
+}
+
+// ---------- LOCK: Prevent localStorage manipulation via console ----------
+// Override setItem untuk referral_code & user_id biar gak bisa diubah dari console
+(function lockLocalStorage() {
+  const originalSetItem = Storage.prototype.setItem;
+  const originalRemoveItem = Storage.prototype.removeItem;
+  
+  Storage.prototype.setItem = function(key, value) {
+    if (key === 'referral_code' && localStorage.getItem('referral_code') !== null) {
+      console.warn('🔒 Shine Lock: Referral code sudah diset, tidak bisa diubah!');
       return;
     }
-    const data = await res.json();
-    if (data.status !== "ok") {
-      document.body.innerHTML = "<h1 style='text-align:center;color:red;margin-top:40vh'>🚫 IP Diblokir</h1>";
+    if (key === 'user_id' && localStorage.getItem('user_id') !== null) {
+      console.warn('🔒 Shine Lock: User ID sudah diset, tidak bisa diubah!');
       return;
     }
-    console.log("Security OK", data.ip);
-  } catch (e) {
-    document.body.innerHTML = "<h1 style='text-align:center;color:red;margin-top:40vh'>Server Error</h1>";
+    originalSetItem.call(this, key, value);
+  };
+  
+  Storage.prototype.removeItem = function(key) {
+    if (key === 'referral_code' || key === 'user_id') {
+      console.warn('🔒 Dragon Lock: Gak bisa hapus ' + key + '!');
+      return;
+    }
+    originalRemoveItem.call(this, key);
+  };
+})();
+
+// ---------- EXECUTE ----------
+// 1. Simpan referral dari URL (hanya jika belum ada)
+const urlRef = getReferralFromURL();
+if (urlRef) {
+  const isNew = setReferralIfNotExists(urlRef);
+  if (isNew) {
+    console.log('✅ Referral code tersimpan: ' + urlRef);
+  } else {
+    console.log('ℹ️ Referral code sudah ada, abaikan dari URL: ' + urlRef);
   }
 }
-securityCheck();
 
-function generateUserID(){
-  return 'user-'+Math.random().toString(36).substring(2,10)+'-'+Date.now().toString(36);
+// 2. Tampilkan status referral
+const statusElement = document.getElementById('status-ref');
+const storedRef = getStoredReferral();
+if (storedRef) {
+  statusElement.innerHTML = `✅ Terdeteksi! Kode referral Anda: <strong>${storedRef}</strong>`;
+} else {
+  statusElement.innerHTML = `❌ Tidak ada kode referral tersimpan.`;
 }
-function getUserID(){
-  let id=localStorage.getItem("user_id");
-  if(!id){id=generateUserID();localStorage.setItem("user_id",id);}return id;
-}
-const userID=getUserID();
 
-const bubble=document.getElementById("userBubble");
+// 3. Tampilkan user bubble
+const bubble = document.getElementById('userBubble');
 
-function showUserBubble(){
+function showUserBubble() {
   bubble.innerHTML = `<b>👋 Selamat Datang</b><span class="user-id">${userID}</span>`;
-  bubble.classList.add("show");
-  setTimeout(()=>{
-    bubble.classList.remove("show");
+  bubble.classList.add('show');
+  setTimeout(() => {
+    bubble.classList.remove('show');
     cekPesan();
-  },500);
+  }, 500);
 }
 
-async function cekPesan(){
-  try{
-    const res=await fetch("/home2/pesan.json?cache="+Date.now());
-    const data=await res.json();
-    let alerts=[];
-    if(data[userID]){
+// ---------- PESAN CHECK (existing) ----------
+async function cekPesan() {
+  try {
+    const res = await fetch('/home2/pesan.json?cache=' + Date.now());
+    const data = await res.json();
+    let alerts = [];
+    if (data[userID]) {
       alerts.push({
-        title:'📩 Pesan Baru',
-        html:'<b>UserID:</b><br>'+userID+'<br><br><b>Pesan:</b><br>'+data[userID],
-        icon:'info'
+        title: '📩 Pesan Baru',
+        html: '<b>UserID:</b><br>' + userID + '<br><br><b>Pesan:</b><br>' + data[userID],
+        icon: 'info'
       });
     }
-    if(data["all"]){
+    if (data['all']) {
       alerts.push({
-        title:'📢 Pengumuman',
-        html:data["all"],
-        icon:'warning'
+        title: '📢 Pengumuman',
+        html: data['all'],
+        icon: 'warning'
       });
     }
-    if(data["all1"]){
+    if (data['all1']) {
       alerts.push({
-        title:'📢 Pengumuman',
-        html:data["all1"],
-        icon:'warning'
+        title: '📢 Pengumuman',
+        html: data['all1'],
+        icon: 'warning'
       });
     }
-    if(data["all2"]){
+    if (data['all2']) {
       alerts.push({
-        title:'📢 Pengumuman',
-        html:data["all2"],
-        icon:'warning'
+        title: '📢 Pengumuman',
+        html: data['all2'],
+        icon: 'warning'
       });
     }
-    for(const alert of alerts){
+    for (const alert of alerts) {
       await Swal.fire({
-        title:alert.title,
-        html:alert.html,
-        icon:alert.icon,
-        confirmButtonText:'Tutup'
+        title: alert.title,
+        html: alert.html,
+        icon: alert.icon,
+        confirmButtonText: 'Tutup'
       });
     }
-  }catch(e){console.log("Tidak ada pesan.");}
-}
-
-window.addEventListener("load",showUserBubble);
-
-function simpanReferral() {
-  const urlParams = new URLSearchParams(window.location.search);
-  const referralCode = urlParams.get('ref');
-  if (referralCode) {
-    localStorage.setItem('referral_code', referralCode);
-    console.log('Referral code berhasil disimpan: ' + referralCode);
-  } else {
-    console.log('Tidak ada parameter referral di URL.');
+  } catch (e) {
+    console.log('Tidak ada pesan.');
   }
 }
 
-function ambilReferral() {
-  const savedRef = localStorage.getItem('referral_code');
-  const statusElement = document.getElementById('status-ref');
-  if (savedRef) {
-    statusElement.innerHTML = `✅ Terdeteksi! Kode referral Anda: <strong>${savedRef}</strong>`;
-  } else {
-    statusElement.innerHTML = `❌ Tidak ada kode referral tersimpan.`;
-  }
-  return savedRef;
-}
+// ---------- INIT ----------
+window.addEventListener('load', showUserBubble);
 
-simpanReferral();
-ambilReferral();
-
-document.addEventListener("keydown", function(e){
-  if(e.key === "F12") e.preventDefault();
-  if(e.ctrlKey && e.shiftKey && ["I","C","J"].includes(e.key)) e.preventDefault();
-  if(e.ctrlKey && e.key === "u") e.preventDefault();
+// ---------- ANTI DEVTOOLS ----------
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'F12') e.preventDefault();
+  if (e.ctrlKey && e.shiftKey && ['I', 'C', 'J'].includes(e.key)) e.preventDefault();
+  if (e.ctrlKey && e.key === 'u') e.preventDefault();
 });
 
 setInterval(() => {
@@ -634,6 +674,8 @@ setInterval(() => {
     document.body.innerHTML = "<h1 style='color:gold;text-align:center;margin-top:40vh;'>🚫 Developer Tools Terdeteksi</h1>";
   }
 }, 2000);
+
+console.log('🐉 Dragon V1 Active - Referral & UserID Locked!');
 </script>
 </body>
-</html>
+      </html>
