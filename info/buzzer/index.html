@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Buzzer Misi - Shine Shop</title>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0a0a0a;
+            min-height: 100vh;
+            padding: 30px 20px;
+            background: radial-gradient(circle at 20% 30%, #ffaa0010, transparent 50%),
+                        radial-gradient(circle at 80% 70%, #ff660010, transparent 50%),
+                        #0a0a0a;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        .card {
+            background: #1a1a1a;
+            border-radius: 24px;
+            padding: 30px 28px;
+            border: 1px solid #ffaa0033;
+            box-shadow: 0 0 40px rgba(255,170,0,0.05);
+            margin-bottom: 20px;
+        }
+        .card h2 {
+            color: #ffaa00;
+            font-size: 22px;
+            margin-bottom: 6px;
+        }
+        .card .sub {
+            color: #888;
+            font-size: 14px;
+            margin-bottom: 20px;
+        }
+        .btn {
+            padding: 10px 24px;
+            border-radius: 30px;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.3s;
+            font-size: 13px;
+        }
+        .btn-back {
+            background: #444;
+            color: #fff;
+        }
+        .btn-back:hover {
+            background: #555;
+        }
+        .btn-upload {
+            background: #ffaa0044;
+            color: #ffaa00;
+            border: 1px solid #ffaa0055;
+        }
+        .btn-upload:hover {
+            background: #ffaa0066;
+        }
+        .btn-upload:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .header-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 10px;
+        }
+        .misi-card {
+            background: #0d0d0d;
+            border-radius: 16px;
+            padding: 20px;
+            border: 1px solid #ffaa0015;
+            margin-bottom: 16px;
+            transition: 0.3s;
+        }
+        .misi-card:hover {
+            border-color: #ffaa0044;
+        }
+        .misi-card .title {
+            font-size: 18px;
+            font-weight: 700;
+            color: #ffaa00;
+        }
+        .misi-card .detail {
+            color: #ccc;
+            font-size: 14px;
+            margin: 6px 0;
+        }
+        .misi-card .detail strong {
+            color: #fff;
+        }
+        .misi-card .target {
+            color: #00ccff;
+            font-size: 13px;
+            word-break: break-all;
+        }
+        .misi-card .target a {
+            color: #00ccff;
+            text-decoration: underline;
+        }
+        .misi-card .pesan-box {
+            background: #ffaa0008;
+            border-left: 3px solid #ffaa00;
+            padding: 10px 14px;
+            border-radius: 8px;
+            margin: 8px 0;
+            color: #ddd;
+            font-size: 13px;
+            font-style: italic;
+        }
+        .misi-card .completed-by {
+            color: #888;
+            font-size: 12px;
+            margin-top: 8px;
+        }
+        .misi-card .completed-by .email-list {
+            color: #00ffaa;
+            font-weight: 500;
+        }
+        .misi-card .upload-area {
+            margin-top: 14px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+        }
+        .misi-card .upload-area input[type="file"] {
+            background: #222;
+            color: #fff;
+            padding: 8px 12px;
+            border-radius: 12px;
+            border: 1px solid #ffaa0033;
+            font-size: 12px;
+            flex: 1;
+            min-width: 150px;
+        }
+        .misi-card .upload-area input[type="file"]::file-selector-button {
+            background: #ffaa0022;
+            color: #ffaa00;
+            border: 1px solid #ffaa0044;
+            padding: 4px 12px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 11px;
+        }
+        .misi-card .upload-area input[type="file"]::file-selector-button:hover {
+            background: #ffaa0044;
+        }
+        .badge {
+            display: inline-block;
+            padding: 2px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            background: #ffaa0022;
+            color: #ffaa00;
+        }
+        .badge.done {
+            background: #00ffaa22;
+            color: #00ffaa;
+        }
+        .text-muted {
+            color: #666;
+            font-size: 12px;
+        }
+        .no-data {
+            color: #666;
+            text-align: center;
+            padding: 30px 0;
+            font-size: 14px;
+        }
+        .loading {
+            color: #888;
+            text-align: center;
+            padding: 20px 0;
+            font-size: 14px;
+        }
+        .divider {
+            border: none;
+            border-top: 1px solid #ffaa0015;
+            margin: 16px 0;
+        }
+        .progress-bar {
+            background: #222;
+            border-radius: 20px;
+            height: 6px;
+            margin: 8px 0;
+            overflow: hidden;
+        }
+        .progress-bar .fill {
+            background: linear-gradient(90deg, #ffaa00, #ff6600);
+            height: 100%;
+            border-radius: 20px;
+            transition: width 0.5s ease;
+        }
+        @media (max-width: 600px) {
+            .card {
+                padding: 20px 16px;
+            }
+            .misi-card .upload-area {
+                flex-direction: column;
+            }
+            .misi-card .upload-area input[type="file"] {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- ===== HEADER ===== -->
+        <div class="card">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;">
+                <div>
+                    <h2>📢 Buzzer Misi</h2>
+                    <div class="sub">Selesaikan misi & dapatkan reward!</div>
+                </div>
+                <div class="header-actions">
+                    <button class="btn btn-back" onclick="location.href='/info/dashboard/index.html'">⬅️ Kembali</button>
+                    <button class="btn btn-refresh" onclick="loadMisi()" style="background:#00ffaa22;color:#00ffaa;border:1px solid #00ffaa44;">🔄 Refresh</button>
+                </div>
+            </div>
+            <div id="userInfo" style="color:#888;font-size:13px;margin-top:8px;">
+                👤 <span id="userEmailDisplay">-</span>
+            </div>
+        </div>
+
+        <!-- ===== LIST MISI ===== -->
+        <div id="misiContainer">
+            <div class="loading">⏳ Memuat daftar misi...</div>
+        </div>
+
+        <div class="text-muted" style="text-align:center;margin-top:20px;">
+            © Shine Shop · Buzzer System
+        </div>
+    </div>
+
+    <script>
+        // ===================== KONFIGURASI =====================
+        const DATA_URL = '/info/buzzer/data.json';
+        const TELEGRAM_TOKEN = '8785872128:AAGJApScDjRIjg1VorXB35OvrvtUDCtVr0M';
+        const TELEGRAM_CHAT_ID = '6317157631';
+
+        // ===================== CEK SESSION =====================
+        function checkSession() {
+            const loggedIn = localStorage.getItem('logged_in');
+            if (loggedIn !== 'true') {
+                window.location.href = '/info/index.html';
+                return false;
+            }
+            return true;
+        }
+
+        if (!checkSession()) {
+            throw new Error('Redirect ke login');
+        }
+
+        // ===================== GET USER DATA =====================
+        function getUserData() {
+            return {
+                email: localStorage.getItem('user_email') || '',
+                role: localStorage.getItem('user_role') || 'user'
+            };
+        }
+
+        // ===================== LOAD MISI =====================
+        async function loadMisi() {
+            const container = document.getElementById('misiContainer');
+            container.innerHTML = '<div class="loading">⏳ Memuat daftar misi...</div>';
+
+            const user = getUserData();
+            document.getElementById('userEmailDisplay').textContent = user.email || 'Belum login';
+
+            try {
+                const res = await fetch(DATA_URL + '?t=' + Date.now());
+                if (!res.ok) throw new Error('Gagal mengambil data misi');
+
+                const data = await res.json();
+                if (!Array.isArray(data) || data.length === 0) {
+                    container.innerHTML = '<div class="no-data">📭 Belum ada misi tersedia.</div>';
+                    return;
+                }
+
+                let html = '';
+                data.forEach((misi, index) => {
+                    const completedList = misi.Terselesaikan || [];
+                    const isCompleted = completedList.includes(user.email);
+                    const progress = misi.Jumlah ? Math.min((completedList.length / misi.Jumlah) * 100, 100) : 0;
+
+                    html += `
+                        <div class="misi-card" id="misi-${index}">
+                            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;">
+                                <div class="title">${misi.Tugas || 'Misi'}</div>
+                                <span class="badge ${isCompleted ? 'done' : ''}">
+                                    ${isCompleted ? '✅ Selesai' : '⏳ Belum'}
+                                </span>
+                            </div>
+                            
+                            <div class="detail"><strong>Harga:</strong> ${misi.Harga || 'Gratis'}</div>
+                            <div class="detail"><strong>Jumlah yang dibutuhkan:</strong> ${misi.Jumlah || '∞'}</div>
+                            <div class="detail"><strong>Sudah dikerjakan:</strong> ${completedList.length} / ${misi.Jumlah || '∞'}</div>
+                            
+                            <div class="progress-bar">
+                                <div class="fill" style="width:${Math.min(progress, 100)}%;"></div>
+                            </div>
+
+                            <div class="target"><strong>🎯 Target:</strong> 
+                                <a href="${misi.Target || '#'}" target="_blank">${misi.Target || '-'}</a>
+                            </div>
+
+                            ${misi.Pesan ? `
+                                <div class="pesan-box">
+                                    <strong>📝 Pesan:</strong> ${Array.isArray(misi.Pesan) ? misi.Pesan.join(' | ') : misi.Pesan}
+                                </div>
+                            ` : ''}
+
+                            ${completedList.length > 0 ? `
+                                <div class="completed-by">
+                                    ✅ <strong>Telah diselesaikan oleh:</strong>
+                                    <span class="email-list">${completedList.join(', ')}</span>
+                                </div>
+                            ` : ''}
+
+                            <div class="divider"></div>
+
+                            <!-- UPLOAD AREA -->
+                            <div class="upload-area">
+                                <input type="file" id="fileInput-${index}" accept="image/*" ${isCompleted ? 'disabled' : ''}>
+                                <button class="btn btn-upload" id="uploadBtn-${index}" ${isCompleted ? 'disabled' : ''}>
+                                    ${isCompleted ? '✅ Sudah selesai' : '📤 Upload Bukti'}
+                                </button>
+                            </div>
+                            ${isCompleted ? '<div class="text-muted" style="margin-top:4px;">✨ Anda sudah menyelesaikan misi ini.</div>' : ''}
+                        </div>
+                    `;
+                });
+
+                container.innerHTML = html;
+
+                // ===== ATTACH EVENT UPLOAD =====
+                data.forEach((misi, index) => {
+                    const btn = document.getElementById(`uploadBtn-${index}`);
+                    const fileInput = document.getElementById(`fileInput-${index}`);
+
+                    if (btn && fileInput) {
+                        btn.addEventListener('click', function() {
+                            handleUpload(misi, index, fileInput);
+                        });
+                    }
+                });
+
+            } catch (err) {
+                console.error('Error load misi:', err);
+                container.innerHTML = `<div class="no-data" style="color:#ff6666;">❌ Gagal memuat misi: ${err.message}</div>`;
+            }
+        }
+
+        // ===================== HANDLE UPLOAD =====================
+        async function handleUpload(misi, index, fileInput) {
+            const user = getUserData();
+            const file = fileInput.files[0];
+
+            if (!file) {
+                Swal.fire({
+                    title: '⚠️ Belum ada file',
+                    text: 'Silakan pilih bukti screenshot terlebih dahulu.',
+                    icon: 'warning',
+                    confirmButtonColor: '#ffaa00'
+                });
+                return;
+            }
+
+            // Cek apakah user sudah menyelesaikan misi ini
+            if (misi.Terselesaikan && misi.Terselesaikan.includes(user.email)) {
+                Swal.fire({
+                    title: '✅ Sudah selesai',
+                    text: 'Anda sudah menyelesaikan misi ini sebelumnya.',
+                    icon: 'info',
+                    confirmButtonColor: '#ffaa00'
+                });
+                return;
+            }
+
+            // Cek kuota
+            if (misi.Jumlah && misi.Terselesaikan && misi.Terselesaikan.length >= misi.Jumlah) {
+                Swal.fire({
+                    title: '❌ Kuota Penuh',
+                    text: 'Misi ini sudah mencapai jumlah target yang dibutuhkan.',
+                    icon: 'error',
+                    confirmButtonColor: '#ffaa00'
+                });
+                return;
+            }
+
+            // Konfirmasi
+            const confirmResult = await Swal.fire({
+                title: '📤 Upload Bukti',
+                html: `
+                    <b>Misi:</b> ${misi.Tugas}<br>
+                    <b>Target:</b> ${misi.Target}<br>
+                    <b>File:</b> ${file.name}
+                `,
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonText: '✅ Kirim',
+                cancelButtonText: '❌ Batal',
+                confirmButtonColor: '#ffaa00',
+                cancelButtonColor: '#666'
+            });
+
+            if (!confirmResult.isConfirmed) return;
+
+            // ===== KIRIM KE TELEGRAM =====
+            const btn = document.getElementById(`uploadBtn-${index}`);
+            btn.disabled = true;
+            btn.textContent = '⏳ Mengirim...';
+
+            try {
+                // Kirim pesan teks ke Telegram
+                const textMessage = `
+📢 **Bukti Buzzer Misi**
+👤 User: ${user.email}
+📋 Misi: ${misi.Tugas}
+🎯 Target: ${misi.Target}
+💰 Harga: ${misi.Harga || 'Gratis'}
+📝 Pesan: ${Array.isArray(misi.Pesan) ? misi.Pesan.join(' | ') : misi.Pesan || '-'}
+📅 Waktu: ${new Date().toLocaleString('id-ID')}
+                `;
+
+                // Kirim teks dulu
+                await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        chat_id: TELEGRAM_CHAT_ID,
+                        text: textMessage,
+                        parse_mode: 'Markdown'
+                    })
+                });
+
+                // Kirim file (foto)
+                const formData = new FormData();
+                formData.append('chat_id', TELEGRAM_CHAT_ID);
+                formData.append('photo', file);
+
+                await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendPhoto`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                // ===== UPDATE DATA.JSON (di sisi client, sebenarnya perlu backend, tapi kita simpan di localStorage sementara) =====
+                // Simpan progress di localStorage agar tidak hilang
+                const progressKey = 'buzzer_progress_' + misi.Tugas.replace(/\s/g, '_');
+                let progress = JSON.parse(localStorage.getItem(progressKey) || '[]');
+                if (!progress.includes(user.email)) {
+                    progress.push(user.email);
+                    localStorage.setItem(progressKey, JSON.stringify(progress));
+                }
+
+                Swal.fire({
+                    title: '✅ Berhasil!',
+                    text: `Bukti untuk misi "${misi.Tugas}" berhasil dikirim ke admin!`,
+                    icon: 'success',
+                    confirmButtonColor: '#ffaa00'
+                });
+
+                // Refresh tampilan
+                loadMisi();
+
+            } catch (err) {
+                console.error('Error upload:', err);
+                Swal.fire({
+                    title: '❌ Gagal',
+                    text: 'Terjadi error saat mengirim bukti: ' + err.message,
+                    icon: 'error',
+                    confirmButtonColor: '#ffaa00'
+                });
+                btn.disabled = false;
+                btn.textContent = '📤 Upload Bukti';
+            }
+        }
+
+        // ===================== INIT =====================
+        document.addEventListener('DOMContentLoaded', function() {
+            loadMisi();
+        });
+
+        // Refresh otomatis setiap 30 detik
+        setInterval(loadMisi, 30000);
+
+        console.log('📢 Buzzer Misi siap!');
+        console.log('👤 User:', getUserData().email);
+    </script>
+</body>
+</html>
