@@ -58,6 +58,14 @@
         .btn-back:hover {
             background: #555;
         }
+        .btn-refresh {
+            background: #00ffaa22;
+            color: #00ffaa;
+            border: 1px solid #00ffaa44;
+        }
+        .btn-refresh:hover {
+            background: #00ffaa44;
+        }
         .btn-upload {
             background: #ffaa0044;
             color: #ffaa00;
@@ -99,6 +107,11 @@
         }
         .misi-card .detail strong {
             color: #fff;
+        }
+        .misi-card .id-misi {
+            color: #ffaa00;
+            font-weight: 600;
+            font-size: 13px;
         }
         .misi-card .target {
             color: #00ccff;
@@ -156,6 +169,28 @@
         }
         .misi-card .upload-area input[type="file"]::file-selector-button:hover {
             background: #ffaa0044;
+        }
+        .misi-card .input-buzzer {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .misi-card .input-buzzer input {
+            flex: 1;
+            min-width: 120px;
+            background: #222;
+            color: #fff;
+            border: 1px solid #ffaa0033;
+            border-radius: 12px;
+            padding: 10px 14px;
+            font-size: 13px;
+            outline: none;
+            transition: 0.3s;
+        }
+        .misi-card .input-buzzer input:focus {
+            border-color: #ffaa00;
+            box-shadow: 0 0 20px rgba(255,170,0,0.1);
         }
         .badge {
             display: inline-block;
@@ -218,7 +253,16 @@
             color: #00ffaa;
             font-weight: 600;
         }
+        .history-item .h-id {
+            color: #ffaa00;
+            font-size: 10px;
+            font-weight: 600;
+        }
         .history-item .h-date {
+            color: #888;
+            font-size: 11px;
+        }
+        .history-item .h-bukti {
             color: #888;
             font-size: 11px;
         }
@@ -230,6 +274,12 @@
                 flex-direction: column;
             }
             .misi-card .upload-area input[type="file"] {
+                width: 100%;
+            }
+            .misi-card .input-buzzer {
+                flex-direction: column;
+            }
+            .misi-card .input-buzzer input {
                 width: 100%;
             }
         }
@@ -246,7 +296,7 @@
                 </div>
                 <div class="header-actions">
                     <button class="btn btn-back" onclick="location.href='/info/dashboard/index.html'">⬅️ Kembali</button>
-                    <button class="btn btn-refresh" onclick="loadMisi()" style="background:#00ffaa22;color:#00ffaa;border:1px solid #00ffaa44;">🔄 Refresh</button>
+                    <button class="btn btn-refresh" onclick="loadMisi()">🔄 Refresh</button>
                 </div>
             </div>
             <div id="userInfo" style="color:#888;font-size:13px;margin-top:8px;">
@@ -325,13 +375,18 @@
                             historyHtml += `
                                 <div class="history-item">
                                     <span class="h-user">${h.user}</span>
+                                    <span class="h-id">[${h.id_misi || misi.id_misi || '-'}]</span>
                                     <span class="h-date">${h.tanggal || '-'}</span>
-                                    <span style="color:#888;font-size:11px;">| Bukti: ${h.bukti || 'Tidak ada'}</span>
+                                    <span class="h-bukti">| Bukti: ${h.bukti || 'Tidak ada'}</span>
                                 </div>
                             `;
                         });
                         historyHtml += `</div>`;
                     }
+
+                    // Pesan 1 & Pesan 2
+                    const pesan1 = Array.isArray(misi.Pesan) ? misi.Pesan[0] || '-' : misi.Pesan || '-';
+                    const pesan2 = Array.isArray(misi.Pesan) && misi.Pesan[1] ? misi.Pesan[1] : '-';
 
                     html += `
                         <div class="misi-card" id="misi-${index}">
@@ -342,9 +397,10 @@
                                 </span>
                             </div>
                             
-                            <div class="detail"><strong>Harga:</strong> ${misi.Harga || 'Gratis'}</div>
-                            <div class="detail"><strong>Jumlah yang dibutuhkan:</strong> ${misi.Jumlah || '∞'}</div>
-                            <div class="detail"><strong>Sudah dikerjakan:</strong> ${completedList.length} / ${misi.Jumlah || '∞'}</div>
+                            <div class="detail"><strong>🆔 ID Misi:</strong> <span class="id-misi">${misi.id_misi || '-'}</span></div>
+                            <div class="detail"><strong>💰 Harga:</strong> ${misi.Harga || 'Gratis'}</div>
+                            <div class="detail"><strong>📊 Jumlah yang dibutuhkan:</strong> ${misi.Jumlah || '∞'}</div>
+                            <div class="detail"><strong>✅ Sudah dikerjakan:</strong> ${completedList.length} / ${misi.Jumlah || '∞'}</div>
                             
                             <div class="progress-bar">
                                 <div class="fill" style="width:${Math.min(progress, 100)}%;"></div>
@@ -356,8 +412,8 @@
 
                             ${misi.Pesan ? `
                                 <div class="pesan-box">
-                                    <strong>📝 Pesan 1:</strong> ${Array.isArray(misi.Pesan) ? misi.Pesan[0] || '-' : misi.Pesan}
-                                    ${Array.isArray(misi.Pesan) && misi.Pesan[1] ? `<br><strong>📝 Pesan 2:</strong> ${misi.Pesan[1]}` : ''}
+                                    <strong>📝 Pesan 1:</strong> ${pesan1}
+                                    ${pesan2 !== '-' ? `<br><strong>📝 Pesan 2:</strong> ${pesan2}` : ''}
                                 </div>
                             ` : ''}
 
@@ -366,9 +422,9 @@
                             <div class="divider"></div>
 
                             <!-- INPUT BUZZER DATA -->
-                            <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
-                                <input type="text" id="buzzerName-${index}" placeholder="Nama/Username Buzzer" style="flex:1;min-width:120px;background:#222;color:#fff;border:1px solid #ffaa0033;border-radius:12px;padding:10px 14px;font-size:13px;">
-                                <input type="text" id="buzzerEmail-${index}" placeholder="Gmail Buzzer" style="flex:1;min-width:150px;background:#222;color:#fff;border:1px solid #ffaa0033;border-radius:12px;padding:10px 14px;font-size:13px;" value="${user.email}">
+                            <div class="input-buzzer">
+                                <input type="text" id="buzzerName-${index}" placeholder="Nama/Username Buzzer" style="flex:2;">
+                                <input type="text" id="buzzerEmail-${index}" placeholder="Gmail Buzzer" style="flex:2;" value="${user.email}">
                             </div>
 
                             <!-- UPLOAD AREA -->
@@ -461,6 +517,7 @@
                 title: '📤 Upload Bukti Buzzer',
                 html: `
                     <div style="text-align:left;">
+                        <b>🆔 ID Misi:</b> ${misi.id_misi || '-'}<br>
                         <b>📋 Misi:</b> ${misi.Tugas}<br>
                         <b>🎯 Target:</b> ${misi.Target}<br>
                         <b>👤 Nama Buzzer:</b> ${buzzerName}<br>
@@ -500,6 +557,7 @@
                 const textMessage = `
 📢 **LAPORAN BUZZER MISI**
 ━━━━━━━━━━━━━━━━━━━━━
+🆔 **ID Misi:** ${misi.id_misi || '-'}
 📋 **Misi:** ${misi.Tugas}
 🎯 **Target:** ${misi.Target}
 💰 **Harga:** ${misi.Harga || 'Gratis'}
@@ -530,7 +588,7 @@
                 const formData = new FormData();
                 formData.append('chat_id', TELEGRAM_CHAT_ID);
                 formData.append('photo', file);
-                formData.append('caption', `📸 Bukti: ${misi.Tugas} - ${buzzerName}`);
+                formData.append('caption', `📸 Bukti: ${misi.Tugas} - ${buzzerName} [${misi.id_misi || '-'}]`);
 
                 await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendPhoto`, {
                     method: 'POST',
@@ -538,7 +596,7 @@
                 });
 
                 // ===== UPDATE HISTORY DI LOCALSTORAGE =====
-                const historyKey = 'buzzer_history_' + misi.Tugas.replace(/\s/g, '_');
+                const historyKey = 'buzzer_history_' + (misi.id_misi || misi.Tugas.replace(/\s/g, '_'));
                 let historyData = JSON.parse(localStorage.getItem(historyKey) || '[]');
                 
                 // Tambahkan data baru
@@ -547,6 +605,7 @@
                     nama: buzzerName,
                     tanggal: tanggal,
                     bukti: file.name,
+                    id_misi: misi.id_misi || '-',
                     misi: misi.Tugas,
                     target: misi.Target
                 });
@@ -557,7 +616,7 @@
                     title: '✅ Berhasil!',
                     html: `
                         Bukti untuk misi <b>"${misi.Tugas}"</b> berhasil dikirim ke admin!<br>
-                        <span style="font-size:13px;color:#888;">Nama Buzzer: ${buzzerName}</span>
+                        <span style="font-size:13px;color:#888;">🆔 ${misi.id_misi || '-'} | Nama: ${buzzerName}</span>
                     `,
                     icon: 'success',
                     confirmButtonColor: '#ffaa00'
@@ -577,20 +636,6 @@
                 btn.disabled = false;
                 btn.textContent = '📤 Upload Bukti';
             }
-        }
-
-        // ===================== LOAD HISTORY DARI LOCALSTORAGE =====================
-        function loadHistoryFromLocal(misi) {
-            const historyKey = 'buzzer_history_' + misi.Tugas.replace(/\s/g, '_');
-            const data = localStorage.getItem(historyKey);
-            if (data) {
-                try {
-                    return JSON.parse(data);
-                } catch {
-                    return [];
-                }
-            }
-            return [];
         }
 
         // ===================== INIT =====================
