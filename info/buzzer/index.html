@@ -205,6 +205,23 @@
             border-radius: 20px;
             transition: width 0.5s ease;
         }
+        .history-item {
+            background: #00ffaa08;
+            border-left: 2px solid #00ffaa;
+            padding: 8px 12px;
+            border-radius: 8px;
+            margin: 4px 0;
+            font-size: 12px;
+            color: #aaa;
+        }
+        .history-item .h-user {
+            color: #00ffaa;
+            font-weight: 600;
+        }
+        .history-item .h-date {
+            color: #888;
+            font-size: 11px;
+        }
         @media (max-width: 600px) {
             .card {
                 padding: 20px 16px;
@@ -295,9 +312,26 @@
 
                 let html = '';
                 data.forEach((misi, index) => {
-                    const completedList = misi.Terselesaikan || [];
+                    const history = misi.History || [];
+                    const completedList = history.map(h => h.user);
                     const isCompleted = completedList.includes(user.email);
                     const progress = misi.Jumlah ? Math.min((completedList.length / misi.Jumlah) * 100, 100) : 0;
+
+                    // Buat riwayat
+                    let historyHtml = '';
+                    if (history.length > 0) {
+                        historyHtml = `<div style="margin-top:10px;"><strong style="color:#888;font-size:12px;">📜 Riwayat Penyelesaian:</strong>`;
+                        history.forEach(h => {
+                            historyHtml += `
+                                <div class="history-item">
+                                    <span class="h-user">${h.user}</span>
+                                    <span class="h-date">${h.tanggal || '-'}</span>
+                                    <span style="color:#888;font-size:11px;">| Bukti: ${h.bukti || 'Tidak ada'}</span>
+                                </div>
+                            `;
+                        });
+                        historyHtml += `</div>`;
+                    }
 
                     html += `
                         <div class="misi-card" id="misi-${index}">
@@ -322,18 +356,20 @@
 
                             ${misi.Pesan ? `
                                 <div class="pesan-box">
-                                    <strong>📝 Pesan:</strong> ${Array.isArray(misi.Pesan) ? misi.Pesan.join(' | ') : misi.Pesan}
+                                    <strong>📝 Pesan 1:</strong> ${Array.isArray(misi.Pesan) ? misi.Pesan[0] || '-' : misi.Pesan}
+                                    ${Array.isArray(misi.Pesan) && misi.Pesan[1] ? `<br><strong>📝 Pesan 2:</strong> ${misi.Pesan[1]}` : ''}
                                 </div>
                             ` : ''}
 
-                            ${completedList.length > 0 ? `
-                                <div class="completed-by">
-                                    ✅ <strong>Telah diselesaikan oleh:</strong>
-                                    <span class="email-list">${completedList.join(', ')}</span>
-                                </div>
-                            ` : ''}
+                            ${historyHtml}
 
                             <div class="divider"></div>
+
+                            <!-- INPUT BUZZER DATA -->
+                            <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
+                                <input type="text" id="buzzerName-${index}" placeholder="Nama/Username Buzzer" style="flex:1;min-width:120px;background:#222;color:#fff;border:1px solid #ffaa0033;border-radius:12px;padding:10px 14px;font-size:13px;">
+                                <input type="text" id="buzzerEmail-${index}" placeholder="Gmail Buzzer" style="flex:1;min-width:150px;background:#222;color:#fff;border:1px solid #ffaa0033;border-radius:12px;padding:10px 14px;font-size:13px;" value="${user.email}">
+                            </div>
 
                             <!-- UPLOAD AREA -->
                             <div class="upload-area">
@@ -353,10 +389,14 @@
                 data.forEach((misi, index) => {
                     const btn = document.getElementById(`uploadBtn-${index}`);
                     const fileInput = document.getElementById(`fileInput-${index}`);
+                    const nameInput = document.getElementById(`buzzerName-${index}`);
+                    const emailInput = document.getElementById(`buzzerEmail-${index}`);
 
                     if (btn && fileInput) {
                         btn.addEventListener('click', function() {
-                            handleUpload(misi, index, fileInput);
+                            const buzzerName = nameInput ? nameInput.value.trim() : '-';
+                            const buzzerEmail = emailInput ? emailInput.value.trim() : user.email;
+                            handleUpload(misi, index, fileInput, buzzerName, buzzerEmail);
                         });
                     }
                 });
@@ -368,7 +408,7 @@
         }
 
         // ===================== HANDLE UPLOAD =====================
-        async function handleUpload(misi, index, fileInput) {
+        async function handleUpload(misi, index, fileInput, buzzerName, buzzerEmail) {
             const user = getUserData();
             const file = fileInput.files[0];
 
@@ -382,11 +422,23 @@
                 return;
             }
 
+            if (!buzzerName) {
+                Swal.fire({
+                    title: '⚠️ Isi Nama Buzzer',
+                    text: 'Silakan isi nama/username buzzer terlebih dahulu.',
+                    icon: 'warning',
+                    confirmButtonColor: '#ffaa00'
+                });
+                return;
+            }
+
             // Cek apakah user sudah menyelesaikan misi ini
-            if (misi.Terselesaikan && misi.Terselesaikan.includes(user.email)) {
+            const history = misi.History || [];
+            const completedEmails = history.map(h => h.user);
+            if (completedEmails.includes(buzzerEmail)) {
                 Swal.fire({
                     title: '✅ Sudah selesai',
-                    text: 'Anda sudah menyelesaikan misi ini sebelumnya.',
+                    text: `${buzzerEmail} sudah menyelesaikan misi ini sebelumnya.`,
                     icon: 'info',
                     confirmButtonColor: '#ffaa00'
                 });
@@ -394,7 +446,7 @@
             }
 
             // Cek kuota
-            if (misi.Jumlah && misi.Terselesaikan && misi.Terselesaikan.length >= misi.Jumlah) {
+            if (misi.Jumlah && completedEmails.length >= misi.Jumlah) {
                 Swal.fire({
                     title: '❌ Kuota Penuh',
                     text: 'Misi ini sudah mencapai jumlah target yang dibutuhkan.',
@@ -406,11 +458,15 @@
 
             // Konfirmasi
             const confirmResult = await Swal.fire({
-                title: '📤 Upload Bukti',
+                title: '📤 Upload Bukti Buzzer',
                 html: `
-                    <b>Misi:</b> ${misi.Tugas}<br>
-                    <b>Target:</b> ${misi.Target}<br>
-                    <b>File:</b> ${file.name}
+                    <div style="text-align:left;">
+                        <b>📋 Misi:</b> ${misi.Tugas}<br>
+                        <b>🎯 Target:</b> ${misi.Target}<br>
+                        <b>👤 Nama Buzzer:</b> ${buzzerName}<br>
+                        <b>📧 Email:</b> ${buzzerEmail}<br>
+                        <b>📎 File:</b> ${file.name}
+                    </div>
                 `,
                 icon: 'question',
                 showCancelButton: true,
@@ -428,15 +484,35 @@
             btn.textContent = '⏳ Mengirim...';
 
             try {
+                const tanggal = new Date().toLocaleString('id-ID', {
+                    day: '2-digit',
+                    month: 'long',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+
+                // Pesan 1 & Pesan 2
+                const pesan1 = Array.isArray(misi.Pesan) ? misi.Pesan[0] || '-' : misi.Pesan || '-';
+                const pesan2 = Array.isArray(misi.Pesan) && misi.Pesan[1] ? misi.Pesan[1] : '-';
+
                 // Kirim pesan teks ke Telegram
                 const textMessage = `
-📢 **Bukti Buzzer Misi**
-👤 User: ${user.email}
-📋 Misi: ${misi.Tugas}
-🎯 Target: ${misi.Target}
-💰 Harga: ${misi.Harga || 'Gratis'}
-📝 Pesan: ${Array.isArray(misi.Pesan) ? misi.Pesan.join(' | ') : misi.Pesan || '-'}
-📅 Waktu: ${new Date().toLocaleString('id-ID')}
+📢 **LAPORAN BUZZER MISI**
+━━━━━━━━━━━━━━━━━━━━━
+📋 **Misi:** ${misi.Tugas}
+🎯 **Target:** ${misi.Target}
+💰 **Harga:** ${misi.Harga || 'Gratis'}
+
+👤 **Nama Buzzer:** ${buzzerName}
+📧 **Email:** ${buzzerEmail}
+📅 **Tanggal:** ${tanggal}
+
+📝 **Pesan 1:** ${pesan1}
+📝 **Pesan 2:** ${pesan2}
+
+━━━━━━━━━━━━━━━━━━━━━
+📎 **Bukti terlampir di bawah**
                 `;
 
                 // Kirim teks dulu
@@ -454,24 +530,35 @@
                 const formData = new FormData();
                 formData.append('chat_id', TELEGRAM_CHAT_ID);
                 formData.append('photo', file);
+                formData.append('caption', `📸 Bukti: ${misi.Tugas} - ${buzzerName}`);
 
                 await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendPhoto`, {
                     method: 'POST',
                     body: formData
                 });
 
-                // ===== UPDATE DATA.JSON (di sisi client, sebenarnya perlu backend, tapi kita simpan di localStorage sementara) =====
-                // Simpan progress di localStorage agar tidak hilang
-                const progressKey = 'buzzer_progress_' + misi.Tugas.replace(/\s/g, '_');
-                let progress = JSON.parse(localStorage.getItem(progressKey) || '[]');
-                if (!progress.includes(user.email)) {
-                    progress.push(user.email);
-                    localStorage.setItem(progressKey, JSON.stringify(progress));
-                }
+                // ===== UPDATE HISTORY DI LOCALSTORAGE =====
+                const historyKey = 'buzzer_history_' + misi.Tugas.replace(/\s/g, '_');
+                let historyData = JSON.parse(localStorage.getItem(historyKey) || '[]');
+                
+                // Tambahkan data baru
+                historyData.push({
+                    user: buzzerEmail,
+                    nama: buzzerName,
+                    tanggal: tanggal,
+                    bukti: file.name,
+                    misi: misi.Tugas,
+                    target: misi.Target
+                });
+
+                localStorage.setItem(historyKey, JSON.stringify(historyData));
 
                 Swal.fire({
                     title: '✅ Berhasil!',
-                    text: `Bukti untuk misi "${misi.Tugas}" berhasil dikirim ke admin!`,
+                    html: `
+                        Bukti untuk misi <b>"${misi.Tugas}"</b> berhasil dikirim ke admin!<br>
+                        <span style="font-size:13px;color:#888;">Nama Buzzer: ${buzzerName}</span>
+                    `,
                     icon: 'success',
                     confirmButtonColor: '#ffaa00'
                 });
@@ -490,6 +577,20 @@
                 btn.disabled = false;
                 btn.textContent = '📤 Upload Bukti';
             }
+        }
+
+        // ===================== LOAD HISTORY DARI LOCALSTORAGE =====================
+        function loadHistoryFromLocal(misi) {
+            const historyKey = 'buzzer_history_' + misi.Tugas.replace(/\s/g, '_');
+            const data = localStorage.getItem(historyKey);
+            if (data) {
+                try {
+                    return JSON.parse(data);
+                } catch {
+                    return [];
+                }
+            }
+            return [];
         }
 
         // ===================== INIT =====================
