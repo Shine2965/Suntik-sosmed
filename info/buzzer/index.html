@@ -206,8 +206,16 @@
             background: #00ffaa22;
             color: #00ffaa;
         }
+        .badge.limit {
+            background: #ff444422;
+            color: #ff6666;
+        }
         .text-muted {
             color: #666;
+            font-size: 12px;
+        }
+        .text-warning {
+            color: #ffaa00;
             font-size: 12px;
         }
         .no-data {
@@ -266,6 +274,23 @@
             color: #888;
             font-size: 11px;
         }
+        .limit-info {
+            background: #ffaa0010;
+            border: 1px solid #ffaa0033;
+            border-radius: 10px;
+            padding: 8px 14px;
+            margin-top: 8px;
+            font-size: 12px;
+            color: #ffaa00;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .limit-info .count {
+            font-weight: 700;
+            font-size: 14px;
+        }
         @media (max-width: 600px) {
             .card {
                 padding: 20px 16px;
@@ -292,7 +317,7 @@
             <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;">
                 <div>
                     <h2>📢 Buzzer Misi</h2>
-                    <div class="sub">Selesaikan misi & dapatkan reward!</div>
+                    <div class="sub">Selesaikan misi & dapatkan reward! (Maks 5 konfirmasi per user)</div>
                 </div>
                 <div class="header-actions">
                     <button class="btn btn-back" onclick="location.href='/info/dashboard/index.html'">⬅️ Kembali</button>
@@ -310,7 +335,7 @@
         </div>
 
         <div class="text-muted" style="text-align:center;margin-top:20px;">
-            © Shine Shop · Buzzer System
+            © Shine Shop · Buzzer System · Maks 5 konfirmasi per user
         </div>
     </div>
 
@@ -319,6 +344,7 @@
         const DATA_URL = '/info/buzzer/data.json';
         const TELEGRAM_TOKEN = '8785872128:AAGJApScDjRIjg1VorXB35OvrvtUDCtVr0M';
         const TELEGRAM_CHAT_ID = '6317157631';
+        const MAX_KONFIRMASI_PER_USER = 5;
 
         // ===================== CEK SESSION =====================
         function checkSession() {
@@ -340,6 +366,19 @@
                 email: localStorage.getItem('user_email') || '',
                 role: localStorage.getItem('user_role') || 'user'
             };
+        }
+
+        // ===================== HITUNG KONFIRMASI PER USER =====================
+        function getUserKonfirmasiCount(history, userEmail) {
+            return history.filter(h => h.user === userEmail).length;
+        }
+
+        // ===================== CEK APAKAH USER SUDAH PERNAH PAKAI USERNAME INI =====================
+        function isUsernameAlreadyUsed(history, username, excludeIndex = -1) {
+            return history.some((h, idx) => {
+                if (idx === excludeIndex) return false;
+                return h.nama && h.nama.toLowerCase() === username.toLowerCase();
+            });
         }
 
         // ===================== LOAD MISI =====================
@@ -364,7 +403,15 @@
                 data.forEach((misi, index) => {
                     const history = misi.History || [];
                     const completedList = history.map(h => h.user);
+                    
+                    // Hitung konfirmasi user untuk misi ini
+                    const userCount = getUserKonfirmasiCount(history, user.email);
+                    const isLimitReached = userCount >= MAX_KONFIRMASI_PER_USER;
                     const isCompleted = completedList.includes(user.email);
+                    
+                    // Cek apakah user sudah mencapai limit
+                    const canUpload = !isLimitReached && !isCompleted;
+                    
                     const progress = misi.Jumlah ? Math.min((completedList.length / misi.Jumlah) * 100, 100) : 0;
 
                     // Buat riwayat
@@ -378,6 +425,7 @@
                                     <span class="h-id">[${h.id_misi || misi.id_misi || '-'}]</span>
                                     <span class="h-date">${h.tanggal || '-'}</span>
                                     <span class="h-bukti">| Bukti: ${h.bukti || 'Tidak ada'}</span>
+                                    ${h.nama ? `<span style="color:#ffaa00;font-size:10px;">| @${h.nama}</span>` : ''}
                                 </div>
                             `;
                         });
@@ -388,19 +436,28 @@
                     const pesan1 = Array.isArray(misi.Pesan) ? misi.Pesan[0] || '-' : misi.Pesan || '-';
                     const pesan2 = Array.isArray(misi.Pesan) && misi.Pesan[1] ? misi.Pesan[1] : '-';
 
+                    // Status badge
+                    let statusBadge = '';
+                    if (isLimitReached) {
+                        statusBadge = `<span class="badge limit">⛔ Limit 5</span>`;
+                    } else if (isCompleted) {
+                        statusBadge = `<span class="badge done">✅ Selesai</span>`;
+                    } else {
+                        statusBadge = `<span class="badge">⏳ ${userCount}/${MAX_KONFIRMASI_PER_USER}</span>`;
+                    }
+
                     html += `
                         <div class="misi-card" id="misi-${index}">
                             <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;">
                                 <div class="title">${misi.Tugas || 'Misi'}</div>
-                                <span class="badge ${isCompleted ? 'done' : ''}">
-                                    ${isCompleted ? '✅ Selesai' : '⏳ Belum'}
-                                </span>
+                                ${statusBadge}
                             </div>
                             
                             <div class="detail"><strong>🆔 ID Misi:</strong> <span class="id-misi">${misi.id_misi || '-'}</span></div>
                             <div class="detail"><strong>💰 Harga:</strong> ${misi.Harga || 'Gratis'}</div>
                             <div class="detail"><strong>📊 Jumlah yang dibutuhkan:</strong> ${misi.Jumlah || '∞'}</div>
                             <div class="detail"><strong>✅ Sudah dikerjakan:</strong> ${completedList.length} / ${misi.Jumlah || '∞'}</div>
+                            <div class="detail"><strong>👤 Konfirmasi Anda:</strong> ${userCount} / ${MAX_KONFIRMASI_PER_USER}</div>
                             
                             <div class="progress-bar">
                                 <div class="fill" style="width:${Math.min(progress, 100)}%;"></div>
@@ -419,22 +476,31 @@
 
                             ${historyHtml}
 
+                            ${isLimitReached ? `
+                                <div class="limit-info">
+                                    <span>⛔ Anda sudah mencapai batas maksimal ${MAX_KONFIRMASI_PER_USER} konfirmasi untuk misi ini.</span>
+                                    <span class="count">${userCount}/${MAX_KONFIRMASI_PER_USER}</span>
+                                </div>
+                            ` : ''}
+
                             <div class="divider"></div>
 
                             <!-- INPUT BUZZER DATA -->
                             <div class="input-buzzer">
-                                <input type="text" id="buzzerName-${index}" placeholder="Nama/Username Buzzer" style="flex:2;">
-                                <input type="text" id="buzzerEmail-${index}" placeholder="Gmail Buzzer" style="flex:2;" value="${user.email}">
+                                <input type="text" id="buzzerName-${index}" placeholder="Nama/Username Buzzer (wajib unik)" style="flex:2;" ${!canUpload ? 'disabled' : ''}>
+                                <input type="text" id="buzzerEmail-${index}" placeholder="Gmail Buzzer" style="flex:2;" value="${user.email}" ${!canUpload ? 'disabled' : ''}>
                             </div>
 
                             <!-- UPLOAD AREA -->
                             <div class="upload-area">
-                                <input type="file" id="fileInput-${index}" accept="image/*" ${isCompleted ? 'disabled' : ''}>
-                                <button class="btn btn-upload" id="uploadBtn-${index}" ${isCompleted ? 'disabled' : ''}>
-                                    ${isCompleted ? '✅ Sudah selesai' : '📤 Upload Bukti'}
+                                <input type="file" id="fileInput-${index}" accept="image/*" ${!canUpload ? 'disabled' : ''}>
+                                <button class="btn btn-upload" id="uploadBtn-${index}" ${!canUpload ? 'disabled' : ''}>
+                                    ${isLimitReached ? '⛔ Limit 5' : isCompleted ? '✅ Selesai' : '📤 Upload Bukti'}
                                 </button>
                             </div>
-                            ${isCompleted ? '<div class="text-muted" style="margin-top:4px;">✨ Anda sudah menyelesaikan misi ini.</div>' : ''}
+                            ${isLimitReached ? '<div class="text-muted" style="margin-top:4px;">⛔ Anda sudah mencapai batas 5 konfirmasi untuk misi ini.</div>' : ''}
+                            ${isCompleted && !isLimitReached ? '<div class="text-muted" style="margin-top:4px;">✨ Anda sudah menyelesaikan misi ini.</div>' : ''}
+                            ${!isCompleted && !isLimitReached ? '<div class="text-muted" style="margin-top:4px;">📌 Gunakan username yang berbeda untuk setiap konfirmasi.</div>' : ''}
                         </div>
                     `;
                 });
@@ -448,7 +514,7 @@
                     const nameInput = document.getElementById(`buzzerName-${index}`);
                     const emailInput = document.getElementById(`buzzerEmail-${index}`);
 
-                    if (btn && fileInput) {
+                    if (btn && fileInput && !btn.disabled) {
                         btn.addEventListener('click', function() {
                             const buzzerName = nameInput ? nameInput.value.trim() : '-';
                             const buzzerEmail = emailInput ? emailInput.value.trim() : user.email;
@@ -488,20 +554,33 @@
                 return;
             }
 
-            // Cek apakah user sudah menyelesaikan misi ini
+            // ===== CEK LIMIT KONFIRMASI =====
             const history = misi.History || [];
-            const completedEmails = history.map(h => h.user);
-            if (completedEmails.includes(buzzerEmail)) {
+            const userCount = getUserKonfirmasiCount(history, buzzerEmail);
+
+            if (userCount >= MAX_KONFIRMASI_PER_USER) {
                 Swal.fire({
-                    title: '✅ Sudah selesai',
-                    text: `${buzzerEmail} sudah menyelesaikan misi ini sebelumnya.`,
-                    icon: 'info',
+                    title: '⛔ Limit Maksimal',
+                    text: `Anda sudah mencapai batas maksimal ${MAX_KONFIRMASI_PER_USER} konfirmasi untuk misi ini.`,
+                    icon: 'error',
                     confirmButtonColor: '#ffaa00'
                 });
                 return;
             }
 
-            // Cek kuota
+            // ===== CEK USERNAME UNIK (belum pernah dipakai sebelumnya) =====
+            if (isUsernameAlreadyUsed(history, buzzerName)) {
+                Swal.fire({
+                    title: '⚠️ Username Sudah Dipakai',
+                    text: `Username "${buzzerName}" sudah pernah digunakan untuk misi ini. Gunakan username yang berbeda.`,
+                    icon: 'warning',
+                    confirmButtonColor: '#ffaa00'
+                });
+                return;
+            }
+
+            // Cek kuota misi
+            const completedEmails = history.map(h => h.user);
             if (misi.Jumlah && completedEmails.length >= misi.Jumlah) {
                 Swal.fire({
                     title: '❌ Kuota Penuh',
@@ -522,7 +601,8 @@
                         <b>🎯 Target:</b> ${misi.Target}<br>
                         <b>👤 Nama Buzzer:</b> ${buzzerName}<br>
                         <b>📧 Email:</b> ${buzzerEmail}<br>
-                        <b>📎 File:</b> ${file.name}
+                        <b>📎 File:</b> ${file.name}<br>
+                        <b>📊 Konfirmasi ke-:</b> ${userCount + 1} / ${MAX_KONFIRMASI_PER_USER}
                     </div>
                 `,
                 icon: 'question',
@@ -565,6 +645,7 @@
 👤 **Nama Buzzer:** ${buzzerName}
 📧 **Email:** ${buzzerEmail}
 📅 **Tanggal:** ${tanggal}
+📊 **Konfirmasi ke-:** ${userCount + 1} / ${MAX_KONFIRMASI_PER_USER}
 
 📝 **Pesan 1:** ${pesan1}
 📝 **Pesan 2:** ${pesan2}
@@ -588,7 +669,7 @@
                 const formData = new FormData();
                 formData.append('chat_id', TELEGRAM_CHAT_ID);
                 formData.append('photo', file);
-                formData.append('caption', `📸 Bukti: ${misi.Tugas} - ${buzzerName} [${misi.id_misi || '-'}]`);
+                formData.append('caption', `📸 Bukti: ${misi.Tugas} - ${buzzerName} [${misi.id_misi || '-'}] (${userCount + 1}/${MAX_KONFIRMASI_PER_USER})`);
 
                 await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendPhoto`, {
                     method: 'POST',
@@ -607,7 +688,8 @@
                     bukti: file.name,
                     id_misi: misi.id_misi || '-',
                     misi: misi.Tugas,
-                    target: misi.Target
+                    target: misi.Target,
+                    konfirmasi_ke: userCount + 1
                 });
 
                 localStorage.setItem(historyKey, JSON.stringify(historyData));
@@ -616,7 +698,8 @@
                     title: '✅ Berhasil!',
                     html: `
                         Bukti untuk misi <b>"${misi.Tugas}"</b> berhasil dikirim ke admin!<br>
-                        <span style="font-size:13px;color:#888;">🆔 ${misi.id_misi || '-'} | Nama: ${buzzerName}</span>
+                        <span style="font-size:13px;color:#888;">🆔 ${misi.id_misi || '-'} | Nama: ${buzzerName}</span><br>
+                        <span style="font-size:13px;color:#ffaa00;">📊 Konfirmasi ke-${userCount + 1} / ${MAX_KONFIRMASI_PER_USER}</span>
                     `,
                     icon: 'success',
                     confirmButtonColor: '#ffaa00'
@@ -648,6 +731,7 @@
 
         console.log('📢 Buzzer Misi siap!');
         console.log('👤 User:', getUserData().email);
+        console.log('📊 Maks konfirmasi per user:', MAX_KONFIRMASI_PER_USER);
     </script>
 </body>
 </html>
