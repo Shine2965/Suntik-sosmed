@@ -122,6 +122,12 @@
             color: #00ccff;
             text-decoration: underline;
         }
+        .misi-card .target a.disabled-link {
+            color: #555;
+            text-decoration: line-through;
+            cursor: not-allowed;
+            pointer-events: none;
+        }
         .misi-card .pesan-box {
             background: #ffaa0008;
             border-left: 3px solid #ffaa00;
@@ -170,6 +176,10 @@
         .misi-card .upload-area input[type="file"]::file-selector-button:hover {
             background: #ffaa0044;
         }
+        .misi-card .upload-area input[type="file"]:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
         .misi-card .input-buzzer {
             display: flex;
             flex-wrap: wrap;
@@ -192,6 +202,10 @@
             border-color: #ffaa00;
             box-shadow: 0 0 20px rgba(255,170,0,0.1);
         }
+        .misi-card .input-buzzer input:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
         .badge {
             display: inline-block;
             padding: 2px 12px;
@@ -210,12 +224,29 @@
             background: #ff444422;
             color: #ff6666;
         }
+        .badge.full {
+            background: #ff444422;
+            color: #ff4444;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .badge.closed {
+            background: #444;
+            color: #888;
+        }
         .text-muted {
             color: #666;
             font-size: 12px;
         }
         .text-warning {
             color: #ffaa00;
+            font-size: 12px;
+        }
+        .text-success {
+            color: #00ffaa;
             font-size: 12px;
         }
         .no-data {
@@ -247,6 +278,9 @@
             height: 100%;
             border-radius: 20px;
             transition: width 0.5s ease;
+        }
+        .progress-bar .fill.full {
+            background: linear-gradient(90deg, #ff4444, #ff6600);
         }
         .history-item {
             background: #00ffaa08;
@@ -290,6 +324,20 @@
         .limit-info .count {
             font-weight: 700;
             font-size: 14px;
+        }
+        .closed-info {
+            background: #ff444415;
+            border: 1px solid #ff444455;
+            border-radius: 10px;
+            padding: 12px 16px;
+            margin-top: 8px;
+            font-size: 13px;
+            color: #ff6666;
+            text-align: center;
+            font-weight: 600;
+        }
+        .hidden {
+            display: none !important;
         }
         @media (max-width: 600px) {
             .card {
@@ -335,7 +383,7 @@
         </div>
 
         <div class="text-muted" style="text-align:center;margin-top:20px;">
-            © Shine Shop · Buzzer System 
+            © Shine Shop · Buzzer System
         </div>
     </div>
 
@@ -373,12 +421,20 @@
             return history.filter(h => h.user === userEmail).length;
         }
 
-        // ===================== CEK APAKAH USER SUDAH PERNAH PAKAI USERNAME INI =====================
+        // ===================== CEK APAKAH USERNAME SUDAH PERNAH DIPAKAI =====================
         function isUsernameAlreadyUsed(history, username, excludeIndex = -1) {
             return history.some((h, idx) => {
                 if (idx === excludeIndex) return false;
                 return h.nama && h.nama.toLowerCase() === username.toLowerCase();
             });
+        }
+
+        // ===================== CEK APAKAH KUOTA MISI PENUH =====================
+        function isMisiFull(misi) {
+            const history = misi.History || [];
+            const jumlah = misi.Jumlah || 0;
+            if (jumlah === 0) return false;
+            return history.length >= jumlah;
         }
 
         // ===================== LOAD MISI =====================
@@ -404,13 +460,16 @@
                     const history = misi.History || [];
                     const completedList = history.map(h => h.user);
                     
+                    // CEK APAKAH MISI SUDAH PENUH
+                    const isFull = isMisiFull(misi);
+                    
                     // Hitung konfirmasi user untuk misi ini
                     const userCount = getUserKonfirmasiCount(history, user.email);
                     const isLimitReached = userCount >= MAX_KONFIRMASI_PER_USER;
                     const isCompleted = completedList.includes(user.email);
                     
-                    // Cek apakah user sudah mencapai limit
-                    const canUpload = !isLimitReached && !isCompleted;
+                    // Cek apakah user bisa upload (misi belum penuh DAN user belum limit)
+                    const canUpload = !isFull && !isLimitReached && !isCompleted;
                     
                     const progress = misi.Jumlah ? Math.min((completedList.length / misi.Jumlah) * 100, 100) : 0;
 
@@ -426,6 +485,7 @@
                                     <span class="h-date">${h.tanggal || '-'}</span>
                                     <span class="h-bukti">| Bukti: ${h.bukti || 'Tidak ada'}</span>
                                     ${h.nama ? `<span style="color:#ffaa00;font-size:10px;">| @${h.nama}</span>` : ''}
+                                    ${h.konfirmasi_ke ? `<span style="color:#ffaa00;font-size:10px;">| #${h.konfirmasi_ke}</span>` : ''}
                                 </div>
                             `;
                         });
@@ -438,13 +498,44 @@
 
                     // Status badge
                     let statusBadge = '';
-                    if (isLimitReached) {
+                    if (isFull) {
+                        statusBadge = `<span class="badge full">🔒 MISI TELAH SELESAI</span>`;
+                    } else if (isLimitReached) {
                         statusBadge = `<span class="badge limit">⛔ Limit 5</span>`;
                     } else if (isCompleted) {
                         statusBadge = `<span class="badge done">✅ Selesai</span>`;
                     } else {
                         statusBadge = `<span class="badge">⏳ ${userCount}/${MAX_KONFIRMASI_PER_USER}</span>`;
                     }
+
+                    // Target link - disabled jika misi penuh
+                    const targetLink = isFull 
+                        ? `<span class="target" style="color:#555;">🔒 Target telah ditutup (kuota penuh)</span>`
+                        : `<div class="target"><strong>🎯 Target:</strong> 
+                            <a href="${misi.Target || '#'}" target="_blank">${misi.Target || '-'}</a>
+                           </div>`;
+
+                    // Upload area - hidden jika misi penuh
+                    const uploadArea = isFull ? `
+                        <div class="closed-info">
+                            🔒 MISI TELAH SELESAI - Kuota ${misi.Jumlah || '∞'} target telah terpenuhi
+                        </div>
+                    ` : `
+                        <div class="input-buzzer">
+                            <input type="text" id="buzzerName-${index}" placeholder="Nama/Username Buzzer (wajib unik)" style="flex:2;" ${!canUpload ? 'disabled' : ''}>
+                            <input type="text" id="buzzerEmail-${index}" placeholder="Gmail Buzzer" style="flex:2;" value="${user.email}" ${!canUpload ? 'disabled' : ''}>
+                        </div>
+
+                        <div class="upload-area">
+                            <input type="file" id="fileInput-${index}" accept="image/*" ${!canUpload ? 'disabled' : ''}>
+                            <button class="btn btn-upload" id="uploadBtn-${index}" ${!canUpload ? 'disabled' : ''}>
+                                ${isLimitReached ? '⛔ Limit 5' : isCompleted ? '✅ Selesai' : '📤 Upload Bukti'}
+                            </button>
+                        </div>
+                        ${isLimitReached ? '<div class="text-muted" style="margin-top:4px;">⛔ Anda sudah mencapai batas 5 konfirmasi untuk misi ini.</div>' : ''}
+                        ${isCompleted && !isLimitReached ? '<div class="text-muted" style="margin-top:4px;">✨ Anda sudah menyelesaikan misi ini.</div>' : ''}
+                        ${!isCompleted && !isLimitReached && !isFull ? '<div class="text-muted" style="margin-top:4px;">📌 Gunakan username yang berbeda untuk setiap konfirmasi.</div>' : ''}
+                    `;
 
                     html += `
                         <div class="misi-card" id="misi-${index}">
@@ -456,16 +547,14 @@
                             <div class="detail"><strong>🆔 ID Misi:</strong> <span class="id-misi">${misi.id_misi || '-'}</span></div>
                             <div class="detail"><strong>💰 Harga:</strong> ${misi.Harga || 'Gratis'}</div>
                             <div class="detail"><strong>📊 Jumlah yang dibutuhkan:</strong> ${misi.Jumlah || '∞'}</div>
-                            <div class="detail"><strong>✅ Sudah dikerjakan:</strong> ${completedList.length} / ${misi.Jumlah || '∞'}</div>
+                            <div class="detail"><strong>✅ Sudah dikerjakan:</strong> ${completedList.length} / ${misi.Jumlah || '∞'} ${isFull ? '🔒 (PENUH)' : ''}</div>
                             <div class="detail"><strong>👤 Konfirmasi Anda:</strong> ${userCount} / ${MAX_KONFIRMASI_PER_USER}</div>
                             
                             <div class="progress-bar">
-                                <div class="fill" style="width:${Math.min(progress, 100)}%;"></div>
+                                <div class="fill ${isFull ? 'full' : ''}" style="width:${Math.min(progress, 100)}%;"></div>
                             </div>
 
-                            <div class="target"><strong>🎯 Target:</strong> 
-                                <a href="${misi.Target || '#'}" target="_blank">${misi.Target || '-'}</a>
-                            </div>
+                            ${targetLink}
 
                             ${misi.Pesan ? `
                                 <div class="pesan-box">
@@ -476,7 +565,7 @@
 
                             ${historyHtml}
 
-                            ${isLimitReached ? `
+                            ${isLimitReached && !isFull ? `
                                 <div class="limit-info">
                                     <span>⛔ Anda sudah mencapai batas maksimal ${MAX_KONFIRMASI_PER_USER} konfirmasi untuk misi ini.</span>
                                     <span class="count">${userCount}/${MAX_KONFIRMASI_PER_USER}</span>
@@ -485,30 +574,18 @@
 
                             <div class="divider"></div>
 
-                            <!-- INPUT BUZZER DATA -->
-                            <div class="input-buzzer">
-                                <input type="text" id="buzzerName-${index}" placeholder="Nama/Username Buzzer (wajib unik)" style="flex:2;" ${!canUpload ? 'disabled' : ''}>
-                                <input type="text" id="buzzerEmail-${index}" placeholder="Gmail Buzzer" style="flex:2;" value="${user.email}" ${!canUpload ? 'disabled' : ''}>
-                            </div>
-
-                            <!-- UPLOAD AREA -->
-                            <div class="upload-area">
-                                <input type="file" id="fileInput-${index}" accept="image/*" ${!canUpload ? 'disabled' : ''}>
-                                <button class="btn btn-upload" id="uploadBtn-${index}" ${!canUpload ? 'disabled' : ''}>
-                                    ${isLimitReached ? '⛔ Limit 5' : isCompleted ? '✅ Selesai' : '📤 Upload Bukti'}
-                                </button>
-                            </div>
-                            ${isLimitReached ? '<div class="text-muted" style="margin-top:4px;">⛔ Anda sudah mencapai batas 5 konfirmasi untuk misi ini.</div>' : ''}
-                            ${isCompleted && !isLimitReached ? '<div class="text-muted" style="margin-top:4px;">✨ Anda sudah menyelesaikan misi ini.</div>' : ''}
-                            ${!isCompleted && !isLimitReached ? '<div class="text-muted" style="margin-top:4px;">📌 Gunakan username yang berbeda untuk setiap konfirmasi.</div>' : ''}
+                            ${uploadArea}
                         </div>
                     `;
                 });
 
                 container.innerHTML = html;
 
-                // ===== ATTACH EVENT UPLOAD =====
+                // ===== ATTACH EVENT UPLOAD (hanya jika misi belum penuh) =====
                 data.forEach((misi, index) => {
+                    const isFull = isMisiFull(misi);
+                    if (isFull) return; // Skip attach event jika misi penuh
+
                     const btn = document.getElementById(`uploadBtn-${index}`);
                     const fileInput = document.getElementById(`fileInput-${index}`);
                     const nameInput = document.getElementById(`buzzerName-${index}`);
@@ -533,6 +610,18 @@
         async function handleUpload(misi, index, fileInput, buzzerName, buzzerEmail) {
             const user = getUserData();
             const file = fileInput.files[0];
+
+            // CEK APAKAH MISI SUDAH PENUH (validasi ulang)
+            if (isMisiFull(misi)) {
+                Swal.fire({
+                    title: '🔒 Misi Telah Selesai',
+                    text: 'Maaf, misi ini sudah mencapai kuota penuh dan tidak dapat menerima konfirmasi lagi.',
+                    icon: 'info',
+                    confirmButtonColor: '#ffaa00'
+                });
+                loadMisi();
+                return;
+            }
 
             if (!file) {
                 Swal.fire({
@@ -568,7 +657,7 @@
                 return;
             }
 
-            // ===== CEK USERNAME UNIK (belum pernah dipakai sebelumnya) =====
+            // ===== CEK USERNAME UNIK =====
             if (isUsernameAlreadyUsed(history, buzzerName)) {
                 Swal.fire({
                     title: '⚠️ Username Sudah Dipakai',
@@ -579,7 +668,7 @@
                 return;
             }
 
-            // Cek kuota misi
+            // Cek kuota misi (validasi ulang)
             const completedEmails = history.map(h => h.user);
             if (misi.Jumlah && completedEmails.length >= misi.Jumlah) {
                 Swal.fire({
@@ -588,6 +677,7 @@
                     icon: 'error',
                     confirmButtonColor: '#ffaa00'
                 });
+                loadMisi();
                 return;
             }
 
@@ -617,8 +707,10 @@
 
             // ===== KIRIM KE TELEGRAM =====
             const btn = document.getElementById(`uploadBtn-${index}`);
-            btn.disabled = true;
-            btn.textContent = '⏳ Mengirim...';
+            if (btn) {
+                btn.disabled = true;
+                btn.textContent = '⏳ Mengirim...';
+            }
 
             try {
                 const tanggal = new Date().toLocaleString('id-ID', {
@@ -654,7 +746,7 @@
 📎 **Bukti terlampir di bawah**
                 `;
 
-                // Kirim teks dulu
+                // Kirim teks
                 await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -680,7 +772,6 @@
                 const historyKey = 'buzzer_history_' + (misi.id_misi || misi.Tugas.replace(/\s/g, '_'));
                 let historyData = JSON.parse(localStorage.getItem(historyKey) || '[]');
                 
-                // Tambahkan data baru
                 historyData.push({
                     user: buzzerEmail,
                     nama: buzzerName,
@@ -716,8 +807,10 @@
                     icon: 'error',
                     confirmButtonColor: '#ffaa00'
                 });
-                btn.disabled = false;
-                btn.textContent = '📤 Upload Bukti';
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = '📤 Upload Bukti';
+                }
             }
         }
 
