@@ -11,6 +11,7 @@ const ALLOWED_DOMAINS = [
 
 // Daftar IP yang diizinkan (tanpa port)
 const ALLOWED_IPS = [
+    '216.198.79.65'
 ];
 
 // Rate Limiting: maks 10 request per menit per IP
