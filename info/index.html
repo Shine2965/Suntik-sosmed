@@ -119,7 +119,7 @@
 </head>
 <body>
     <div class="login-container">
-        <h1>🔐 Login Page</h1>
+        <h1>🔐 Info Saldo</h1>
         <div class="sub">Masuk untuk melihat saldo akun</div>
         
         <label>📧 Gmail</label>
@@ -132,14 +132,13 @@
         <div class="error-msg" id="loginError"></div>
         <div class="info-text">🔒 Data aman & hanya bisa diakses oleh pemilik akun</div>
         <div class="env-status" id="envStatus">🔌 Mengambil data dari server...</div>
-        <div class="security-badge">🛡️ Akses Dilindungi Shine Shop</div>
+        <div class="security-badge">📁 Data dari accounts.json</div>
     </div>
 
     <script>
         // ===================== KONFIGURASI =====================
-        const API_ENDPOINT = '/api/accounts';
+        const ACCOUNTS_FILE = '/info/accounts.json';
         const DASHBOARD_URL = '/info/dashboard/index.html';
-        const LOGIN_URL = '/info/index.html';
 
         // ===================== ELEMEN =====================
         const emailInput = document.getElementById('loginEmail');
@@ -161,41 +160,29 @@
             return token;
         }
 
-        // ===================== AMBIL DATA DARI API =====================
-        async function fetchAccountsFromAPI() {
+        // ===================== AMBIL DATA DARI accounts.json =====================
+        async function fetchAccounts() {
             try {
-                envStatus.textContent = '⏳ Menghubungi server...';
+                envStatus.textContent = '⏳ Mengambil data akun...';
                 envStatus.style.color = '#888';
                 
-                const res = await fetch(API_ENDPOINT + '?t=' + Date.now(), {
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Requested-With': 'XMLHttpRequest'
-                    },
-                    credentials: 'include'
-                });
+                const res = await fetch(ACCOUNTS_FILE + '?t=' + Date.now());
                 
                 if (!res.ok) {
-                    if (res.status === 403) {
-                        throw new Error('Akses API ditolak. Domain atau IP tidak terdaftar.');
-                    }
-                    if (res.status === 429) {
-                        throw new Error('Terlalu banyak request. Coba lagi nanti.');
-                    }
                     throw new Error('Gagal mengambil data: ' + res.status);
                 }
 
                 const data = await res.json();
                 
-                if (!data.success || !data.accounts) {
-                    throw new Error(data.message || 'Format data tidak valid');
+                if (!Array.isArray(data)) {
+                    throw new Error('Format data tidak valid (harus array)');
                 }
 
-                envStatus.textContent = '✅ ' + data.accounts.length + ' akun tersedia';
+                accountsData = data;
+                envStatus.textContent = '✅ ' + accountsData.length + ' akun tersedia';
                 envStatus.style.color = '#00ffaa';
-                console.log('✅ Akun dari API:', data.accounts.length, 'akun');
-                console.log('📡 Request Info:', data.request_info || 'N/A');
-                return data.accounts;
+                console.log('✅ Akun dimuat:', accountsData.length, 'akun');
+                return accountsData;
 
             } catch (err) {
                 console.error('Error fetch accounts:', err);
@@ -219,17 +206,19 @@
             loginBtn.disabled = true;
 
             try {
-                // Ambil data dari API
-                const accounts = await fetchAccountsFromAPI();
+                // Pastikan data akun sudah di-load
+                if (accountsData.length === 0) {
+                    await fetchAccounts();
+                }
 
-                if (accounts.length === 0) {
+                if (accountsData.length === 0) {
                     errorEl.textContent = '❌ Tidak ada data akun. Hubungi admin.';
                     loginBtn.disabled = false;
                     return;
                 }
 
                 // Cari akun yang cocok
-                const found = accounts.find(acc => 
+                const found = accountsData.find(acc => 
                     acc.Gmail && acc.Gmail.toLowerCase() === email.toLowerCase() &&
                     acc.Password && acc.Password === password
                 );
@@ -289,12 +278,12 @@
                 localStorage.clear();
             }
 
-            // Ambil data akun dari API (untuk menampilkan status)
-            await fetchAccountsFromAPI();
+            // Ambil data akun dari accounts.json
+            await fetchAccounts();
             
             console.log('🔐 Halaman Login siap!');
-            console.log('📡 Domain: ' + window.location.hostname);
-            console.log('🛡️ API dilindungi oleh Domain & IP Validation');
+            console.log('📊 Total akun:', accountsData.length);
+            console.log('📁 Sumber data: /info/accounts.json');
         }
 
         init();
