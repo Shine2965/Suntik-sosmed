@@ -1,41 +1,13 @@
 // /api/accounts.js
-// Vercel Serverless Function dengan Domain + IP Validation
-// Hanya bisa diakses oleh domain shinedomain.my.id & IP 114.8.223.223
+// Vercel Serverless Function - Tanpa Domain & IP Validation
 
 // ===================== KONFIGURASI =====================
-// Daftar domain yang diizinkan
-const ALLOWED_DOMAINS = [
-    'shinedomain.my.id',
-    'www.shinedomain.my.id',
-];
-
-// Daftar IP yang diizinkan (tanpa port)
-const ALLOWED_IPS = [
-    '216.198.79.65'
-];
-
 // Rate Limiting: maks 10 request per menit per IP
 const RATE_LIMIT_WINDOW = 60000; // 1 menit
 const RATE_LIMIT_MAX = 10;
 const rateLimitStore = new Map();
 
 // ===================== HELPER FUNCTIONS =====================
-
-// Cek apakah IP ada di daftar yang diizinkan
-function isIPAllowed(ip) {
-    if (!ip) return false;
-    // Bersihkan IP dari port jika ada
-    const cleanIP = ip.split(':')[0];
-    return ALLOWED_IPS.includes(cleanIP) || ALLOWED_IPS.includes(ip);
-}
-
-// Cek apakah domain ada di daftar yang diizinkan
-function isDomainAllowed(origin) {
-    if (!origin) return false;
-    return ALLOWED_DOMAINS.some(domain => {
-        return origin.includes(domain) || origin.endsWith(domain);
-    });
-}
 
 // Cek rate limit
 function checkRateLimit(ip) {
@@ -78,38 +50,18 @@ setInterval(() => {
 
 // ===================== MAIN HANDLER =====================
 export default function handler(req, res) {
-    // ===== 1. AMBIL INFORMASI REQUEST =====
-    const origin = req.headers.origin || '';
-    const host = req.headers.host || '';
-    const userAgent = req.headers['user-agent'] || '';
-    const clientIp = req.headers['x-forwarded-for'] || 
-                     req.headers['x-real-ip'] || 
-                     req.connection?.remoteAddress || 
-                     req.socket?.remoteAddress || 
-                     '';
-
-    // ===== 2. SET CORS HEADERS =====
-    // Cek apakah origin diizinkan
-    const isDomainValid = isDomainAllowed(origin) || isDomainAllowed(host);
-    
-    if (isDomainValid) {
-        res.setHeader('Access-Control-Allow-Origin', origin || 'https://shinedomain.my.id');
-        res.setHeader('Access-Control-Allow-Credentials', 'true');
-    } else {
-        // Jika domain tidak diizinkan, tetap set tapi dengan origin yang valid
-        res.setHeader('Access-Control-Allow-Origin', 'https://shinedomain.my.id');
-    }
-    
+    // ===== 1. SET CORS HEADERS =====
+    res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, X-Forwarded-For');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
     res.setHeader('Access-Control-Max-Age', '86400'); // 24 jam cache
 
-    // ===== 3. HANDLE PREFLIGHT (OPTIONS) =====
+    // ===== 2. HANDLE PREFLIGHT (OPTIONS) =====
     if (req.method === 'OPTIONS') {
         return res.status(200).end();
     }
 
-    // ===== 4. HANYA MENERIMA GET =====
+    // ===== 3. HANYA MENERIMA GET =====
     if (req.method !== 'GET') {
         return res.status(405).json({
             success: false,
@@ -117,31 +69,14 @@ export default function handler(req, res) {
         });
     }
 
-    // ===== 5. VALIDASI DOMAIN (KEAMANAN UTAMA 1) =====
-    const isDomainValidStrict = isDomainAllowed(origin) || isDomainAllowed(host);
-    
-    if (!isDomainValidStrict && process.env.NODE_ENV === 'production') {
-        console.warn(`🚫 [DOMAIN] Akses ditolak | Origin: ${origin} | Host: ${host} | IP: ${clientIp}`);
-        return res.status(403).json({
-            success: false,
-            message: 'Akses ditolak. Domain tidak terdaftar.',
-            error: 'FORBIDDEN_DOMAIN'
-        });
-    }
+    // ===== 4. AMBIL INFORMASI REQUEST =====
+    const clientIp = req.headers['x-forwarded-for'] || 
+                     req.headers['x-real-ip'] || 
+                     req.connection?.remoteAddress || 
+                     req.socket?.remoteAddress || 
+                     '';
 
-    // ===== 6. VALIDASI IP (KEAMANAN UTAMA 2) =====
-    const isIPValid = isIPAllowed(clientIp);
-    
-    if (!isIPValid && process.env.NODE_ENV === 'production') {
-        console.warn(`🚫 [IP] Akses ditolak | IP: ${clientIp} | Origin: ${origin}`);
-        return res.status(403).json({
-            success: false,
-            message: 'Akses ditolak. IP Address tidak terdaftar.',
-            error: 'FORBIDDEN_IP'
-        });
-    }
-
-    // ===== 7. RATE LIMITING =====
+    // ===== 5. RATE LIMITING =====
     if (!checkRateLimit(clientIp)) {
         console.warn(`⏳ [RATE LIMIT] Terlalu banyak request | IP: ${clientIp}`);
         return res.status(429).json({
@@ -151,7 +86,7 @@ export default function handler(req, res) {
         });
     }
 
-    // ===== 8. AMBIL DATA DARI ENVIRONMENT VARIABLE =====
+    // ===== 6. AMBIL DATA DARI ENVIRONMENT VARIABLE =====
     try {
         const accountsEnv = process.env.ACCOUNTS_DATA;
         
@@ -185,21 +120,17 @@ export default function handler(req, res) {
             });
         }
 
-        // ===== 9. LOG AKSES (untuk monitoring) =====
-        console.log(`✅ Akses diizinkan | IP: ${clientIp} | Domain: ${origin || host} | Total Akun: ${accounts.length}`);
-        console.log(`📋 User-Agent: ${userAgent.substring(0, 100)}`);
+        // ===== 7. LOG AKSES (untuk monitoring) =====
+        console.log(`✅ Akses diizinkan | IP: ${clientIp} | Total Akun: ${accounts.length}`);
 
-        // ===== 10. KIRIM RESPONSE =====
+        // ===== 8. KIRIM RESPONSE =====
         return res.status(200).json({
             success: true,
             accounts: accounts,
             total: accounts.length,
             timestamp: new Date().toISOString(),
             request_info: {
-                ip: clientIp ? clientIp.split(',')[0].trim() : 'unknown',
-                domain: origin || host || 'unknown',
-                allowed_domain: isDomainValidStrict,
-                allowed_ip: isIPValid
+                ip: clientIp ? clientIp.split(',')[0].trim() : 'unknown'
             }
         });
 
