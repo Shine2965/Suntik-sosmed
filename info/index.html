@@ -101,17 +101,19 @@
             text-align: center;
             margin-top: 16px;
         }
-        .loading {
-            color: #888;
-            text-align: center;
-            font-size: 13px;
-            margin-top: 10px;
-        }
         .env-status {
             text-align: center;
             font-size: 11px;
             color: #555;
             margin-top: 8px;
+        }
+        .login-container .security-badge {
+            text-align: center;
+            font-size: 10px;
+            color: #444;
+            margin-top: 12px;
+            border-top: 1px solid #00ffaa15;
+            padding-top: 12px;
         }
     </style>
 </head>
@@ -130,12 +132,14 @@
         <div class="error-msg" id="loginError"></div>
         <div class="info-text">🔒 Data aman & hanya bisa diakses oleh pemilik akun</div>
         <div class="env-status" id="envStatus">🔌 Mengambil data dari server...</div>
+        <div class="security-badge">🛡️ Protected by Domain & IP Validation</div>
     </div>
 
     <script>
         // ===================== KONFIGURASI =====================
-        // Endpoint untuk mengambil data dari environment variable Vercel
         const API_ENDPOINT = '/api/accounts';
+        const DASHBOARD_URL = '/info/dashboard/index.html';
+        const LOGIN_URL = '/info/index.html';
 
         // ===================== ELEMEN =====================
         const emailInput = document.getElementById('loginEmail');
@@ -146,13 +150,38 @@
 
         let accountsData = [];
 
-        // ===================== AMBIL DATA DARI ENV =====================
-        async function fetchAccountsFromEnv() {
+        // ===================== GENERATE SESSION TOKEN =====================
+        function generateSessionToken() {
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+            let token = 'session_';
+            for (let i = 0; i < 32; i++) {
+                token += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            token += '_' + Date.now().toString(36);
+            return token;
+        }
+
+        // ===================== AMBIL DATA DARI API =====================
+        async function fetchAccountsFromAPI() {
             try {
-                envStatus.textContent = '⏳ Mengambil data akun dari server...';
-                const res = await fetch(API_ENDPOINT + '?t=' + Date.now());
+                envStatus.textContent = '⏳ Menghubungi server...';
+                envStatus.style.color = '#888';
+                
+                const res = await fetch(API_ENDPOINT + '?t=' + Date.now(), {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    credentials: 'include'
+                });
                 
                 if (!res.ok) {
+                    if (res.status === 403) {
+                        throw new Error('Akses ditolak. Domain atau IP tidak terdaftar.');
+                    }
+                    if (res.status === 429) {
+                        throw new Error('Terlalu banyak request. Coba lagi nanti.');
+                    }
                     throw new Error('Gagal mengambil data: ' + res.status);
                 }
 
@@ -162,15 +191,15 @@
                     throw new Error(data.message || 'Format data tidak valid');
                 }
 
-                accountsData = data.accounts;
-                envStatus.textContent = '✅ ' + accountsData.length + ' akun tersedia';
+                envStatus.textContent = '✅ ' + data.accounts.length + ' akun tersedia';
                 envStatus.style.color = '#00ffaa';
-                console.log('✅ Akun dari ENV:', accountsData);
-                return accountsData;
+                console.log('✅ Akun dari API:', data.accounts.length, 'akun');
+                console.log('📡 Request Info:', data.request_info || 'N/A');
+                return data.accounts;
 
             } catch (err) {
                 console.error('Error fetch accounts:', err);
-                envStatus.textContent = '❌ Gagal mengambil data: ' + err.message;
+                envStatus.textContent = '❌ ' + err.message;
                 envStatus.style.color = '#ff6666';
                 return [];
             }
@@ -190,19 +219,17 @@
             loginBtn.disabled = true;
 
             try {
-                // Pastikan data akun sudah di-load
-                if (accountsData.length === 0) {
-                    await fetchAccountsFromEnv();
-                }
+                // Ambil data dari API
+                const accounts = await fetchAccountsFromAPI();
 
-                if (accountsData.length === 0) {
+                if (accounts.length === 0) {
                     errorEl.textContent = '❌ Tidak ada data akun. Hubungi admin.';
                     loginBtn.disabled = false;
                     return;
                 }
 
                 // Cari akun yang cocok
-                const found = accountsData.find(acc => 
+                const found = accounts.find(acc => 
                     acc.Gmail && acc.Gmail.toLowerCase() === email.toLowerCase() &&
                     acc.Password && acc.Password === password
                 );
@@ -213,8 +240,13 @@
                     return;
                 }
 
+                // ✅ Generate session token
+                const sessionToken = generateSessionToken();
+                
                 // ✅ Login berhasil → simpan session ke localStorage
                 localStorage.setItem('logged_in', 'true');
+                localStorage.setItem('session_token', sessionToken);
+                localStorage.setItem('session_created', Date.now().toString());
                 localStorage.setItem('user_email', found.Gmail);
                 localStorage.setItem('user_password', found.Password);
                 localStorage.setItem('user_saldo', found.Saldo || '0');
@@ -223,7 +255,7 @@
                 localStorage.setItem('user_dana', found.Dana || '');
 
                 // Redirect ke dashboard
-                window.location.href = '/info/dashboard/';
+                window.location.href = DASHBOARD_URL;
 
             } catch (err) {
                 errorEl.textContent = '❌ Error: ' + err.message;
@@ -244,19 +276,49 @@
         // ===================== INIT =====================
         async function init() {
             // Cek apakah sudah login sebelumnya
-            if (localStorage.getItem('logged_in') === 'true') {
-                window.location.href = '/info/dashboard/';
+            const loggedIn = localStorage.getItem('logged_in');
+            const sessionToken = localStorage.getItem('session_token');
+            
+            if (loggedIn === 'true' && sessionToken) {
+                window.location.href = DASHBOARD_URL;
                 return;
             }
 
-            // Ambil data akun dari environment variable
-            await fetchAccountsFromEnv();
+            // Hapus session lama jika ada
+            if (loggedIn === 'true' && !sessionToken) {
+                localStorage.clear();
+            }
+
+            // Ambil data akun dari API (untuk menampilkan status)
+            await fetchAccountsFromAPI();
             
             console.log('🔐 Halaman Login siap!');
-            console.log('📊 Total akun:', accountsData.length);
+            console.log('📡 Domain: ' + window.location.hostname);
         }
 
         init();
+
+        // ===================== ANTI INSPECT =====================
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'F12' || 
+                (e.ctrlKey && e.shiftKey && ['I', 'C', 'J'].includes(e.key)) ||
+                (e.ctrlKey && e.key === 'u')) {
+                e.preventDefault();
+                return false;
+            }
+        });
+
+        // Deteksi DevTools
+        setInterval(() => {
+            const threshold = 160;
+            const widthThreshold = window.outerWidth - window.innerWidth > threshold;
+            const heightThreshold = window.outerHeight - window.innerHeight > threshold;
+            
+            if (widthThreshold || heightThreshold) {
+                // Tindakan jika DevTools terbuka (opsional)
+                console.log('🔒 DevTools terdeteksi');
+            }
+        }, 3000);
     </script>
 </body>
 </html>
