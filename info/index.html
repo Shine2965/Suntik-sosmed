@@ -83,6 +83,11 @@
             background: #00dd99;
             transform: scale(0.97);
         }
+        .login-container button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
         .login-container .error-msg {
             color: #ff6666;
             font-size: 13px;
@@ -102,6 +107,12 @@
             font-size: 13px;
             margin-top: 10px;
         }
+        .env-status {
+            text-align: center;
+            font-size: 11px;
+            color: #555;
+            margin-top: 8px;
+        }
     </style>
 </head>
 <body>
@@ -118,17 +129,52 @@
         <button id="loginBtn">✅ Masuk</button>
         <div class="error-msg" id="loginError"></div>
         <div class="info-text">🔒 Data aman & hanya bisa diakses oleh pemilik akun</div>
+        <div class="env-status" id="envStatus">🔌 Mengambil data dari server...</div>
     </div>
 
     <script>
         // ===================== KONFIGURASI =====================
-        const ACCOUNTS_URL = '/info/accounts.env';
+        // Endpoint untuk mengambil data dari environment variable Vercel
+        const API_ENDPOINT = '/api/accounts';
 
         // ===================== ELEMEN =====================
         const emailInput = document.getElementById('loginEmail');
         const passInput = document.getElementById('loginPassword');
         const loginBtn = document.getElementById('loginBtn');
         const errorEl = document.getElementById('loginError');
+        const envStatus = document.getElementById('envStatus');
+
+        let accountsData = [];
+
+        // ===================== AMBIL DATA DARI ENV =====================
+        async function fetchAccountsFromEnv() {
+            try {
+                envStatus.textContent = '⏳ Mengambil data akun dari server...';
+                const res = await fetch(API_ENDPOINT + '?t=' + Date.now());
+                
+                if (!res.ok) {
+                    throw new Error('Gagal mengambil data: ' + res.status);
+                }
+
+                const data = await res.json();
+                
+                if (!data.success || !data.accounts) {
+                    throw new Error(data.message || 'Format data tidak valid');
+                }
+
+                accountsData = data.accounts;
+                envStatus.textContent = '✅ ' + accountsData.length + ' akun tersedia';
+                envStatus.style.color = '#00ffaa';
+                console.log('✅ Akun dari ENV:', accountsData);
+                return accountsData;
+
+            } catch (err) {
+                console.error('Error fetch accounts:', err);
+                envStatus.textContent = '❌ Gagal mengambil data: ' + err.message;
+                envStatus.style.color = '#ff6666';
+                return [];
+            }
+        }
 
         // ===================== LOGIN =====================
         async function handleLogin() {
@@ -144,14 +190,19 @@
             loginBtn.disabled = true;
 
             try {
-                const res = await fetch(ACCOUNTS_URL + '?t=' + Date.now());
-                if (!res.ok) throw new Error('Gagal mengambil data akun');
+                // Pastikan data akun sudah di-load
+                if (accountsData.length === 0) {
+                    await fetchAccountsFromEnv();
+                }
 
-                const accounts = await res.json();
-                if (!Array.isArray(accounts)) throw new Error('Format data tidak valid');
+                if (accountsData.length === 0) {
+                    errorEl.textContent = '❌ Tidak ada data akun. Hubungi admin.';
+                    loginBtn.disabled = false;
+                    return;
+                }
 
                 // Cari akun yang cocok
-                const found = accounts.find(acc => 
+                const found = accountsData.find(acc => 
                     acc.Gmail && acc.Gmail.toLowerCase() === email.toLowerCase() &&
                     acc.Password && acc.Password === password
                 );
@@ -190,12 +241,22 @@
             }
         });
 
-        // Cek apakah sudah login sebelumnya
-        if (localStorage.getItem('logged_in') === 'true') {
-            window.location.href = '/info/dashboard/';
+        // ===================== INIT =====================
+        async function init() {
+            // Cek apakah sudah login sebelumnya
+            if (localStorage.getItem('logged_in') === 'true') {
+                window.location.href = '/info/dashboard/';
+                return;
+            }
+
+            // Ambil data akun dari environment variable
+            await fetchAccountsFromEnv();
+            
+            console.log('🔐 Halaman Login siap!');
+            console.log('📊 Total akun:', accountsData.length);
         }
 
-        console.log('🔐 Halaman Login siap!');
+        init();
     </script>
 </body>
 </html>
