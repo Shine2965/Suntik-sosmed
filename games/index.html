@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>🚂 Dragon Rail - Kereta Bolak-Balik Otomatis</title>
+    <title>🚂 Dragon Rail - Wesel Per Stasiun + Auto Green Signal</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -116,8 +116,8 @@
         .slide-nav button.active { background: #2a4a6a; border-color: #4a8aaa; }
         .slide-nav button:hover { background: #28405a; }
         .slide-content {
-            min-height: 350px;
-            max-height: 500px;
+            min-height: 400px;
+            max-height: 550px;
             overflow-y: auto;
             padding: 8px;
             background: #0c1522;
@@ -231,6 +231,35 @@
             border-radius: 50%;
             border: 2px solid #2a4a6a;
         }
+        .station-slide .wesel-control {
+            background: #0a121e;
+            border: 1px solid #1a2c3f;
+            border-radius: 12px;
+            padding: 12px;
+            margin-top: 8px;
+        }
+        .station-slide .wesel-control .wesel-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: #8aadcc;
+            margin-bottom: 8px;
+        }
+        .station-slide .wesel-control select {
+            background: #1a2a3c;
+            color: #dce6f0;
+            border: 1px solid #34516a;
+            padding: 6px 14px;
+            border-radius: 30px;
+            font-size: 12px;
+            cursor: pointer;
+            width: 100%;
+            max-width: 300px;
+        }
+        .station-slide .wesel-control .wesel-info {
+            font-size: 11px;
+            color: #6a8aaa;
+            margin-top: 4px;
+        }
         .station-slide .schedule-section {
             background: #0a121e;
             border: 1px solid #1a2c3f;
@@ -290,6 +319,11 @@
             color: #7acfde;
             animation: pulse 0.5s infinite;
         }
+        .station-slide .schedule-section .schedule-item .status-badge.green-signal {
+            background: #1d4a3a;
+            color: #7acf8a;
+            border: 1px solid #22c55e;
+        }
         @keyframes pulse {
             0% { opacity: 1; }
             50% { opacity: 0.5; }
@@ -318,7 +352,7 @@
         .station-slide .schedule-section .schedule-item .schedule-actions button.danger:hover { background: #6d3747; }
         .station-slide .notification-box {
             background: #1a2a3c;
-            border-left: 4px solid #f5c97a;
+            border-left: 4px solid #22c55e;
             padding: 10px 16px;
             border-radius: 8px;
             margin: 8px 0;
@@ -333,7 +367,7 @@
             0% { opacity: 0; transform: translateX(-20px); }
             100% { opacity: 1; transform: translateX(0); }
         }
-        .station-slide .notification-box .train-name { font-weight: 600; color: #f5c97a; }
+        .station-slide .notification-box .train-name { font-weight: 600; color: #7acf8a; }
         .station-slide .notification-box .action-btn {
             background: #1d4a3a;
             border: 1px solid #3a8a6a;
@@ -538,7 +572,7 @@
 <body>
 <div class="container">
     <h1>
-        🚂 DRAGON RAIL BOLAK-BALIK <small>— jalur dunia nyata Surabaya-Sidoarjo</small>
+        🚂 DRAGON RAIL WESEL <small>— wesel per stasiun + auto green signal</small>
     </h1>
     
     <canvas id="railCanvas" width="1500" height="750"></canvas>
@@ -549,7 +583,7 @@
         <button id="resetBtn" class="danger">⟳ Reset</button>
         <button id="toggleLoopBtn">🔄 Bolak-Balik ON</button>
         <div class="badge" id="trainCount">🚆 0 kereta</div>
-        <div class="badge" id="weselStatus">🔀 Wesel: 1</div>
+        <div class="badge" id="weselStatus">🔀 Wesel Global: 1</div>
         <div class="badge" style="background:#1d3a2a;border-color:#3a8a6a;">🔄 Real-Time ON</div>
     </div>
 
@@ -560,7 +594,7 @@
     <!-- SLIDE PER STASIUN -->
     <div class="slide-container">
         <div class="slide-header">
-            <h3>📍 JADWAL & MAP PER STASIUN</h3>
+            <h3>📍 JADWAL & WESEL PER STASIUN</h3>
             <div class="slide-nav" id="slideNav">
                 <!-- Dinamis dari JS -->
             </div>
@@ -584,9 +618,9 @@
         <span class="item"><span class="dot" style="background:#22d3ee;"></span> Wesel aktif</span>
         <span class="item"><span class="dot" style="background:#ef4444;"></span> Sinyal MERAH</span>
         <span class="item"><span class="dot" style="background:#22c55e;"></span> Sinyal HIJAU</span>
-        <span class="item"><span class="dot" style="background:#f59e0b;"></span> Jadwal Mendekat</span>
+        <span class="item"><span class="dot" style="background:#f59e0b;"></span> Auto Green Signal</span>
     </div>
-    <footer>© Dragon — kereta bolak-balik otomatis, jalur dunia nyata Turi→Gubeng→Wonokromo→Waru→Gedangan→Sidoarjo</footer>
+    <footer>© Dragon — wesel diatur per stasiun, sinyal auto hijau saat jadwal berangkat</footer>
 </div>
 
 <!-- POPUP -->
@@ -625,7 +659,7 @@
 <script>
 (function() {
     // ============================================================
-    //  DRAGON RAIL BOLAK-BALIK — JALUR DUNIA NYATA
+    //  DRAGON RAIL WESEL PER STASIUN + AUTO GREEN SIGNAL
     // ============================================================
     const canvas = document.getElementById('railCanvas');
     const ctx = canvas.getContext('2d');
@@ -639,18 +673,42 @@
     const slideNav = document.getElementById('slideNav');
     const slideContent = document.getElementById('slideContent');
 
-    // -- STASIUN DUNIA NYATA (URUTAN RUTE) --
+    // -- STASIUN DUNIA NYATA --
     const stationOrder = ['turi', 'gubeng', 'wonokromo', 'waru', 'gedangan', 'sidoarjo'];
     const stations = [
-        { id: 'turi', name: 'Surabaya Pasar Turi', x: 80, y: 380, jalurCount: 6, signal: true, autoRed: false },
-        { id: 'gubeng', name: 'Gubeng', x: 320, y: 250, jalurCount: 8, signal: true, autoRed: false },
-        { id: 'wonokromo', name: 'Wonokromo', x: 580, y: 480, jalurCount: 4, signal: true, autoRed: false },
-        { id: 'waru', name: 'Waru', x: 840, y: 300, jalurCount: 2, signal: true, autoRed: false },
-        { id: 'gedangan', name: 'Gedangan', x: 1100, y: 420, jalurCount: 2, signal: true, autoRed: false },
-        { id: 'sidoarjo', name: 'Sidoarjo', x: 1360, y: 340, jalurCount: 3, signal: true, autoRed: false }
+        { id: 'turi', name: 'Surabaya Pasar Turi', x: 80, y: 380, jalurCount: 6, signal: true, autoRed: false, wesel: 0 },
+        { id: 'gubeng', name: 'Gubeng', x: 320, y: 250, jalurCount: 8, signal: true, autoRed: false, wesel: 0 },
+        { id: 'wonokromo', name: 'Wonokromo', x: 580, y: 480, jalurCount: 4, signal: true, autoRed: false, wesel: 0 },
+        { id: 'waru', name: 'Waru', x: 840, y: 300, jalurCount: 2, signal: true, autoRed: false, wesel: 0 },
+        { id: 'gedangan', name: 'Gedangan', x: 1100, y: 420, jalurCount: 2, signal: true, autoRed: false, wesel: 0 },
+        { id: 'sidoarjo', name: 'Sidoarjo', x: 1360, y: 340, jalurCount: 3, signal: true, autoRed: false, wesel: 0 }
     ];
 
-    // -- ROUTE DEFINITION (sesuai dunia nyata) --
+    // -- WESEL PER STASIUN --
+    const stationWesels = {
+        'turi': [
+            { id: 0, label: 'Jalur 1 - Turi → Gubeng' },
+            { id: 1, label: 'Jalur 2 - Turi → Gubeng' }
+        ],
+        'gubeng': [
+            { id: 0, label: 'Jalur 1 - Gubeng → Wonokromo' },
+            { id: 1, label: 'Jalur 2 - Gubeng → Wonokromo' }
+        ],
+        'wonokromo': [
+            { id: 0, label: 'Jalur 1 - Wonokromo → Waru' }
+        ],
+        'waru': [
+            { id: 0, label: 'Jalur 1 - Waru → Gedangan' }
+        ],
+        'gedangan': [
+            { id: 0, label: 'Jalur 1 - Gedangan → Sidoarjo' }
+        ],
+        'sidoarjo': [
+            { id: 0, label: 'Jalur 1 - Sidoarjo → Gedangan' }
+        ]
+    };
+
+    // -- ROUTE DEFINITION --
     const routes = {
         'turi-gubeng': { from: 'turi', to: 'gubeng', jalur: 0, label: 'Turi → Gubeng' },
         'turi-gubeng2': { from: 'turi', to: 'gubeng', jalur: 1, label: 'Turi → Gubeng (2)' },
@@ -666,11 +724,11 @@
         'gubeng-turi': { from: 'gubeng', to: 'turi', jalur: 0, label: 'Gubeng → Turi' }
     };
 
-    // -- JADWAL PER STASIUN --
+    // -- JADWAL --
     let schedules = {};
     stations.forEach(s => { schedules[s.id] = []; });
 
-    // -- WESEL --
+    // -- GLOBAL WESEL (untuk map) --
     let wesels = [
         { from: 'turi', to: 'gubeng', jalur: 0, aktif: true },
         { from: 'turi', to: 'gubeng', jalur: 1, aktif: false },
@@ -702,13 +760,15 @@
     let countdownInterval = null;
     let editingSchedule = null;
     let loopMode = true;
+    let autoGreenSignals = {};
 
     // -- INIT --
     function initTrains() {
         trains = [];
-        stations.forEach(s => { s.signal = true; s.autoRed = false; });
+        stations.forEach(s => { s.signal = true; s.autoRed = false; s.wesel = 0; });
         signalCooldown = {};
         stationAlerts = {};
+        autoGreenSignals = {};
         schedules = {};
         stations.forEach(s => { schedules[s.id] = []; });
         updateTrainCount();
@@ -733,10 +793,20 @@
                         } else if (remaining > -5000) {
                             sch.countdown = '🚀 Berangkat!';
                             sch.status = 'running';
-                            // Pindahkan kereta ke jalur tujuan
+                            
+                            // AUTO GREEN SIGNAL untuk kereta ini
+                            const st = stations.find(stn => stn.id === s.id);
+                            if (st) {
+                                st.signal = true;
+                                st.autoRed = false;
+                                autoGreenSignals[s.id] = { time: now, trainName: sch.trainName };
+                                showPopup('🟢 ' + sch.trainName, 'SINYAL HIJAU OTOMATIS dari ' + s.name);
+                            }
+                            
                             moveTrainToRoute(sch);
                             showPopup('🔔 ' + sch.trainName, 'berangkat dari ' + s.name + ' menuju ' + sch.destinationName);
                             renderSlides();
+                            updateSignalIndicators();
                         } else if (remaining > -15000) {
                             sch.countdown = '🔄 Perjalanan';
                             sch.status = 'running';
@@ -744,10 +814,15 @@
                         } else {
                             sch.countdown = '✅ Tiba';
                             sch.status = 'arrived';
-                            // Kereta sampai tujuan, balik arah otomatis
                             if (loopMode) {
                                 reverseTrain(sch);
                             }
+                            // Reset auto green setelah 10 detik
+                            setTimeout(() => {
+                                delete autoGreenSignals[s.id];
+                                renderSlides();
+                                updateSignalIndicators();
+                            }, 10000);
                             renderSlides();
                         }
                     }
@@ -763,7 +838,6 @@
         const toSt = stations.find(s => s.id === schedule.destinationId);
         if (!fromSt || !toSt) return;
 
-        // Cari kereta dengan nama yang sama
         let train = trains.find(t => t.name === schedule.trainName);
         if (!train) {
             const t = trainTypes.find(tp => tp.name === schedule.trainName);
@@ -787,7 +861,6 @@
             trains.push(train);
         }
 
-        // Tentukan jalur berdasarkan rute
         const routeKey = `${schedule.stationId}-${schedule.destinationId}`;
         const route = routes[routeKey] || Object.values(routes).find(r => r.from === schedule.stationId && r.to === schedule.destinationId);
         if (route) {
@@ -802,21 +875,18 @@
         renderTrainControls();
     }
 
-    // -- REVERSE TRAIN (BOLAK-BALIK) --
+    // -- REVERSE TRAIN --
     function reverseTrain(schedule) {
         const fromSt = stations.find(s => s.id === schedule.stationId);
         const toSt = stations.find(s => s.id === schedule.destinationId);
         if (!fromSt || !toSt) return;
 
-        // Cari kereta
         let train = trains.find(t => t.name === schedule.trainName);
         if (!train) return;
 
-        // Balik arah
         train.direction = -1;
         train.progress = 0.95;
 
-        // Rute balik
         const reverseRouteKey = `${schedule.destinationId}-${schedule.stationId}`;
         const reverseRoute = routes[reverseRouteKey];
         if (reverseRoute) {
@@ -953,7 +1023,7 @@
                 }
             }
 
-            if (approaching && approachStation && !approachStation.autoRed) {
+            if (approaching && approachStation && !approachStation.autoRed && !autoGreenSignals[approachStation.id]) {
                 approachStation.signal = false;
                 approachStation.autoRed = true;
                 signalCooldown[approachStation.id] = now;
@@ -990,7 +1060,7 @@
             let shouldStop = false;
             let stopReason = '';
             
-            if (inStationArea && currentStation && !currentStation.signal) {
+            if (inStationArea && currentStation && !currentStation.signal && !autoGreenSignals[currentStation.id]) {
                 shouldStop = true;
                 stopReason = 'SINYAL MERAH';
             }
@@ -1028,7 +1098,6 @@
                 train.progress += delta;
                 if (train.progress > 1.0) {
                     train.progress = 1.0;
-                    // Bolak-balik otomatis
                     if (loopMode) {
                         train.direction = -1;
                         train.progress = 0.95;
@@ -1051,7 +1120,7 @@
                 }
             }
 
-            if (inStationArea && currentStation && currentStation.signal && train.trainSignal) {
+            if (inStationArea && currentStation && (currentStation.signal || autoGreenSignals[currentStation.id]) && train.trainSignal) {
                 if (now - lastPopupTime > 1500 && !trainAhead) {
                     showPopup(train.name, 'melewati ' + currentStation.name);
                     lastPopupTime = now;
@@ -1111,13 +1180,21 @@
         ctx.setLineDash([]);
 
         for (let s of stations) {
+            // Auto Green Signal effect
+            if (autoGreenSignals[s.id]) {
+                ctx.shadowColor = '#22c55e88';
+                ctx.shadowBlur = 40;
+            }
             if (s.autoRed) {
                 ctx.shadowColor = '#ef444488';
                 ctx.shadowBlur = 30;
             }
             ctx.fillStyle = '#1a2a3c';
             ctx.fillRect(s.x - 3, s.y - 65, 6, 65);
-            const signalColor = s.signal ? '#22c55e' : '#ef4444';
+            
+            let signalColor = s.signal ? '#22c55e' : '#ef4444';
+            if (autoGreenSignals[s.id]) signalColor = '#22c55e';
+            
             ctx.beginPath();
             ctx.arc(s.x, s.y - 72, 12, 0, 2 * Math.PI);
             ctx.fillStyle = '#0a121e';
@@ -1130,10 +1207,13 @@
             ctx.fillStyle = signalColor;
             ctx.fill();
             ctx.shadowBlur = 0;
-            ctx.fillStyle = s.signal ? '#8fde7a' : '#f77a7a';
+            
+            let label = s.signal ? 'HIJAU' : 'MERAH';
+            if (autoGreenSignals[s.id]) label = '🟢 AUTO GREEN';
+            ctx.fillStyle = autoGreenSignals[s.id] ? '#7acf8a' : (s.signal ? '#8fde7a' : '#f77a7a');
             ctx.font = 'bold 10px monospace';
             ctx.textAlign = 'center';
-            ctx.fillText(s.signal ? 'HIJAU' : 'MERAH', s.x, s.y - 92);
+            ctx.fillText(label, s.x, s.y - 92);
             if (s.autoRed) {
                 ctx.fillStyle = '#ef444488';
                 ctx.font = 'bold 8px monospace';
@@ -1151,7 +1231,7 @@
             ctx.stroke();
             ctx.fillStyle = '#8aadcc';
             ctx.font = '10px monospace';
-            ctx.fillText(`${s.jalurCount} jalur`, s.x, s.y + 32);
+            ctx.fillText(`Wesel: ${s.wesel + 1}`, s.x, s.y + 32);
         }
 
         for (let i = 0; i < wesels.length; i++) {
@@ -1239,20 +1319,22 @@
         }
 
         const aktifWesel = wesels[currentWeselIndex] || wesels[0];
-        weselStatus.textContent = `🔀 Wesel: ${currentWeselIndex + 1} ${aktifWesel.aktif ? '✅' : '🔴'}`;
+        weselStatus.textContent = `🔀 Wesel Global: ${currentWeselIndex + 1}`;
         updateTrainCount();
     }
 
     // -- SIGNAL INDICATORS --
     function updateSignalIndicators() {
-        signalIndicatorsEl.innerHTML = stations.map(s => `
+        signalIndicatorsEl.innerHTML = stations.map(s => {
+            const isAutoGreen = autoGreenSignals[s.id] ? true : false;
+            return `
             <div class="sig">
-                <span class="light" style="background:${s.signal ? '#22c55e' : '#ef4444'};"></span>
-                ${s.name} ${s.signal ? '🟢' : '🔴'}
+                <span class="light" style="background:${isAutoGreen ? '#22c55e' : (s.signal ? '#22c55e' : '#ef4444')};"></span>
+                ${s.name} ${isAutoGreen ? '🟢 AUTO' : (s.signal ? '🟢' : '🔴')}
                 ${s.autoRed ? '⚡' : ''}
                 <button onclick="toggleStationSignal('${s.id}')" style="background:#1a2a3c;border:1px solid #34516a;color:#dce6f0;border-radius:20px;padding:2px 12px;cursor:pointer;font-size:11px;">Toggle</button>
             </div>
-        `).join('');
+        `}).join('');
     }
 
     // -- TOGGLE SINYAL STASIUN --
@@ -1262,6 +1344,7 @@
             st.signal = !st.signal;
             st.autoRed = false;
             delete signalCooldown[st.id];
+            delete autoGreenSignals[st.id];
             showPopup('🚦 Sinyal ' + (st.signal ? 'HIJAU' : 'MERAH'), st.name + ' (manual)');
             updateSignalIndicators();
             renderSlides();
@@ -1338,6 +1421,16 @@
         }
     };
 
+    // -- WESEL PER STASIUN --
+    window.changeStationWesel = function(stationId, weselId) {
+        const st = stations.find(s => s.id === stationId);
+        if (st) {
+            st.wesel = parseInt(weselId);
+            showPopup('🔀 Wesel ' + st.name, 'ke jalur ' + (parseInt(weselId) + 1));
+            renderSlides();
+        }
+    };
+
     // -- OPEN SCHEDULE MODAL --
     window.openScheduleModal = function(scheduleId, stationId) {
         const modal = document.getElementById('scheduleModal');
@@ -1354,7 +1447,6 @@
             `<option value="${s.id}" ${s.id === stationId ? 'selected' : ''}>${s.name}</option>`
         ).join('');
 
-        // Destination dropdown (hanya stasiun setelahnya dalam rute)
         const destSelect = document.getElementById('editDestination');
         const currentIdx = stationOrder.indexOf(stationId);
         const nextStations = stationOrder.slice(currentIdx + 1);
@@ -1423,7 +1515,6 @@
             schedules[stationId].push(schedule);
         }
 
-        // Spawn kereta
         let existingTrain = trains.find(t => t.name === trainType.name);
         if (!existingTrain) {
             const newTrain = {
@@ -1473,6 +1564,8 @@
 
         slideContent.innerHTML = stations.map((s, idx) => {
             const stationSchedules = schedules[s.id] || [];
+            const weselOptions = stationWesels[s.id] || [];
+            const isAutoGreen = autoGreenSignals[s.id] ? true : false;
             
             let mapHtml = '';
             for (let j = 0; j < Math.min(s.jalurCount, 6); j++) {
@@ -1494,7 +1587,7 @@
             return `
             <div class="station-slide ${idx === currentSlide ? 'active' : ''}" id="slide-${idx}">
                 <div class="station-title">
-                    <span>📍 ${s.name} ${s.autoRed ? '⚡AUTO RED' : ''}</span>
+                    <span>📍 ${s.name} ${isAutoGreen ? '🟢 AUTO GREEN' : ''} ${s.autoRed ? '⚡AUTO RED' : ''}</span>
                     <span class="train-indicator">${stationSchedules.length} jadwal</span>
                 </div>
 
@@ -1503,44 +1596,55 @@
                         <div class="map-title">🗺️ MAP JALUR ${s.name}</div>
                         ${mapHtml}
                         <div class="signal-status" style="margin-top:8px;">
-                            <span class="light" style="background:${s.signal ? '#22c55e' : '#ef4444'};"></span>
-                            Sinyal: ${s.signal ? '🟢 HIJAU' : '🔴 MERAH'} ${s.autoRed ? '(Otomatis)' : ''}
+                            <span class="light" style="background:${isAutoGreen ? '#22c55e' : (s.signal ? '#22c55e' : '#ef4444')};"></span>
+                            Sinyal: ${isAutoGreen ? '🟢 AUTO GREEN' : (s.signal ? '🟢 HIJAU' : '🔴 MERAH')}
+                            ${s.autoRed ? '(Otomatis)' : ''}
                         </div>
                         <div class="signal-controls">
                             <button class="green" onclick="setSignal('${s.id}', true)">🟢 Hijau</button>
                             <button class="red" onclick="setSignal('${s.id}', false)">🔴 Merah</button>
-                            <button onclick="toggleWeselFromSlide()" style="background:#1d3a4a;border-color:#3a8aaa;color:#7acfde;">
-                                🔀 Wesel ${currentWeselIndex + 1}
-                            </button>
                             <button onclick="openScheduleModal(null, '${s.id}')" style="background:#1d4a3a;border-color:#3a8a6a;color:#7acf8a;">
                                 ➕ Jadwal
                             </button>
                         </div>
                     </div>
                     <div class="track-map">
-                        <div class="map-title">📋 JADWAL REAL-TIME</div>
-                        <div class="schedule-list">
-                            ${stationSchedules.length === 0 ? `
-                                <div style="color:#6a8aaa;font-size:13px;padding:12px;text-align:center;">
-                                    Belum ada jadwal. Klik "➕ Jadwal" di samping.
-                                </div>
-                            ` : stationSchedules.map(sch => `
-                                <div class="schedule-item">
-                                    <span class="train-name" style="color:${sch.trainColor}">${sch.trainName}</span>
-                                    <span class="time">⏰ ${sch.time}</span>
-                                    <span class="countdown">${sch.countdown || '⏳'}</span>
-                                    <span class="status-badge ${sch.status}">
-                                        ${sch.status === 'scheduled' ? '📅 Terjadwal' : 
-                                          sch.status === 'running' ? '🔄 Perjalanan' :
-                                          sch.status === 'arrived' ? '✅ Tiba' : 
-                                          sch.status === 'departed' ? '🚀 Berangkat' : sch.status}
-                                    </span>
-                                    <div class="schedule-actions">
-                                        <button onclick="openScheduleModal('${sch.id}', '${s.id}')">✏️</button>
-                                        <button class="danger" onclick="deleteSchedule('${sch.id}', '${s.id}')">🗑️</button>
+                        <div class="map-title">🔀 WESEL ${s.name}</div>
+                        <div class="wesel-control">
+                            <div class="wesel-title">Pilih Wesel:</div>
+                            <select onchange="changeStationWesel('${s.id}', this.value)">
+                                ${weselOptions.map(w => `
+                                    <option value="${w.id}" ${s.wesel === w.id ? 'selected' : ''}>${w.label}</option>
+                                `).join('')}
+                            </select>
+                            <div class="wesel-info">Wesel aktif: ${weselOptions.find(w => w.id === s.wesel)?.label || 'Jalur 1'}</div>
+                        </div>
+                        <div style="margin-top:10px;">
+                            <div class="map-title">📋 JADWAL REAL-TIME</div>
+                            <div class="schedule-list">
+                                ${stationSchedules.length === 0 ? `
+                                    <div style="color:#6a8aaa;font-size:13px;padding:12px;text-align:center;">
+                                        Belum ada jadwal.
                                     </div>
-                                </div>
-                            `).join('')}
+                                ` : stationSchedules.map(sch => `
+                                    <div class="schedule-item">
+                                        <span class="train-name" style="color:${sch.trainColor}">${sch.trainName}</span>
+                                        <span class="time">⏰ ${sch.time}</span>
+                                        <span class="countdown">${sch.countdown || '⏳'}</span>
+                                        <span class="status-badge ${sch.status === 'scheduled' && autoGreenSignals[s.id] ? 'green-signal' : sch.status}">
+                                            ${sch.status === 'scheduled' && autoGreenSignals[s.id] ? '🟢 AUTO GREEN' :
+                                              sch.status === 'scheduled' ? '📅 Terjadwal' : 
+                                              sch.status === 'running' ? '🔄 Perjalanan' :
+                                              sch.status === 'arrived' ? '✅ Tiba' : 
+                                              sch.status === 'departed' ? '🚀 Berangkat' : sch.status}
+                                        </span>
+                                        <div class="schedule-actions">
+                                            <button onclick="openScheduleModal('${sch.id}', '${s.id}')">✏️</button>
+                                            <button class="danger" onclick="deleteSchedule('${sch.id}', '${s.id}')">🗑️</button>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1556,20 +1660,11 @@
             st.signal = status;
             st.autoRed = false;
             delete signalCooldown[st.id];
+            delete autoGreenSignals[st.id];
             showPopup('🚦 Sinyal ' + (status ? 'HIJAU' : 'MERAH'), st.name);
             updateSignalIndicators();
             renderSlides();
         }
-    };
-
-    // -- TOGGLE WESEL --
-    window.toggleWeselFromSlide = function() {
-        currentWeselIndex = (currentWeselIndex + 1) % wesels.length;
-        for (let i = 0; i < wesels.length; i++) {
-            wesels[i].aktif = (i === currentWeselIndex);
-        }
-        showPopup('🔀 Wesel ke-' + (currentWeselIndex + 1), 'diubah');
-        renderSlides();
     };
 
     // -- TOGGLE LOOP --
@@ -1593,8 +1688,9 @@
     function resetAll() {
         if (animationId) cancelAnimationFrame(animationId);
         if (countdownInterval) clearInterval(countdownInterval);
-        stations.forEach(s => { s.signal = true; s.autoRed = false; });
+        stations.forEach(s => { s.signal = true; s.autoRed = false; s.wesel = 0; });
         signalCooldown = {};
+        autoGreenSignals = {};
         currentWeselIndex = 0;
         wesels.forEach((w, i) => w.aktif = (i === 0));
         initTrains();
@@ -1628,6 +1724,7 @@
                 s.signal = !s.signal;
                 s.autoRed = false;
                 delete signalCooldown[s.id];
+                delete autoGreenSignals[s.id];
                 showPopup('🚦 Sinyal ' + (s.signal ? 'HIJAU' : 'MERAH'), s.name + ' (manual)');
                 updateSignalIndicators();
                 renderSlides();
@@ -1660,8 +1757,8 @@
     renderSlides();
     loop();
 
-    console.log('🚂 DRAGON RAIL BOLAK-BALIK — jalur dunia nyata!');
-    console.log('📍 Rute: Turi→Gubeng→Wonokromo→Waru→Gedangan→Sidoarjo');
+    console.log('🚂 DRAGON RAIL WESEL PER STASIUN — auto green signal aktif!');
+    console.log('📍 Wesel diatur per stasiun, sinyal auto hijau saat jadwal berangkat');
 })();
 </script>
 </body>
