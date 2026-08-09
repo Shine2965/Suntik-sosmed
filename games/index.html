@@ -3,380 +3,521 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>🚂 Simulasi Kereta Api Dragon</title>
+    <title>🚂 Dragon Rail PRO MAX - Kontrol Total</title>
     <style>
         * {
-            box-sizing: border-box;
             margin: 0;
             padding: 0;
+            box-sizing: border-box;
         }
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: #0b0e14;
-            color: #e0e0e0;
+            font-family: 'Segoe UI', Tahoma, sans-serif;
+            background: #080c14;
+            color: #d0dcec;
             display: flex;
             justify-content: center;
-            align-items: center;
+            padding: 15px;
             min-height: 100vh;
-            padding: 20px;
         }
         .container {
-            max-width: 1300px;
+            max-width: 1500px;
             width: 100%;
-            background: #141a24;
-            border-radius: 24px;
-            padding: 25px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.8);
-            border: 1px solid #2a3a4a;
+            background: #0f1824;
+            border-radius: 28px;
+            padding: 22px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.95);
+            border: 1px solid #1a2c3f;
         }
         h1 {
-            font-size: 28px;
-            font-weight: 700;
-            color: #f0c27a;
-            text-shadow: 0 0 10px #f0c27a44;
+            font-size: 26px;
+            color: #f5c97a;
             display: flex;
+            justify-content: space-between;
             align-items: center;
-            gap: 12px;
-            margin-bottom: 20px;
-            border-bottom: 2px solid #2a3a4a;
-            padding-bottom: 12px;
+            border-bottom: 2px solid #1a2c3f;
+            padding-bottom: 14px;
+            margin-bottom: 18px;
+            flex-wrap: wrap;
+            gap: 10px;
         }
         h1 small {
-            font-size: 14px;
+            font-size: 13px;
             font-weight: 300;
-            color: #8a9bb0;
-            margin-left: auto;
-        }
-        .canvas-wrapper {
-            position: relative;
-            background: #1c2634;
-            border-radius: 16px;
-            overflow: hidden;
-            border: 1px solid #2f4052;
+            color: #7a94b0;
         }
         #railCanvas {
-            display: block;
             width: 100%;
             height: auto;
-            background: #1c2634;
-            cursor: crosshair;
+            background: #0c1520;
+            border-radius: 16px;
+            border: 1px solid #1f3448;
+            display: block;
         }
         .controls {
             display: flex;
             flex-wrap: wrap;
-            gap: 15px;
-            margin: 18px 0 12px;
+            gap: 12px;
+            margin: 16px 0 12px;
             align-items: center;
         }
         .controls button {
-            background: #283544;
-            border: none;
-            color: #d0dcec;
-            padding: 10px 20px;
+            background: #1a2a3c;
+            border: 1px solid #34516a;
+            color: #dce6f0;
+            padding: 9px 22px;
             border-radius: 40px;
             font-weight: 600;
-            font-size: 14px;
+            font-size: 13px;
             cursor: pointer;
             transition: all 0.2s;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            border: 1px solid #3e5368;
-            box-shadow: 0 4px 0 #0d121b;
+            box-shadow: 0 3px 0 #080e16;
         }
         .controls button:hover {
-            background: #34515e;
+            background: #28405a;
             transform: translateY(-2px);
-            box-shadow: 0 6px 0 #0d121b;
-            border-color: #5f7f96;
+            box-shadow: 0 5px 0 #080e16;
+            border-color: #4a708f;
         }
         .controls button.danger {
-            background: #5e2e3a;
-            border-color: #9e4a5a;
+            background: #4d2732;
+            border-color: #884a5a;
         }
         .controls button.danger:hover {
-            background: #7e3e4e;
+            background: #6d3747;
         }
-        .controls .badge {
-            background: #1f2a36;
-            padding: 6px 16px;
+        .controls button.success {
+            background: #1d4a3a;
+            border-color: #3a8a6a;
+        }
+        .controls button.success:hover {
+            background: #2d6a4a;
+        }
+        .badge {
+            background: #0f1a26;
+            padding: 7px 18px;
             border-radius: 40px;
+            border: 1px solid #2a435c;
             font-size: 13px;
-            color: #b0c8dd;
-            border: 1px solid #3a5066;
+            color: #b8cddf;
         }
-        .legend {
+        .train-control-panel {
+            background: #0a121e;
+            border: 1px solid #1d3245;
+            border-radius: 16px;
+            padding: 16px;
+            margin: 12px 0;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .train-control-panel::-webkit-scrollbar {
+            width: 6px;
+            background: #0a121e;
+        }
+        .train-control-panel::-webkit-scrollbar-thumb {
+            background: #2a4a6a;
+            border-radius: 10px;
+        }
+        .train-item {
             display: flex;
             flex-wrap: wrap;
-            gap: 18px;
-            padding: 12px 0 6px;
-            font-size: 13px;
-            color: #b8c9dd;
-            border-top: 1px solid #25323f;
-            margin-top: 12px;
+            align-items: center;
+            gap: 12px;
+            padding: 8px 12px;
+            margin: 4px 0;
+            background: #0f1a28;
+            border-radius: 10px;
+            border-left: 4px solid #facc15;
         }
-        .legend span {
+        .train-item .name {
+            font-weight: 600;
+            font-size: 14px;
+            min-width: 180px;
+        }
+        .train-item .color-dot {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            display: inline-block;
+            border: 1px solid #2a4a6a;
+        }
+        .train-item select {
+            background: #1a2a3c;
+            color: #dce6f0;
+            border: 1px solid #34516a;
+            padding: 5px 12px;
+            border-radius: 30px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+        .train-item .status {
+            font-size: 12px;
+            color: #8aadcc;
+            margin-left: auto;
+        }
+        .train-item .status.stop {
+            color: #f77a7a;
+        }
+        .train-item .status.run {
+            color: #7acf8a;
+        }
+        .info-panel {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            padding: 12px 0 8px;
+            border-top: 1px solid #14222f;
+            margin-top: 14px;
+            font-size: 13px;
+        }
+        .info-panel .item {
             display: flex;
             align-items: center;
             gap: 6px;
         }
-        .legend .dot {
-            display: inline-block;
+        .info-panel .dot {
             width: 14px;
             height: 14px;
             border-radius: 50%;
-            border: 1px solid #33475b;
+            border: 1px solid #2a4a6a;
         }
-        .popup-notif {
+        .popup-train {
             position: fixed;
             bottom: 30px;
             right: 30px;
-            background: #0b141e;
-            border-left: 6px solid #f0c27a;
-            padding: 14px 24px;
+            background: #0c1622;
+            border-left: 6px solid #f5c97a;
+            padding: 16px 26px;
             border-radius: 16px;
-            box-shadow: 0 12px 30px rgba(0,0,0,0.9);
-            color: #eef4fa;
+            border: 1px solid #2a4660;
+            box-shadow: 0 12px 40px rgba(0,0,0,0.95);
+            color: #ecf4fa;
             font-weight: 600;
             font-size: 18px;
-            max-width: 340px;
+            max-width: 380px;
             z-index: 9999;
             transition: all 0.4s ease;
-            border: 1px solid #3d566e;
-            backdrop-filter: blur(6px);
-            transform: translateY(20px);
+            transform: translateY(30px);
             opacity: 0;
             pointer-events: none;
+            backdrop-filter: blur(8px);
         }
-        .popup-notif.show {
+        .popup-train.show {
             transform: translateY(0);
             opacity: 1;
         }
-        .popup-notif small {
+        .popup-train small {
             display: block;
             font-weight: 300;
             font-size: 13px;
-            color: #99aec9;
+            color: #9ab0cc;
             margin-top: 4px;
+        }
+        .signal-indicator {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin: 8px 0;
+        }
+        .signal-indicator .sig {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+        }
+        .signal-indicator .sig .light {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            border: 2px solid #2a4a6a;
         }
         footer {
             text-align: center;
             margin-top: 20px;
-            color: #5a6f86;
-            font-size: 13px;
-            border-top: 1px solid #1f2c39;
+            color: #3a5670;
+            font-size: 12px;
+            border-top: 1px solid #14212e;
             padding-top: 16px;
         }
-        @media (max-width: 700px) {
+        @media (max-width: 800px) {
             .controls { flex-direction: column; align-items: stretch; }
+            .train-item { flex-direction: column; align-items: stretch; }
+            .train-item .status { margin-left: 0; }
         }
     </style>
 </head>
 <body>
 <div class="container">
     <h1>
-        🚂 SHINE RAIL <small>— kendalikan jalur & sinyal</small>
+        🚂 DRAGON RAIL PRO MAX <small>— sinyal merah = stop total!</small>
     </h1>
-    <div class="canvas-wrapper">
-        <canvas id="railCanvas" width="1200" height="600"></canvas>
-    </div>
+    
+    <canvas id="railCanvas" width="1500" height="750"></canvas>
+    
     <div class="controls">
         <button id="addTrainBtn">➕ Tambah Kereta</button>
-        <button id="toggleSignalBtn">🚦 Ubah Sinyal</button>
-        <button id="resetBtn" class="danger">⟳ Reset Semua</button>
-        <div class="badge" id="trainCountBadge">🚆 6 kereta</div>
-        <div class="badge" id="signalStatus">🟢 Sinyal HIJAU</div>
+        <button id="toggleAllSignalBtn">🚦 Ubah Semua Sinyal</button>
+        <button id="resetBtn" class="danger">⟳ Reset</button>
+        <button id="toggleWeselBtn" class="success">🔀 Next Wesel</button>
+        <div class="badge" id="trainCount">🚆 6 kereta</div>
+        <div class="badge" id="weselStatus">🔀 Wesel: 1</div>
     </div>
-    <div class="legend">
-        <span><span class="dot" style="background:#facc15;"></span> Commuter Line</span>
-        <span><span class="dot" style="background:#f97316;"></span> KA Harina</span>
-        <span><span class="dot" style="background:#3b82f6;"></span> KA Pandalungan</span>
-        <span><span class="dot" style="background:#a855f7;"></span> KA Anggrek</span>
-        <span><span class="dot" style="background:#ec4899;"></span> Stasiun</span>
-        <span><span class="dot" style="background:#22c55e;"></span> Sinyal Hijau</span>
-        <span><span class="dot" style="background:#ef4444;"></span> Sinyal Merah</span>
+
+    <div class="signal-indicator" id="signalIndicators">
+        <!-- Dinamis dari JS -->
     </div>
-    <footer>© Alvino Jeremy - 2026| klik jalur untuk atur sinyal</footer>
+
+    <div class="train-control-panel" id="trainControlPanel">
+        <div style="font-weight:300;color:#6a8aaa;margin-bottom:8px;font-size:13px;">🎛️ KONTROL PER KERETA — pilih jalur masuk:</div>
+        <div id="trainList"></div>
+    </div>
+
+    <div class="info-panel">
+        <span class="item"><span class="dot" style="background:#facc15;"></span> Commuter Line</span>
+        <span class="item"><span class="dot" style="background:#f97316;"></span> KA Harina</span>
+        <span class="item"><span class="dot" style="background:#3b82f6;"></span> KA Pandalungan</span>
+        <span class="item"><span class="dot" style="background:#a855f7;"></span> KA Anggrek</span>
+        <span class="item"><span class="dot" style="background:#ec4899;"></span> Stasiun</span>
+        <span class="item"><span class="dot" style="background:#22d3ee;"></span> Wesel aktif</span>
+        <span class="item"><span class="dot" style="background:#ef4444;"></span> Sinyal MERAH (stop)</span>
+        <span class="item"><span class="dot" style="background:#22c55e;"></span> Sinyal HIJAU (jalan)</span>
+    </div>
+    <footer>©Alvino Jeremy - 2026</footer>
 </div>
 
-<!-- POPUP NOTIF -->
-<div id="trainPopup" class="popup-notif">
-    🚆 <span id="popupTrainName">Commuter Line Arjonegoro</span>
-    <small id="popupStation">melewati Surabaya Pasar Turi</small>
+<!-- POPUP -->
+<div id="trainPopup" class="popup-train">
+    🚆 <span id="popupName">Commuter Line</span>
+    <small id="popupStation">melewati stasiun</small>
 </div>
 
 <script>
-    (function() {
-        // ============================================================
-        //  DRAGON V1 — SIMULASI KERETA API DENGAN PERSINYALAN
-        // ============================================================
-        const canvas = document.getElementById('railCanvas');
-        const ctx = canvas.getContext('2d');
-        const popup = document.getElementById('trainPopup');
-        const popupName = document.getElementById('popupTrainName');
-        const popupStation = document.getElementById('popupStation');
-        const trainCountBadge = document.getElementById('trainCountBadge');
-        const signalStatus = document.getElementById('signalStatus');
+(function() {
+    // ============================================================
+    //  DRAGON RAIL PRO MAX — SINYAL MERAH = STOP + KONTROL JALUR
+    // ============================================================
+    const canvas = document.getElementById('railCanvas');
+    const ctx = canvas.getContext('2d');
+    const popup = document.getElementById('trainPopup');
+    const popupName = document.getElementById('popupName');
+    const popupStation = document.getElementById('popupStation');
+    const trainCountBadge = document.getElementById('trainCount');
+    const weselStatus = document.getElementById('weselStatus');
+    const trainListEl = document.getElementById('trainList');
+    const signalIndicatorsEl = document.getElementById('signalIndicators');
 
-        // -- STASIUN (3) --
-        const stations = [
-            { name: 'Surabaya Pasar Turi', x: 150, y: 300, color: '#ec4899' },
-            { name: 'Gubeng', x: 600, y: 180, color: '#ec4899' },
-            { name: 'Wonokromo', x: 1050, y: 400, color: '#ec4899' }
-        ];
+    // -- STASIUN (4) --
+    const stations = [
+        { id: 'turi', name: 'Surabaya Pasar Turi', x: 130, y: 380, jalurCount: 6, signal: true },
+        { id: 'gubeng', name: 'Gubeng', x: 580, y: 260, jalurCount: 8, signal: true },
+        { id: 'wonokromo', name: 'Wonokromo', x: 1000, y: 500, jalurCount: 4, signal: true },
+        { id: 'waru', name: 'Waru', x: 1350, y: 320, jalurCount: 2, signal: true }
+    ];
 
-        // -- DATA KERETA (default 6) --
-        const trainTypes = [
-            { name: 'Commuter Line Arjonegoro 1B', color: '#facc15', speed: 1.2, size: 18 },
-            { name: 'Commuter Line Penataran', color: '#facc15', speed: 1.0, size: 18 },
-            { name: 'KA HARINA', color: '#f97316', speed: 1.8, size: 20 },
-            { name: 'KA PANDALUNGAN', color: '#3b82f6', speed: 2.0, size: 20 },
-            { name: 'KA ANGGREK', color: '#a855f7', speed: 1.6, size: 20 },
-            { name: 'Commuter Line Arjonegoro 1A', color: '#facc15', speed: 1.3, size: 18 }
-        ];
+    // -- WESEL --
+    let wesels = [
+        { from: 'turi', to: 'gubeng', jalur: 0, aktif: true },
+        { from: 'turi', to: 'gubeng', jalur: 1, aktif: false },
+        { from: 'gubeng', to: 'wonokromo', jalur: 0, aktif: false },
+        { from: 'gubeng', to: 'wonokromo', jalur: 1, aktif: false },
+        { from: 'wonokromo', to: 'waru', jalur: 0, aktif: false }
+    ];
+    let currentWeselIndex = 0;
 
-        // -- STATE --
-        let trains = [];
-        let signalGreen = true;       // true = hijau, false = merah
-        let selectedStationIndex = -1;
-        let animationFrame = null;
-        let popupTimer = null;
-        let lastPopupTime = 0;
+    // -- KERETA --
+    const trainTypes = [
+        { name: 'Commuter Line Arjonegoro', color: '#facc15', speed: 1.3, size: 18 },
+        { name: 'Commuter Line Penataran', color: '#facc15', speed: 1.1, size: 18 },
+        { name: 'KA HARINA', color: '#f97316', speed: 1.9, size: 20 },
+        { name: 'KA PANDALUNGAN', color: '#3b82f6', speed: 2.1, size: 20 },
+        { name: 'KA ANGGREK', color: '#a855f7', speed: 1.7, size: 20 },
+        { name: 'Commuter Line Arjonegoro', color: '#facc15', speed: 1.2, size: 18 }
+    ];
 
-        // Inisialisasi kereta
-        function initTrains() {
-            trains = trainTypes.map((t, idx) => {
-                // posisi awal tersebar di lintasan
-                const progress = (idx / trainTypes.length) * 0.9 + 0.05;
-                return {
-                    ...t,
-                    id: Date.now() + idx,
-                    progress: progress,           // 0..1 sepanjang rute
-                    direction: 1,                 // 1 maju, -1 mundur
-                    active: true,
-                    currentStation: null,
-                    lastStationIdx: -1
-                };
-            });
-            updateTrainCount();
+    let trains = [];
+    let lastPopupTime = 0;
+    let popupTimer = null;
+    let animationId = null;
+    let selectedWesel = 0;
+
+    // -- INIT --
+    function initTrains() {
+        trains = trainTypes.map((t, idx) => {
+            return {
+                ...t,
+                id: Date.now() + idx,
+                progress: 0.05 + (idx / trainTypes.length) * 0.85,
+                direction: 1,
+                active: true,
+                currentStation: null,
+                assignedJalur: 0, // jalur yang dipilih user
+                isStopped: false,
+                stopAtStation: null,
+                lastStationIdx: -1
+            };
+        });
+        updateTrainCount();
+        renderTrainControls();
+    }
+
+    // -- POSISI --
+    function getPositionOnPath(progress, jalurIndex = 0) {
+        const offset = jalurIndex * 14;
+        const p0 = { x: 30, y: 320 + offset };
+        const p1 = { x: stations[0].x, y: stations[0].y + offset - 8 };
+        const p2 = { x: stations[1].x, y: stations[1].y + offset - 6 };
+        const p3 = { x: stations[2].x, y: stations[2].y + offset + 6 };
+        const p4 = { x: stations[3].x, y: stations[3].y + offset };
+        const p5 = { x: 1470, y: 320 + offset };
+
+        const pts = [p0, p1, p2, p3, p4, p5];
+        const t = Math.min(1, Math.max(0, progress));
+        const seg = t * 5;
+        const segIdx = Math.min(4, Math.floor(seg));
+        const localT = seg - segIdx;
+
+        const idx = segIdx;
+        const a = pts[Math.max(0, idx - 1)];
+        const b = pts[idx];
+        const c = pts[Math.min(5, idx + 1)];
+        const d = pts[Math.min(5, idx + 2)];
+
+        const t2 = localT * localT;
+        const t3 = t2 * localT;
+        const x = 0.5 * ( (2*b.x) + (-a.x + c.x)*localT + (2*a.x - 5*b.x + 4*c.x - d.x)*t2 + (-a.x + 3*b.x - 3*c.x + d.x)*t3 );
+        const y = 0.5 * ( (2*b.y) + (-a.y + c.y)*localT + (2*a.y - 5*b.y + 4*c.y - d.y)*t2 + (-a.y + 3*b.y - 3*c.y + d.y)*t3 );
+        return { x, y };
+    }
+
+    // -- CEK STASIUN TERDEKAT --
+    function getNearestStation(pos) {
+        let minDist = 50;
+        let found = null;
+        for (let s of stations) {
+            const dx = pos.x - s.x;
+            const dy = pos.y - s.y;
+            const dist = Math.sqrt(dx*dx + dy*dy);
+            if (dist < minDist) {
+                minDist = dist;
+                found = s;
+            }
         }
+        return found;
+    }
 
-        // -- Fungsi untuk dapatkan posisi (x,y) dari progress sepanjang jalur --
-        function getPositionOnPath(progress) {
-            // Jalur berupa kurva sederhana yang melewati 3 stasiun
-            // Kita definisikan 4 titik kontrol: start, stasiun1, stasiun2, stasiun3
-            const p0 = { x: 30, y: 300 };
-            const p1 = stations[0]; // Surabaya Pasar Turi
-            const p2 = stations[1]; // Gubeng
-            const p3 = stations[2]; // Wonokromo
-            const p4 = { x: 1170, y: 300 };
+    // -- UPDATE KERETA (DENGAN SINYAL MERAH) --
+    function updateTrains() {
+        const now = Date.now();
+        for (let train of trains) {
+            if (!train.active) continue;
 
-            // Interpolasi spline sederhana (Catmull-Rom style) 
-            // tapi kita pakai 5 titik + smooth
-            const t = Math.min(1, Math.max(0, progress));
-            // bagi jadi 4 segmen
-            const seg = t * 4;
-            const segIdx = Math.min(3, Math.floor(seg));
-            const localT = seg - segIdx;
-
-            let a, b, c, d;
-            const pts = [p0, p1, p2, p3, p4];
-            const idx = segIdx;
-            a = pts[Math.max(0, idx - 1)];
-            b = pts[idx];
-            c = pts[Math.min(4, idx + 1)];
-            d = pts[Math.min(4, idx + 2)];
-
-            // Catmull-Rom
-            const t2 = localT * localT;
-            const t3 = t2 * localT;
-            const x = 0.5 * ( (2*b.x) + (-a.x + c.x)*localT + (2*a.x - 5*b.x + 4*c.x - d.x)*t2 + (-a.x + 3*b.x - 3*c.x + d.x)*t3 );
-            const y = 0.5 * ( (2*b.y) + (-a.y + c.y)*localT + (2*a.y - 5*b.y + 4*c.y - d.y)*t2 + (-a.y + 3*b.y - 3*c.y + d.y)*t3 );
-            return { x, y };
-        }
-
-        // -- Cari stasiun terdekat untuk popup --
-        function getNearestStation(pos) {
-            let minDist = 50;
-            let found = null;
-            for (let s of stations) {
-                const dx = pos.x - s.x;
-                const dy = pos.y - s.y;
-                const dist = Math.sqrt(dx*dx + dy*dy);
-                if (dist < minDist) {
-                    minDist = dist;
-                    found = s;
+            const pos = getPositionOnPath(train.progress, train.assignedJalur);
+            const nearStation = getNearestStation(pos);
+            
+            // Cek apakah di dalam area stasiun (radius 35)
+            let inStationArea = false;
+            let currentStation = null;
+            if (nearStation) {
+                const dx = pos.x - nearStation.x;
+                const dy = pos.y - nearStation.y;
+                if (Math.sqrt(dx*dx + dy*dy) < 38) {
+                    inStationArea = true;
+                    currentStation = nearStation;
                 }
             }
-            return found;
-        }
 
-        // -- Update semua kereta --
-        function updateTrains() {
-            const now = Date.now();
-            for (let train of trains) {
-                if (!train.active) continue;
-                // gerakan
-                const speedFactor = signalGreen ? 1.0 : 0.25; // kalau merah melambat
-                let delta = (train.speed * 0.003) * speedFactor;
-                if (train.direction === 1) {
-                    train.progress += delta;
-                    if (train.progress > 1.0) {
-                        train.progress = 1.0;
-                        train.direction = -1;
-                    }
+            // LOGIKA SINYAL MERAH: berhenti di jalur masuk/keluar stasiun
+            let shouldStop = false;
+            if (inStationArea && currentStation) {
+                // Cek sinyal stasiun
+                if (!currentStation.signal) {
+                    shouldStop = true;
+                    train.stopAtStation = currentStation.id;
                 } else {
-                    train.progress -= delta;
-                    if (train.progress < 0.0) {
-                        train.progress = 0.0;
-                        train.direction = 1;
-                    }
+                    train.stopAtStation = null;
                 }
+            } else {
+                train.stopAtStation = null;
+            }
 
-                // cek stasiun terdekat -> popup
-                const pos = getPositionOnPath(train.progress);
-                const nearStation = getNearestStation(pos);
-                if (nearStation) {
-                    const dist = Math.sqrt((pos.x - nearStation.x)**2 + (pos.y - nearStation.y)**2);
-                    if (dist < 28 && (now - lastPopupTime > 1800)) {
-                        // popup!
-                        showPopup(train.name, nearStation.name);
-                        lastPopupTime = now;
-                        train.currentStation = nearStation.name;
-                    }
+            // Jika kereta berhenti karena sinyal merah
+            if (shouldStop) {
+                train.isStopped = true;
+                // Popup peringatan
+                if (now - lastPopupTime > 2000) {
+                    showPopup('🔴 ' + train.name, 'BERHENTI di ' + currentStation.name + ' (SINYAL MERAH)');
+                    lastPopupTime = now;
+                }
+                continue; // SKIP gerakan
+            } else {
+                train.isStopped = false;
+            }
+
+            // Gerakan normal
+            let speedMul = 1.0;
+            // Cek wesel aktif
+            const aktifWesel = wesels[currentWeselIndex];
+            if (aktifWesel && !aktifWesel.aktif) {
+                speedMul = 0.5;
+            }
+
+            let delta = (train.speed * 0.004) * speedMul;
+            if (train.direction === 1) {
+                train.progress += delta;
+                if (train.progress > 1.0) {
+                    train.progress = 1.0;
+                    train.direction = -1;
+                }
+            } else {
+                train.progress -= delta;
+                if (train.progress < 0.0) {
+                    train.progress = 0.0;
+                    train.direction = 1;
+                }
+            }
+
+            // Popup lewat stasiun (hanya jika sinyal hijau)
+            if (inStationArea && currentStation && currentStation.signal) {
+                if (now - lastPopupTime > 1500) {
+                    showPopup(train.name, 'melewati ' + currentStation.name);
+                    lastPopupTime = now;
+                    train.currentStation = currentStation.name;
                 }
             }
         }
+        updateTrainControls();
+    }
 
-        // -- Show Popup --
-        function showPopup(trainName, stationName) {
-            popupName.textContent = trainName;
-            popupStation.textContent = `melewati ${stationName}`;
-            popup.classList.add('show');
-            if (popupTimer) clearTimeout(popupTimer);
-            popupTimer = setTimeout(() => {
-                popup.classList.remove('show');
-            }, 2000);
-        }
+    // -- POPUP --
+    function showPopup(name, station) {
+        popupName.textContent = name;
+        popupStation.textContent = station;
+        popup.classList.add('show');
+        if (popupTimer) clearTimeout(popupTimer);
+        popupTimer = setTimeout(() => {
+            popup.classList.remove('show');
+        }, 2200);
+    }
 
-        // -- DRAW --
-        function draw() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // -- DRAW --
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // 1. Gambar rel (track)
+        // 1. GAMBAR JALUR (8 jalur)
+        for (let j = 0; j < 8; j++) {
             ctx.beginPath();
-            ctx.strokeStyle = '#4a617c';
-            ctx.lineWidth = 6;
-            ctx.setLineDash([]);
-            // track utama via 5 titik
-            const pts = [
-                { x: 30, y: 300 },
-                stations[0], stations[1], stations[2],
-                { x: 1170, y: 300 }
-            ];
+            ctx.strokeStyle = j < 6 ? '#2a4a6a' : '#1a3a5a';
+            ctx.lineWidth = j < 4 ? 4 : 2.5;
+            ctx.setLineDash(j % 2 === 0 ? [] : [6, 8]);
+            const offset = j * 14;
+            const p0 = { x: 30, y: 320 + offset };
+            const p1 = { x: stations[0].x, y: stations[0].y + offset - 8 };
+            const p2 = { x: stations[1].x, y: stations[1].y + offset - 6 };
+            const p3 = { x: stations[2].x, y: stations[2].y + offset + 6 };
+            const p4 = { x: stations[3].x, y: stations[3].y + offset };
+            const p5 = { x: 1470, y: 320 + offset };
+            const pts = [p0, p1, p2, p3, p4, p5];
             ctx.moveTo(pts[0].x, pts[0].y);
             for (let i = 1; i < pts.length; i++) {
-                // kurva halus
                 const prev = pts[i-1];
                 const curr = pts[i];
                 const cp1x = prev.x + (curr.x - prev.x) * 0.4;
@@ -386,159 +527,296 @@
                 ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, curr.x, curr.y);
             }
             ctx.stroke();
+        }
+        ctx.setLineDash([]);
 
-            // 2. Gambar sinyal di tiap stasiun
-            for (let s of stations) {
-                // tiang
-                ctx.fillStyle = '#3a4a5a';
-                ctx.fillRect(s.x - 3, s.y - 50, 6, 50);
-                // lampu
-                const color = signalGreen ? '#22c55e' : '#ef4444';
+        // 2. GAMBAR STASIUN + SINYAL
+        for (let s of stations) {
+            // Tiang sinyal
+            ctx.fillStyle = '#1a2a3c';
+            ctx.fillRect(s.x - 3, s.y - 65, 6, 65);
+            // Lampu sinyal
+            const signalColor = s.signal ? '#22c55e' : '#ef4444';
+            ctx.beginPath();
+            ctx.arc(s.x, s.y - 72, 12, 0, 2 * Math.PI);
+            ctx.fillStyle = '#0a121e';
+            ctx.fill();
+            ctx.strokeStyle = '#2a4a6a';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.arc(s.x, s.y - 72, 8, 0, 2 * Math.PI);
+            ctx.fillStyle = signalColor;
+            ctx.fill();
+            // Label sinyal
+            ctx.fillStyle = s.signal ? '#8fde7a' : '#f77a7a';
+            ctx.font = 'bold 10px monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText(s.signal ? 'HIJAU' : 'MERAH', s.x, s.y - 92);
+
+            // Nama stasiun
+            ctx.fillStyle = '#d4e6f5';
+            ctx.font = 'bold 13px "Segoe UI"';
+            ctx.textAlign = 'center';
+            ctx.fillText(s.name, s.x, s.y - 110);
+            
+            // Marker stasiun
+            ctx.beginPath();
+            ctx.arc(s.x, s.y, 14, 0, 2 * Math.PI);
+            ctx.fillStyle = '#ec4899';
+            ctx.fill();
+            ctx.strokeStyle = '#f9c8e0';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Info jalur
+            ctx.fillStyle = '#8aadcc';
+            ctx.font = '10px monospace';
+            ctx.fillText(`${s.jalurCount} jalur`, s.x, s.y + 32);
+        }
+
+        // 3. GAMBAR WESEL
+        for (let i = 0; i < wesels.length; i++) {
+            const w = wesels[i];
+            const fromSt = stations.find(s => s.id === w.from);
+            const toSt = stations.find(s => s.id === w.to);
+            if (!fromSt || !toSt) continue;
+            const isActive = i === currentWeselIndex && w.aktif;
+            ctx.beginPath();
+            ctx.strokeStyle = isActive ? '#22d3ee' : '#2a4a6a';
+            ctx.lineWidth = isActive ? 6 : 2;
+            ctx.setLineDash(isActive ? [] : [6, 8]);
+            const midX = (fromSt.x + toSt.x) / 2;
+            const midY = (fromSt.y + toSt.y) / 2 - 30;
+            ctx.moveTo(fromSt.x + 20, fromSt.y + 10);
+            ctx.quadraticCurveTo(midX, midY, toSt.x - 20, toSt.y + 10);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            ctx.fillStyle = isActive ? '#22d3ee' : '#3a5a7a';
+            ctx.font = 'bold 10px monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText(`Wesel ${i+1}`, (fromSt.x + toSt.x)/2, midY - 12);
+        }
+
+        // 4. GAMBAR KERETA
+        for (let train of trains) {
+            if (!train.active) continue;
+            const pos = getPositionOnPath(train.progress, train.assignedJalur);
+            
+            // Efek berhenti (lingkaran merah)
+            if (train.isStopped) {
                 ctx.beginPath();
-                ctx.arc(s.x, s.y - 58, 12, 0, 2 * Math.PI);
-                ctx.fillStyle = '#1a2632';
-                ctx.fill();
-                ctx.strokeStyle = '#2f4052';
-                ctx.lineWidth = 2;
+                ctx.arc(pos.x, pos.y, train.size/2 + 8, 0, 2 * Math.PI);
+                ctx.strokeStyle = '#ef444488';
+                ctx.lineWidth = 3;
+                ctx.setLineDash([4, 6]);
                 ctx.stroke();
-                ctx.beginPath();
-                ctx.arc(s.x, s.y - 58, 8, 0, 2 * Math.PI);
-                ctx.fillStyle = color;
-                ctx.fill();
-                // label stasiun
-                ctx.fillStyle = '#d4e2f0';
-                ctx.font = 'bold 13px "Segoe UI"';
-                ctx.textAlign = 'center';
-                ctx.fillText(s.name, s.x, s.y - 80);
-                // marker stasiun
-                ctx.beginPath();
-                ctx.arc(s.x, s.y, 12, 0, 2 * Math.PI);
-                ctx.fillStyle = '#ec4899';
-                ctx.fill();
-                ctx.strokeStyle = '#f9c8e0';
-                ctx.lineWidth = 2;
-                ctx.stroke();
+                ctx.setLineDash([]);
             }
 
-            // 3. Gambar kereta
-            for (let train of trains) {
-                if (!train.active) continue;
-                const pos = getPositionOnPath(train.progress);
-                // badan kereta
-                ctx.shadowColor = '#00000066';
-                ctx.shadowBlur = 14;
-                ctx.beginPath();
-                ctx.rect(pos.x - train.size/2, pos.y - train.size/2, train.size, train.size);
-                ctx.fillStyle = train.color;
-                ctx.fill();
-                ctx.strokeStyle = '#0b141e';
-                ctx.lineWidth = 2;
-                ctx.stroke();
-                ctx.shadowBlur = 0;
-                // nama kereta di atas
-                ctx.fillStyle = '#f0f6ff';
-                ctx.font = 'bold 11px monospace';
-                ctx.textAlign = 'center';
-                ctx.fillText(train.name.substring(0, 14), pos.x, pos.y - train.size/2 - 8);
-                // arah panah
-                ctx.fillStyle = '#ffffffcc';
-                ctx.font = '14px sans-serif';
-                ctx.fillText(train.direction === 1 ? '▶' : '◀', pos.x, pos.y + 4);
-            }
+            // Body kereta
+            ctx.shadowColor = '#00000088';
+            ctx.shadowBlur = 18;
+            ctx.fillStyle = train.color;
+            ctx.beginPath();
+            ctx.roundRect(pos.x - train.size/2, pos.y - train.size/2, train.size, train.size, 4);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+            ctx.strokeStyle = '#0b141e';
+            ctx.lineWidth = 2;
+            ctx.stroke();
 
-            // info signal
-            signalStatus.textContent = signalGreen ? '🟢 Sinyal HIJAU' : '🔴 Sinyal MERAH';
-            signalStatus.style.color = signalGreen ? '#8fde7a' : '#f57a7a';
+            // Nama kereta
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 10px monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText(train.name.substring(0, 12), pos.x, pos.y - train.size/2 - 8);
+            
+            // Arah
+            ctx.fillStyle = '#ffffffcc';
+            ctx.font = '14px sans-serif';
+            ctx.fillText(train.direction === 1 ? '▶' : '◀', pos.x, pos.y + 4);
+
+            // Label jalur assigned
+            ctx.fillStyle = '#8aadcc';
+            ctx.font = '9px monospace';
+            ctx.fillText(`J${train.assignedJalur+1}`, pos.x + train.size/2 + 12, pos.y + 4);
         }
 
-        // -- LOOP --
-        function loop() {
-            updateTrains();
-            draw();
-            animationFrame = requestAnimationFrame(loop);
+        // Update status
+        const aktifWesel = wesels[currentWeselIndex] || wesels[0];
+        weselStatus.textContent = `🔀 Wesel: ${currentWeselIndex + 1} ${aktifWesel.aktif ? '✅' : '🔴'}`;
+        updateTrainCount();
+        updateSignalIndicators();
+    }
+
+    // -- SIGNAL INDICATORS --
+    function updateSignalIndicators() {
+        signalIndicatorsEl.innerHTML = stations.map(s => `
+            <div class="sig">
+                <span class="light" style="background:${s.signal ? '#22c55e' : '#ef4444'};"></span>
+                ${s.name} ${s.signal ? '🟢' : '🔴'}
+                <button onclick="toggleStationSignal('${s.id}')" style="background:#1a2a3c;border:1px solid #34516a;color:#dce6f0;border-radius:20px;padding:2px 12px;cursor:pointer;font-size:11px;">Toggle</button>
+            </div>
+        `).join('');
+    }
+
+    // -- TOGGLE SINYAL STASIUN --
+    window.toggleStationSignal = function(stationId) {
+        const st = stations.find(s => s.id === stationId);
+        if (st) {
+            st.signal = !st.signal;
+            showPopup('🚦 Sinyal ' + (st.signal ? 'HIJAU' : 'MERAH'), st.name);
+            updateSignalIndicators();
         }
+    };
 
-        // -- update counter --
-        function updateTrainCount() {
-            const active = trains.filter(t => t.active).length;
-            trainCountBadge.textContent = `🚆 ${active} kereta`;
-        }
+    // -- RENDER KONTROL KERETA --
+    function renderTrainControls() {
+        trainListEl.innerHTML = trains.map((t, idx) => `
+            <div class="train-item">
+                <span class="color-dot" style="background:${t.color};"></span>
+                <span class="name">${t.name}</span>
+                <select onchange="assignJalur(${idx}, this.value)">
+                    ${Array.from({length: 8}, (_, i) => `
+                        <option value="${i}" ${t.assignedJalur === i ? 'selected' : ''}>Jalur ${i+1}</option>
+                    `).join('')}
+                </select>
+                <span class="status ${t.isStopped ? 'stop' : 'run'}">
+                    ${t.isStopped ? '⏹ BERHENTI' : '▶ BERJALAN'}
+                </span>
+            </div>
+        `).join('');
+    }
 
-        // -- Toggle sinyal (klik stasiun) --
-        function toggleSignal() {
-            signalGreen = !signalGreen;
-            // efek popup sinyal
-            showPopup('🚦 Sinyal ' + (signalGreen ? 'HIJAU' : 'MERAH'), 'sistem persinyalan');
-        }
-
-        // -- Tambah kereta baru (random) --
-        function addRandomTrain() {
-            const types = [
-                { name: 'Commuter Line Arjonegoro', color: '#facc15', speed: 1.2, size: 18 },
-                { name: 'Commuter Line Penataran', color: '#facc15', speed: 1.0, size: 18 },
-                { name: 'KA HARINA', color: '#f97316', speed: 1.8, size: 20 },
-                { name: 'KA PANDALUNGAN', color: '#3b82f6', speed: 2.0, size: 20 },
-                { name: 'KA ANGGREK', color: '#a855f7', speed: 1.6, size: 20 }
-            ];
-            const t = types[Math.floor(Math.random() * types.length)];
-            const newTrain = {
-                ...t,
-                id: Date.now() + Math.random(),
-                progress: Math.random() * 0.8 + 0.1,
-                direction: Math.random() > 0.5 ? 1 : -1,
-                active: true,
-                currentStation: null,
-                lastStationIdx: -1
-            };
-            trains.push(newTrain);
-            updateTrainCount();
-            showPopup('🚆 ' + newTrain.name, 'kereta baru masuk');
-        }
-
-        // -- Reset --
-        function resetAll() {
-            if (animationFrame) cancelAnimationFrame(animationFrame);
-            initTrains();
-            signalGreen = true;
-            lastPopupTime = 0;
-            if (popupTimer) clearTimeout(popupTimer);
-            popup.classList.remove('show');
-            updateTrainCount();
-            loop();
-        }
-
-        // -- Event klik canvas: atur sinyal di stasiun --
-        canvas.addEventListener('click', (e) => {
-            const rect = canvas.getBoundingClientRect();
-            const scaleX = canvas.width / rect.width;
-            const scaleY = canvas.height / rect.height;
-            const mouseX = (e.clientX - rect.left) * scaleX;
-            const mouseY = (e.clientY - rect.top) * scaleY;
-
-            for (let s of stations) {
-                const dx = mouseX - s.x;
-                const dy = mouseY - s.y;
-                if (Math.sqrt(dx*dx + dy*dy) < 35) {
-                    toggleSignal();
-                    return;
+    function updateTrainControls() {
+        // Update status tanpa re-render penuh
+        const items = trainListEl.querySelectorAll('.train-item');
+        items.forEach((item, idx) => {
+            if (idx < trains.length) {
+                const statusEl = item.querySelector('.status');
+                if (statusEl) {
+                    statusEl.textContent = trains[idx].isStopped ? '⏹ BERHENTI' : '▶ BERJALAN';
+                    statusEl.className = `status ${trains[idx].isStopped ? 'stop' : 'run'}`;
                 }
             }
         });
+    }
 
-        // -- BIND BUTTONS --
-        document.getElementById('addTrainBtn').addEventListener('click', addRandomTrain);
-        document.getElementById('toggleSignalBtn').addEventListener('click', toggleSignal);
-        document.getElementById('resetBtn').addEventListener('click', resetAll);
+    // -- ASSIGN JALUR --
+    window.assignJalur = function(trainIdx, jalur) {
+        if (trainIdx < trains.length) {
+            trains[trainIdx].assignedJalur = parseInt(jalur);
+            showPopup('🛤️ ' + trains[trainIdx].name, 'masuk Jalur ' + (parseInt(jalur)+1));
+        }
+    };
 
-        // -- START --
+    // -- LOOP --
+    function loop() {
+        updateTrains();
+        draw();
+        animationId = requestAnimationFrame(loop);
+    }
+
+    // -- HELPERS --
+    function updateTrainCount() {
+        const active = trains.filter(t => t.active).length;
+        trainCountBadge.textContent = `🚆 ${active} kereta`;
+    }
+
+    // -- TAMBAH KERETA --
+    function addRandomTrain() {
+        const types = [
+            { name: 'Commuter Line Arjonegoro', color: '#facc15', speed: 1.3, size: 18 },
+            { name: 'Commuter Line Penataran', color: '#facc15', speed: 1.1, size: 18 },
+            { name: 'KA HARINA', color: '#f97316', speed: 1.9, size: 20 },
+            { name: 'KA PANDALUNGAN', color: '#3b82f6', speed: 2.1, size: 20 },
+            { name: 'KA ANGGREK', color: '#a855f7', speed: 1.7, size: 20 }
+        ];
+        const t = types[Math.floor(Math.random() * types.length)];
+        const newTrain = {
+            ...t,
+            id: Date.now() + Math.random(),
+            progress: Math.random() * 0.8 + 0.1,
+            direction: Math.random() > 0.5 ? 1 : -1,
+            active: true,
+            currentStation: null,
+            assignedJalur: Math.floor(Math.random() * 4),
+            isStopped: false,
+            stopAtStation: null,
+            lastStationIdx: -1
+        };
+        trains.push(newTrain);
+        updateTrainCount();
+        renderTrainControls();
+        showPopup('🚆 ' + newTrain.name, 'kereta baru masuk!');
+    }
+
+    // -- TOGGLE ALL SIGNAL --
+    function toggleAllSignals() {
+        const allGreen = stations.every(s => s.signal);
+        stations.forEach(s => s.signal = !allGreen);
+        showPopup('🚦 Semua sinyal ' + (allGreen ? 'MERAH' : 'HIJAU'), 'sistem global');
+        updateSignalIndicators();
+    }
+
+    // -- TOGGLE WESEL --
+    function toggleWesel() {
+        currentWeselIndex = (currentWeselIndex + 1) % wesels.length;
+        for (let i = 0; i < wesels.length; i++) {
+            wesels[i].aktif = (i === currentWeselIndex);
+        }
+        showPopup('🔀 Wesel ke-' + (currentWeselIndex + 1), 'jalur diubah');
+    }
+
+    // -- RESET --
+    function resetAll() {
+        if (animationId) cancelAnimationFrame(animationId);
+        stations.forEach(s => s.signal = true);
+        currentWeselIndex = 0;
+        wesels.forEach((w, i) => w.aktif = (i === 0));
         initTrains();
+        lastPopupTime = 0;
+        if (popupTimer) clearTimeout(popupTimer);
+        popup.classList.remove('show');
+        updateSignalIndicators();
         loop();
+    }
 
-        // ==========================================================
-        //  BONUS: klik kanan untuk debug / gak ada
-        // ==========================================================
-        console.log('🚂 DRAGON RAIL siap! Klik stasiun untuk ubah sinyal.');
-    })();
+    // -- EVENT: KLIK STASIUN UNTUK TOGGLE SINYAL --
+    canvas.addEventListener('click', (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        const mx = (e.clientX - rect.left) * scaleX;
+        const my = (e.clientY - rect.top) * scaleY;
+
+        for (let s of stations) {
+            const dx = mx - s.x;
+            const dy = my - s.y;
+            if (Math.sqrt(dx*dx + dy*dy) < 40) {
+                s.signal = !s.signal;
+                showPopup('🚦 Sinyal ' + (s.signal ? 'HIJAU' : 'MERAH'), s.name);
+                updateSignalIndicators();
+                return;
+            }
+        }
+    });
+
+    // -- BIND BUTTONS --
+    document.getElementById('addTrainBtn').addEventListener('click', addRandomTrain);
+    document.getElementById('toggleAllSignalBtn').addEventListener('click', toggleAllSignals);
+    document.getElementById('toggleWeselBtn').addEventListener('click', toggleWesel);
+    document.getElementById('resetBtn').addEventListener('click', resetAll);
+
+    // -- START --
+    initTrains();
+    updateSignalIndicators();
+    loop();
+
+    console.log('🚂 DRAGON RAIL PRO MAX — sinyal merah = stop total!');
+    console.log('💡 Klik stasiun untuk toggle sinyal, pilih jalur di panel kontrol!');
+})();
 </script>
 </body>
 </html>
