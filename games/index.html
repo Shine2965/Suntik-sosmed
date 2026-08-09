@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>🚂 Dragon Rail - Wesel Per Stasiun + Auto Green Signal</title>
+    <title>🚂 Dragon Rail - Sistem Kereta Realistis</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -324,6 +324,10 @@
             color: #7acf8a;
             border: 1px solid #22c55e;
         }
+        .station-slide .schedule-section .schedule-item .status-badge.waiting {
+            background: #3a3a1a;
+            color: #f5c97a;
+        }
         @keyframes pulse {
             0% { opacity: 1; }
             50% { opacity: 0.5; }
@@ -408,15 +412,6 @@
             border-radius: 50%;
             display: inline-block;
             border: 1px solid #2a4a6a;
-        }
-        .train-item select {
-            background: #1a2a3c;
-            color: #dce6f0;
-            border: 1px solid #34516a;
-            padding: 5px 12px;
-            border-radius: 30px;
-            font-size: 12px;
-            cursor: pointer;
         }
         .train-item .status {
             font-size: 12px;
@@ -572,13 +567,12 @@
 <body>
 <div class="container">
     <h1>
-        🚂 DRAGON RAIL WESEL <small>— wesel per stasiun + auto green signal</small>
+        🚂 DRAGON RAIL REALISTIS <small>— wesel per stasiun, auto green khusus</small>
     </h1>
     
     <canvas id="railCanvas" width="1500" height="750"></canvas>
     
     <div class="controls">
-        <button id="spawnTrainBtn" class="success">🚆 Spawn Kereta</button>
         <button id="addScheduleBtn">📋 Tambah Jadwal</button>
         <button id="resetBtn" class="danger">⟳ Reset</button>
         <button id="toggleLoopBtn">🔄 Bolak-Balik ON</button>
@@ -605,7 +599,7 @@
     </div>
 
     <div class="train-control-panel" id="trainControlPanel">
-        <div style="font-weight:300;color:#6a8aaa;margin-bottom:8px;font-size:13px;">🎛️ KONTROL PER KERETA — sinyal & jalur:</div>
+        <div style="font-weight:300;color:#6a8aaa;margin-bottom:8px;font-size:13px;">🎛️ KONTROL PER KERETA — berdasarkan stasiun:</div>
         <div id="trainList"></div>
     </div>
 
@@ -618,9 +612,10 @@
         <span class="item"><span class="dot" style="background:#22d3ee;"></span> Wesel aktif</span>
         <span class="item"><span class="dot" style="background:#ef4444;"></span> Sinyal MERAH</span>
         <span class="item"><span class="dot" style="background:#22c55e;"></span> Sinyal HIJAU</span>
-        <span class="item"><span class="dot" style="background:#f59e0b;"></span> Auto Green Signal</span>
+        <span class="item"><span class="dot" style="background:#f59e0b;"></span> Auto Green</span>
+        <span class="item"><span class="dot" style="background:#4a6a8a;"></span> Menunggu</span>
     </div>
-    <footer>© Dragon — wesel diatur per stasiun, sinyal auto hijau saat jadwal berangkat</footer>
+    <footer>© Dragon — kereta ikut wesel per stasiun, auto green khusus jadwal, bolak-balik sesuai jadwal</footer>
 </div>
 
 <!-- POPUP -->
@@ -659,7 +654,7 @@
 <script>
 (function() {
     // ============================================================
-    //  DRAGON RAIL WESEL PER STASIUN + AUTO GREEN SIGNAL
+    //  DRAGON RAIL REALISTIS — SISTEM KERETA SESUAI REALITA
     // ============================================================
     const canvas = document.getElementById('railCanvas');
     const ctx = canvas.getContext('2d');
@@ -673,7 +668,7 @@
     const slideNav = document.getElementById('slideNav');
     const slideContent = document.getElementById('slideContent');
 
-    // -- STASIUN DUNIA NYATA --
+    // -- STASIUN DUNIA NYATA (URUTAN RUTE) --
     const stationOrder = ['turi', 'gubeng', 'wonokromo', 'waru', 'gedangan', 'sidoarjo'];
     const stations = [
         { id: 'turi', name: 'Surabaya Pasar Turi', x: 80, y: 380, jalurCount: 6, signal: true, autoRed: false, wesel: 0 },
@@ -684,7 +679,7 @@
         { id: 'sidoarjo', name: 'Sidoarjo', x: 1360, y: 340, jalurCount: 3, signal: true, autoRed: false, wesel: 0 }
     ];
 
-    // -- WESEL PER STASIUN --
+    // -- WESEL PER STASIUN (REALITA) --
     const stationWesels = {
         'turi': [
             { id: 0, label: 'Jalur 1 - Turi → Gubeng' },
@@ -708,7 +703,7 @@
         ]
     };
 
-    // -- ROUTE DEFINITION --
+    // -- ROUTE DEFINITION (REALITA) --
     const routes = {
         'turi-gubeng': { from: 'turi', to: 'gubeng', jalur: 0, label: 'Turi → Gubeng' },
         'turi-gubeng2': { from: 'turi', to: 'gubeng', jalur: 1, label: 'Turi → Gubeng (2)' },
@@ -756,19 +751,19 @@
     let spawnCounter = 0;
     let currentSlide = 0;
     let signalCooldown = {};
-    let stationAlerts = {};
     let countdownInterval = null;
     let editingSchedule = null;
     let loopMode = true;
     let autoGreenSignals = {};
+    let trainLocations = {};
 
     // -- INIT --
     function initTrains() {
         trains = [];
         stations.forEach(s => { s.signal = true; s.autoRed = false; s.wesel = 0; });
         signalCooldown = {};
-        stationAlerts = {};
         autoGreenSignals = {};
+        trainLocations = {};
         schedules = {};
         stations.forEach(s => { schedules[s.id] = []; });
         updateTrainCount();
@@ -794,22 +789,43 @@
                             sch.countdown = '🚀 Berangkat!';
                             sch.status = 'running';
                             
-                            // AUTO GREEN SIGNAL untuk kereta ini
+                            // AUTO GREEN KHUSUS UNTUK JADWAL INI
                             const st = stations.find(stn => stn.id === s.id);
                             if (st) {
-                                st.signal = true;
-                                st.autoRed = false;
-                                autoGreenSignals[s.id] = { time: now, trainName: sch.trainName };
-                                showPopup('🟢 ' + sch.trainName, 'SINYAL HIJAU OTOMATIS dari ' + s.name);
+                                // Cek apakah ada kereta lain di jalur yang sama
+                                const routeKey = `${s.id}-${sch.destinationId}`;
+                                const route = routes[routeKey];
+                                let hasTrainOnSameRoute = false;
+                                if (route) {
+                                    for (let t of trains) {
+                                        if (t.routeKey === routeKey && t.active && t.progress > 0.1 && t.progress < 0.9) {
+                                            hasTrainOnSameRoute = true;
+                                            break;
+                                        }
+                                    }
+                                }
+                                
+                                // Jika tidak ada kereta di jalur yang sama, beri green signal
+                                if (!hasTrainOnSameRoute) {
+                                    st.signal = true;
+                                    st.autoRed = false;
+                                    autoGreenSignals[s.id] = { time: now, trainName: sch.trainName, scheduleId: sch.id };
+                                    showPopup('🟢 ' + sch.trainName, 'SINYAL HIJAU OTOMATIS dari ' + s.name);
+                                } else {
+                                    sch.status = 'waiting';
+                                    sch.countdown = '⏳ Menunggu...';
+                                    showPopup('⏳ ' + sch.trainName, 'menunggu jalur kosong di ' + s.name);
+                                }
                             }
                             
                             moveTrainToRoute(sch);
-                            showPopup('🔔 ' + sch.trainName, 'berangkat dari ' + s.name + ' menuju ' + sch.destinationName);
                             renderSlides();
                             updateSignalIndicators();
                         } else if (remaining > -15000) {
-                            sch.countdown = '🔄 Perjalanan';
-                            sch.status = 'running';
+                            if (sch.status !== 'waiting') {
+                                sch.countdown = '🔄 Perjalanan';
+                                sch.status = 'running';
+                            }
                             renderSlides();
                         } else {
                             sch.countdown = '✅ Tiba';
@@ -817,7 +833,6 @@
                             if (loopMode) {
                                 reverseTrain(sch);
                             }
-                            // Reset auto green setelah 10 detik
                             setTimeout(() => {
                                 delete autoGreenSignals[s.id];
                                 renderSlides();
@@ -848,7 +863,7 @@
                 progress: 0,
                 direction: 1,
                 active: true,
-                currentStation: null,
+                currentStation: fromSt.name,
                 assignedJalur: 0,
                 isStopped: false,
                 stopAtStation: null,
@@ -856,7 +871,8 @@
                 trainSignal: true,
                 autoStopped: false,
                 passedStations: [],
-                routeKey: null
+                routeKey: null,
+                scheduleId: schedule.id
             };
             trains.push(train);
         }
@@ -870,12 +886,14 @@
             train.progress = 0.05;
             train.active = true;
             train.isStopped = false;
+            train.currentStation = fromSt.name;
+            trainLocations[train.id] = fromSt.name;
         }
         updateTrainCount();
         renderTrainControls();
     }
 
-    // -- REVERSE TRAIN --
+    // -- REVERSE TRAIN (BOLAK-BALIK SESUAI JADWAL) --
     function reverseTrain(schedule) {
         const fromSt = stations.find(s => s.id === schedule.stationId);
         const toSt = stations.find(s => s.id === schedule.destinationId);
@@ -884,6 +902,7 @@
         let train = trains.find(t => t.name === schedule.trainName);
         if (!train) return;
 
+        // Balik arah ke stasiun sebelumnya
         train.direction = -1;
         train.progress = 0.95;
 
@@ -892,9 +911,26 @@
         if (reverseRoute) {
             train.assignedJalur = reverseRoute.jalur;
             train.routeKey = reverseRouteKey;
+            train.currentStation = toSt.name;
+            trainLocations[train.id] = toSt.name;
         }
 
-        showPopup('🔄 ' + train.name, 'balik arah menuju ' + fromSt.name);
+        // Buat jadwal balik otomatis
+        const newSchedule = {
+            id: Date.now() + Math.random(),
+            trainName: train.name,
+            trainColor: train.color,
+            time: new Date().toLocaleTimeString(),
+            departureTime: Date.now() + 5000,
+            countdown: '⏳',
+            status: 'scheduled',
+            stationId: schedule.destinationId,
+            destinationId: schedule.stationId,
+            destinationName: fromSt.name
+        };
+        schedules[schedule.destinationId].push(newSchedule);
+
+        showPopup('🔄 ' + train.name, 'balik arah menuju ' + fromSt.name + ' (jadwal otomatis)');
         renderSlides();
     }
 
@@ -908,7 +944,7 @@
             progress: 0.05 + Math.random() * 0.15,
             direction: 1,
             active: true,
-            currentStation: null,
+            currentStation: stations[0].name,
             assignedJalur: Math.floor(Math.random() * 4),
             isStopped: false,
             stopAtStation: null,
@@ -916,9 +952,11 @@
             trainSignal: true,
             autoStopped: false,
             passedStations: [],
-            routeKey: null
+            routeKey: null,
+            scheduleId: null
         };
         trains.push(newTrain);
+        trainLocations[newTrain.id] = stations[0].name;
         updateTrainCount();
         renderTrainControls();
         renderSlides();
@@ -1003,6 +1041,7 @@
                 if (Math.sqrt(dx*dx + dy*dy) < 45) {
                     inStationArea = true;
                     currentStation = nearStation;
+                    trainLocations[train.id] = nearStation.name;
                 }
             }
 
@@ -1023,6 +1062,7 @@
                 }
             }
 
+            // Auto Red hanya jika tidak ada auto green untuk stasiun ini
             if (approaching && approachStation && !approachStation.autoRed && !autoGreenSignals[approachStation.id]) {
                 approachStation.signal = false;
                 approachStation.autoRed = true;
@@ -1098,7 +1138,19 @@
                 train.progress += delta;
                 if (train.progress > 1.0) {
                     train.progress = 1.0;
-                    if (loopMode) {
+                    if (loopMode && train.scheduleId) {
+                        // Cari schedule terkait
+                        for (let s of stations) {
+                            for (let sch of schedules[s.id]) {
+                                if (sch.id === train.scheduleId) {
+                                    sch.status = 'arrived';
+                                    sch.countdown = '✅ Tiba';
+                                    reverseTrain(sch);
+                                    break;
+                                }
+                            }
+                        }
+                    } else if (loopMode) {
                         train.direction = -1;
                         train.progress = 0.95;
                         showPopup('🔄 ' + train.name, 'balik arah!');
@@ -1110,7 +1162,17 @@
                 train.progress -= delta;
                 if (train.progress < 0.0) {
                     train.progress = 0.0;
-                    if (loopMode) {
+                    if (loopMode && train.scheduleId) {
+                        for (let s of stations) {
+                            for (let sch of schedules[s.id]) {
+                                if (sch.id === train.scheduleId) {
+                                    sch.status = 'arrived';
+                                    sch.countdown = '✅ Tiba';
+                                    break;
+                                }
+                            }
+                        }
+                    } else if (loopMode) {
                         train.direction = 1;
                         train.progress = 0.05;
                         showPopup('🔄 ' + train.name, 'balik arah!');
@@ -1125,6 +1187,7 @@
                     showPopup(train.name, 'melewati ' + currentStation.name);
                     lastPopupTime = now;
                     train.currentStation = currentStation.name;
+                    trainLocations[train.id] = currentStation.name;
                 }
             }
         }
@@ -1180,7 +1243,6 @@
         ctx.setLineDash([]);
 
         for (let s of stations) {
-            // Auto Green Signal effect
             if (autoGreenSignals[s.id]) {
                 ctx.shadowColor = '#22c55e88';
                 ctx.shadowBlur = 40;
@@ -1297,11 +1359,18 @@
                 ctx.fillText('⛔', pos.x, pos.y - train.size/2 - 20);
             }
 
+            // Lokasi kereta saat ini
+            const location = trainLocations[train.id] || 'Unknown';
+            ctx.fillStyle = '#8aadcc';
+            ctx.font = '8px monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText(location.substring(0, 12), pos.x, pos.y + train.size/2 + 14);
+
             if (train.routeKey && routes[train.routeKey]) {
-                ctx.fillStyle = '#8aadcc';
-                ctx.font = '8px monospace';
+                ctx.fillStyle = '#6a8aaa';
+                ctx.font = '7px monospace';
                 ctx.textAlign = 'center';
-                ctx.fillText(routes[train.routeKey].label.substring(0, 15), pos.x, pos.y + train.size/2 + 14);
+                ctx.fillText(routes[train.routeKey].label.substring(0, 12), pos.x, pos.y + train.size/2 + 26);
             }
 
             ctx.fillStyle = '#ffffff';
@@ -1361,12 +1430,15 @@
         }
     };
 
-    // -- RENDER KONTROL --
+    // -- RENDER KONTROL PER KERETA (BERDASARKAN STASIUN) --
     function renderTrainControls() {
-        trainListEl.innerHTML = trains.map((t, idx) => `
+        trainListEl.innerHTML = trains.map((t, idx) => {
+            const location = trainLocations[t.id] || 'Unknown';
+            return `
             <div class="train-item">
                 <span class="color-dot" style="background:${t.color};"></span>
                 <span class="name">${t.name}</span>
+                <span style="font-size:11px;color:#8aadcc;min-width:100px;">📍 ${location}</span>
                 <select onchange="assignJalur(${idx}, this.value)">
                     ${Array.from({length: 8}, (_, i) => `
                         <option value="${i}" ${t.assignedJalur === i ? 'selected' : ''}>Jalur ${i+1}</option>
@@ -1381,7 +1453,7 @@
                     ${t.isStopped ? (t.autoStopped ? '⛔ TUMPUK' : '⏹ BERHENTI') : '▶ BERJALAN'}
                 </span>
             </div>
-        `).join('');
+        `}).join('');
     }
 
     function updateTrainControls() {
@@ -1403,6 +1475,11 @@
                 if (btn) {
                     btn.textContent = trains[idx].trainSignal ? '🟢 ON' : '🔴 OFF';
                     btn.className = trains[idx].trainSignal ? 'active' : 'inactive';
+                }
+                // Update lokasi
+                const locationSpan = item.querySelector('span[style*="min-width:100px;"]');
+                if (locationSpan && trainLocations[trains[idx].id]) {
+                    locationSpan.textContent = '📍 ' + trainLocations[trains[idx].id];
                 }
             }
         });
@@ -1523,7 +1600,7 @@
                 progress: 0.05,
                 direction: 1,
                 active: true,
-                currentStation: null,
+                currentStation: fromStation.name,
                 assignedJalur: 0,
                 isStopped: false,
                 stopAtStation: null,
@@ -1531,11 +1608,14 @@
                 trainSignal: true,
                 autoStopped: false,
                 passedStations: [],
-                routeKey: null
+                routeKey: null,
+                scheduleId: schedule.id
             };
             trains.push(newTrain);
+            trainLocations[newTrain.id] = fromStation.name;
             showPopup('🚆 ' + trainType.name, 'dispawn untuk jadwal dari ' + fromStation.name + ' ke ' + destStation.name);
         } else {
+            existingTrain.scheduleId = schedule.id;
             showPopup('📋 Jadwal ' + trainType.name, 'dari ' + fromStation.name + ' ke ' + destStation.name);
         }
 
@@ -1634,6 +1714,7 @@
                                         <span class="status-badge ${sch.status === 'scheduled' && autoGreenSignals[s.id] ? 'green-signal' : sch.status}">
                                             ${sch.status === 'scheduled' && autoGreenSignals[s.id] ? '🟢 AUTO GREEN' :
                                               sch.status === 'scheduled' ? '📅 Terjadwal' : 
+                                              sch.status === 'waiting' ? '⏳ Menunggu' :
                                               sch.status === 'running' ? '🔄 Perjalanan' :
                                               sch.status === 'arrived' ? '✅ Tiba' : 
                                               sch.status === 'departed' ? '🚀 Berangkat' : sch.status}
@@ -1691,6 +1772,7 @@
         stations.forEach(s => { s.signal = true; s.autoRed = false; s.wesel = 0; });
         signalCooldown = {};
         autoGreenSignals = {};
+        trainLocations = {};
         currentWeselIndex = 0;
         wesels.forEach((w, i) => w.aktif = (i === 0));
         initTrains();
@@ -1742,7 +1824,6 @@
     }
 
     // -- BIND BUTTONS --
-    document.getElementById('spawnTrainBtn').addEventListener('click', spawnTrain);
     document.getElementById('addScheduleBtn').addEventListener('click', () => {
         if (stations[currentSlide]) {
             openScheduleModal(null, stations[currentSlide].id);
@@ -1757,8 +1838,8 @@
     renderSlides();
     loop();
 
-    console.log('🚂 DRAGON RAIL WESEL PER STASIUN — auto green signal aktif!');
-    console.log('📍 Wesel diatur per stasiun, sinyal auto hijau saat jadwal berangkat');
+    console.log('🚂 DRAGON RAIL REALISTIS — sistem kereta sesuai realita!');
+    console.log('📍 Kereta ikut wesel per stasiun, auto green khusus jadwal, bolak-balik sesuai jadwal');
 })();
 </script>
 </body>
