@@ -339,6 +339,12 @@
         .hidden {
             display: none !important;
         }
+        .env-status {
+            text-align: center;
+            font-size: 11px;
+            color: #555;
+            margin-top: 8px;
+        }
         @media (max-width: 600px) {
             .card {
                 padding: 20px 16px;
@@ -375,6 +381,7 @@
             <div id="userInfo" style="color:#888;font-size:13px;margin-top:8px;">
                 👤 <span id="userEmailDisplay">-</span>
             </div>
+            <div class="env-status" id="envStatus">🔌 Mengambil konfigurasi dari server...</div>
         </div>
 
         <!-- ===== LIST MISI ===== -->
@@ -390,9 +397,12 @@
     <script>
         // ===================== KONFIGURASI =====================
         const DATA_URL = '/info/buzzer/data.json';
-        const TELEGRAM_TOKEN = '8785872128:AAGJApScDjRIjg1VorXB35OvrvtUDCtVr0M';
-        const TELEGRAM_CHAT_ID = '6317157631';
+        const CONFIG_API = '/api/config';
         const MAX_KONFIRMASI_PER_USER = 5;
+
+        // ===================== VARIABEL DARI ENV =====================
+        let TELEGRAM_TOKEN = '';
+        let TELEGRAM_CHAT_ID = '';
 
         // ===================== CEK SESSION =====================
         function checkSession() {
@@ -414,6 +424,47 @@
                 email: localStorage.getItem('user_email') || '',
                 role: localStorage.getItem('user_role') || 'user'
             };
+        }
+
+        // ===================== AMBIL KONFIGURASI DARI API =====================
+        async function fetchConfig() {
+            const statusEl = document.getElementById('envStatus');
+            try {
+                statusEl.textContent = '⏳ Mengambil konfigurasi dari server...';
+                statusEl.style.color = '#888';
+                
+                const res = await fetch(CONFIG_API + '?t=' + Date.now(), {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    credentials: 'include'
+                });
+                
+                if (!res.ok) {
+                    throw new Error('Gagal mengambil konfigurasi: ' + res.status);
+                }
+
+                const data = await res.json();
+                
+                if (!data.success) {
+                    throw new Error(data.message || 'Format data tidak valid');
+                }
+
+                TELEGRAM_TOKEN = data.telegram_token;
+                TELEGRAM_CHAT_ID = data.owner_id;
+
+                statusEl.textContent = '✅ Konfigurasi berhasil dimuat';
+                statusEl.style.color = '#00ffaa';
+                console.log('✅ Telegram Config loaded from ENV');
+                return true;
+
+            } catch (err) {
+                console.error('Error fetch config:', err);
+                statusEl.textContent = '❌ ' + err.message;
+                statusEl.style.color = '#ff6666';
+                return false;
+            }
         }
 
         // ===================== HITUNG KONFIRMASI PER USER =====================
@@ -584,7 +635,7 @@
                 // ===== ATTACH EVENT UPLOAD (hanya jika misi belum penuh) =====
                 data.forEach((misi, index) => {
                     const isFull = isMisiFull(misi);
-                    if (isFull) return; // Skip attach event jika misi penuh
+                    if (isFull) return;
 
                     const btn = document.getElementById(`uploadBtn-${index}`);
                     const fileInput = document.getElementById(`fileInput-${index}`);
@@ -611,11 +662,11 @@
             const user = getUserData();
             const file = fileInput.files[0];
 
-            // CEK APAKAH MISI SUDAH PENUH (validasi ulang)
+            // CEK APAKAH MISI SUDAH PENUH
             if (isMisiFull(misi)) {
                 Swal.fire({
                     title: '🔒 Misi Telah Selesai',
-                    text: 'Maaf, misi ini sudah mencapai kuota penuh dan tidak dapat menerima konfirmasi lagi.',
+                    text: 'Maaf, misi ini sudah mencapai kuota penuh.',
                     icon: 'info',
                     confirmButtonColor: '#ffaa00'
                 });
@@ -643,37 +694,37 @@
                 return;
             }
 
-            // ===== CEK LIMIT KONFIRMASI =====
+            // CEK LIMIT KONFIRMASI
             const history = misi.History || [];
             const userCount = getUserKonfirmasiCount(history, buzzerEmail);
 
             if (userCount >= MAX_KONFIRMASI_PER_USER) {
                 Swal.fire({
                     title: '⛔ Limit Maksimal',
-                    text: `Anda sudah mencapai batas maksimal ${MAX_KONFIRMASI_PER_USER} konfirmasi untuk misi ini.`,
+                    text: `Anda sudah mencapai batas maksimal ${MAX_KONFIRMASI_PER_USER} konfirmasi.`,
                     icon: 'error',
                     confirmButtonColor: '#ffaa00'
                 });
                 return;
             }
 
-            // ===== CEK USERNAME UNIK =====
+            // CEK USERNAME UNIK
             if (isUsernameAlreadyUsed(history, buzzerName)) {
                 Swal.fire({
                     title: '⚠️ Username Sudah Dipakai',
-                    text: `Username "${buzzerName}" sudah pernah digunakan untuk misi ini. Gunakan username yang berbeda.`,
+                    text: `Username "${buzzerName}" sudah pernah digunakan. Gunakan username berbeda.`,
                     icon: 'warning',
                     confirmButtonColor: '#ffaa00'
                 });
                 return;
             }
 
-            // Cek kuota misi (validasi ulang)
+            // Cek kuota misi
             const completedEmails = history.map(h => h.user);
             if (misi.Jumlah && completedEmails.length >= misi.Jumlah) {
                 Swal.fire({
                     title: '❌ Kuota Penuh',
-                    text: 'Misi ini sudah mencapai jumlah target yang dibutuhkan.',
+                    text: 'Misi ini sudah mencapai jumlah target.',
                     icon: 'error',
                     confirmButtonColor: '#ffaa00'
                 });
@@ -721,7 +772,6 @@
                     minute: '2-digit'
                 });
 
-                // Pesan 1 & Pesan 2
                 const pesan1 = Array.isArray(misi.Pesan) ? misi.Pesan[0] || '-' : misi.Pesan || '-';
                 const pesan2 = Array.isArray(misi.Pesan) && misi.Pesan[1] ? misi.Pesan[1] : '-';
 
@@ -768,7 +818,7 @@
                     body: formData
                 });
 
-                // ===== UPDATE HISTORY DI LOCALSTORAGE =====
+                // UPDATE HISTORY DI LOCALSTORAGE
                 const historyKey = 'buzzer_history_' + (misi.id_misi || misi.Tugas.replace(/\s/g, '_'));
                 let historyData = JSON.parse(localStorage.getItem(historyKey) || '[]');
                 
@@ -788,7 +838,7 @@
                 Swal.fire({
                     title: '✅ Berhasil!',
                     html: `
-                        Bukti untuk misi <b>"${misi.Tugas}"</b> berhasil dikirim ke admin!<br>
+                        Bukti untuk misi <b>"${misi.Tugas}"</b> berhasil dikirim!<br>
                         <span style="font-size:13px;color:#888;">🆔 ${misi.id_misi || '-'} | Nama: ${buzzerName}</span><br>
                         <span style="font-size:13px;color:#ffaa00;">📊 Konfirmasi ke-${userCount + 1} / ${MAX_KONFIRMASI_PER_USER}</span>
                     `,
@@ -796,14 +846,13 @@
                     confirmButtonColor: '#ffaa00'
                 });
 
-                // Refresh tampilan
                 loadMisi();
 
             } catch (err) {
                 console.error('Error upload:', err);
                 Swal.fire({
                     title: '❌ Gagal',
-                    text: 'Terjadi error saat mengirim bukti: ' + err.message,
+                    text: 'Error: ' + err.message,
                     icon: 'error',
                     confirmButtonColor: '#ffaa00'
                 });
@@ -815,7 +864,21 @@
         }
 
         // ===================== INIT =====================
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', async function() {
+            // Ambil konfigurasi dari ENV dulu
+            const configLoaded = await fetchConfig();
+            
+            if (!configLoaded) {
+                Swal.fire({
+                    title: '❌ Gagal memuat konfigurasi',
+                    text: 'Tidak dapat mengambil konfigurasi Telegram dari server.',
+                    icon: 'error',
+                    confirmButtonColor: '#ffaa00'
+                });
+                return;
+            }
+
+            // Load misi
             loadMisi();
         });
 
@@ -825,6 +888,7 @@
         console.log('📢 Buzzer Misi siap!');
         console.log('👤 User:', getUserData().email);
         console.log('📊 Maks konfirmasi per user:', MAX_KONFIRMASI_PER_USER);
+        console.log('🔐 Telegram Config loaded from ENV');
     </script>
 </body>
 </html>
