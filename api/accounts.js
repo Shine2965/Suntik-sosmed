@@ -1,5 +1,6 @@
 // /api/accounts.js
 // Vercel Serverless Function dengan Domain + IP Validation
+// Hanya bisa diakses oleh domain shinedomain.my.id & IP 114.8.223.223
 
 // ===================== KONFIGURASI =====================
 // Daftar domain yang diizinkan
@@ -90,7 +91,7 @@ export default function handler(req, res) {
                      req.connection?.remoteAddress || 
                      req.socket?.remoteAddress || 
                      '';
-    
+
     // ===== 2. SET CORS HEADERS =====
     // Cek apakah origin diizinkan
     const isDomainValid = isDomainAllowed(origin) || isDomainAllowed(host);
@@ -193,21 +194,16 @@ export default function handler(req, res) {
         console.log(`📋 User-Agent: ${userAgent.substring(0, 100)}`);
 
         // ===== 10. KIRIM RESPONSE =====
-        // Hapus password dari response untuk keamanan ekstra (opsional)
-        // Jika ingin password tetap dikirim, comment baris di bawah
-        // const safeAccounts = accounts.map(acc => {
-        //     const { Password, ...rest } = acc;
-        //     return rest;
-        // });
-
         return res.status(200).json({
             success: true,
-            accounts: accounts, // Ganti dengan safeAccounts jika ingin sembunyikan password
+            accounts: accounts,
             total: accounts.length,
             timestamp: new Date().toISOString(),
             request_info: {
                 ip: clientIp ? clientIp.split(',')[0].trim() : 'unknown',
-                domain: origin || host || 'unknown'
+                domain: origin || host || 'unknown',
+                allowed_domain: isDomainValidStrict,
+                allowed_ip: isIPValid
             }
         });
 
@@ -224,7 +220,7 @@ export default function handler(req, res) {
 // ===================== EXPORT UNTUK VERCEL =====================
 export const config = {
     api: {
-        bodyParser: false, // Tidak perlu body parser
+        bodyParser: false,
         externalResolver: true
     }
 };
