@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - Info Saldo</title>
+    <title>Dashboard - Info Saldo</title>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -14,92 +15,222 @@
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: #0a0a0a;
             min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            background: radial-gradient(circle at 20% 30%, #00c6ff15, transparent 50%),
-                        radial-gradient(circle at 80% 70%, #0072ff15, transparent 50%),
+            padding: 30px 20px;
+            background: radial-gradient(circle at 20% 30%, #00c6ff10, transparent 50%),
+                        radial-gradient(circle at 80% 70%, #0072ff10, transparent 50%),
                         #0a0a0a;
         }
-        .login-container {
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        .card {
             background: #1a1a1a;
             border-radius: 24px;
-            padding: 40px 35px;
-            max-width: 420px;
-            width: 90%;
-            border: 1px solid #00ffaa33;
-            box-shadow: 0 0 60px rgba(0,255,170,0.08);
+            padding: 30px 28px;
+            border: 1px solid #00ffaa22;
+            box-shadow: 0 0 40px rgba(0,255,170,0.05);
+            margin-bottom: 20px;
         }
-        .login-container h1 {
+        .card h2 {
             color: #00ffaa;
-            font-size: 28px;
-            text-align: center;
+            font-size: 22px;
             margin-bottom: 6px;
+        }
+        .card .sub {
+            color: #888;
+            font-size: 14px;
+            margin-bottom: 20px;
+        }
+        .saldo-box {
+            background: #00ffaa15;
+            border-radius: 16px;
+            padding: 20px 24px;
+            border-left: 4px solid #00ffaa;
+            margin: 10px 0 20px 0;
+        }
+        .saldo-box .label {
+            color: #aaa;
+            font-size: 13px;
+            text-transform: uppercase;
             letter-spacing: 1px;
         }
-        .login-container .sub {
-            color: #888;
-            text-align: center;
-            font-size: 14px;
-            margin-bottom: 28px;
-        }
-        .login-container label {
-            color: #ccc;
-            font-size: 13px;
-            font-weight: 600;
-            display: block;
-            margin-top: 16px;
-            margin-bottom: 6px;
-        }
-        .login-container input {
-            width: 100%;
-            padding: 14px 16px;
-            border-radius: 14px;
-            border: 1px solid #00ffaa33;
-            background: #0d0d0d;
-            color: #fff;
-            font-size: 14px;
-            outline: none;
-            transition: 0.3s;
-        }
-        .login-container input:focus {
-            border-color: #00ffaa;
-            box-shadow: 0 0 20px rgba(0,255,170,0.1);
-        }
-        .login-container button {
-            width: 100%;
-            margin-top: 24px;
-            padding: 14px;
-            background: #00ffaa;
-            border: none;
-            border-radius: 30px;
+        .saldo-box .amount {
+            font-size: 36px;
             font-weight: 700;
-            font-size: 16px;
-            color: #0a0a0a;
+            color: #00ffaa;
+            margin-top: 4px;
+        }
+        .saldo-box .amount small {
+            font-size: 18px;
+            font-weight: 400;
+            color: #88ddbb;
+        }
+        .saldo-box .note {
+            color: #888;
+            font-size: 12px;
+            margin-top: 8px;
+            border-top: 1px solid #00ffaa22;
+            padding-top: 8px;
+        }
+        .badge {
+            display: inline-block;
+            padding: 3px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            background: #00ffaa22;
+            color: #00ffaa;
+        }
+        .badge.admin {
+            background: #ff444422;
+            color: #ff6666;
+        }
+        .btn {
+            padding: 10px 24px;
+            border-radius: 30px;
+            border: none;
+            font-weight: 600;
             cursor: pointer;
             transition: 0.3s;
-        }
-        .login-container button:hover {
-            background: #00dd99;
-            transform: scale(0.97);
-        }
-        .login-container button:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            transform: none;
-        }
-        .login-container .error-msg {
-            color: #ff6666;
             font-size: 13px;
-            text-align: center;
-            margin-top: 14px;
-            min-height: 20px;
         }
-        .login-container .info-text {
+        .btn-logout {
+            background: #ff444422;
+            color: #ff6666;
+            border: 1px solid #ff444455;
+        }
+        .btn-logout:hover {
+            background: #ff444466;
+            color: #fff;
+        }
+        .btn-refresh {
+            background: #00ffaa22;
+            color: #00ffaa;
+            border: 1px solid #00ffaa44;
+        }
+        .btn-refresh:hover {
+            background: #00ffaa44;
+        }
+        .btn-buzzer {
+            background: #ffaa0044;
+            color: #ffaa00;
+            border: 1px solid #ffaa0055;
+        }
+        .btn-buzzer:hover {
+            background: #ffaa0066;
+        }
+        .header-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 10px;
+        }
+        .table-wrap {
+            overflow-x: auto;
+            margin-top: 16px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+        table th {
+            text-align: left;
+            padding: 10px 12px;
+            color: #888;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 11px;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid #00ffaa22;
+        }
+        table td {
+            padding: 10px 12px;
+            border-bottom: 1px solid #222;
+            color: #ddd;
+        }
+        table tr:hover td {
+            background: #ffffff05;
+        }
+        .text-muted {
             color: #666;
             font-size: 12px;
+        }
+        .role-tag {
+            display: inline-block;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            background: #00ffaa15;
+            color: #00ffaa;
+        }
+        .role-tag.admin {
+            background: #ff444415;
+            color: #ff6666;
+        }
+        .payment-methods {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin: 8px 0;
+        }
+        .payment-methods .pm-item {
+            background: #0d0d0d;
+            padding: 8px 16px;
+            border-radius: 12px;
+            border: 1px solid #00ffaa22;
+            font-size: 13px;
+            color: #ccc;
+        }
+        .payment-methods .pm-item strong {
+            color: #00ffaa;
+        }
+        .warning-box {
+            background: #ff444415;
+            border-left: 4px solid #ff4444;
+            padding: 14px 18px;
+            border-radius: 12px;
+            color: #ff8888;
+            font-size: 13px;
+            margin: 10px 0;
+        }
+        .qris-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin: 12px 0;
+        }
+        .qris-grid .qris-item {
+            background: #0d0d0d;
+            border-radius: 14px;
+            padding: 16px;
+            border: 1px solid #00ffaa15;
             text-align: center;
-            margin-top: 16px;
+        }
+        .qris-grid .qris-item .email-label {
+            color: #888;
+            font-size: 12px;
+            margin-bottom: 8px;
+            word-break: break-all;
+        }
+        .qris-grid .qris-item canvas {
+            background: #fff;
+            padding: 10px;
+            border-radius: 10px;
+            max-width: 140px;
+            height: auto;
+            margin: 0 auto;
+        }
+        .qris-grid .qris-item .qris-string {
+            font-size: 10px;
+            color: #888;
+            word-break: break-all;
+            margin-top: 6px;
+            font-family: 'Courier New', monospace;
         }
         .env-status {
             text-align: center;
@@ -107,68 +238,274 @@
             color: #555;
             margin-top: 8px;
         }
-        .login-container .security-badge {
+        .no-data {
+            color: #666;
+            text-align: center;
+            padding: 30px 0;
+            font-size: 14px;
+        }
+        .security-badge {
             text-align: center;
             font-size: 10px;
             color: #444;
-            margin-top: 12px;
+            margin-top: 8px;
             border-top: 1px solid #00ffaa15;
-            padding-top: 12px;
+            padding-top: 8px;
+        }
+        @media (max-width: 600px) {
+            .card {
+                padding: 20px 16px;
+            }
+            .saldo-box .amount {
+                font-size: 28px;
+            }
+            .qris-grid {
+                grid-template-columns: 1fr;
+            }
+            .header-actions {
+                flex-direction: column;
+            }
+            .header-actions .btn {
+                width: 100%;
+                text-align: center;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="login-container">
-        <h1>🔐 Info Saldo</h1>
-        <div class="sub">Masuk untuk melihat saldo akun</div>
-        
-        <label>📧 Gmail</label>
-        <input type="email" id="loginEmail" placeholder="Masukkan Gmail..." autocomplete="email">
-        
-        <label>🔑 Password</label>
-        <input type="password" id="loginPassword" placeholder="Masukkan Password..." autocomplete="current-password">
-        
-        <button id="loginBtn">✅ Masuk</button>
-        <div class="error-msg" id="loginError"></div>
-        <div class="info-text">🔒 Data aman & hanya bisa diakses oleh pemilik akun</div>
-        <div class="env-status" id="envStatus">🔌 Mengambil data dari server...</div>
-        <div class="security-badge">🛡️ Protected by Domain & IP Validation</div>
+    <div class="container">
+        <!-- ===== CARD USER INFO ===== -->
+        <div class="card" id="userCard">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;">
+                <div>
+                    <h2>👤 Dashboard</h2>
+                    <div class="sub" id="userInfo">Memuat data...</div>
+                </div>
+                <div class="header-actions">
+                    <button class="btn btn-refresh" onclick="loadDashboard()">🔄 Refresh</button>
+                    <button class="btn btn-buzzer" onclick="location.href='/info/buzzer/'">📢 Jadi Buzzer</button>
+                    <button class="btn btn-logout" onclick="logout()">🚪 Keluar</button>
+                </div>
+            </div>
+            <div class="env-status" id="envStatus">🔌 Mengambil data dari server...</div>
+            <div class="security-badge">🛡️ Protected by Domain & IP Validation</div>
+        </div>
+
+        <!-- ===== CARD SALDO ===== -->
+        <div class="card" id="saldoCard">
+            <h2>💰 Saldo Anda</h2>
+            <div class="saldo-box">
+                <div class="label">Total Saldo</div>
+                <div class="amount" id="saldoDisplay">Rp <span id="saldoAmount">-</span></div>
+                <div class="note">💡 HUBUNGI ADMIN MELALUI CS BOT ATAU GMAIL alvinojeremy74@gmail.com minimal pencairan dana 1K biaya admin 300 perak</div>
+            </div>
+
+            <div id="paymentMethods">
+                <div class="sub">💳 Metode Pembayaran</div>
+                <div class="payment-methods" id="paymentList">
+                    <span class="text-muted">Memuat...</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== CARD QRIS GENERATOR ===== -->
+        <div class="card" id="qrisCard" style="display:none;">
+            <h2>📱 QRIS Generator</h2>
+            <div class="sub" id="qrisSub">QRIS dari string CRC16</div>
+            <div id="qrisContainer"></div>
+        </div>
+
+        <!-- ===== CARD ADMIN ===== -->
+        <div class="card" id="adminCard" style="display:none;">
+            <h2>🛡️ Admin Panel</h2>
+            <div class="sub">Lihat semua akun & QRIS yang digenerate</div>
+            <div class="warning-box">⚠️ Anda memiliki akses admin. Semua data akun terlihat.</div>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr><th>Gmail</th><th>Saldo</th><th>Role</th><th>QRIS</th><th>Dana</th></tr>
+                    </thead>
+                    <tbody id="adminTableBody">
+                        <tr><td colspan="5" class="no-data">Memuat data...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div id="adminQrisGrid" class="qris-grid" style="margin-top:20px;"></div>
+        </div>
+
+        <div class="text-muted" style="text-align:center;margin-top:20px;">
+            © Shine Shop · Info Saldo System
+        </div>
     </div>
 
     <script>
         // ===================== KONFIGURASI =====================
         const API_ENDPOINT = '/api/accounts';
-        const DASHBOARD_URL = '/info/dashboard/index.html';
         const LOGIN_URL = '/info/index.html';
+        const SESSION_TIMEOUT = 3600000; // 1 jam
 
-        // ===================== ELEMEN =====================
-        const emailInput = document.getElementById('loginEmail');
-        const passInput = document.getElementById('loginPassword');
-        const loginBtn = document.getElementById('loginBtn');
-        const errorEl = document.getElementById('loginError');
-        const envStatus = document.getElementById('envStatus');
+        // ===================== CEK SESSION =====================
+        function checkSession() {
+            const loggedIn = localStorage.getItem('logged_in');
+            const sessionToken = localStorage.getItem('session_token');
+            const sessionCreated = parseInt(localStorage.getItem('session_created') || '0');
+            const now = Date.now();
 
-        let accountsData = [];
-
-        // ===================== GENERATE SESSION TOKEN =====================
-        function generateSessionToken() {
-            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-            let token = 'session_';
-            for (let i = 0; i < 32; i++) {
-                token += chars.charAt(Math.floor(Math.random() * chars.length));
+            // Cek apakah session masih valid
+            if (loggedIn !== 'true' || !sessionToken) {
+                logout();
+                return false;
             }
-            token += '_' + Date.now().toString(36);
-            return token;
+
+            // Cek timeout session (1 jam)
+            if (now - sessionCreated > SESSION_TIMEOUT) {
+                console.log('⏰ Session expired');
+                logout();
+                return false;
+            }
+
+            return true;
+        }
+
+        if (!checkSession()) {
+            throw new Error('Redirect ke login');
+        }
+
+        // ===================== GET USER DATA =====================
+        function getUserData() {
+            return {
+                email: localStorage.getItem('user_email') || '',
+                saldo: localStorage.getItem('user_saldo') || '0',
+                role: localStorage.getItem('user_role') || 'user',
+                qris: localStorage.getItem('user_qris') || '',
+                dana: localStorage.getItem('user_dana') || ''
+            };
+        }
+
+        // ===================== GENERATE QRIS =====================
+        function generateQRIS(crc16String, containerId, size = 180) {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+
+            container.innerHTML = '';
+
+            if (!crc16String || crc16String.trim() === '' || crc16String === '-') {
+                container.innerHTML = '<span class="text-muted">Tidak ada QRIS string</span>';
+                return;
+            }
+
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            canvas.style.maxWidth = size + 'px';
+            canvas.style.height = 'auto';
+            container.appendChild(canvas);
+
+            QRCode.toCanvas(canvas, crc16String, {
+                width: size,
+                margin: 2,
+                color: {
+                    dark: '#000000',
+                    light: '#ffffff'
+                }
+            }, function(error) {
+                if (error) {
+                    console.error('QRIS Error:', error);
+                    container.innerHTML = '<span class="text-muted" style="color:#ff6666;">❌ Gagal generate QRIS</span>';
+                }
+            });
+
+            const stringDiv = document.createElement('div');
+            stringDiv.className = 'qris-string';
+            stringDiv.textContent = crc16String;
+            stringDiv.style.cssText = `
+                font-size: 10px;
+                color: #888;
+                word-break: break-all;
+                margin-top: 8px;
+                font-family: 'Courier New', monospace;
+                max-width: 100%;
+                background: #00ffaa08;
+                padding: 6px 10px;
+                border-radius: 8px;
+                border: 1px solid #00ffaa11;
+            `;
+            container.appendChild(stringDiv);
+
+            const copyBtn = document.createElement('button');
+            copyBtn.textContent = '📋 Copy QRIS String';
+            copyBtn.className = 'copy-btn';
+            copyBtn.style.cssText = `
+                margin-top: 8px;
+                background: #00ffaa22;
+                color: #00ffaa;
+                border: 1px solid #00ffaa44;
+                padding: 4px 14px;
+                border-radius: 20px;
+                font-size: 11px;
+                cursor: pointer;
+                transition: 0.3s;
+            `;
+            copyBtn.onmouseover = () => { copyBtn.style.background = '#00ffaa44'; };
+            copyBtn.onmouseout = () => { copyBtn.style.background = '#00ffaa22'; };
+            copyBtn.onclick = () => {
+                navigator.clipboard.writeText(crc16String).then(() => {
+                    alert('✅ QRIS string berhasil disalin!');
+                }).catch(() => {
+                    const textarea = document.createElement('textarea');
+                    textarea.value = crc16String;
+                    document.body.appendChild(textarea);
+                    textarea.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(textarea);
+                    alert('✅ QRIS string berhasil disalin!');
+                });
+            };
+            container.appendChild(copyBtn);
+        }
+
+        // ===================== UPDATE UI USER =====================
+        function updateUserUI(user) {
+            document.getElementById('userInfo').innerHTML = `
+                📧 ${user.email} 
+                <span class="role-tag ${user.role === 'admin' ? 'admin' : ''}">${user.role}</span>
+            `;
+            document.getElementById('saldoAmount').textContent = 
+                new Intl.NumberFormat('id-ID').format(parseInt(user.saldo) || 0);
+        }
+
+        // ===================== UPDATE PAYMENT METHODS =====================
+        function updatePaymentMethods(user) {
+            const container = document.getElementById('paymentList');
+            let html = '';
+
+            if (user.qris && user.qris !== '-') {
+                html += `<div class="pm-item"><strong>QRIS:</strong> ✅ Tersedia</div>`;
+            } else {
+                html += `<div class="pm-item"><strong>QRIS:</strong> ❌ Tidak tersedia</div>`;
+            }
+
+            if (user.dana && user.dana !== '-') {
+                html += `<div class="pm-item"><strong>Dana:</strong> ${user.dana}</div>`;
+            } else {
+                html += `<div class="pm-item"><strong>Dana:</strong> ❌ Tidak tersedia</div>`;
+            }
+
+            container.innerHTML = html || '<span class="text-muted">Tidak ada metode pembayaran</span>';
         }
 
         // ===================== AMBIL DATA DARI API =====================
         async function fetchAccountsFromAPI() {
+            const statusEl = document.getElementById('envStatus');
             try {
-                envStatus.textContent = '⏳ Menghubungi server...';
-                envStatus.style.color = '#888';
+                statusEl.textContent = '⏳ Mengambil data...';
+                statusEl.style.color = '#888';
+                
+                const sessionToken = localStorage.getItem('session_token');
                 
                 const res = await fetch(API_ENDPOINT + '?t=' + Date.now(), {
                     headers: {
+                        'Authorization': 'Bearer ' + sessionToken,
                         'Content-Type': 'application/json',
                         'X-Requested-With': 'XMLHttpRequest'
                     },
@@ -182,6 +519,9 @@
                     if (res.status === 429) {
                         throw new Error('Terlalu banyak request. Coba lagi nanti.');
                     }
+                    if (res.status === 401) {
+                        throw new Error('Sesi tidak valid. Silakan login ulang.');
+                    }
                     throw new Error('Gagal mengambil data: ' + res.status);
                 }
 
@@ -191,112 +531,155 @@
                     throw new Error(data.message || 'Format data tidak valid');
                 }
 
-                envStatus.textContent = '✅ ' + data.accounts.length + ' akun tersedia';
-                envStatus.style.color = '#00ffaa';
-                console.log('✅ Akun dari API:', data.accounts.length, 'akun');
-                console.log('📡 Request Info:', data.request_info || 'N/A');
+                statusEl.textContent = '✅ ' + data.accounts.length + ' akun tersedia';
+                statusEl.style.color = '#00ffaa';
                 return data.accounts;
 
             } catch (err) {
                 console.error('Error fetch accounts:', err);
-                envStatus.textContent = '❌ ' + err.message;
-                envStatus.style.color = '#ff6666';
+                statusEl.textContent = '❌ ' + err.message;
+                statusEl.style.color = '#ff6666';
+                
+                if (err.message.includes('Sesi tidak valid') || err.message.includes('Akses ditolak')) {
+                    setTimeout(() => logout(), 2000);
+                }
                 return [];
             }
         }
 
-        // ===================== LOGIN =====================
-        async function handleLogin() {
-            const email = emailInput.value.trim();
-            const password = passInput.value.trim();
-
-            if (!email || !password) {
-                errorEl.textContent = '❌ Harap isi Gmail dan Password!';
+        // ===================== LOAD DASHBOARD =====================
+        async function loadDashboard() {
+            const user = getUserData();
+            if (!user.email) {
+                logout();
                 return;
             }
 
-            errorEl.textContent = '⏳ Memeriksa akun...';
-            loginBtn.disabled = true;
+            document.getElementById('saldoAmount').textContent = 'Memuat...';
 
             try {
-                // Ambil data dari API
                 const accounts = await fetchAccountsFromAPI();
-
+                
                 if (accounts.length === 0) {
-                    errorEl.textContent = '❌ Tidak ada data akun. Hubungi admin.';
-                    loginBtn.disabled = false;
+                    document.getElementById('saldoAmount').textContent = 'Data kosong';
                     return;
                 }
 
-                // Cari akun yang cocok
                 const found = accounts.find(acc => 
-                    acc.Gmail && acc.Gmail.toLowerCase() === email.toLowerCase() &&
-                    acc.Password && acc.Password === password
+                    acc.Gmail && acc.Gmail.toLowerCase() === user.email.toLowerCase()
                 );
 
                 if (!found) {
-                    errorEl.textContent = '❌ Gmail atau Password salah!';
-                    loginBtn.disabled = false;
+                    alert('Akun tidak ditemukan. Silakan login ulang.');
+                    logout();
                     return;
                 }
 
-                // ✅ Generate session token
-                const sessionToken = generateSessionToken();
-                
-                // ✅ Login berhasil → simpan session ke localStorage
-                localStorage.setItem('logged_in', 'true');
-                localStorage.setItem('session_token', sessionToken);
-                localStorage.setItem('session_created', Date.now().toString());
-                localStorage.setItem('user_email', found.Gmail);
-                localStorage.setItem('user_password', found.Password);
+                // Update localStorage dengan data terbaru
                 localStorage.setItem('user_saldo', found.Saldo || '0');
                 localStorage.setItem('user_role', found.role || 'user');
                 localStorage.setItem('user_qris', found.qris || '');
                 localStorage.setItem('user_dana', found.Dana || '');
 
-                // Redirect ke dashboard
-                window.location.href = DASHBOARD_URL;
+                const updatedUser = getUserData();
+
+                // Update UI
+                updateUserUI(updatedUser);
+                updatePaymentMethods(updatedUser);
+
+                // === QRIS CARD ===
+                const qrisCard = document.getElementById('qrisCard');
+                const isSpecificUser = updatedUser.email.toLowerCase() === 'alvinojeremy74@gmail.com';
+                const isAdmin = updatedUser.role === 'admin';
+
+                if (isSpecificUser || isAdmin) {
+                    qrisCard.style.display = 'block';
+                    document.getElementById('qrisSub').textContent = 
+                        isAdmin ? '🔓 Admin: Semua QRIS dari semua akun' : '📱 QRIS dari string CRC16 Anda';
+                    
+                    const container = document.getElementById('qrisContainer');
+                    container.innerHTML = '';
+
+                    if (isAdmin) {
+                        const grid = document.createElement('div');
+                        grid.className = 'qris-grid';
+                        
+                        accounts.forEach(acc => {
+                            if (acc.qris && acc.qris.trim() !== '' && acc.qris !== '-') {
+                                const item = document.createElement('div');
+                                item.className = 'qris-item';
+                                const safeId = 'qris_admin_' + (acc.Gmail?.replace(/[^a-zA-Z0-9]/g, '_') || 'unknown');
+                                item.innerHTML = `
+                                    <div class="email-label">📧 ${acc.Gmail || 'unknown'}</div>
+                                    <div id="${safeId}"></div>
+                                `;
+                                grid.appendChild(item);
+                                
+                                setTimeout(() => {
+                                    const subContainer = document.getElementById(safeId);
+                                    if (subContainer) {
+                                        generateQRIS(acc.qris, subContainer.id, 120);
+                                    }
+                                }, 50);
+                            }
+                        });
+
+                        if (grid.children.length === 0) {
+                            container.innerHTML = '<span class="text-muted">Tidak ada QRIS dari akun manapun</span>';
+                        } else {
+                            container.appendChild(grid);
+                        }
+                    } else {
+                        generateQRIS(updatedUser.qris, 'qrisContainer', 180);
+                    }
+                } else {
+                    qrisCard.style.display = 'none';
+                }
+
+                // === ADMIN PANEL ===
+                const adminCard = document.getElementById('adminCard');
+                if (isAdmin) {
+                    adminCard.style.display = 'block';
+                    const tbody = document.getElementById('adminTableBody');
+                    let rows = '';
+                    accounts.forEach(acc => {
+                        rows += `
+                            <tr>
+                                <td>${acc.Gmail || '-'}</td>
+                                <td>Rp ${new Intl.NumberFormat('id-ID').format(parseInt(acc.Saldo) || 0)}</td>
+                                <td><span class="role-tag ${acc.role === 'admin' ? 'admin' : ''}">${acc.role || 'user'}</span></td>
+                                <td>${acc.qris && acc.qris !== '-' ? '✅' : '-'}</td>
+                                <td>${acc.Dana && acc.Dana !== '-' ? acc.Dana : '-'}</td>
+                            </tr>
+                        `;
+                    });
+                    tbody.innerHTML = rows || '<tr><td colspan="5" class="no-data">Tidak ada akun</td></tr>';
+                } else {
+                    adminCard.style.display = 'none';
+                }
 
             } catch (err) {
-                errorEl.textContent = '❌ Error: ' + err.message;
-                loginBtn.disabled = false;
+                console.error('Error:', err);
+                document.getElementById('saldoAmount').textContent = 'Gagal memuat';
+                if (err.message.includes('Akses ditolak')) {
+                    setTimeout(() => logout(), 2000);
+                }
             }
         }
 
-        // ===================== EVENT =====================
-        loginBtn.addEventListener('click', handleLogin);
-
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                handleLogin();
-            }
-        });
+        // ===================== LOGOUT =====================
+        function logout() {
+            localStorage.clear();
+            window.location.href = LOGIN_URL;
+        }
 
         // ===================== INIT =====================
-        async function init() {
-            // Cek apakah sudah login sebelumnya
-            const loggedIn = localStorage.getItem('logged_in');
-            const sessionToken = localStorage.getItem('session_token');
-            
-            if (loggedIn === 'true' && sessionToken) {
-                window.location.href = DASHBOARD_URL;
-                return;
-            }
+        document.addEventListener('DOMContentLoaded', function() {
+            loadDashboard();
+        });
 
-            // Hapus session lama jika ada
-            if (loggedIn === 'true' && !sessionToken) {
-                localStorage.clear();
-            }
-
-            // Ambil data akun dari API (untuk menampilkan status)
-            await fetchAccountsFromAPI();
-            
-            console.log('🔐 Halaman Login siap!');
-            console.log('📡 Domain: ' + window.location.hostname);
-        }
-
-        init();
+        // Refresh otomatis setiap 60 detik
+        setInterval(loadDashboard, 60000);
 
         // ===================== ANTI INSPECT =====================
         document.addEventListener('keydown', function(e) {
@@ -315,10 +698,15 @@
             const heightThreshold = window.outerHeight - window.innerHeight > threshold;
             
             if (widthThreshold || heightThreshold) {
-                // Tindakan jika DevTools terbuka (opsional)
                 console.log('🔒 DevTools terdeteksi');
             }
         }, 3000);
+
+        console.log('📊 Dashboard Info Saldo siap!');
+        console.log('👤 User:', getUserData().email);
+        console.log('🔑 Role:', getUserData().role);
+        console.log('📱 QRIS Generator aktif!');
+        console.log('🛡️ Protected by Domain & IP Validation');
     </script>
 </body>
 </html>
