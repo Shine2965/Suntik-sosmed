@@ -287,8 +287,8 @@
                     <button class="btn btn-logout" onclick="logout()">🚪 Keluar</button>
                 </div>
             </div>
-            <div class="env-status" id="envStatus">🔌 Mengambil data dari server...</div>
-            <div class="security-badge">🛡️ API dilindungi oleh Domain & IP Validation</div>
+            <div class="env-status" id="envStatus">🔌 Mengambil data...</div>
+            <div class="security-badge">📁 Data dari accounts.json</div>
         </div>
 
         <!-- ===== CARD SALDO ===== -->
@@ -340,7 +340,7 @@
 
     <script>
         // ===================== KONFIGURASI =====================
-        const API_ENDPOINT = '/api/accounts';
+        const ACCOUNTS_FILE = '/info/accounts.json';
         const LOGIN_URL = '/info/index.html';
         const SESSION_TIMEOUT = 3600000; // 1 jam
 
@@ -351,13 +351,11 @@
             const sessionCreated = parseInt(localStorage.getItem('session_created') || '0');
             const now = Date.now();
 
-            // Cek apakah session masih valid
             if (loggedIn !== 'true' || !sessionToken) {
                 logout();
                 return false;
             }
 
-            // Cek timeout session (1 jam)
             if (now - sessionCreated > SESSION_TIMEOUT) {
                 console.log('⏰ Session expired');
                 logout();
@@ -494,55 +492,33 @@
             container.innerHTML = html || '<span class="text-muted">Tidak ada metode pembayaran</span>';
         }
 
-        // ===================== AMBIL DATA DARI API =====================
-        async function fetchAccountsFromAPI() {
+        // ===================== AMBIL DATA DARI accounts.json =====================
+        async function fetchAccounts() {
             const statusEl = document.getElementById('envStatus');
             try {
                 statusEl.textContent = '⏳ Mengambil data...';
                 statusEl.style.color = '#888';
                 
-                const sessionToken = localStorage.getItem('session_token');
-                
-                const res = await fetch(API_ENDPOINT + '?t=' + Date.now(), {
-                    headers: {
-                        'Authorization': 'Bearer ' + sessionToken,
-                        'Content-Type': 'application/json',
-                        'X-Requested-With': 'XMLHttpRequest'
-                    },
-                    credentials: 'include'
-                });
+                const res = await fetch(ACCOUNTS_FILE + '?t=' + Date.now());
                 
                 if (!res.ok) {
-                    if (res.status === 403) {
-                        throw new Error('Akses API ditolak. Domain atau IP tidak terdaftar.');
-                    }
-                    if (res.status === 429) {
-                        throw new Error('Terlalu banyak request. Coba lagi nanti.');
-                    }
-                    if (res.status === 401) {
-                        throw new Error('Sesi tidak valid. Silakan login ulang.');
-                    }
                     throw new Error('Gagal mengambil data: ' + res.status);
                 }
 
                 const data = await res.json();
                 
-                if (!data.success || !data.accounts) {
-                    throw new Error(data.message || 'Format data tidak valid');
+                if (!Array.isArray(data)) {
+                    throw new Error('Format data tidak valid (harus array)');
                 }
 
-                statusEl.textContent = '✅ ' + data.accounts.length + ' akun tersedia';
+                statusEl.textContent = '✅ ' + data.length + ' akun tersedia';
                 statusEl.style.color = '#00ffaa';
-                return data.accounts;
+                return data;
 
             } catch (err) {
                 console.error('Error fetch accounts:', err);
                 statusEl.textContent = '❌ ' + err.message;
                 statusEl.style.color = '#ff6666';
-                
-                if (err.message.includes('Sesi tidak valid') || err.message.includes('Akses API ditolak')) {
-                    setTimeout(() => logout(), 2000);
-                }
                 return [];
             }
         }
@@ -558,7 +534,7 @@
             document.getElementById('saldoAmount').textContent = 'Memuat...';
 
             try {
-                const accounts = await fetchAccountsFromAPI();
+                const accounts = await fetchAccounts();
                 
                 if (accounts.length === 0) {
                     document.getElementById('saldoAmount').textContent = 'Data kosong';
@@ -661,9 +637,6 @@
             } catch (err) {
                 console.error('Error:', err);
                 document.getElementById('saldoAmount').textContent = 'Gagal memuat';
-                if (err.message.includes('Akses API ditolak')) {
-                    setTimeout(() => logout(), 2000);
-                }
             }
         }
 
@@ -695,7 +668,7 @@
         console.log('👤 User:', getUserData().email);
         console.log('🔑 Role:', getUserData().role);
         console.log('📱 QRIS Generator aktif!');
-        console.log('🛡️ API dilindungi oleh Domain & IP Validation');
+        console.log('📁 Sumber data: /info/accounts.json');
     </script>
 </body>
 </html>
