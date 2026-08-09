@@ -67,6 +67,13 @@
             font-weight: 400;
             color: #88ddbb;
         }
+        .saldo-box .note {
+            color: #888;
+            font-size: 12px;
+            margin-top: 8px;
+            border-top: 1px solid #00ffaa22;
+            padding-top: 8px;
+        }
         .info-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -143,6 +150,14 @@
         .btn-refresh:hover {
             background: #00ffaa44;
         }
+        .btn-buzzer {
+            background: #ffaa0044;
+            color: #ffaa00;
+            border: 1px solid #ffaa0055;
+        }
+        .btn-buzzer:hover {
+            background: #ffaa0066;
+        }
         .header-actions {
             display: flex;
             gap: 10px;
@@ -187,12 +202,6 @@
             color: #666;
             text-align: center;
             padding: 30px 0;
-            font-size: 14px;
-        }
-        .loading-dash {
-            color: #888;
-            text-align: center;
-            padding: 20px 0;
             font-size: 14px;
         }
         .role-tag {
@@ -240,8 +249,6 @@
             font-size: 13px;
             margin: 10px 0;
         }
-
-        /* QRIS DISPLAY */
         .qris-display {
             display: flex;
             flex-wrap: wrap;
@@ -297,7 +304,6 @@
         .qris-display .qris-detail .copy-btn:hover {
             background: #00ffaa44;
         }
-
         .qris-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -332,7 +338,12 @@
             margin-top: 6px;
             font-family: 'Courier New', monospace;
         }
-
+        .env-status {
+            text-align: center;
+            font-size: 11px;
+            color: #555;
+            margin-top: 8px;
+        }
         @media (max-width: 600px) {
             .info-grid {
                 grid-template-columns: 1fr;
@@ -364,12 +375,11 @@
                 </div>
                 <div class="header-actions">
                     <button class="btn btn-refresh" onclick="loadDashboard()">🔄 Refresh</button>
-                    <button class="btn" onclick="location.href='/info/buzzer/'" style="background:#ffaa0044;color:#ffaa00;border:1px solid #ffaa0055;">
-    📢 Jadi Buzzer 
-                    </button>
+                    <button class="btn btn-buzzer" onclick="location.href='/info/buzzer/'">📢 Jadi Buzzer</button>
                     <button class="btn btn-logout" onclick="logout()">🚪 Keluar</button>
                 </div>
             </div>
+            <div class="env-status" id="envStatus">🔌 Mengambil data dari server...</div>
         </div>
 
         <!-- ===== CARD SALDO ===== -->
@@ -378,7 +388,7 @@
             <div class="saldo-box">
                 <div class="label">Total Saldo</div>
                 <div class="amount" id="saldoDisplay">Rp <span id="saldoAmount">-</span></div>
-                <p>HUBUNGI ADMIN MELALUI CS BOT ATAU GMAIL alvinojeremy74@gmail.com minimal pencairan dana 1K biaya admin 300 perak</p>
+                <div class="note">💡 HUBUNGI ADMIN MELALUI CS BOT ATAU GMAIL alvinojeremy74@gmail.com minimal pencairan dana 1K biaya admin 300 perak</div>
             </div>
 
             <!-- Payment Methods (QRIS / Dana) -->
@@ -431,7 +441,7 @@
 
     <script>
         // ===================== KONFIGURASI =====================
-        const ACCOUNTS_URL = '/info/accounts.json';
+        const API_ENDPOINT = '/api/accounts';
 
         // ===================== CEK SESSION =====================
         function checkSession() {
@@ -471,7 +481,6 @@
                 return;
             }
 
-            // Buat canvas
             const canvas = document.createElement('canvas');
             canvas.width = size;
             canvas.height = size;
@@ -479,7 +488,6 @@
             canvas.style.height = 'auto';
             container.appendChild(canvas);
 
-            // Generate QR Code
             QRCode.toCanvas(canvas, crc16String, {
                 width: size,
                 margin: 2,
@@ -494,7 +502,6 @@
                 }
             });
 
-            // Tambahkan string QRIS di bawah
             const stringDiv = document.createElement('div');
             stringDiv.className = 'qris-string';
             stringDiv.textContent = crc16String;
@@ -512,7 +519,6 @@
             `;
             container.appendChild(stringDiv);
 
-            // Tombol copy
             const copyBtn = document.createElement('button');
             copyBtn.textContent = '📋 Copy QRIS String';
             copyBtn.className = 'copy-btn';
@@ -533,7 +539,6 @@
                 navigator.clipboard.writeText(crc16String).then(() => {
                     alert('✅ QRIS string berhasil disalin!');
                 }).catch(() => {
-                    // Fallback
                     const textarea = document.createElement('textarea');
                     textarea.value = crc16String;
                     document.body.appendChild(textarea);
@@ -561,7 +566,6 @@
             const container = document.getElementById('paymentList');
             let html = '';
 
-            // Tampilkan QRIS milik user sendiri
             if (user.qris) {
                 html += `<div class="pm-item"><strong>QRIS:</strong> Tersedia (lihat di bawah)</div>`;
             } else {
@@ -577,6 +581,37 @@
             container.innerHTML = html || '<span class="text-muted">Tidak ada metode pembayaran</span>';
         }
 
+        // ===================== AMBIL DATA DARI ENV =====================
+        async function fetchAccountsFromEnv() {
+            const statusEl = document.getElementById('envStatus');
+            try {
+                statusEl.textContent = '⏳ Mengambil data akun dari server...';
+                statusEl.style.color = '#888';
+                
+                const res = await fetch(API_ENDPOINT + '?t=' + Date.now());
+                
+                if (!res.ok) {
+                    throw new Error('Gagal mengambil data: ' + res.status);
+                }
+
+                const data = await res.json();
+                
+                if (!data.success || !data.accounts) {
+                    throw new Error(data.message || 'Format data tidak valid');
+                }
+
+                statusEl.textContent = '✅ ' + data.accounts.length + ' akun tersedia';
+                statusEl.style.color = '#00ffaa';
+                return data.accounts;
+
+            } catch (err) {
+                console.error('Error fetch accounts:', err);
+                statusEl.textContent = '❌ Gagal mengambil data: ' + err.message;
+                statusEl.style.color = '#ff6666';
+                return [];
+            }
+        }
+
         // ===================== LOAD DASHBOARD =====================
         async function loadDashboard() {
             const user = getUserData();
@@ -588,11 +623,12 @@
             document.getElementById('saldoAmount').textContent = 'Memuat...';
 
             try {
-                const res = await fetch(ACCOUNTS_URL + '?t=' + Date.now());
-                if (!res.ok) throw new Error('Gagal fetch data');
-
-                const accounts = await res.json();
-                if (!Array.isArray(accounts)) throw new Error('Format data tidak valid');
+                const accounts = await fetchAccountsFromEnv();
+                
+                if (accounts.length === 0) {
+                    document.getElementById('saldoAmount').textContent = 'Data kosong';
+                    return;
+                }
 
                 const found = accounts.find(acc => 
                     acc.Gmail && acc.Gmail.toLowerCase() === user.email.toLowerCase()
@@ -630,7 +666,6 @@
                     container.innerHTML = '';
 
                     if (isAdmin) {
-                        // Admin: tampilkan QRIS semua akun
                         const grid = document.createElement('div');
                         grid.className = 'qris-grid';
                         
@@ -638,15 +673,15 @@
                             if (acc.qris && acc.qris.trim() !== '') {
                                 const item = document.createElement('div');
                                 item.className = 'qris-item';
+                                const safeId = 'qris_admin_' + (acc.Gmail?.replace(/[^a-zA-Z0-9]/g, '_') || 'unknown');
                                 item.innerHTML = `
                                     <div class="email-label">📧 ${acc.Gmail || 'unknown'}</div>
-                                    <div id="qris_admin_${acc.Gmail?.replace(/[^a-zA-Z0-9]/g, '_') || 'unknown'}"></div>
+                                    <div id="${safeId}"></div>
                                 `;
                                 grid.appendChild(item);
                                 
-                                // Generate QRIS di dalam item setelah DOM render
                                 setTimeout(() => {
-                                    const subContainer = document.getElementById(`qris_admin_${acc.Gmail?.replace(/[^a-zA-Z0-9]/g, '_') || 'unknown'}`);
+                                    const subContainer = document.getElementById(safeId);
                                     if (subContainer) {
                                         generateQRIS(acc.qris, subContainer.id, 120);
                                     }
@@ -660,7 +695,6 @@
                             container.appendChild(grid);
                         }
                     } else {
-                        // User spesifik: tampilkan QRIS sendiri
                         generateQRIS(updatedUser.qris, 'qrisContainer', 180);
                     }
                 } else {
