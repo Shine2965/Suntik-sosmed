@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>🚂 Dragon Rail - Kontrol Jadwal Per Kereta</title>
+    <title>🚂 Dragon Rail - Kereta Bolak-Balik Otomatis</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -188,21 +188,6 @@
             border: 2px solid #0a121e;
             box-shadow: 0 0 10px rgba(255,255,255,0.2);
         }
-        .station-slide .map-container .track-map .track-visual .station-marker {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            font-size: 9px;
-            color: #8aadcc;
-            min-width: 40px;
-        }
-        .station-slide .map-container .track-map .track-visual .station-marker .marker {
-            width: 14px;
-            height: 14px;
-            border-radius: 50%;
-            background: #ec4899;
-            border: 2px solid #f9c8e0;
-        }
         .station-slide .map-container .track-map .signal-controls {
             display: flex;
             gap: 8px;
@@ -300,6 +285,16 @@
             color: #f5c97a;
             animation: pulse 1s infinite;
         }
+        .station-slide .schedule-section .schedule-item .status-badge.running {
+            background: #1a3a4a;
+            color: #7acfde;
+            animation: pulse 0.5s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
         .station-slide .schedule-section .schedule-item .schedule-actions {
             display: flex;
             gap: 4px;
@@ -321,11 +316,6 @@
             color: #f77a7a;
         }
         .station-slide .schedule-section .schedule-item .schedule-actions button.danger:hover { background: #6d3747; }
-        @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.5; }
-            100% { opacity: 1; }
-        }
         .station-slide .notification-box {
             background: #1a2a3c;
             border-left: 4px solid #f5c97a;
@@ -508,21 +498,9 @@
             max-height: 80vh;
             overflow-y: auto;
         }
-        .modal h2 {
-            color: #f5c97a;
-            margin-bottom: 16px;
-            border-bottom: 1px solid #1a2c3f;
-            padding-bottom: 10px;
-        }
-        .modal .form-group {
-            margin-bottom: 12px;
-        }
-        .modal .form-group label {
-            display: block;
-            font-size: 13px;
-            color: #8aadcc;
-            margin-bottom: 4px;
-        }
+        .modal h2 { color: #f5c97a; margin-bottom: 16px; border-bottom: 1px solid #1a2c3f; padding-bottom: 10px; }
+        .modal .form-group { margin-bottom: 12px; }
+        .modal .form-group label { display: block; font-size: 13px; color: #8aadcc; margin-bottom: 4px; }
         .modal .form-group input, .modal .form-group select {
             width: 100%;
             padding: 8px 12px;
@@ -532,16 +510,8 @@
             color: #dce6f0;
             font-size: 14px;
         }
-        .modal .form-group input:focus, .modal .form-group select:focus {
-            outline: none;
-            border-color: #4a8aaa;
-        }
-        .modal .modal-actions {
-            display: flex;
-            gap: 12px;
-            margin-top: 16px;
-            justify-content: flex-end;
-        }
+        .modal .form-group input:focus, .modal .form-group select:focus { outline: none; border-color: #4a8aaa; }
+        .modal .modal-actions { display: flex; gap: 12px; margin-top: 16px; justify-content: flex-end; }
         .modal .modal-actions button {
             padding: 8px 24px;
             border-radius: 30px;
@@ -553,17 +523,9 @@
             transition: all 0.2s;
         }
         .modal .modal-actions button:hover { background: #28405a; }
-        .modal .modal-actions button.primary {
-            background: #1d4a3a;
-            border-color: #3a8a6a;
-            color: #7acf8a;
-        }
+        .modal .modal-actions button.primary { background: #1d4a3a; border-color: #3a8a6a; color: #7acf8a; }
         .modal .modal-actions button.primary:hover { background: #2d6a4a; }
-        .modal .modal-actions button.danger {
-            background: #4d2732;
-            border-color: #884a5a;
-            color: #f77a7a;
-        }
+        .modal .modal-actions button.danger { background: #4d2732; border-color: #884a5a; color: #f77a7a; }
         .modal .modal-actions button.danger:hover { background: #6d3747; }
         @media (max-width: 800px) {
             .controls { flex-direction: column; align-items: stretch; }
@@ -576,7 +538,7 @@
 <body>
 <div class="container">
     <h1>
-        🚂 DRAGON RAIL SCHEDULE <small>— kontrol jadwal per kereta</small>
+        🚂 DRAGON RAIL BOLAK-BALIK <small>— jalur dunia nyata Surabaya-Sidoarjo</small>
     </h1>
     
     <canvas id="railCanvas" width="1500" height="750"></canvas>
@@ -585,6 +547,7 @@
         <button id="spawnTrainBtn" class="success">🚆 Spawn Kereta</button>
         <button id="addScheduleBtn">📋 Tambah Jadwal</button>
         <button id="resetBtn" class="danger">⟳ Reset</button>
+        <button id="toggleLoopBtn">🔄 Bolak-Balik ON</button>
         <div class="badge" id="trainCount">🚆 0 kereta</div>
         <div class="badge" id="weselStatus">🔀 Wesel: 1</div>
         <div class="badge" style="background:#1d3a2a;border-color:#3a8a6a;">🔄 Real-Time ON</div>
@@ -623,7 +586,7 @@
         <span class="item"><span class="dot" style="background:#22c55e;"></span> Sinyal HIJAU</span>
         <span class="item"><span class="dot" style="background:#f59e0b;"></span> Jadwal Mendekat</span>
     </div>
-    <footer>© Dragon — atur jadwal per kereta, jalur spesifik Turi→Gubeng(2) Gubeng→Wonokromo(2) Wonokromo→Sidoarjo(1)</footer>
+    <footer>© Dragon — kereta bolak-balik otomatis, jalur dunia nyata Turi→Gubeng→Wonokromo→Waru→Gedangan→Sidoarjo</footer>
 </div>
 
 <!-- POPUP -->
@@ -645,18 +608,12 @@
             <select id="editStation"></select>
         </div>
         <div class="form-group">
-            <label>Waktu Keberangkatan (detik dari sekarang)</label>
-            <input type="number" id="editDelay" value="10" min="3" max="60" />
+            <label>Stasiun Tujuan</label>
+            <select id="editDestination"></select>
         </div>
         <div class="form-group">
-            <label>Jalur Tujuan</label>
-            <select id="editRoute">
-                <option value="turi-gubeng">Turi → Gubeng (Jalur 1)</option>
-                <option value="turi-gubeng2">Turi → Gubeng (Jalur 2)</option>
-                <option value="gubeng-wonokromo">Gubeng → Wonokromo (Jalur 1)</option>
-                <option value="gubeng-wonokromo2">Gubeng → Wonokromo (Jalur 2)</option>
-                <option value="wonokromo-sidoarjo">Wonokromo → Sidoarjo (Jalur 1)</option>
-            </select>
+            <label>Waktu Keberangkatan (detik dari sekarang)</label>
+            <input type="number" id="editDelay" value="10" min="3" max="60" />
         </div>
         <div class="modal-actions">
             <button onclick="closeScheduleModal()">Batal</button>
@@ -668,7 +625,7 @@
 <script>
 (function() {
     // ============================================================
-    //  DRAGON RAIL SCHEDULE — KONTROL JADWAL PER KERETA
+    //  DRAGON RAIL BOLAK-BALIK — JALUR DUNIA NYATA
     // ============================================================
     const canvas = document.getElementById('railCanvas');
     const ctx = canvas.getContext('2d');
@@ -682,23 +639,31 @@
     const slideNav = document.getElementById('slideNav');
     const slideContent = document.getElementById('slideContent');
 
-    // -- STASIUN (6) --
+    // -- STASIUN DUNIA NYATA (URUTAN RUTE) --
+    const stationOrder = ['turi', 'gubeng', 'wonokromo', 'waru', 'gedangan', 'sidoarjo'];
     const stations = [
-        { id: 'turi', name: 'Surabaya Pasar Turi', x: 100, y: 380, jalurCount: 6, signal: true, autoRed: false },
-        { id: 'gubeng', name: 'Gubeng', x: 350, y: 250, jalurCount: 8, signal: true, autoRed: false },
-        { id: 'wonokromo', name: 'Wonokromo', x: 620, y: 480, jalurCount: 4, signal: true, autoRed: false },
-        { id: 'waru', name: 'Waru', x: 870, y: 300, jalurCount: 2, signal: true, autoRed: false },
-        { id: 'gedangan', name: 'Gedangan', x: 1120, y: 420, jalurCount: 2, signal: true, autoRed: false },
-        { id: 'sidoarjo', name: 'Sidoarjo', x: 1370, y: 340, jalurCount: 3, signal: true, autoRed: false }
+        { id: 'turi', name: 'Surabaya Pasar Turi', x: 80, y: 380, jalurCount: 6, signal: true, autoRed: false },
+        { id: 'gubeng', name: 'Gubeng', x: 320, y: 250, jalurCount: 8, signal: true, autoRed: false },
+        { id: 'wonokromo', name: 'Wonokromo', x: 580, y: 480, jalurCount: 4, signal: true, autoRed: false },
+        { id: 'waru', name: 'Waru', x: 840, y: 300, jalurCount: 2, signal: true, autoRed: false },
+        { id: 'gedangan', name: 'Gedangan', x: 1100, y: 420, jalurCount: 2, signal: true, autoRed: false },
+        { id: 'sidoarjo', name: 'Sidoarjo', x: 1360, y: 340, jalurCount: 3, signal: true, autoRed: false }
     ];
 
-    // -- ROUTE DEFINITION (jalur spesifik) --
+    // -- ROUTE DEFINITION (sesuai dunia nyata) --
     const routes = {
-        'turi-gubeng': { from: 'turi', to: 'gubeng', jalur: 0, label: 'Turi → Gubeng (Jalur 1)' },
-        'turi-gubeng2': { from: 'turi', to: 'gubeng', jalur: 1, label: 'Turi → Gubeng (Jalur 2)' },
-        'gubeng-wonokromo': { from: 'gubeng', to: 'wonokromo', jalur: 0, label: 'Gubeng → Wonokromo (Jalur 1)' },
-        'gubeng-wonokromo2': { from: 'gubeng', to: 'wonokromo', jalur: 1, label: 'Gubeng → Wonokromo (Jalur 2)' },
-        'wonokromo-sidoarjo': { from: 'wonokromo', to: 'sidoarjo', jalur: 0, label: 'Wonokromo → Sidoarjo (Jalur 1)' }
+        'turi-gubeng': { from: 'turi', to: 'gubeng', jalur: 0, label: 'Turi → Gubeng' },
+        'turi-gubeng2': { from: 'turi', to: 'gubeng', jalur: 1, label: 'Turi → Gubeng (2)' },
+        'gubeng-wonokromo': { from: 'gubeng', to: 'wonokromo', jalur: 0, label: 'Gubeng → Wonokromo' },
+        'gubeng-wonokromo2': { from: 'gubeng', to: 'wonokromo', jalur: 1, label: 'Gubeng → Wonokromo (2)' },
+        'wonokromo-waru': { from: 'wonokromo', to: 'waru', jalur: 0, label: 'Wonokromo → Waru' },
+        'waru-gedangan': { from: 'waru', to: 'gedangan', jalur: 0, label: 'Waru → Gedangan' },
+        'gedangan-sidoarjo': { from: 'gedangan', to: 'sidoarjo', jalur: 0, label: 'Gedangan → Sidoarjo' },
+        'sidoarjo-gedangan': { from: 'sidoarjo', to: 'gedangan', jalur: 0, label: 'Sidoarjo → Gedangan' },
+        'gedangan-waru': { from: 'gedangan', to: 'waru', jalur: 0, label: 'Gedangan → Waru' },
+        'waru-wonokromo': { from: 'waru', to: 'wonokromo', jalur: 0, label: 'Waru → Wonokromo' },
+        'wonokromo-gubeng': { from: 'wonokromo', to: 'gubeng', jalur: 0, label: 'Wonokromo → Gubeng' },
+        'gubeng-turi': { from: 'gubeng', to: 'turi', jalur: 0, label: 'Gubeng → Turi' }
     };
 
     // -- JADWAL PER STASIUN --
@@ -711,17 +676,19 @@
         { from: 'turi', to: 'gubeng', jalur: 1, aktif: false },
         { from: 'gubeng', to: 'wonokromo', jalur: 0, aktif: false },
         { from: 'gubeng', to: 'wonokromo', jalur: 1, aktif: false },
-        { from: 'wonokromo', to: 'sidoarjo', jalur: 0, aktif: false }
+        { from: 'wonokromo', to: 'waru', jalur: 0, aktif: false },
+        { from: 'waru', to: 'gedangan', jalur: 0, aktif: false },
+        { from: 'gedangan', to: 'sidoarjo', jalur: 0, aktif: false }
     ];
     let currentWeselIndex = 0;
 
     // -- DATA KERETA --
     const trainTypes = [
-        { name: 'Commuter Line Arjonegoro', color: '#facc15', speed: 0.5, size: 18 },
-        { name: 'Commuter Line Penataran', color: '#facc15', speed: 0.4, size: 18 },
-        { name: 'KA HARINA', color: '#f97316', speed: 0.7, size: 20 },
-        { name: 'KA PANDALUNGAN', color: '#3b82f6', speed: 0.8, size: 20 },
-        { name: 'KA ANGGREK', color: '#a855f7', speed: 0.6, size: 20 }
+        { name: 'Commuter Line Arjonegoro', color: '#facc15', speed: 0.6, size: 18 },
+        { name: 'Commuter Line Penataran', color: '#facc15', speed: 0.5, size: 18 },
+        { name: 'KA HARINA', color: '#f97316', speed: 0.8, size: 20 },
+        { name: 'KA PANDALUNGAN', color: '#3b82f6', speed: 0.9, size: 20 },
+        { name: 'KA ANGGREK', color: '#a855f7', speed: 0.7, size: 20 }
     ];
 
     let trains = [];
@@ -734,6 +701,7 @@
     let stationAlerts = {};
     let countdownInterval = null;
     let editingSchedule = null;
+    let loopMode = true;
 
     // -- INIT --
     function initTrains() {
@@ -760,21 +728,26 @@
                     if (sch.status === 'scheduled' && sch.departureTime) {
                         const remaining = sch.departureTime - now;
                         if (remaining > 0) {
-                            const mins = Math.floor(remaining / 60000);
-                            const secs = Math.floor((remaining % 60000) / 1000);
-                            sch.countdown = `${mins}m ${secs}s`;
-                        } else if (remaining > -3000) {
-                            sch.countdown = '⏰ Berangkat!';
-                            sch.status = 'approaching';
-                            showPopup('🔔 ' + sch.trainName, 'jadwal berangkat dari ' + s.name + '!');
+                            const secs = Math.floor(remaining / 1000);
+                            sch.countdown = `${secs}s`;
+                        } else if (remaining > -5000) {
+                            sch.countdown = '🚀 Berangkat!';
+                            sch.status = 'running';
+                            // Pindahkan kereta ke jalur tujuan
+                            moveTrainToRoute(sch);
+                            showPopup('🔔 ' + sch.trainName, 'berangkat dari ' + s.name + ' menuju ' + sch.destinationName);
                             renderSlides();
-                        } else if (remaining > -10000) {
-                            sch.countdown = '🚀 Berangkat';
-                            sch.status = 'departed';
+                        } else if (remaining > -15000) {
+                            sch.countdown = '🔄 Perjalanan';
+                            sch.status = 'running';
                             renderSlides();
                         } else {
-                            sch.countdown = '✅ Selesai';
-                            sch.status = 'departed';
+                            sch.countdown = '✅ Tiba';
+                            sch.status = 'arrived';
+                            // Kereta sampai tujuan, balik arah otomatis
+                            if (loopMode) {
+                                reverseTrain(sch);
+                            }
                             renderSlides();
                         }
                     }
@@ -784,132 +757,76 @@
         }, 1000);
     }
 
-    // -- OPEN SCHEDULE MODAL --
-    window.openScheduleModal = function(scheduleId, stationId) {
-        const modal = document.getElementById('scheduleModal');
-        const station = stations.find(s => s.id === stationId);
-        if (!station) return;
+    // -- MOVE TRAIN TO ROUTE --
+    function moveTrainToRoute(schedule) {
+        const fromSt = stations.find(s => s.id === schedule.stationId);
+        const toSt = stations.find(s => s.id === schedule.destinationId);
+        if (!fromSt || !toSt) return;
 
-        // Populate train dropdown
-        const trainSelect = document.getElementById('editTrainName');
-        trainSelect.innerHTML = trainTypes.map(t => 
-            `<option value="${t.name}">${t.name}</option>`
-        ).join('');
-
-        // Populate station dropdown (hanya stasiun yang valid untuk rute)
-        const stationSelect = document.getElementById('editStation');
-        stationSelect.innerHTML = stations.map(s => 
-            `<option value="${s.id}" ${s.id === stationId ? 'selected' : ''}>${s.name}</option>`
-        ).join('');
-
-        // Populate route dropdown
-        const routeSelect = document.getElementById('editRoute');
-        routeSelect.innerHTML = Object.entries(routes).map(([key, r]) => 
-            `<option value="${key}">${r.label}</option>`
-        ).join('');
-
-        // Jika edit existing schedule
-        if (scheduleId) {
-            const sch = schedules[stationId].find(s => s.id === scheduleId);
-            if (sch) {
-                document.getElementById('editTrainName').value = sch.trainName;
-                document.getElementById('editStation').value = stationId;
-                document.getElementById('editDelay').value = Math.max(3, Math.floor((sch.departureTime - Date.now()) / 1000));
-                editingSchedule = { id: sch.id, stationId: stationId };
-            }
-        } else {
-            editingSchedule = null;
-        }
-
-        modal.classList.add('show');
-    };
-
-    // -- CLOSE MODAL --
-    window.closeScheduleModal = function() {
-        document.getElementById('scheduleModal').classList.remove('show');
-        editingSchedule = null;
-    };
-
-    // -- SAVE SCHEDULE --
-    window.saveSchedule = function() {
-        const trainName = document.getElementById('editTrainName').value;
-        const stationId = document.getElementById('editStation').value;
-        const delay = parseInt(document.getElementById('editDelay').value) || 10;
-        const routeKey = document.getElementById('editRoute').value;
-        const route = routes[routeKey];
-
-        if (!trainName || !stationId || !route) return;
-
-        const trainType = trainTypes.find(t => t.name === trainName);
-        if (!trainType) return;
-
-        const departureTime = Date.now() + (delay * 1000);
-
-        const schedule = {
-            id: editingSchedule ? editingSchedule.id : Date.now() + Math.random(),
-            trainName: trainType.name,
-            trainColor: trainType.color,
-            time: new Date().toLocaleTimeString(),
-            departureTime: departureTime,
-            countdown: '⏳',
-            status: 'scheduled',
-            stationId: stationId,
-            route: routeKey,
-            routeLabel: route.label
-        };
-
-        if (editingSchedule) {
-            // Edit existing
-            const idx = schedules[editingSchedule.stationId].findIndex(s => s.id === editingSchedule.id);
-            if (idx !== -1) {
-                schedules[editingSchedule.stationId][idx] = schedule;
-            }
-        } else {
-            schedules[stationId].push(schedule);
-        }
-
-        // Spawn kereta jika belum ada
-        let existingTrain = trains.find(t => t.name === trainType.name);
-        if (!existingTrain) {
-            const newTrain = {
-                ...trainType,
+        // Cari kereta dengan nama yang sama
+        let train = trains.find(t => t.name === schedule.trainName);
+        if (!train) {
+            const t = trainTypes.find(tp => tp.name === schedule.trainName);
+            if (!t) return;
+            train = {
+                ...t,
                 id: Date.now() + Math.random(),
-                progress: 0.05 + Math.random() * 0.1,
+                progress: 0,
                 direction: 1,
                 active: true,
                 currentStation: null,
-                assignedJalur: route.jalur,
+                assignedJalur: 0,
                 isStopped: false,
                 stopAtStation: null,
                 lastStationIdx: -1,
                 trainSignal: true,
                 autoStopped: false,
                 passedStations: [],
-                routeKey: routeKey
+                routeKey: null
             };
-            trains.push(newTrain);
-            showPopup('🚆 ' + trainType.name, 'dispawn untuk jadwal');
-        } else {
-            // Update jalur kereta sesuai rute
-            existingTrain.assignedJalur = route.jalur;
-            existingTrain.routeKey = routeKey;
-            showPopup('📋 Jadwal ' + trainType.name, 'diupdate ke ' + route.label);
+            trains.push(train);
         }
 
+        // Tentukan jalur berdasarkan rute
+        const routeKey = `${schedule.stationId}-${schedule.destinationId}`;
+        const route = routes[routeKey] || Object.values(routes).find(r => r.from === schedule.stationId && r.to === schedule.destinationId);
+        if (route) {
+            train.assignedJalur = route.jalur;
+            train.routeKey = routeKey;
+            train.direction = 1;
+            train.progress = 0.05;
+            train.active = true;
+            train.isStopped = false;
+        }
         updateTrainCount();
         renderTrainControls();
-        renderSlides();
-        closeScheduleModal();
-    };
+    }
 
-    // -- DELETE SCHEDULE --
-    window.deleteSchedule = function(scheduleId, stationId) {
-        if (confirm('Hapus jadwal ini?')) {
-            schedules[stationId] = schedules[stationId].filter(s => s.id !== scheduleId);
-            renderSlides();
-            showPopup('🗑️ Jadwal dihapus', '');
+    // -- REVERSE TRAIN (BOLAK-BALIK) --
+    function reverseTrain(schedule) {
+        const fromSt = stations.find(s => s.id === schedule.stationId);
+        const toSt = stations.find(s => s.id === schedule.destinationId);
+        if (!fromSt || !toSt) return;
+
+        // Cari kereta
+        let train = trains.find(t => t.name === schedule.trainName);
+        if (!train) return;
+
+        // Balik arah
+        train.direction = -1;
+        train.progress = 0.95;
+
+        // Rute balik
+        const reverseRouteKey = `${schedule.destinationId}-${schedule.stationId}`;
+        const reverseRoute = routes[reverseRouteKey];
+        if (reverseRoute) {
+            train.assignedJalur = reverseRoute.jalur;
+            train.routeKey = reverseRouteKey;
         }
-    };
+
+        showPopup('🔄 ' + train.name, 'balik arah menuju ' + fromSt.name);
+        renderSlides();
+    }
 
     // -- SPAWN --
     function spawnTrain() {
@@ -1111,13 +1028,26 @@
                 train.progress += delta;
                 if (train.progress > 1.0) {
                     train.progress = 1.0;
-                    train.direction = -1;
+                    // Bolak-balik otomatis
+                    if (loopMode) {
+                        train.direction = -1;
+                        train.progress = 0.95;
+                        showPopup('🔄 ' + train.name, 'balik arah!');
+                    } else {
+                        train.direction = -1;
+                    }
                 }
             } else {
                 train.progress -= delta;
                 if (train.progress < 0.0) {
                     train.progress = 0.0;
-                    train.direction = 1;
+                    if (loopMode) {
+                        train.direction = 1;
+                        train.progress = 0.05;
+                        showPopup('🔄 ' + train.name, 'balik arah!');
+                    } else {
+                        train.direction = 1;
+                    }
                 }
             }
 
@@ -1287,7 +1217,6 @@
                 ctx.fillText('⛔', pos.x, pos.y - train.size/2 - 20);
             }
 
-            // Route label
             if (train.routeKey && routes[train.routeKey]) {
                 ctx.fillStyle = '#8aadcc';
                 ctx.font = '8px monospace';
@@ -1400,13 +1329,137 @@
     window.assignJalur = function(trainIdx, jalur) {
         if (trainIdx < trains.length) {
             trains[trainIdx].assignedJalur = parseInt(jalur);
-            // Update route jika sesuai
             const routeEntry = Object.entries(routes).find(([key, r]) => r.jalur === parseInt(jalur));
             if (routeEntry) {
                 trains[trainIdx].routeKey = routeEntry[0];
             }
             showPopup('🛤️ ' + trains[trainIdx].name, 'masuk Jalur ' + (parseInt(jalur)+1));
             renderSlides();
+        }
+    };
+
+    // -- OPEN SCHEDULE MODAL --
+    window.openScheduleModal = function(scheduleId, stationId) {
+        const modal = document.getElementById('scheduleModal');
+        const station = stations.find(s => s.id === stationId);
+        if (!station) return;
+
+        const trainSelect = document.getElementById('editTrainName');
+        trainSelect.innerHTML = trainTypes.map(t => 
+            `<option value="${t.name}">${t.name}</option>`
+        ).join('');
+
+        const stationSelect = document.getElementById('editStation');
+        stationSelect.innerHTML = stations.map(s => 
+            `<option value="${s.id}" ${s.id === stationId ? 'selected' : ''}>${s.name}</option>`
+        ).join('');
+
+        // Destination dropdown (hanya stasiun setelahnya dalam rute)
+        const destSelect = document.getElementById('editDestination');
+        const currentIdx = stationOrder.indexOf(stationId);
+        const nextStations = stationOrder.slice(currentIdx + 1);
+        destSelect.innerHTML = nextStations.map(id => {
+            const s = stations.find(st => st.id === id);
+            return s ? `<option value="${s.id}">${s.name}</option>` : '';
+        }).join('');
+
+        if (scheduleId) {
+            const sch = schedules[stationId].find(s => s.id === scheduleId);
+            if (sch) {
+                document.getElementById('editTrainName').value = sch.trainName;
+                document.getElementById('editStation').value = stationId;
+                document.getElementById('editDestination').value = sch.destinationId || '';
+                document.getElementById('editDelay').value = Math.max(3, Math.floor((sch.departureTime - Date.now()) / 1000));
+                editingSchedule = { id: sch.id, stationId: stationId };
+            }
+        } else {
+            editingSchedule = null;
+        }
+
+        modal.classList.add('show');
+    };
+
+    // -- CLOSE MODAL --
+    window.closeScheduleModal = function() {
+        document.getElementById('scheduleModal').classList.remove('show');
+        editingSchedule = null;
+    };
+
+    // -- SAVE SCHEDULE --
+    window.saveSchedule = function() {
+        const trainName = document.getElementById('editTrainName').value;
+        const stationId = document.getElementById('editStation').value;
+        const destinationId = document.getElementById('editDestination').value;
+        const delay = parseInt(document.getElementById('editDelay').value) || 10;
+
+        if (!trainName || !stationId || !destinationId) return;
+
+        const trainType = trainTypes.find(t => t.name === trainName);
+        if (!trainType) return;
+
+        const departureTime = Date.now() + (delay * 1000);
+        const destStation = stations.find(s => s.id === destinationId);
+        const fromStation = stations.find(s => s.id === stationId);
+
+        const schedule = {
+            id: editingSchedule ? editingSchedule.id : Date.now() + Math.random(),
+            trainName: trainType.name,
+            trainColor: trainType.color,
+            time: new Date().toLocaleTimeString(),
+            departureTime: departureTime,
+            countdown: '⏳',
+            status: 'scheduled',
+            stationId: stationId,
+            destinationId: destinationId,
+            destinationName: destStation ? destStation.name : 'Tujuan'
+        };
+
+        if (editingSchedule) {
+            const idx = schedules[editingSchedule.stationId].findIndex(s => s.id === editingSchedule.id);
+            if (idx !== -1) {
+                schedules[editingSchedule.stationId][idx] = schedule;
+            }
+        } else {
+            schedules[stationId].push(schedule);
+        }
+
+        // Spawn kereta
+        let existingTrain = trains.find(t => t.name === trainType.name);
+        if (!existingTrain) {
+            const newTrain = {
+                ...trainType,
+                id: Date.now() + Math.random(),
+                progress: 0.05,
+                direction: 1,
+                active: true,
+                currentStation: null,
+                assignedJalur: 0,
+                isStopped: false,
+                stopAtStation: null,
+                lastStationIdx: -1,
+                trainSignal: true,
+                autoStopped: false,
+                passedStations: [],
+                routeKey: null
+            };
+            trains.push(newTrain);
+            showPopup('🚆 ' + trainType.name, 'dispawn untuk jadwal dari ' + fromStation.name + ' ke ' + destStation.name);
+        } else {
+            showPopup('📋 Jadwal ' + trainType.name, 'dari ' + fromStation.name + ' ke ' + destStation.name);
+        }
+
+        updateTrainCount();
+        renderTrainControls();
+        renderSlides();
+        closeScheduleModal();
+    };
+
+    // -- DELETE SCHEDULE --
+    window.deleteSchedule = function(scheduleId, stationId) {
+        if (confirm('Hapus jadwal ini?')) {
+            schedules[stationId] = schedules[stationId].filter(s => s.id !== scheduleId);
+            renderSlides();
+            showPopup('🗑️ Jadwal dihapus', '');
         }
     };
 
@@ -1421,7 +1474,6 @@
         slideContent.innerHTML = stations.map((s, idx) => {
             const stationSchedules = schedules[s.id] || [];
             
-            // Map visual jalur
             let mapHtml = '';
             for (let j = 0; j < Math.min(s.jalurCount, 6); j++) {
                 const trainsOnLine = trains.filter(t => t.assignedJalur === j && t.active);
@@ -1479,7 +1531,7 @@
                                     <span class="countdown">${sch.countdown || '⏳'}</span>
                                     <span class="status-badge ${sch.status}">
                                         ${sch.status === 'scheduled' ? '📅 Terjadwal' : 
-                                          sch.status === 'approaching' ? '🔔 Mendekat' : 
+                                          sch.status === 'running' ? '🔄 Perjalanan' :
                                           sch.status === 'arrived' ? '✅ Tiba' : 
                                           sch.status === 'departed' ? '🚀 Berangkat' : sch.status}
                                     </span>
@@ -1519,6 +1571,15 @@
         showPopup('🔀 Wesel ke-' + (currentWeselIndex + 1), 'diubah');
         renderSlides();
     };
+
+    // -- TOGGLE LOOP --
+    function toggleLoop() {
+        loopMode = !loopMode;
+        showPopup('🔄 Bolak-balik ' + (loopMode ? 'ON' : 'OFF'), '');
+        document.getElementById('toggleLoopBtn').textContent = loopMode ? '🔄 Bolak-Balik ON' : '⏹ Bolak-Balik OFF';
+        document.getElementById('toggleLoopBtn').style.background = loopMode ? '#1d4a3a' : '#4d2732';
+        document.getElementById('toggleLoopBtn').style.borderColor = loopMode ? '#3a8a6a' : '#884a5a';
+    }
 
     // -- GO TO SLIDE --
     window.goToSlide = function(idx) {
@@ -1591,6 +1652,7 @@
         }
     });
     document.getElementById('resetBtn').addEventListener('click', resetAll);
+    document.getElementById('toggleLoopBtn').addEventListener('click', toggleLoop);
 
     // -- START --
     initTrains();
@@ -1598,8 +1660,8 @@
     renderSlides();
     loop();
 
-    console.log('🚂 DRAGON RAIL SCHEDULE — kontrol jadwal per kereta!');
-    console.log('📍 Jalur: Turi→Gubeng(2) Gubeng→Wonokromo(2) Wonokromo→Sidoarjo(1)');
+    console.log('🚂 DRAGON RAIL BOLAK-BALIK — jalur dunia nyata!');
+    console.log('📍 Rute: Turi→Gubeng→Wonokromo→Waru→Gedangan→Sidoarjo');
 })();
 </script>
 </body>
