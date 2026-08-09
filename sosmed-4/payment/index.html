@@ -21,7 +21,6 @@ body{
   position:relative;
   overflow-x:hidden;
 }
-/* Animated Background */
 body::before{
   content:'';
   position:fixed;
@@ -43,7 +42,6 @@ body::before{
   66%{transform:translate(-1%,3%) rotate(-1deg)}
   100%{transform:translate(1%,-1%) rotate(1deg)}
 }
-/* Floating Orbs */
 .orb{
   position:fixed;
   border-radius:50%;
@@ -251,7 +249,6 @@ p{
 </style>
 </head>
 <body>
-<!-- Floating Orbs -->
 <div class="orb orb-1"></div>
 <div class="orb orb-2"></div>
 <div class="orb orb-3"></div>
@@ -402,6 +399,7 @@ function buildQR(a){
   return base+tag+"6304"+crc16(base+tag+"6304");
 }
 
+// ================= UPDATE DISPLAY (REFLEK DISKON) =================
 function updateDisplay(){
   uniqueCode = generateUniqueCode();
   document.getElementById('uniqueCode').textContent = uniqueCode;
@@ -413,12 +411,13 @@ function updateDisplay(){
   <strong>Layanan:</strong> ${layanan}<br>
   <strong>Target:</strong> ${target}<br>
   <strong>Total:</strong> <s>Rp ${originalTotal.toLocaleString("id-ID")}</s><br>
-  <strong>Total Bayar:</strong> Rp ${totalDenganUnik.toLocaleString("id-ID")}
   `;
   
   if (appliedVoucher) {
-    detailHtml += `<br><strong>🎫 Voucher:</strong> <span class="voucher-text">${appliedVoucher}</span> <span class="discount-text">(Diskon Rp ${appliedDiscount.toLocaleString("id-ID")})</span>`;
+    detailHtml += `<strong>🎫 Voucher:</strong> <span class="voucher-text">${appliedVoucher}</span> <span class="discount-text">(Diskon Rp ${appliedDiscount.toLocaleString("id-ID")})</span><br>`;
   }
+  
+  detailHtml += `<strong>Total Bayar:</strong> Rp ${totalDenganUnik.toLocaleString("id-ID")}`;
   
   document.getElementById('orderDetails').innerHTML = detailHtml;
   
@@ -448,7 +447,7 @@ async function loadVoucher(){
   }catch{return []}
 }
 
-// ================= APPLY VOUCHER =================
+// ================= APPLY VOUCHER (AUTO-REDUCE TOTAL) =================
 document.getElementById('applyVoucher').onclick = async function() {
   const code = document.getElementById('voucherInput').value.trim().toUpperCase();
   if(!code) return Swal.fire("Isi kode voucher","","warning");
@@ -482,6 +481,7 @@ document.getElementById('applyVoucher').onclick = async function() {
   
   let discount = 0;
   if (v.type === "percent") {
+    // SUPPORT DESIMAL: value bisa 0.7 (berarti 0.7%)
     discount = originalTotal * (v.value / 100);
     if (v.max_discount) discount = Math.min(discount, v.max_discount);
   } else if (v.type === "fixed") {
@@ -509,7 +509,9 @@ document.getElementById('applyVoucher').onclick = async function() {
   this.disabled = true;
   this.style.opacity = '0.4';
   
+  // UPDATE DISPLAY LANGSUNG - QRIS & TOTAL BERUBAH
   updateDisplay();
+  
   Swal.fire({
     title: "✅ Berhasil!",
     html: `Voucher <b>${v.code}</b> berhasil digunakan!<br>Diskon: <b>${discountText}</b>`,
@@ -594,6 +596,7 @@ Order sekarang di shinedomain.my.id`
   }
 })();
 
+// ================= UPDATE DISPLAY AWAL =================
 updateDisplay();
 
 // ================= REFERRAL =================
@@ -628,6 +631,7 @@ setInterval(() => {
 }, 2000);
 
 console.log('💳 QRIS Payment - Sosmed 4 siap!');
+console.log('🎫 Voucher otomatis mengurangi total bayar & update QRIS');
 </script>
 </body>
 </html>
