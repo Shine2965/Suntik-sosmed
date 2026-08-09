@@ -7,15 +7,10 @@
 const ALLOWED_DOMAINS = [
     'shinedomain.my.id',
     'www.shinedomain.my.id',
-    'localhost',
-    '127.0.0.1'
 ];
 
 // Daftar IP yang diizinkan (tanpa port)
 const ALLOWED_IPS = [
-    '114.8.223.223',
-    '::1', // localhost IPv6
-    '127.0.0.1' // localhost IPv4
 ];
 
 // Rate Limiting: maks 10 request per menit per IP
