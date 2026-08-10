@@ -1,19 +1,16 @@
 // /api/config.js
-// Vercel Serverless Function untuk mengambil Telegram Config dari ENV
+// Vercel Serverless Function - Mengambil konfigurasi dari ENV
 
 export default function handler(req, res) {
-    // ===== 1. SET CORS HEADERS =====
-    res.setHeader('Access-Control-Allow-Origin', 'https://shinedomain.my.id');
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    // Set CORS
+    res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
 
-    // ===== 2. HANDLE PREFLIGHT =====
     if (req.method === 'OPTIONS') {
         return res.status(200).end();
     }
 
-    // ===== 3. HANYA MENERIMA GET =====
     if (req.method !== 'GET') {
         return res.status(405).json({
             success: false,
@@ -21,19 +18,17 @@ export default function handler(req, res) {
         });
     }
 
-    // ===== 4. AMBIL DARI ENVIRONMENT VARIABLE =====
     try {
-        const telegramToken = process.env.TELEGRAM_TOKEN;
-        const ownerId = process.env.OWNER_ID;
+        const telegramToken = process.env.TELEGRAM_BOT_TOKEN;
+        const ownerId = process.env.TELEGRAM_OWNER_ID;
 
         if (!telegramToken || !ownerId) {
             return res.status(500).json({
                 success: false,
-                message: 'TELEGRAM_TOKEN atau OWNER_ID tidak ditemukan di environment'
+                message: 'Konfigurasi Telegram tidak ditemukan di environment'
             });
         }
 
-        // ===== 5. KIRIM RESPONSE =====
         return res.status(200).json({
             success: true,
             telegram_token: telegramToken,
