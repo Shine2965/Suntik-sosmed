@@ -19,8 +19,8 @@ export default function handler(req, res) {
     }
 
     try {
-        const telegramToken = process.env.TELEGRAM_BOT_TOKEN;
-        const ownerId = process.env.TELEGRAM_OWNER_ID;
+        const telegramToken = process.env.TELEGRAM_TOKEN;
+        const ownerId = process.env.OWNER_ID;
 
         if (!telegramToken || !ownerId) {
             return res.status(500).json({
