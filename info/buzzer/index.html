@@ -78,11 +78,48 @@
             opacity: 0.5;
             cursor: not-allowed;
         }
+        .btn-filter {
+            background: #222;
+            color: #aaa;
+            border: 1px solid #333;
+            padding: 8px 18px;
+            border-radius: 20px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        .btn-filter:hover {
+            background: #333;
+            color: #fff;
+        }
+        .btn-filter.active {
+            background: #ffaa0044;
+            color: #ffaa00;
+            border-color: #ffaa0055;
+        }
         .header-actions {
             display: flex;
             gap: 10px;
             flex-wrap: wrap;
             margin-top: 10px;
+        }
+        .filter-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin: 12px 0 16px 0;
+            padding: 12px;
+            background: #0d0d0d;
+            border-radius: 12px;
+            border: 1px solid #ffaa0015;
+        }
+        .filter-group .filter-label {
+            color: #888;
+            font-size: 12px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            margin-right: 8px;
         }
         .misi-card {
             background: #0d0d0d;
@@ -122,12 +159,6 @@
             color: #00ccff;
             text-decoration: underline;
         }
-        .misi-card .target a.disabled-link {
-            color: #555;
-            text-decoration: line-through;
-            cursor: not-allowed;
-            pointer-events: none;
-        }
         .misi-card .pesan-box {
             background: #ffaa0008;
             border-left: 3px solid #ffaa00;
@@ -137,15 +168,6 @@
             color: #ddd;
             font-size: 13px;
             font-style: italic;
-        }
-        .misi-card .completed-by {
-            color: #888;
-            font-size: 12px;
-            margin-top: 8px;
-        }
-        .misi-card .completed-by .email-list {
-            color: #00ffaa;
-            font-weight: 500;
         }
         .misi-card .upload-area {
             margin-top: 14px;
@@ -185,6 +207,27 @@
             flex-wrap: wrap;
             gap: 10px;
             margin-bottom: 10px;
+        }
+        .misi-card .input-buzzer select {
+            flex: 1;
+            min-width: 120px;
+            background: #222;
+            color: #fff;
+            border: 1px solid #ffaa0033;
+            border-radius: 12px;
+            padding: 10px 14px;
+            font-size: 13px;
+            outline: none;
+            transition: 0.3s;
+            cursor: pointer;
+        }
+        .misi-card .input-buzzer select:focus {
+            border-color: #ffaa00;
+            box-shadow: 0 0 20px rgba(255,170,0,0.1);
+        }
+        .misi-card .input-buzzer select:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
         }
         .misi-card .input-buzzer input {
             flex: 1;
@@ -232,10 +275,6 @@
         @keyframes pulse {
             0%, 100% { opacity: 1; }
             50% { opacity: 0.5; }
-        }
-        .badge.closed {
-            background: #444;
-            color: #888;
         }
         .text-muted {
             color: #666;
@@ -336,6 +375,16 @@
             text-align: center;
             font-weight: 600;
         }
+        .no-account-warning {
+            background: #ffaa0010;
+            border: 1px solid #ffaa0044;
+            border-radius: 12px;
+            padding: 16px 20px;
+            color: #ffaa00;
+            text-align: center;
+            font-size: 14px;
+            margin: 10px 0;
+        }
         .hidden {
             display: none !important;
         }
@@ -358,8 +407,12 @@
             .misi-card .input-buzzer {
                 flex-direction: column;
             }
+            .misi-card .input-buzzer select,
             .misi-card .input-buzzer input {
                 width: 100%;
+            }
+            .filter-group {
+                flex-direction: column;
             }
         }
     </style>
@@ -381,7 +434,25 @@
             <div id="userInfo" style="color:#888;font-size:13px;margin-top:8px;">
                 👤 <span id="userEmailDisplay">-</span>
             </div>
-            <div class="env-status" id="envStatus">🔌 Mengambil konfigurasi dari server...</div>
+            <div id="accountInfo" style="color:#00ffaa;font-size:12px;margin-top:4px;">
+                📱 Akun Buzzer: <span id="accountCount">0</span> terdaftar
+            </div>
+            <div class="env-status" id="envStatus">🔌 Mengambil konfigurasi...</div>
+        </div>
+
+        <!-- ===== FILTER PLATFORM ===== -->
+        <div class="card" id="filterCard">
+            <div class="filter-group">
+                <span class="filter-label">🎯 Filter Platform:</span>
+                <button class="btn-filter active" data-filter="all" onclick="setFilter('all')">📋 Semua</button>
+                <button class="btn-filter" data-filter="Instagram" onclick="setFilter('Instagram')">📷 Instagram</button>
+                <button class="btn-filter" data-filter="TikTok" onclick="setFilter('TikTok')">🎵 TikTok</button>
+                <button class="btn-filter" data-filter="YouTube" onclick="setFilter('YouTube')">▶️ YouTube</button>
+                <button class="btn-filter" data-filter="Facebook" onclick="setFilter('Facebook')">👍 Facebook</button>
+                <button class="btn-filter" data-filter="Twitter" onclick="setFilter('Twitter')">🐦 Twitter/X</button>
+                <button class="btn-filter" data-filter="Telegram" onclick="setFilter('Telegram')">✈️ Telegram</button>
+                <button class="btn-filter" data-filter="WhatsApp" onclick="setFilter('WhatsApp')">💬 WhatsApp</button>
+            </div>
         </div>
 
         <!-- ===== LIST MISI ===== -->
@@ -398,17 +469,26 @@
         // ===================== KONFIGURASI =====================
         const DATA_URL = '/info/buzzer/data.json';
         const CONFIG_API = '/api/config';
+        const ACCOUNTS_FILE = '/info/accounts.json';
+        const BUZZ_ACCOUNTS_URL = '/info/buzz.json';
+        const RULES_URL = '/rules/';
         const MAX_KONFIRMASI_PER_USER = 5;
+        const LOGIN_PAGE = '/info/index.html';
 
-        // ===================== VARIABEL DARI ENV =====================
+        // ===================== VARIABEL =====================
         let TELEGRAM_TOKEN = '';
         let TELEGRAM_CHAT_ID = '';
+        let currentFilter = 'all';
+        let userAccounts = [];
+        let userData = {};
 
-        // ===================== CEK SESSION =====================
+        // ===================== CEK SESSION & REDIRECT =====================
         function checkSession() {
             const loggedIn = localStorage.getItem('logged_in');
-            if (loggedIn !== 'true') {
-                window.location.href = '/info/index.html';
+            const userEmail = localStorage.getItem('user_email');
+            
+            if (loggedIn !== 'true' || !userEmail) {
+                window.location.href = LOGIN_PAGE;
                 return false;
             }
             return true;
@@ -422,41 +502,30 @@
         function getUserData() {
             return {
                 email: localStorage.getItem('user_email') || '',
-                role: localStorage.getItem('user_role') || 'user'
+                role: localStorage.getItem('user_role') || 'user',
+                saldo: localStorage.getItem('user_saldo') || '0'
             };
         }
 
-        // ===================== AMBIL KONFIGURASI DARI API =====================
+        // ===================== AMBIL KONFIGURASI =====================
         async function fetchConfig() {
             const statusEl = document.getElementById('envStatus');
             try {
-                statusEl.textContent = '⏳ Mengambil konfigurasi dari server...';
+                statusEl.textContent = '⏳ Mengambil konfigurasi...';
                 statusEl.style.color = '#888';
                 
-                const res = await fetch(CONFIG_API + '?t=' + Date.now(), {
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Requested-With': 'XMLHttpRequest'
-                    },
-                    credentials: 'include'
-                });
-                
-                if (!res.ok) {
-                    throw new Error('Gagal mengambil konfigurasi: ' + res.status);
-                }
+                const res = await fetch(CONFIG_API + '?t=' + Date.now());
+                if (!res.ok) throw new Error('Gagal mengambil konfigurasi: ' + res.status);
 
                 const data = await res.json();
-                
-                if (!data.success) {
-                    throw new Error(data.message || 'Format data tidak valid');
-                }
+                if (!data.success) throw new Error(data.message || 'Format data tidak valid');
 
                 TELEGRAM_TOKEN = data.telegram_token;
                 TELEGRAM_CHAT_ID = data.owner_id;
 
                 statusEl.textContent = '✅ Konfigurasi berhasil dimuat';
                 statusEl.style.color = '#00ffaa';
-                console.log('✅ Telegram Config loaded from ENV');
+                console.log('✅ Telegram Config loaded');
                 return true;
 
             } catch (err) {
@@ -467,12 +536,104 @@
             }
         }
 
+        // ===================== AMBIL DATA AKUN BUZZER =====================
+        async function fetchBuzzerAccounts() {
+            try {
+                const res = await fetch(BUZZ_ACCOUNTS_URL + '?t=' + Date.now());
+                if (!res.ok) throw new Error('Gagal mengambil data akun buzzer');
+
+                const data = await res.json();
+                if (!Array.isArray(data)) throw new Error('Format data tidak valid');
+
+                const user = getUserData();
+                const found = data.find(item => item.email === user.email);
+                
+                if (found && found.accounts) {
+                    userAccounts = found.accounts;
+                    document.getElementById('accountCount').textContent = userAccounts.length;
+                    return userAccounts;
+                }
+
+                document.getElementById('accountCount').textContent = '0 (Tidak ada akun)';
+                return [];
+
+            } catch (err) {
+                console.error('Error fetch buzzer accounts:', err);
+                document.getElementById('accountCount').textContent = '❌ Gagal memuat';
+                return [];
+            }
+        }
+
+        // ===================== TAMPILKAN SYARAT & KETENTUAN =====================
+        async function showRules() {
+            try {
+                const res = await fetch(RULES_URL + '?t=' + Date.now());
+                if (!res.ok) throw new Error('Gagal mengambil syarat & ketentuan');
+
+                const rulesText = await res.text();
+                
+                const result = await Swal.fire({
+                    title: '📋 Syarat & Ketentuan Buzzer',
+                    html: `
+                        <div style="text-align:left;max-height:400px;overflow-y:auto;color:#ccc;font-size:13px;line-height:1.8;padding:10px;">
+                            ${rulesText || 'Syarat & ketentuan belum tersedia.'}
+                        </div>
+                        <div style="margin-top:15px;padding:10px;background:#ffaa0010;border-radius:8px;border:1px solid #ffaa0033;">
+                            <label style="color:#ffaa00;cursor:pointer;font-size:14px;">
+                                <input type="checkbox" id="rulesAgree" style="accent-color:#ffaa00;width:18px;height:18px;margin-right:10px;vertical-align:middle;">
+                                Saya sudah membaca dan menyetujui syarat & ketentuan
+                            </label>
+                        </div>
+                    `,
+                    icon: 'info',
+                    confirmButtonText: '✅ Lanjutkan',
+                    cancelButtonText: '❌ Batal',
+                    showCancelButton: true,
+                    confirmButtonColor: '#ffaa00',
+                    cancelButtonColor: '#666',
+                    preConfirm: () => {
+                        const agree = document.getElementById('rulesAgree');
+                        if (!agree || !agree.checked) {
+                            Swal.showValidationMessage('⚠️ Anda harus menyetujui syarat & ketentuan terlebih dahulu!');
+                            return false;
+                        }
+                        return true;
+                    },
+                    allowOutsideClick: false
+                });
+
+                return result.isConfirmed;
+
+            } catch (err) {
+                console.error('Error show rules:', err);
+                Swal.fire({
+                    title: '❌ Gagal',
+                    text: 'Gagal mengambil syarat & ketentuan.',
+                    icon: 'error',
+                    confirmButtonColor: '#ffaa00'
+                });
+                return false;
+            }
+        }
+
+        // ===================== FILTER MISI =====================
+        function setFilter(platform) {
+            currentFilter = platform;
+            
+            // Update button aktif
+            document.querySelectorAll('.btn-filter').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.filter === platform);
+            });
+            
+            loadMisi();
+        }
+
         // ===================== HITUNG KONFIRMASI PER USER =====================
         function getUserKonfirmasiCount(history, userEmail) {
             return history.filter(h => h.user === userEmail).length;
         }
 
-        // ===================== CEK APAKAH USERNAME SUDAH PERNAH DIPAKAI =====================
+        // ===================== CEK USERNAME SUDAH DIPAKAI =====================
         function isUsernameAlreadyUsed(history, username, excludeIndex = -1) {
             return history.some((h, idx) => {
                 if (idx === excludeIndex) return false;
@@ -480,7 +641,7 @@
             });
         }
 
-        // ===================== CEK APAKAH KUOTA MISI PENUH =====================
+        // ===================== CEK KUOTA MISI PENUH =====================
         function isMisiFull(misi) {
             const history = misi.History || [];
             const jumlah = misi.Jumlah || 0;
@@ -496,6 +657,9 @@
             const user = getUserData();
             document.getElementById('userEmailDisplay').textContent = user.email || 'Belum login';
 
+            // Ambil data akun buzzer
+            await fetchBuzzerAccounts();
+
             try {
                 const res = await fetch(DATA_URL + '?t=' + Date.now());
                 if (!res.ok) throw new Error('Gagal mengambil data misi');
@@ -506,25 +670,35 @@
                     return;
                 }
 
+                // Filter misi berdasarkan platform
+                let filteredData = data;
+                if (currentFilter !== 'all') {
+                    filteredData = data.filter(misi => {
+                        const taskLower = (misi.Tugas || '').toLowerCase();
+                        const filterLower = currentFilter.toLowerCase();
+                        return taskLower.includes(filterLower);
+                    });
+                }
+
+                if (filteredData.length === 0) {
+                    container.innerHTML = `<div class="no-data">📭 Tidak ada misi untuk platform <b>${currentFilter}</b>.</div>`;
+                    return;
+                }
+
                 let html = '';
-                data.forEach((misi, index) => {
+                filteredData.forEach((misi, index) => {
                     const history = misi.History || [];
                     const completedList = history.map(h => h.user);
                     
-                    // CEK APAKAH MISI SUDAH PENUH
                     const isFull = isMisiFull(misi);
-                    
-                    // Hitung konfirmasi user untuk misi ini
                     const userCount = getUserKonfirmasiCount(history, user.email);
                     const isLimitReached = userCount >= MAX_KONFIRMASI_PER_USER;
                     const isCompleted = completedList.includes(user.email);
                     
-                    // Cek apakah user bisa upload (misi belum penuh DAN user belum limit)
-                    const canUpload = !isFull && !isLimitReached && !isCompleted;
+                    const canUpload = !isFull && !isLimitReached && !isCompleted && userAccounts.length > 0;
                     
                     const progress = misi.Jumlah ? Math.min((completedList.length / misi.Jumlah) * 100, 100) : 0;
 
-                    // Buat riwayat
                     let historyHtml = '';
                     if (history.length > 0) {
                         historyHtml = `<div style="margin-top:10px;"><strong style="color:#888;font-size:12px;">📜 Riwayat Penyelesaian:</strong>`;
@@ -537,17 +711,16 @@
                                     <span class="h-bukti">| Bukti: ${h.bukti || 'Tidak ada'}</span>
                                     ${h.nama ? `<span style="color:#ffaa00;font-size:10px;">| @${h.nama}</span>` : ''}
                                     ${h.konfirmasi_ke ? `<span style="color:#ffaa00;font-size:10px;">| #${h.konfirmasi_ke}</span>` : ''}
+                                    ${h.used_account ? `<span style="color:#00ffaa;font-size:10px;">| 📱 ${h.used_account}</span>` : ''}
                                 </div>
                             `;
                         });
                         historyHtml += `</div>`;
                     }
 
-                    // Pesan 1 & Pesan 2
                     const pesan1 = Array.isArray(misi.Pesan) ? misi.Pesan[0] || '-' : misi.Pesan || '-';
                     const pesan2 = Array.isArray(misi.Pesan) && misi.Pesan[1] ? misi.Pesan[1] : '-';
 
-                    // Status badge
                     let statusBadge = '';
                     if (isFull) {
                         statusBadge = `<span class="badge full">🔒 MISI TELAH SELESAI</span>`;
@@ -559,22 +732,42 @@
                         statusBadge = `<span class="badge">⏳ ${userCount}/${MAX_KONFIRMASI_PER_USER}</span>`;
                     }
 
-                    // Target link - disabled jika misi penuh
                     const targetLink = isFull 
                         ? `<span class="target" style="color:#555;">🔒 Target telah ditutup (kuota penuh)</span>`
                         : `<div class="target"><strong>🎯 Target:</strong> 
                             <a href="${misi.Target || '#'}" target="_blank">${misi.Target || '-'}</a>
                            </div>`;
 
-                    // Upload area - hidden jika misi penuh
+                    // No account warning
+                    const noAccountWarning = userAccounts.length === 0 && !isFull ? `
+                        <div class="no-account-warning">
+                            ⚠️ Anda belum memiliki akun buzzer terdaftar. 
+                            Hubungi admin untuk menambahkan akun.
+                        </div>
+                    ` : '';
+
+                    // Akun buzzer options
+                    let accountOptions = '<option value="">Pilih akun yang digunakan...</option>';
+                    userAccounts.forEach(acc => {
+                        accountOptions += `
+                            <option value="${acc.platform}|${acc.username}">
+                                ${acc.platform}: ${acc.username}
+                            </option>
+                        `;
+                    });
+
                     const uploadArea = isFull ? `
                         <div class="closed-info">
                             🔒 MISI TELAH SELESAI - Kuota ${misi.Jumlah || '∞'} target telah terpenuhi
                         </div>
                     ` : `
+                        ${noAccountWarning}
                         <div class="input-buzzer">
-                            <input type="text" id="buzzerName-${index}" placeholder="Nama/Username Buzzer (wajib unik)" style="flex:2;" ${!canUpload ? 'disabled' : ''}>
-                            <input type="text" id="buzzerEmail-${index}" placeholder="Gmail Buzzer" style="flex:2;" value="${user.email}" ${!canUpload ? 'disabled' : ''}>
+                            <select id="accountSelect-${index}" ${!canUpload ? 'disabled' : ''}>
+                                ${accountOptions}
+                            </select>
+                            <input type="text" id="buzzerName-${index}" placeholder="Nama/Username Buzzer" style="flex:1;" ${!canUpload ? 'disabled' : ''}>
+                            <input type="email" id="buzzerEmail-${index}" value="${user.email}" style="flex:1;" disabled>
                         </div>
 
                         <div class="upload-area">
@@ -583,9 +776,9 @@
                                 ${isLimitReached ? '⛔ Limit 5' : isCompleted ? '✅ Selesai' : '📤 Upload Bukti'}
                             </button>
                         </div>
-                        ${isLimitReached ? '<div class="text-muted" style="margin-top:4px;">⛔ Anda sudah mencapai batas 5 konfirmasi untuk misi ini.</div>' : ''}
+                        ${isLimitReached ? '<div class="text-muted" style="margin-top:4px;">⛔ Anda sudah mencapai batas 5 konfirmasi.</div>' : ''}
                         ${isCompleted && !isLimitReached ? '<div class="text-muted" style="margin-top:4px;">✨ Anda sudah menyelesaikan misi ini.</div>' : ''}
-                        ${!isCompleted && !isLimitReached && !isFull ? '<div class="text-muted" style="margin-top:4px;">📌 Gunakan username yang berbeda untuk setiap konfirmasi.</div>' : ''}
+                        ${!isCompleted && !isLimitReached && !isFull && userAccounts.length > 0 ? '<div class="text-muted" style="margin-top:4px;">📌 Pilih akun yang digunakan untuk mengerjakan misi.</div>' : ''}
                     `;
 
                     html += `
@@ -618,7 +811,7 @@
 
                             ${isLimitReached && !isFull ? `
                                 <div class="limit-info">
-                                    <span>⛔ Anda sudah mencapai batas maksimal ${MAX_KONFIRMASI_PER_USER} konfirmasi untuk misi ini.</span>
+                                    <span>⛔ Anda sudah mencapai batas maksimal ${MAX_KONFIRMASI_PER_USER} konfirmasi.</span>
                                     <span class="count">${userCount}/${MAX_KONFIRMASI_PER_USER}</span>
                                 </div>
                             ` : ''}
@@ -632,21 +825,23 @@
 
                 container.innerHTML = html;
 
-                // ===== ATTACH EVENT UPLOAD (hanya jika misi belum penuh) =====
-                data.forEach((misi, index) => {
+                // ===== ATTACH EVENT UPLOAD =====
+                filteredData.forEach((misi, index) => {
                     const isFull = isMisiFull(misi);
                     if (isFull) return;
 
                     const btn = document.getElementById(`uploadBtn-${index}`);
                     const fileInput = document.getElementById(`fileInput-${index}`);
+                    const accountSelect = document.getElementById(`accountSelect-${index}`);
                     const nameInput = document.getElementById(`buzzerName-${index}`);
                     const emailInput = document.getElementById(`buzzerEmail-${index}`);
 
                     if (btn && fileInput && !btn.disabled) {
                         btn.addEventListener('click', function() {
+                            const selectedAccount = accountSelect ? accountSelect.value : '';
                             const buzzerName = nameInput ? nameInput.value.trim() : '-';
                             const buzzerEmail = emailInput ? emailInput.value.trim() : user.email;
-                            handleUpload(misi, index, fileInput, buzzerName, buzzerEmail);
+                            handleUpload(misi, index, fileInput, buzzerName, buzzerEmail, selectedAccount);
                         });
                     }
                 });
@@ -658,11 +853,15 @@
         }
 
         // ===================== HANDLE UPLOAD =====================
-        async function handleUpload(misi, index, fileInput, buzzerName, buzzerEmail) {
+        async function handleUpload(misi, index, fileInput, buzzerName, buzzerEmail, selectedAccount) {
             const user = getUserData();
             const file = fileInput.files[0];
 
-            // CEK APAKAH MISI SUDAH PENUH
+            // CEK SYARAT & KETENTUAN
+            const rulesAccepted = await showRules();
+            if (!rulesAccepted) return;
+
+            // CEK MISI PENUH
             if (isMisiFull(misi)) {
                 Swal.fire({
                     title: '🔒 Misi Telah Selesai',
@@ -684,11 +883,32 @@
                 return;
             }
 
+            if (!selectedAccount) {
+                Swal.fire({
+                    title: '⚠️ Pilih Akun Buzzer',
+                    text: 'Silakan pilih akun yang digunakan untuk mengerjakan misi.',
+                    icon: 'warning',
+                    confirmButtonColor: '#ffaa00'
+                });
+                return;
+            }
+
             if (!buzzerName) {
                 Swal.fire({
                     title: '⚠️ Isi Nama Buzzer',
                     text: 'Silakan isi nama/username buzzer terlebih dahulu.',
                     icon: 'warning',
+                    confirmButtonColor: '#ffaa00'
+                });
+                return;
+            }
+
+            // CEK APAKAH USER PUNYA AKUN
+            if (userAccounts.length === 0) {
+                Swal.fire({
+                    title: '⚠️ Tidak Ada Akun',
+                    text: 'Anda tidak memiliki akun buzzer terdaftar. Hubungi admin.',
+                    icon: 'error',
                     confirmButtonColor: '#ffaa00'
                 });
                 return;
@@ -742,6 +962,7 @@
                         <b>🎯 Target:</b> ${misi.Target}<br>
                         <b>👤 Nama Buzzer:</b> ${buzzerName}<br>
                         <b>📧 Email:</b> ${buzzerEmail}<br>
+                        <b>📱 Akun Digunakan:</b> ${selectedAccount.replace('|', ' - ')}<br>
                         <b>📎 File:</b> ${file.name}<br>
                         <b>📊 Konfirmasi ke-:</b> ${userCount + 1} / ${MAX_KONFIRMASI_PER_USER}
                     </div>
@@ -775,6 +996,8 @@
                 const pesan1 = Array.isArray(misi.Pesan) ? misi.Pesan[0] || '-' : misi.Pesan || '-';
                 const pesan2 = Array.isArray(misi.Pesan) && misi.Pesan[1] ? misi.Pesan[1] : '-';
 
+                const [platform, username] = selectedAccount.split('|');
+
                 // Kirim pesan teks ke Telegram
                 const textMessage = `
 📢 **LAPORAN BUZZER MISI**
@@ -786,6 +1009,7 @@
 
 👤 **Nama Buzzer:** ${buzzerName}
 📧 **Email:** ${buzzerEmail}
+📱 **Akun Digunakan:** ${platform} - ${username}
 📅 **Tanggal:** ${tanggal}
 📊 **Konfirmasi ke-:** ${userCount + 1} / ${MAX_KONFIRMASI_PER_USER}
 
@@ -811,7 +1035,7 @@
                 const formData = new FormData();
                 formData.append('chat_id', TELEGRAM_CHAT_ID);
                 formData.append('photo', file);
-                formData.append('caption', `📸 Bukti: ${misi.Tugas} - ${buzzerName} [${misi.id_misi || '-'}] (${userCount + 1}/${MAX_KONFIRMASI_PER_USER})`);
+                formData.append('caption', `📸 Bukti: ${misi.Tugas} - ${buzzerName} [${misi.id_misi || '-'}] (${userCount + 1}/${MAX_KONFIRMASI_PER_USER}) | Akun: ${platform} - ${username}`);
 
                 await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendPhoto`, {
                     method: 'POST',
@@ -830,7 +1054,8 @@
                     id_misi: misi.id_misi || '-',
                     misi: misi.Tugas,
                     target: misi.Target,
-                    konfirmasi_ke: userCount + 1
+                    konfirmasi_ke: userCount + 1,
+                    used_account: `${platform} - ${username}`
                 });
 
                 localStorage.setItem(historyKey, JSON.stringify(historyData));
@@ -840,7 +1065,8 @@
                     html: `
                         Bukti untuk misi <b>"${misi.Tugas}"</b> berhasil dikirim!<br>
                         <span style="font-size:13px;color:#888;">🆔 ${misi.id_misi || '-'} | Nama: ${buzzerName}</span><br>
-                        <span style="font-size:13px;color:#ffaa00;">📊 Konfirmasi ke-${userCount + 1} / ${MAX_KONFIRMASI_PER_USER}</span>
+                        <span style="font-size:13px;color:#ffaa00;">📊 Konfirmasi ke-${userCount + 1} / ${MAX_KONFIRMASI_PER_USER}</span><br>
+                        <span style="font-size:13px;color:#00ffaa;">📱 Akun: ${platform} - ${username}</span>
                     `,
                     icon: 'success',
                     confirmButtonColor: '#ffaa00'
@@ -865,9 +1091,8 @@
 
         // ===================== INIT =====================
         document.addEventListener('DOMContentLoaded', async function() {
-            // Ambil konfigurasi dari ENV dulu
+            // Ambil konfigurasi
             const configLoaded = await fetchConfig();
-            
             if (!configLoaded) {
                 Swal.fire({
                     title: '❌ Gagal memuat konfigurasi',
@@ -879,7 +1104,7 @@
             }
 
             // Load misi
-            loadMisi();
+            await loadMisi();
         });
 
         // Refresh otomatis setiap 30 detik
@@ -888,7 +1113,7 @@
         console.log('📢 Buzzer Misi siap!');
         console.log('👤 User:', getUserData().email);
         console.log('📊 Maks konfirmasi per user:', MAX_KONFIRMASI_PER_USER);
-        console.log('🔐 Telegram Config loaded from ENV');
+        console.log('🔐 Telegram Config loaded');
     </script>
 </body>
 </html>
