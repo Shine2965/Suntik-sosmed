@@ -159,6 +159,12 @@
             color: #00ccff;
             text-decoration: underline;
         }
+        .misi-card .target a.disabled-link {
+            color: #555;
+            text-decoration: line-through;
+            cursor: not-allowed;
+            pointer-events: none;
+        }
         .misi-card .pesan-box {
             background: #ffaa0008;
             border-left: 3px solid #ffaa00;
@@ -272,6 +278,10 @@
             color: #ff4444;
             animation: pulse 1.5s ease-in-out infinite;
         }
+        .badge.no-account {
+            background: #ff444422;
+            color: #ff6666;
+        }
         @keyframes pulse {
             0%, 100% { opacity: 1; }
             50% { opacity: 0.5; }
@@ -384,6 +394,26 @@
             text-align: center;
             font-size: 14px;
             margin: 10px 0;
+        }
+        .no-account-warning .icon {
+            font-size: 24px;
+            display: block;
+            margin-bottom: 6px;
+        }
+        .no-account-warning .btn-contact {
+            display: inline-block;
+            margin-top: 10px;
+            padding: 8px 20px;
+            background: #ffaa0044;
+            color: #ffaa00;
+            border: 1px solid #ffaa0055;
+            border-radius: 20px;
+            text-decoration: none;
+            font-size: 13px;
+            transition: 0.3s;
+        }
+        .no-account-warning .btn-contact:hover {
+            background: #ffaa0066;
         }
         .hidden {
             display: none !important;
@@ -551,15 +581,20 @@
                 if (found && found.accounts) {
                     userAccounts = found.accounts;
                     document.getElementById('accountCount').textContent = userAccounts.length;
+                    document.getElementById('accountCount').style.color = userAccounts.length > 0 ? '#00ffaa' : '#ff6666';
                     return userAccounts;
                 }
 
-                document.getElementById('accountCount').textContent = '0 (Tidak ada akun)';
+                userAccounts = [];
+                document.getElementById('accountCount').textContent = '0 ❌ Tidak ada akun';
+                document.getElementById('accountCount').style.color = '#ff6666';
                 return [];
 
             } catch (err) {
                 console.error('Error fetch buzzer accounts:', err);
+                userAccounts = [];
                 document.getElementById('accountCount').textContent = '❌ Gagal memuat';
+                document.getElementById('accountCount').style.color = '#ff6666';
                 return [];
             }
         }
@@ -620,7 +655,6 @@
         function setFilter(platform) {
             currentFilter = platform;
             
-            // Update button aktif
             document.querySelectorAll('.btn-filter').forEach(btn => {
                 btn.classList.toggle('active', btn.dataset.filter === platform);
             });
@@ -649,6 +683,11 @@
             return history.length >= jumlah;
         }
 
+        // ===================== CEK APAKAH USER PUNYA AKUN =====================
+        function hasUserAccounts() {
+            return userAccounts.length > 0;
+        }
+
         // ===================== LOAD MISI =====================
         async function loadMisi() {
             const container = document.getElementById('misiContainer');
@@ -659,6 +698,8 @@
 
             // Ambil data akun buzzer
             await fetchBuzzerAccounts();
+
+            const hasAccounts = hasUserAccounts();
 
             try {
                 const res = await fetch(DATA_URL + '?t=' + Date.now());
@@ -695,7 +736,8 @@
                     const isLimitReached = userCount >= MAX_KONFIRMASI_PER_USER;
                     const isCompleted = completedList.includes(user.email);
                     
-                    const canUpload = !isFull && !isLimitReached && !isCompleted && userAccounts.length > 0;
+                    // CEK APAKAH USER PUNYA AKUN
+                    const canUpload = hasAccounts && !isFull && !isLimitReached && !isCompleted;
                     
                     const progress = misi.Jumlah ? Math.min((completedList.length / misi.Jumlah) * 100, 100) : 0;
 
@@ -724,6 +766,8 @@
                     let statusBadge = '';
                     if (isFull) {
                         statusBadge = `<span class="badge full">🔒 MISI TELAH SELESAI</span>`;
+                    } else if (!hasAccounts) {
+                        statusBadge = `<span class="badge no-account">⛔ Tidak Ada Akun</span>`;
                     } else if (isLimitReached) {
                         statusBadge = `<span class="badge limit">⛔ Limit 5</span>`;
                     } else if (isCompleted) {
@@ -732,21 +776,34 @@
                         statusBadge = `<span class="badge">⏳ ${userCount}/${MAX_KONFIRMASI_PER_USER}</span>`;
                     }
 
-                    const targetLink = isFull 
-                        ? `<span class="target" style="color:#555;">🔒 Target telah ditutup (kuota penuh)</span>`
-                        : `<div class="target"><strong>🎯 Target:</strong> 
+                    // ===== TARGET LINK - HANYA MUNCUL JIKA PUNYA AKUN =====
+                    let targetHtml = '';
+                    if (hasAccounts && !isFull) {
+                        targetHtml = `<div class="target"><strong>🎯 Target:</strong> 
                             <a href="${misi.Target || '#'}" target="_blank">${misi.Target || '-'}</a>
-                           </div>`;
+                        </div>`;
+                    } else if (isFull) {
+                        targetHtml = `<span class="target" style="color:#555;">🔒 Target telah ditutup (kuota penuh)</span>`;
+                    } else {
+                        targetHtml = `
+                            <div class="target" style="color:#555;">
+                                🔒 Target tidak tersedia - <span style="color:#ff6666;">Anda belum memiliki akun buzzer</span>
+                            </div>
+                        `;
+                    }
 
-                    // No account warning
-                    const noAccountWarning = userAccounts.length === 0 && !isFull ? `
+                    // ===== NO ACCOUNT WARNING =====
+                    const noAccountWarning = !hasAccounts && !isFull ? `
                         <div class="no-account-warning">
-                            ⚠️ Anda belum memiliki akun buzzer terdaftar. 
-                            Hubungi admin untuk menambahkan akun.
+                            <span class="icon">⚠️</span>
+                            Anda belum memiliki akun buzzer yang terdaftar.<br>
+                            Untuk dapat mengerjakan misi, silakan daftarkan akun Anda terlebih dahulu.
+                            <br>
+                            <a href="https://wa.me/6289518103883" target="_blank" class="btn-contact">📱 Hubungi Admin</a>
                         </div>
                     ` : '';
 
-                    // Akun buzzer options
+                    // ===== AKUN BUZZER OPTIONS =====
                     let accountOptions = '<option value="">Pilih akun yang digunakan...</option>';
                     userAccounts.forEach(acc => {
                         accountOptions += `
@@ -756,30 +813,42 @@
                         `;
                     });
 
-                    const uploadArea = isFull ? `
-                        <div class="closed-info">
-                            🔒 MISI TELAH SELESAI - Kuota ${misi.Jumlah || '∞'} target telah terpenuhi
-                        </div>
-                    ` : `
-                        ${noAccountWarning}
-                        <div class="input-buzzer">
-                            <select id="accountSelect-${index}" ${!canUpload ? 'disabled' : ''}>
-                                ${accountOptions}
-                            </select>
-                            <input type="text" id="buzzerName-${index}" placeholder="Nama/Username Buzzer" style="flex:1;" ${!canUpload ? 'disabled' : ''}>
-                            <input type="email" id="buzzerEmail-${index}" value="${user.email}" style="flex:1;" disabled>
-                        </div>
+                    // ===== UPLOAD AREA - HANYA MUNCUL JIKA PUNYA AKUN =====
+                    let uploadAreaHtml = '';
+                    if (isFull) {
+                        uploadAreaHtml = `
+                            <div class="closed-info">
+                                🔒 MISI TELAH SELESAI - Kuota ${misi.Jumlah || '∞'} target telah terpenuhi
+                            </div>
+                        `;
+                    } else if (!hasAccounts) {
+                        uploadAreaHtml = `
+                            <div style="text-align:center;padding:12px;color:#ff6666;background:#ff444415;border-radius:12px;border:1px solid #ff444455;">
+                                ⛔ Akun buzzer tidak ditemukan. Hubungi admin untuk mendaftarkan akun.
+                            </div>
+                        `;
+                    } else {
+                        uploadAreaHtml = `
+                            ${noAccountWarning}
+                            <div class="input-buzzer">
+                                <select id="accountSelect-${index}" ${!canUpload ? 'disabled' : ''}>
+                                    ${accountOptions}
+                                </select>
+                                <input type="text" id="buzzerName-${index}" placeholder="Nama/Username Buzzer" style="flex:1;" ${!canUpload ? 'disabled' : ''}>
+                                <input type="email" id="buzzerEmail-${index}" value="${user.email}" style="flex:1;" disabled>
+                            </div>
 
-                        <div class="upload-area">
-                            <input type="file" id="fileInput-${index}" accept="image/*" ${!canUpload ? 'disabled' : ''}>
-                            <button class="btn btn-upload" id="uploadBtn-${index}" ${!canUpload ? 'disabled' : ''}>
-                                ${isLimitReached ? '⛔ Limit 5' : isCompleted ? '✅ Selesai' : '📤 Upload Bukti'}
-                            </button>
-                        </div>
-                        ${isLimitReached ? '<div class="text-muted" style="margin-top:4px;">⛔ Anda sudah mencapai batas 5 konfirmasi.</div>' : ''}
-                        ${isCompleted && !isLimitReached ? '<div class="text-muted" style="margin-top:4px;">✨ Anda sudah menyelesaikan misi ini.</div>' : ''}
-                        ${!isCompleted && !isLimitReached && !isFull && userAccounts.length > 0 ? '<div class="text-muted" style="margin-top:4px;">📌 Pilih akun yang digunakan untuk mengerjakan misi.</div>' : ''}
-                    `;
+                            <div class="upload-area">
+                                <input type="file" id="fileInput-${index}" accept="image/*" ${!canUpload ? 'disabled' : ''}>
+                                <button class="btn btn-upload" id="uploadBtn-${index}" ${!canUpload ? 'disabled' : ''}>
+                                    ${isLimitReached ? '⛔ Limit 5' : isCompleted ? '✅ Selesai' : '📤 Upload Bukti'}
+                                </button>
+                            </div>
+                            ${isLimitReached ? '<div class="text-muted" style="margin-top:4px;">⛔ Anda sudah mencapai batas 5 konfirmasi.</div>' : ''}
+                            ${isCompleted && !isLimitReached ? '<div class="text-muted" style="margin-top:4px;">✨ Anda sudah menyelesaikan misi ini.</div>' : ''}
+                            ${!isCompleted && !isLimitReached && !isFull && hasAccounts ? '<div class="text-muted" style="margin-top:4px;">📌 Pilih akun yang digunakan untuk mengerjakan misi.</div>' : ''}
+                        `;
+                    }
 
                     html += `
                         <div class="misi-card" id="misi-${index}">
@@ -798,7 +867,7 @@
                                 <div class="fill ${isFull ? 'full' : ''}" style="width:${Math.min(progress, 100)}%;"></div>
                             </div>
 
-                            ${targetLink}
+                            ${targetHtml}
 
                             ${misi.Pesan ? `
                                 <div class="pesan-box">
@@ -809,7 +878,7 @@
 
                             ${historyHtml}
 
-                            ${isLimitReached && !isFull ? `
+                            ${isLimitReached && !isFull && hasAccounts ? `
                                 <div class="limit-info">
                                     <span>⛔ Anda sudah mencapai batas maksimal ${MAX_KONFIRMASI_PER_USER} konfirmasi.</span>
                                     <span class="count">${userCount}/${MAX_KONFIRMASI_PER_USER}</span>
@@ -818,33 +887,35 @@
 
                             <div class="divider"></div>
 
-                            ${uploadArea}
+                            ${uploadAreaHtml}
                         </div>
                     `;
                 });
 
                 container.innerHTML = html;
 
-                // ===== ATTACH EVENT UPLOAD =====
-                filteredData.forEach((misi, index) => {
-                    const isFull = isMisiFull(misi);
-                    if (isFull) return;
+                // ===== ATTACH EVENT UPLOAD (hanya jika user punya akun) =====
+                if (hasAccounts) {
+                    filteredData.forEach((misi, index) => {
+                        const isFull = isMisiFull(misi);
+                        if (isFull) return;
 
-                    const btn = document.getElementById(`uploadBtn-${index}`);
-                    const fileInput = document.getElementById(`fileInput-${index}`);
-                    const accountSelect = document.getElementById(`accountSelect-${index}`);
-                    const nameInput = document.getElementById(`buzzerName-${index}`);
-                    const emailInput = document.getElementById(`buzzerEmail-${index}`);
+                        const btn = document.getElementById(`uploadBtn-${index}`);
+                        const fileInput = document.getElementById(`fileInput-${index}`);
+                        const accountSelect = document.getElementById(`accountSelect-${index}`);
+                        const nameInput = document.getElementById(`buzzerName-${index}`);
+                        const emailInput = document.getElementById(`buzzerEmail-${index}`);
 
-                    if (btn && fileInput && !btn.disabled) {
-                        btn.addEventListener('click', function() {
-                            const selectedAccount = accountSelect ? accountSelect.value : '';
-                            const buzzerName = nameInput ? nameInput.value.trim() : '-';
-                            const buzzerEmail = emailInput ? emailInput.value.trim() : user.email;
-                            handleUpload(misi, index, fileInput, buzzerName, buzzerEmail, selectedAccount);
-                        });
-                    }
-                });
+                        if (btn && fileInput && !btn.disabled) {
+                            btn.addEventListener('click', function() {
+                                const selectedAccount = accountSelect ? accountSelect.value : '';
+                                const buzzerName = nameInput ? nameInput.value.trim() : '-';
+                                const buzzerEmail = emailInput ? emailInput.value.trim() : user.email;
+                                handleUpload(misi, index, fileInput, buzzerName, buzzerEmail, selectedAccount);
+                            });
+                        }
+                    });
+                }
 
             } catch (err) {
                 console.error('Error load misi:', err);
@@ -856,6 +927,17 @@
         async function handleUpload(misi, index, fileInput, buzzerName, buzzerEmail, selectedAccount) {
             const user = getUserData();
             const file = fileInput.files[0];
+
+            // CEK APAKAH USER PUNYA AKUN
+            if (!hasUserAccounts()) {
+                Swal.fire({
+                    title: '⛔ Tidak Ada Akun',
+                    text: 'Anda tidak memiliki akun buzzer terdaftar. Hubungi admin untuk mendaftarkan akun.',
+                    icon: 'error',
+                    confirmButtonColor: '#ffaa00'
+                });
+                return;
+            }
 
             // CEK SYARAT & KETENTUAN
             const rulesAccepted = await showRules();
@@ -898,17 +980,6 @@
                     title: '⚠️ Isi Nama Buzzer',
                     text: 'Silakan isi nama/username buzzer terlebih dahulu.',
                     icon: 'warning',
-                    confirmButtonColor: '#ffaa00'
-                });
-                return;
-            }
-
-            // CEK APAKAH USER PUNYA AKUN
-            if (userAccounts.length === 0) {
-                Swal.fire({
-                    title: '⚠️ Tidak Ada Akun',
-                    text: 'Anda tidak memiliki akun buzzer terdaftar. Hubungi admin.',
-                    icon: 'error',
                     confirmButtonColor: '#ffaa00'
                 });
                 return;
