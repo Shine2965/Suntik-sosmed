@@ -621,10 +621,18 @@
                 if (!Array.isArray(data)) throw new Error('Format data tidak valid');
 
                 const user = getUserData();
-                const found = data.find(item => item.email === user.email);
+                
+                // Cari user berdasarkan email (case insensitive)
+                const found = data.find(item => 
+                    item.email && item.email.toLowerCase() === user.email.toLowerCase()
+                );
                 
                 if (found && found.accounts) {
-                    userAccounts = found.accounts;
+                    // FILTER: Hanya tampilkan akun dengan username bukan "-"
+                    const validAccounts = found.accounts.filter(acc => 
+                        acc.username && acc.username !== '-' && acc.username.trim() !== ''
+                    );
+                    userAccounts = validAccounts;
                     document.getElementById('accountCount').textContent = userAccounts.length;
                     document.getElementById('accountCount').style.color = userAccounts.length > 0 ? '#00ffaa' : '#ff6666';
                     return userAccounts;
@@ -762,7 +770,6 @@
             
             if (pesanList.length === 0) return null;
             
-            // Jika sudah melebihi jumlah pesan, tampilkan pesan terakhir
             if (completedCount >= pesanList.length) {
                 return {
                     index: pesanList.length - 1,
@@ -772,7 +779,6 @@
                 };
             }
             
-            // Tampilkan pesan sesuai urutan konfirmasi
             return {
                 index: completedCount,
                 text: pesanList[completedCount],
@@ -949,17 +955,30 @@
                         </div>
                     ` : '';
 
-                    // ===== AKUN BUZZER OPTIONS (hanya yang sesuai platform) =====
+                    // ===== AKUN BUZZER OPTIONS (hanya yang sesuai platform & username valid) =====
                     let accountOptions = '<option value="">Pilih akun yang digunakan...</option>';
+                    
+                    // Gunakan filteredAccounts (sudah terfilter platform)
                     const accountsToShow = hasMatchingAccount ? filteredAccounts : userAccounts;
-                    accountsToShow.forEach(acc => {
-                        const isMatching = misiPlatform && acc.platform && acc.platform.toLowerCase() === misiPlatform.toLowerCase();
-                        accountOptions += `
-                            <option value="${acc.platform}|${acc.username}" ${isMatching ? 'selected' : ''}>
-                                ${acc.platform}: ${acc.username}
-                            </option>
-                        `;
-                    });
+                    
+                    // Hanya tampilkan akun dengan username bukan "-"
+                    const validAccountsToShow = accountsToShow.filter(acc => 
+                        acc.username && acc.username !== '-' && acc.username.trim() !== ''
+                    );
+                    
+                    if (validAccountsToShow.length === 0) {
+                        accountOptions = '<option value="" disabled>Tidak ada akun valid</option>';
+                    } else {
+                        validAccountsToShow.forEach(acc => {
+                            const isMatching = misiPlatform && acc.platform && 
+                                acc.platform.toLowerCase() === misiPlatform.toLowerCase();
+                            accountOptions += `
+                                <option value="${acc.platform}|${acc.username}" ${isMatching ? 'selected' : ''}>
+                                    ${acc.platform}: ${acc.username}
+                                </option>
+                            `;
+                        });
+                    }
 
                     // ===== UPLOAD AREA =====
                     let uploadAreaHtml = '';
@@ -969,32 +988,35 @@
                                 🔒 MISI TELAH SELESAI - Kuota ${misi.Jumlah || '∞'} target telah terpenuhi
                             </div>
                         `;
-                    } else if (!hasAccounts || !hasMatchingAccount) {
+                    } else if (!hasAccounts || !hasMatchingAccount || validAccountsToShow.length === 0) {
                         uploadAreaHtml = `
                             <div style="text-align:center;padding:12px;color:#ff6666;background:#ff444415;border-radius:12px;border:1px solid #ff444455;">
-                                ⛔ Akun buzzer tidak ditemukan untuk platform ini. Hubungi admin untuk mendaftarkan akun.
+                                ⛔ ${!hasAccounts ? 'Akun buzzer tidak ditemukan.' : validAccountsToShow.length === 0 ? 'Tidak ada akun valid untuk platform ini.' : 'Akun buzzer tidak ditemukan untuk platform ini.'} 
+                                Hubungi admin untuk mendaftarkan akun.
                             </div>
                         `;
                     } else {
+                        const canUploadFinal = hasAccounts && hasMatchingAccount && validAccountsToShow.length > 0 && !isFull && !isLimitReached && !isCompleted;
+                        
                         uploadAreaHtml = `
                             ${noAccountWarning}
                             <div class="input-buzzer">
-                                <select id="accountSelect-${index}" ${!canUpload ? 'disabled' : ''}>
+                                <select id="accountSelect-${index}" ${!canUploadFinal ? 'disabled' : ''}>
                                     ${accountOptions}
                                 </select>
-                                <input type="text" id="buzzerName-${index}" placeholder="Nama/Username Buzzer" style="flex:1;" ${!canUpload ? 'disabled' : ''}>
+                                <input type="text" id="buzzerName-${index}" placeholder="Nama/Username Buzzer" style="flex:1;" ${!canUploadFinal ? 'disabled' : ''}>
                                 <input type="email" id="buzzerEmail-${index}" value="${user.email}" style="flex:1;" disabled>
                             </div>
 
                             <div class="upload-area">
-                                <input type="file" id="fileInput-${index}" accept="image/*" ${!canUpload ? 'disabled' : ''}>
-                                <button class="btn btn-upload" id="uploadBtn-${index}" ${!canUpload ? 'disabled' : ''}>
+                                <input type="file" id="fileInput-${index}" accept="image/*" ${!canUploadFinal ? 'disabled' : ''}>
+                                <button class="btn btn-upload" id="uploadBtn-${index}" ${!canUploadFinal ? 'disabled' : ''}>
                                     ${isLimitReached ? '⛔ Limit 5' : isCompleted ? '✅ Selesai' : '📤 Upload Bukti'}
                                 </button>
                             </div>
                             ${isLimitReached ? '<div class="text-muted" style="margin-top:4px;">⛔ Anda sudah mencapai batas 5 konfirmasi.</div>' : ''}
                             ${isCompleted && !isLimitReached ? '<div class="text-muted" style="margin-top:4px;">✨ Anda sudah menyelesaikan misi ini.</div>' : ''}
-                            ${!isCompleted && !isLimitReached && !isFull && hasAccounts && hasMatchingAccount ? '<div class="text-muted" style="margin-top:4px;">📌 Pilih akun yang digunakan untuk mengerjakan misi.</div>' : ''}
+                            ${!isCompleted && !isLimitReached && !isFull && hasAccounts && hasMatchingAccount && validAccountsToShow.length > 0 ? '<div class="text-muted" style="margin-top:4px;">📌 Pilih akun yang digunakan untuk mengerjakan misi.</div>' : ''}
                         `;
                     }
 
@@ -1079,7 +1101,6 @@
                     position: 'top-end'
                 });
             }).catch(() => {
-                // Fallback
                 const textarea = document.createElement('textarea');
                 textarea.value = text;
                 document.body.appendChild(textarea);
@@ -1102,7 +1123,6 @@
             const user = getUserData();
             const file = fileInput.files[0];
 
-            // CEK APAKAH USER PUNYA AKUN
             if (!hasUserAccounts()) {
                 Swal.fire({
                     title: '⛔ Tidak Ada Akun',
@@ -1113,11 +1133,9 @@
                 return;
             }
 
-            // CEK SYARAT & KETENTUAN
             const rulesAccepted = await showRules();
             if (!rulesAccepted) return;
 
-            // CEK MISI PENUH
             if (isMisiFull(misi)) {
                 Swal.fire({
                     title: '🔒 Misi Telah Selesai',
@@ -1159,7 +1177,6 @@
                 return;
             }
 
-            // CEK LIMIT KONFIRMASI
             const history = misi.History || [];
             const userCount = getUserKonfirmasiCount(history, buzzerEmail);
 
@@ -1173,7 +1190,6 @@
                 return;
             }
 
-            // CEK USERNAME UNIK
             if (isUsernameAlreadyUsed(history, buzzerName)) {
                 Swal.fire({
                     title: '⚠️ Username Sudah Dipakai',
@@ -1184,7 +1200,6 @@
                 return;
             }
 
-            // Cek kuota misi
             const completedEmails = history.map(h => h.user);
             if (misi.Jumlah && completedEmails.length >= misi.Jumlah) {
                 Swal.fire({
@@ -1197,7 +1212,6 @@
                 return;
             }
 
-            // Konfirmasi
             const confirmResult = await Swal.fire({
                 title: '📤 Upload Bukti Buzzer',
                 html: `
@@ -1222,7 +1236,6 @@
 
             if (!confirmResult.isConfirmed) return;
 
-            // ===== KIRIM KE TELEGRAM =====
             const btn = document.getElementById(`uploadBtn-${index}`);
             if (btn) {
                 btn.disabled = true;
@@ -1243,7 +1256,6 @@
 
                 const [platform, username] = selectedAccount.split('|');
 
-                // Kirim pesan teks ke Telegram
                 const textMessage = `
 📢 **LAPORAN BUZZER MISI**
 ━━━━━━━━━━━━━━━━━━━━━
@@ -1265,7 +1277,6 @@ ${pesan2 !== '-' ? `📝 **Pesan tambahan:** ${pesan2}` : ''}
 📎 **Bukti terlampir di bawah**
                 `;
 
-                // Kirim teks
                 await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -1276,7 +1287,6 @@ ${pesan2 !== '-' ? `📝 **Pesan tambahan:** ${pesan2}` : ''}
                     })
                 });
 
-                // Kirim file (foto)
                 const formData = new FormData();
                 formData.append('chat_id', TELEGRAM_CHAT_ID);
                 formData.append('photo', file);
@@ -1287,7 +1297,6 @@ ${pesan2 !== '-' ? `📝 **Pesan tambahan:** ${pesan2}` : ''}
                     body: formData
                 });
 
-                // UPDATE HISTORY DI LOCALSTORAGE
                 const historyKey = 'buzzer_history_' + (misi.id_misi || misi.Tugas.replace(/\s/g, '_'));
                 let historyData = JSON.parse(localStorage.getItem(historyKey) || '[]');
                 
@@ -1350,7 +1359,6 @@ ${pesan2 !== '-' ? `📝 **Pesan tambahan:** ${pesan2}` : ''}
             await loadMisi();
         });
 
-        // Refresh otomatis setiap 30 detik
         setInterval(loadMisi, 30000);
 
         console.log('📢 Buzzer Misi siap!');
