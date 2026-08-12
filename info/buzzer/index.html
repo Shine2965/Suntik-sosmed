@@ -78,6 +78,19 @@
             opacity: 0.5;
             cursor: not-allowed;
         }
+        .btn-copy {
+            background: #00ffaa22;
+            color: #00ffaa;
+            border: 1px solid #00ffaa44;
+            padding: 4px 14px;
+            border-radius: 20px;
+            font-size: 11px;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        .btn-copy:hover {
+            background: #00ffaa44;
+        }
         .btn-filter {
             background: #222;
             color: #aaa;
@@ -174,6 +187,37 @@
             color: #ddd;
             font-size: 13px;
             font-style: italic;
+        }
+        .misi-card .pesan-box .pesan-item {
+            padding: 4px 0;
+            border-bottom: 1px solid #ffaa0015;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+        }
+        .misi-card .pesan-box .pesan-item:last-child {
+            border-bottom: none;
+        }
+        .misi-card .pesan-box .pesan-text {
+            flex: 1;
+            word-break: break-all;
+        }
+        .misi-card .pesan-box .pesan-badge {
+            font-size: 10px;
+            background: #ffaa0022;
+            color: #ffaa00;
+            padding: 2px 8px;
+            border-radius: 10px;
+            white-space: nowrap;
+        }
+        .misi-card .pesan-box .pesan-badge.active {
+            background: #00ffaa22;
+            color: #00ffaa;
+        }
+        .misi-card .pesan-box .pesan-badge.done {
+            background: #444;
+            color: #666;
         }
         .misi-card .upload-area {
             margin-top: 14px;
@@ -444,6 +488,9 @@
             .filter-group {
                 flex-direction: column;
             }
+            .misi-card .pesan-box .pesan-item {
+                flex-wrap: wrap;
+            }
         }
     </style>
 </head>
@@ -499,7 +546,6 @@
         // ===================== KONFIGURASI =====================
         const DATA_URL = '/info/buzzer/data.json';
         const CONFIG_API = '/api/config';
-        const ACCOUNTS_FILE = '/info/accounts.json';
         const BUZZ_ACCOUNTS_URL = '/info/buzz.json';
         const RULES_URL = '/rules/';
         const MAX_KONFIRMASI_PER_USER = 5;
@@ -510,7 +556,6 @@
         let TELEGRAM_CHAT_ID = '';
         let currentFilter = 'all';
         let userAccounts = [];
-        let userData = {};
 
         // ===================== CEK SESSION & REDIRECT =====================
         function checkSession() {
@@ -597,6 +642,27 @@
                 document.getElementById('accountCount').style.color = '#ff6666';
                 return [];
             }
+        }
+
+        // ===================== EKSTRAK PLATFORM DARI MISI =====================
+        function extractPlatformFromMisi(tugas) {
+            const taskLower = (tugas || '').toLowerCase();
+            if (taskLower.includes('instagram')) return 'Instagram';
+            if (taskLower.includes('tiktok')) return 'TikTok';
+            if (taskLower.includes('youtube')) return 'YouTube';
+            if (taskLower.includes('facebook')) return 'Facebook';
+            if (taskLower.includes('twitter') || taskLower.includes('x')) return 'Twitter';
+            if (taskLower.includes('telegram')) return 'Telegram';
+            if (taskLower.includes('whatsapp')) return 'WhatsApp';
+            return null;
+        }
+
+        // ===================== FILTER AKUN SESUAI PLATFORM MISI =====================
+        function getFilteredAccounts(platform) {
+            if (!platform) return userAccounts;
+            return userAccounts.filter(acc => 
+                acc.platform && acc.platform.toLowerCase() === platform.toLowerCase()
+            );
         }
 
         // ===================== TAMPILKAN SYARAT & KETENTUAN =====================
@@ -688,6 +754,33 @@
             return userAccounts.length > 0;
         }
 
+        // ===================== GET PESAN AKTIF =====================
+        function getActivePesan(misi) {
+            const history = misi.History || [];
+            const pesanList = misi.Pesan || [];
+            const completedCount = history.length;
+            
+            if (pesanList.length === 0) return null;
+            
+            // Jika sudah melebihi jumlah pesan, tampilkan pesan terakhir
+            if (completedCount >= pesanList.length) {
+                return {
+                    index: pesanList.length - 1,
+                    text: pesanList[pesanList.length - 1],
+                    isLast: true,
+                    isActive: true
+                };
+            }
+            
+            // Tampilkan pesan sesuai urutan konfirmasi
+            return {
+                index: completedCount,
+                text: pesanList[completedCount],
+                isLast: completedCount === pesanList.length - 1,
+                isActive: true
+            };
+        }
+
         // ===================== LOAD MISI =====================
         async function loadMisi() {
             const container = document.getElementById('misiContainer');
@@ -736,11 +829,22 @@
                     const isLimitReached = userCount >= MAX_KONFIRMASI_PER_USER;
                     const isCompleted = completedList.includes(user.email);
                     
-                    // CEK APAKAH USER PUNYA AKUN
-                    const canUpload = hasAccounts && !isFull && !isLimitReached && !isCompleted;
+                    // === PLATFORM MISI ===
+                    const misiPlatform = extractPlatformFromMisi(misi.Tugas);
+                    
+                    // === FILTER AKUN SESUAI PLATFORM ===
+                    const filteredAccounts = getFilteredAccounts(misiPlatform);
+                    const hasMatchingAccount = filteredAccounts.length > 0;
+                    
+                    // CEK APAKAH USER PUNYA AKUN YANG SESUAI
+                    const canUpload = hasAccounts && hasMatchingAccount && !isFull && !isLimitReached && !isCompleted;
                     
                     const progress = misi.Jumlah ? Math.min((completedList.length / misi.Jumlah) * 100, 100) : 0;
 
+                    // === PESAN AKTIF ===
+                    const activePesan = getActivePesan(misi);
+                    
+                    // === RIWAYAT ===
                     let historyHtml = '';
                     if (history.length > 0) {
                         historyHtml = `<div style="margin-top:10px;"><strong style="color:#888;font-size:12px;">📜 Riwayat Penyelesaian:</strong>`;
@@ -760,13 +864,54 @@
                         historyHtml += `</div>`;
                     }
 
-                    const pesan1 = Array.isArray(misi.Pesan) ? misi.Pesan[0] || '-' : misi.Pesan || '-';
-                    const pesan2 = Array.isArray(misi.Pesan) && misi.Pesan[1] ? misi.Pesan[1] : '-';
+                    // === PESAN BOX ===
+                    let pesanHtml = '';
+                    if (misi.Pesan && misi.Pesan.length > 0) {
+                        pesanHtml = `
+                            <div class="pesan-box">
+                                <strong style="color:#ffaa00;font-size:12px;">📝 Custom Komentar (Copy & Gunakan):</strong>
+                                <div style="margin-top:6px;">
+                        `;
+                        
+                        misi.Pesan.forEach((p, idx) => {
+                            const isActive = activePesan && activePesan.index === idx;
+                            const isDone = activePesan && activePesan.index > idx;
+                            
+                            let badgeText = '';
+                            let badgeClass = '';
+                            if (isActive && !isDone) {
+                                badgeText = '✅ AKTIF';
+                                badgeClass = 'active';
+                            } else if (isDone) {
+                                badgeText = '✅ DONE';
+                                badgeClass = 'done';
+                            } else {
+                                badgeText = `#${idx + 1}`;
+                                badgeClass = '';
+                            }
+                            
+                            pesanHtml += `
+                                <div class="pesan-item">
+                                    <span class="pesan-text">${p}</span>
+                                    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+                                        <span class="pesan-badge ${badgeClass}">${badgeText}</span>
+                                        <button class="btn-copy" onclick="copyPesan('${p.replace(/'/g, "\\'")}')">📋 Copy</button>
+                                    </div>
+                                </div>
+                            `;
+                        });
+                        
+                        pesanHtml += `
+                                </div>
+                            </div>
+                        `;
+                    }
 
+                    // ===== STATUS BADGE =====
                     let statusBadge = '';
                     if (isFull) {
                         statusBadge = `<span class="badge full">🔒 MISI TELAH SELESAI</span>`;
-                    } else if (!hasAccounts) {
+                    } else if (!hasAccounts || !hasMatchingAccount) {
                         statusBadge = `<span class="badge no-account">⛔ Tidak Ada Akun</span>`;
                     } else if (isLimitReached) {
                         statusBadge = `<span class="badge limit">⛔ Limit 5</span>`;
@@ -776,9 +921,9 @@
                         statusBadge = `<span class="badge">⏳ ${userCount}/${MAX_KONFIRMASI_PER_USER}</span>`;
                     }
 
-                    // ===== TARGET LINK - HANYA MUNCUL JIKA PUNYA AKUN =====
+                    // ===== TARGET LINK =====
                     let targetHtml = '';
-                    if (hasAccounts && !isFull) {
+                    if (hasAccounts && hasMatchingAccount && !isFull) {
                         targetHtml = `<div class="target"><strong>🎯 Target:</strong> 
                             <a href="${misi.Target || '#'}" target="_blank">${misi.Target || '-'}</a>
                         </div>`;
@@ -787,33 +932,36 @@
                     } else {
                         targetHtml = `
                             <div class="target" style="color:#555;">
-                                🔒 Target tidak tersedia - <span style="color:#ff6666;">Anda belum memiliki akun buzzer</span>
+                                🔒 Target tidak tersedia - <span style="color:#ff6666;">Anda belum memiliki akun buzzer yang sesuai</span>
                             </div>
                         `;
                     }
 
                     // ===== NO ACCOUNT WARNING =====
-                    const noAccountWarning = !hasAccounts && !isFull ? `
+                    const noAccountWarning = (!hasAccounts || !hasMatchingAccount) && !isFull ? `
                         <div class="no-account-warning">
                             <span class="icon">⚠️</span>
-                            Anda belum memiliki akun buzzer yang terdaftar.<br>
-                            Untuk dapat mengerjakan misi, silakan daftarkan akun Anda terlebih dahulu.
+                            ${!hasAccounts ? 'Anda belum memiliki akun buzzer yang terdaftar.' : 'Anda tidak memiliki akun untuk platform ini.'}
+                            <br>
+                            Silakan daftarkan akun yang sesuai terlebih dahulu.
                             <br>
                             <a href="https://wa.me/6289518103883" target="_blank" class="btn-contact">📱 Hubungi Admin</a>
                         </div>
                     ` : '';
 
-                    // ===== AKUN BUZZER OPTIONS =====
+                    // ===== AKUN BUZZER OPTIONS (hanya yang sesuai platform) =====
                     let accountOptions = '<option value="">Pilih akun yang digunakan...</option>';
-                    userAccounts.forEach(acc => {
+                    const accountsToShow = hasMatchingAccount ? filteredAccounts : userAccounts;
+                    accountsToShow.forEach(acc => {
+                        const isMatching = misiPlatform && acc.platform && acc.platform.toLowerCase() === misiPlatform.toLowerCase();
                         accountOptions += `
-                            <option value="${acc.platform}|${acc.username}">
+                            <option value="${acc.platform}|${acc.username}" ${isMatching ? 'selected' : ''}>
                                 ${acc.platform}: ${acc.username}
                             </option>
                         `;
                     });
 
-                    // ===== UPLOAD AREA - HANYA MUNCUL JIKA PUNYA AKUN =====
+                    // ===== UPLOAD AREA =====
                     let uploadAreaHtml = '';
                     if (isFull) {
                         uploadAreaHtml = `
@@ -821,10 +969,10 @@
                                 🔒 MISI TELAH SELESAI - Kuota ${misi.Jumlah || '∞'} target telah terpenuhi
                             </div>
                         `;
-                    } else if (!hasAccounts) {
+                    } else if (!hasAccounts || !hasMatchingAccount) {
                         uploadAreaHtml = `
                             <div style="text-align:center;padding:12px;color:#ff6666;background:#ff444415;border-radius:12px;border:1px solid #ff444455;">
-                                ⛔ Akun buzzer tidak ditemukan. Hubungi admin untuk mendaftarkan akun.
+                                ⛔ Akun buzzer tidak ditemukan untuk platform ini. Hubungi admin untuk mendaftarkan akun.
                             </div>
                         `;
                     } else {
@@ -846,7 +994,7 @@
                             </div>
                             ${isLimitReached ? '<div class="text-muted" style="margin-top:4px;">⛔ Anda sudah mencapai batas 5 konfirmasi.</div>' : ''}
                             ${isCompleted && !isLimitReached ? '<div class="text-muted" style="margin-top:4px;">✨ Anda sudah menyelesaikan misi ini.</div>' : ''}
-                            ${!isCompleted && !isLimitReached && !isFull && hasAccounts ? '<div class="text-muted" style="margin-top:4px;">📌 Pilih akun yang digunakan untuk mengerjakan misi.</div>' : ''}
+                            ${!isCompleted && !isLimitReached && !isFull && hasAccounts && hasMatchingAccount ? '<div class="text-muted" style="margin-top:4px;">📌 Pilih akun yang digunakan untuk mengerjakan misi.</div>' : ''}
                         `;
                     }
 
@@ -869,16 +1017,11 @@
 
                             ${targetHtml}
 
-                            ${misi.Pesan ? `
-                                <div class="pesan-box">
-                                    <strong>📝 Pesan 1:</strong> ${pesan1}
-                                    ${pesan2 !== '-' ? `<br><strong>📝 Pesan 2:</strong> ${pesan2}` : ''}
-                                </div>
-                            ` : ''}
+                            ${pesanHtml}
 
                             ${historyHtml}
 
-                            ${isLimitReached && !isFull && hasAccounts ? `
+                            ${isLimitReached && !isFull && hasAccounts && hasMatchingAccount ? `
                                 <div class="limit-info">
                                     <span>⛔ Anda sudah mencapai batas maksimal ${MAX_KONFIRMASI_PER_USER} konfirmasi.</span>
                                     <span class="count">${userCount}/${MAX_KONFIRMASI_PER_USER}</span>
@@ -894,7 +1037,7 @@
 
                 container.innerHTML = html;
 
-                // ===== ATTACH EVENT UPLOAD (hanya jika user punya akun) =====
+                // ===== ATTACH EVENT UPLOAD =====
                 if (hasAccounts) {
                     filteredData.forEach((misi, index) => {
                         const isFull = isMisiFull(misi);
@@ -922,6 +1065,37 @@
                 container.innerHTML = `<div class="no-data" style="color:#ff6666;">❌ Gagal memuat misi: ${err.message}</div>`;
             }
         }
+
+        // ===================== COPY PESAN =====================
+        window.copyPesan = function(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                Swal.fire({
+                    title: '✅ Berhasil Disalin!',
+                    text: 'Pesan komentar berhasil disalin ke clipboard.',
+                    icon: 'success',
+                    timer: 1500,
+                    showConfirmButton: false,
+                    toast: true,
+                    position: 'top-end'
+                });
+            }).catch(() => {
+                // Fallback
+                const textarea = document.createElement('textarea');
+                textarea.value = text;
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                Swal.fire({
+                    title: '✅ Berhasil Disalin!',
+                    icon: 'success',
+                    timer: 1500,
+                    showConfirmButton: false,
+                    toast: true,
+                    position: 'top-end'
+                });
+            });
+        };
 
         // ===================== HANDLE UPLOAD =====================
         async function handleUpload(misi, index, fileInput, buzzerName, buzzerEmail, selectedAccount) {
@@ -1084,8 +1258,8 @@
 📅 **Tanggal:** ${tanggal}
 📊 **Konfirmasi ke-:** ${userCount + 1} / ${MAX_KONFIRMASI_PER_USER}
 
-📝 **Pesan 1:** ${pesan1}
-📝 **Pesan 2:** ${pesan2}
+📝 **Pesan yang digunakan:** ${pesan1}
+${pesan2 !== '-' ? `📝 **Pesan tambahan:** ${pesan2}` : ''}
 
 ━━━━━━━━━━━━━━━━━━━━━
 📎 **Bukti terlampir di bawah**
@@ -1162,7 +1336,6 @@
 
         // ===================== INIT =====================
         document.addEventListener('DOMContentLoaded', async function() {
-            // Ambil konfigurasi
             const configLoaded = await fetchConfig();
             if (!configLoaded) {
                 Swal.fire({
@@ -1174,7 +1347,6 @@
                 return;
             }
 
-            // Load misi
             await loadMisi();
         });
 
