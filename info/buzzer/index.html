@@ -401,6 +401,10 @@
             color: #888;
             font-size: 11px;
         }
+        .history-item .h-account {
+            color: #ffaa00;
+            font-size: 10px;
+        }
         .limit-info {
             background: #ffaa0010;
             border: 1px solid #ffaa0033;
@@ -468,33 +472,14 @@
             color: #555;
             margin-top: 8px;
         }
-        .used-accounts-info {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 6px;
-            margin-top: 6px;
-        }
-        .used-accounts-info .used-tag {
-            background: #00ffaa15;
-            border: 1px solid #00ffaa33;
-            color: #00ffaa;
-            padding: 2px 10px;
-            border-radius: 12px;
+        .account-used-badge {
+            display: inline-block;
             font-size: 10px;
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-        }
-        .used-accounts-info .used-tag .remove-btn {
-            background: none;
-            border: none;
-            color: #ff6666;
-            cursor: pointer;
-            font-size: 12px;
-            padding: 0 2px;
-        }
-        .used-accounts-info .used-tag .remove-btn:hover {
-            color: #ff0000;
+            background: #ffaa0022;
+            color: #ffaa00;
+            padding: 2px 10px;
+            border-radius: 10px;
+            margin-left: 4px;
         }
         @media (max-width: 600px) {
             .card {
@@ -542,9 +527,6 @@
             <div id="accountInfo" style="color:#00ffaa;font-size:12px;margin-top:4px;">
                 📱 Akun Buzzer: <span id="accountCount">0</span> terdaftar
             </div>
-            <div id="usedAccountsInfo" style="color:#ffaa00;font-size:12px;margin-top:4px;display:none;">
-                🔄 Akun yang sudah digunakan: <span id="usedAccountsList"></span>
-            </div>
             <div class="env-status" id="envStatus">🔌 Mengambil konfigurasi...</div>
         </div>
 
@@ -587,7 +569,6 @@
         let TELEGRAM_CHAT_ID = '';
         let currentFilter = 'all';
         let userAccounts = [];
-        let usedAccounts = [];
 
         // ===================== CEK SESSION & REDIRECT =====================
         function checkSession() {
@@ -665,60 +646,22 @@
                     userAccounts = validAccounts;
                     document.getElementById('accountCount').textContent = userAccounts.length;
                     document.getElementById('accountCount').style.color = userAccounts.length > 0 ? '#00ffaa' : '#ff6666';
-                    
-                    // Reset used accounts untuk misi ini
-                    usedAccounts = [];
-                    updateUsedAccountsDisplay();
-                    
                     return userAccounts;
                 }
 
                 userAccounts = [];
-                usedAccounts = [];
                 document.getElementById('accountCount').textContent = '0 ❌ Tidak ada akun';
                 document.getElementById('accountCount').style.color = '#ff6666';
-                updateUsedAccountsDisplay();
                 return [];
 
             } catch (err) {
                 console.error('Error fetch buzzer accounts:', err);
                 userAccounts = [];
-                usedAccounts = [];
                 document.getElementById('accountCount').textContent = '❌ Gagal memuat';
                 document.getElementById('accountCount').style.color = '#ff6666';
-                updateUsedAccountsDisplay();
                 return [];
             }
         }
-
-        // ===================== UPDATE USED ACCOUNTS DISPLAY =====================
-        function updateUsedAccountsDisplay() {
-            const container = document.getElementById('usedAccountsInfo');
-            const listEl = document.getElementById('usedAccountsList');
-            
-            if (usedAccounts.length > 0) {
-                container.style.display = 'block';
-                listEl.innerHTML = usedAccounts.map(acc => 
-                    `<span class="used-tag">
-                        ${acc.platform}: ${acc.username}
-                        <button class="remove-btn" onclick="removeUsedAccount('${acc.platform}','${acc.username}')" title="Hapus dari digunakan">✕</button>
-                    </span>`
-                ).join(' ');
-            } else {
-                container.style.display = 'none';
-                listEl.innerHTML = '';
-            }
-        }
-
-        // ===================== REMOVE USED ACCOUNT =====================
-        window.removeUsedAccount = function(platform, username) {
-            usedAccounts = usedAccounts.filter(acc => 
-                !(acc.platform === platform && acc.username === username)
-            );
-            updateUsedAccountsDisplay();
-            // Refresh untuk memperbarui dropdown
-            loadMisi();
-        };
 
         // ===================== EKSTRAK PLATFORM DARI MISI =====================
         function extractPlatformFromMisi(tugas) {
@@ -733,15 +676,20 @@
             return null;
         }
 
-        // ===================== FILTER AKUN SESUAI PLATFORM DAN BELUM DIGUNAKAN =====================
-        function getAvailableAccounts(platform) {
-            let accounts = platform ? userAccounts.filter(acc => 
+        // ===================== FILTER AKUN SESUAI PLATFORM MISI =====================
+        function getFilteredAccounts(platform) {
+            if (!platform) return userAccounts;
+            return userAccounts.filter(acc => 
                 acc.platform && acc.platform.toLowerCase() === platform.toLowerCase()
-            ) : [...userAccounts];
-            
-            // Filter akun yang belum digunakan
-            const usedUsernames = usedAccounts.map(acc => acc.username);
-            return accounts.filter(acc => !usedUsernames.includes(acc.username));
+            );
+        }
+
+        // ===================== CEK APAKAH USER SUDAH PAKAI AKUN INI UNTUK MISI INI =====================
+        function isAccountAlreadyUsedForMisi(history, accountIdentifier, excludeIndex = -1) {
+            return history.some((h, idx) => {
+                if (idx === excludeIndex) return false;
+                return h.used_account && h.used_account.toLowerCase() === accountIdentifier.toLowerCase();
+            });
         }
 
         // ===================== TAMPILKAN SYARAT & KETENTUAN =====================
@@ -812,8 +760,8 @@
             return history.filter(h => h.user === userEmail).length;
         }
 
-        // ===================== CEK USERNAME SUDAH DIPAKAI DI HISTORY =====================
-        function isUsernameAlreadyUsedInHistory(history, username, excludeIndex = -1) {
+        // ===================== CEK USERNAME SUDAH DIPAKAI =====================
+        function isUsernameAlreadyUsed(history, username, excludeIndex = -1) {
             return history.some((h, idx) => {
                 if (idx === excludeIndex) return false;
                 return h.nama && h.nama.toLowerCase() === username.toLowerCase();
@@ -906,12 +854,23 @@
                     
                     const misiPlatform = extractPlatformFromMisi(misi.Tugas);
                     
-                    // Ambil akun yang TERSEDIA (belum digunakan)
-                    const availableAccounts = getAvailableAccounts(misiPlatform);
+                    const filteredAccounts = getFilteredAccounts(misiPlatform);
+                    const hasMatchingAccount = filteredAccounts.length > 0;
+                    
+                    // CEK AKUN YANG SUDAH DIGUNAKAN UNTUK MISI INI
+                    const usedAccountsForMisi = history
+                        .filter(h => h.user === user.email)
+                        .map(h => h.used_account);
+                    
+                    // Filter akun yang belum digunakan
+                    const availableAccounts = filteredAccounts.filter(acc => {
+                        const identifier = `${acc.platform} - ${acc.username}`;
+                        return !usedAccountsForMisi.includes(identifier);
+                    });
+                    
                     const hasAvailableAccount = availableAccounts.length > 0;
                     
-                    // Cek apakah user punya akun yang TERSEDIA
-                    const canUpload = hasAccounts && hasAvailableAccount && !isFull && !isLimitReached && !isCompleted;
+                    const canUpload = hasAccounts && hasMatchingAccount && hasAvailableAccount && !isFull && !isLimitReached && !isCompleted;
                     
                     const progress = misi.Jumlah ? Math.min((completedList.length / misi.Jumlah) * 100, 100) : 0;
 
@@ -981,18 +940,25 @@
                     let statusBadge = '';
                     if (isFull) {
                         statusBadge = `<span class="badge full">🔒 MISI TELAH SELESAI</span>`;
-                    } else if (!hasAccounts || !hasAvailableAccount) {
-                        statusBadge = `<span class="badge no-account">⛔ Tidak Ada Akun Tersedia</span>`;
+                    } else if (!hasAccounts || !hasMatchingAccount || !hasAvailableAccount) {
+                        if (!hasAccounts) {
+                            statusBadge = `<span class="badge no-account">⛔ Tidak Ada Akun</span>`;
+                        } else if (!hasAvailableAccount) {
+                            statusBadge = `<span class="badge done">✅ Semua Akun Terpakai</span>`;
+                        } else {
+                            statusBadge = `<span class="badge no-account">⛔ Tidak Ada Akun</span>`;
+                        }
                     } else if (isLimitReached) {
                         statusBadge = `<span class="badge limit">⛔ Limit 5</span>`;
                     } else if (isCompleted) {
                         statusBadge = `<span class="badge done">✅ Selesai</span>`;
                     } else {
-                        statusBadge = `<span class="badge">⏳ ${userCount}/${MAX_KONFIRMASI_PER_USER}</span>`;
+                        const availableCount = availableAccounts.length;
+                        statusBadge = `<span class="badge">⏳ ${userCount}/${MAX_KONFIRMASI_PER_USER} | 📱 ${availableCount} akun tersedia</span>`;
                     }
 
                     let targetHtml = '';
-                    if (hasAccounts && hasAvailableAccount && !isFull) {
+                    if (hasAccounts && hasMatchingAccount && hasAvailableAccount && !isFull) {
                         targetHtml = `<div class="target"><strong>🎯 Target:</strong> 
                             <a href="${misi.Target || '#'}" target="_blank">${misi.Target || '-'}</a>
                         </div>`;
@@ -1001,34 +967,42 @@
                     } else {
                         targetHtml = `
                             <div class="target" style="color:#555;">
-                                🔒 Target tidak tersedia - <span style="color:#ff6666;">${!hasAccounts ? 'Anda belum memiliki akun buzzer' : 'Semua akun sudah digunakan untuk misi ini'}</span>
+                                🔒 Target tidak tersedia - <span style="color:#ff6666;">${!hasAccounts ? 'Anda belum memiliki akun buzzer' : !hasMatchingAccount ? 'Tidak ada akun untuk platform ini' : 'Semua akun sudah digunakan untuk misi ini'}</span>
                             </div>
                         `;
                     }
 
-                    const noAccountWarning = (!hasAccounts || !hasAvailableAccount) && !isFull ? `
+                    const noAccountWarning = (!hasAccounts || !hasMatchingAccount || !hasAvailableAccount) && !isFull ? `
                         <div class="no-account-warning">
                             <span class="icon">⚠️</span>
-                            ${!hasAccounts ? 'Anda belum memiliki akun buzzer yang terdaftar.' : 'Semua akun Anda sudah digunakan untuk misi ini.'}
+                            ${!hasAccounts ? 'Anda belum memiliki akun buzzer yang terdaftar.' : 
+                              !hasMatchingAccount ? 'Anda tidak memiliki akun untuk platform ini.' :
+                              'Semua akun Anda sudah digunakan untuk misi ini.'}
                             <br>
-                            ${!hasAccounts ? 'Silakan daftarkan akun terlebih dahulu.' : 'Gunakan akun yang berbeda untuk setiap konfirmasi.'}
+                            ${!hasAccounts || !hasMatchingAccount ? 'Silakan daftarkan akun yang sesuai terlebih dahulu.' : 'Setiap akun hanya bisa digunakan 1 kali per misi.'}
                             <br>
                             <a href="https://wa.me/6289518103883" target="_blank" class="btn-contact">📱 Hubungi Admin</a>
                         </div>
                     ` : '';
 
-                    // AKUN BUZZER OPTIONS (hanya yang tersedia)
                     let accountOptions = '<option value="">Pilih akun yang digunakan...</option>';
                     
-                    if (availableAccounts.length === 0) {
-                        accountOptions = '<option value="" disabled>${hasAccounts ? "Semua akun sudah digunakan" : "Tidak ada akun valid"}</option>';
+                    const accountsToShow = hasAvailableAccount ? availableAccounts : filteredAccounts;
+                    
+                    const validAccountsToShow = accountsToShow.filter(acc => 
+                        acc.username && acc.username !== '-' && acc.username.trim() !== ''
+                    );
+                    
+                    if (validAccountsToShow.length === 0) {
+                        accountOptions = '<option value="" disabled>${!hasAccounts ? "Tidak ada akun" : "Semua akun sudah terpakai"}</option>';
                     } else {
-                        availableAccounts.forEach(acc => {
+                        validAccountsToShow.forEach(acc => {
                             const isMatching = misiPlatform && acc.platform && 
                                 acc.platform.toLowerCase() === misiPlatform.toLowerCase();
+                            const isUsed = usedAccountsForMisi.includes(`${acc.platform} - ${acc.username}`);
                             accountOptions += `
-                                <option value="${acc.platform}|${acc.username}" ${isMatching ? 'selected' : ''}>
-                                    ${acc.platform}: ${acc.username}
+                                <option value="${acc.platform}|${acc.username}" ${isMatching ? 'selected' : ''} ${isUsed ? 'disabled' : ''}>
+                                    ${acc.platform}: ${acc.username} ${isUsed ? '✅ (Sudah dipakai)' : ''}
                                 </option>
                             `;
                         });
@@ -1041,36 +1015,37 @@
                                 🔒 MISI TELAH SELESAI - Kuota ${misi.Jumlah || '∞'} target telah terpenuhi
                             </div>
                         `;
-                    } else if (!hasAccounts || !hasAvailableAccount) {
+                    } else if (!hasAccounts || !hasMatchingAccount || validAccountsToShow.length === 0) {
                         uploadAreaHtml = `
                             <div style="text-align:center;padding:12px;color:#ff6666;background:#ff444415;border-radius:12px;border:1px solid #ff444455;">
-                                ⛔ ${!hasAccounts ? 'Akun buzzer tidak ditemukan.' : 'Semua akun sudah digunakan untuk misi ini.'}
-                                ${usedAccounts.length > 0 ? ` (${usedAccounts.length} dari ${userAccounts.length} akun digunakan)` : ''}
-                                <br>
-                                <span style="font-size:11px;color:#888;">Hapus akun yang sudah digunakan dengan klik ✕ pada akun di atas.</span>
+                                ⛔ ${!hasAccounts ? 'Akun buzzer tidak ditemukan.' : 
+                                    validAccountsToShow.length === 0 ? 'Semua akun sudah digunakan untuk misi ini.' : 
+                                    'Akun buzzer tidak ditemukan untuk platform ini.'} 
+                                ${validAccountsToShow.length === 0 ? 'Setiap akun hanya bisa digunakan 1 kali per misi.' : 'Hubungi admin untuk mendaftarkan akun.'}
                             </div>
                         `;
                     } else {
+                        const canUploadFinal = hasAccounts && hasMatchingAccount && validAccountsToShow.length > 0 && !isFull && !isLimitReached && !isCompleted;
+                        
                         uploadAreaHtml = `
                             ${noAccountWarning}
                             <div class="input-buzzer">
-                                <select id="accountSelect-${index}" ${!canUpload ? 'disabled' : ''}>
+                                <select id="accountSelect-${index}" ${!canUploadFinal ? 'disabled' : ''}>
                                     ${accountOptions}
                                 </select>
-                                <input type="text" id="buzzerName-${index}" placeholder="Nama/Username Buzzer" style="flex:1;" ${!canUpload ? 'disabled' : ''}>
+                                <input type="text" id="buzzerName-${index}" placeholder="Nama/Username Buzzer" style="flex:1;" ${!canUploadFinal ? 'disabled' : ''}>
                                 <input type="email" id="buzzerEmail-${index}" value="${user.email}" style="flex:1;" disabled>
                             </div>
 
                             <div class="upload-area">
-                                <input type="file" id="fileInput-${index}" accept="image/*" ${!canUpload ? 'disabled' : ''}>
-                                <button class="btn btn-upload" id="uploadBtn-${index}" ${!canUpload ? 'disabled' : ''}>
+                                <input type="file" id="fileInput-${index}" accept="image/*" ${!canUploadFinal ? 'disabled' : ''}>
+                                <button class="btn btn-upload" id="uploadBtn-${index}" ${!canUploadFinal ? 'disabled' : ''}>
                                     ${isLimitReached ? '⛔ Limit 5' : isCompleted ? '✅ Selesai' : '📤 Upload Bukti'}
                                 </button>
                             </div>
                             ${isLimitReached ? '<div class="text-muted" style="margin-top:4px;">⛔ Anda sudah mencapai batas 5 konfirmasi.</div>' : ''}
                             ${isCompleted && !isLimitReached ? '<div class="text-muted" style="margin-top:4px;">✨ Anda sudah menyelesaikan misi ini.</div>' : ''}
-                            ${!isCompleted && !isLimitReached && !isFull && hasAccounts && hasAvailableAccount ? '<div class="text-muted" style="margin-top:4px;">📌 Pilih akun yang berbeda untuk setiap konfirmasi. Maks 5 konfirmasi.</div>' : ''}
-                            ${usedAccounts.length > 0 ? `<div class="text-muted" style="margin-top:4px;color:#ffaa00;">🔄 ${usedAccounts.length} akun sudah digunakan untuk misi ini.</div>` : ''}
+                            ${!isCompleted && !isLimitReached && !isFull && hasAccounts && hasMatchingAccount && validAccountsToShow.length > 0 ? '<div class="text-muted" style="margin-top:4px;">📌 Pilih akun yang digunakan untuk mengerjakan misi. Setiap akun hanya bisa digunakan 1 kali.</div>' : ''}
                         `;
                     }
 
@@ -1086,6 +1061,7 @@
                             <div class="detail"><strong>📊 Jumlah yang dibutuhkan:</strong> ${misi.Jumlah || '∞'}</div>
                             <div class="detail"><strong>✅ Sudah dikerjakan:</strong> ${completedList.length} / ${misi.Jumlah || '∞'} ${isFull ? '🔒 (PENUH)' : ''}</div>
                             <div class="detail"><strong>👤 Konfirmasi Anda:</strong> ${userCount} / ${MAX_KONFIRMASI_PER_USER}</div>
+                            ${hasAccounts && hasMatchingAccount ? `<div class="detail"><strong>📱 Akun tersisa:</strong> ${availableAccounts.length} / ${filteredAccounts.length}</div>` : ''}
                             
                             <div class="progress-bar">
                                 <div class="fill ${isFull ? 'full' : ''}" style="width:${Math.min(progress, 100)}%;"></div>
@@ -1097,7 +1073,7 @@
 
                             ${historyHtml}
 
-                            ${isLimitReached && !isFull && hasAccounts ? `
+                            ${isLimitReached && !isFull && hasAccounts && hasMatchingAccount ? `
                                 <div class="limit-info">
                                     <span>⛔ Anda sudah mencapai batas maksimal ${MAX_KONFIRMASI_PER_USER} konfirmasi.</span>
                                     <span class="count">${userCount}/${MAX_KONFIRMASI_PER_USER}</span>
@@ -1113,7 +1089,7 @@
 
                 container.innerHTML = html;
 
-                // ATTACH EVENT UPLOAD
+                // ===== ATTACH EVENT UPLOAD =====
                 if (hasAccounts) {
                     filteredData.forEach((misi, index) => {
                         const isFull = isMisiFull(misi);
@@ -1231,23 +1207,20 @@
                 return;
             }
 
-            // CEK APAKAH AKUN SUDAH DIGUNAKAN
-            const [selectedPlatform, selectedUsername] = selectedAccount.split('|');
-            const isAccountUsed = usedAccounts.some(acc => 
-                acc.platform === selectedPlatform && acc.username === selectedUsername
-            );
-
-            if (isAccountUsed) {
+            // CEK APAKAH AKUN SUDAH PERNAH DIPAKAI UNTUK MISI INI
+            const history = misi.History || [];
+            const accountIdentifier = selectedAccount.replace('|', ' - ');
+            
+            if (isAccountAlreadyUsedForMisi(history, accountIdentifier)) {
                 Swal.fire({
-                    title: '⚠️ Akun Sudah Digunakan',
-                    text: `Akun ${selectedPlatform}: ${selectedUsername} sudah digunakan untuk misi ini. Gunakan akun yang berbeda.`,
+                    title: '⚠️ Akun Sudah Dipakai',
+                    text: `Akun "${accountIdentifier}" sudah digunakan untuk misi ini. Setiap akun hanya bisa digunakan 1 kali per misi.`,
                     icon: 'warning',
                     confirmButtonColor: '#ffaa00'
                 });
                 return;
             }
 
-            const history = misi.History || [];
             const userCount = getUserKonfirmasiCount(history, buzzerEmail);
 
             if (userCount >= MAX_KONFIRMASI_PER_USER) {
@@ -1260,7 +1233,7 @@
                 return;
             }
 
-            if (isUsernameAlreadyUsedInHistory(history, buzzerName)) {
+            if (isUsernameAlreadyUsed(history, buzzerName)) {
                 Swal.fire({
                     title: '⚠️ Username Sudah Dipakai',
                     text: `Username "${buzzerName}" sudah pernah digunakan. Gunakan username berbeda.`,
@@ -1367,10 +1340,6 @@ ${pesan2 !== '-' ? `📝 **Pesan tambahan:** ${pesan2}` : ''}
                     body: formData
                 });
 
-                // TAMBAHKAN AKUN KE USED ACCOUNTS
-                usedAccounts.push({ platform, username });
-                updateUsedAccountsDisplay();
-
                 const historyKey = 'buzzer_history_' + (misi.id_misi || misi.Tugas.replace(/\s/g, '_'));
                 let historyData = JSON.parse(localStorage.getItem(historyKey) || '[]');
                 
@@ -1395,7 +1364,6 @@ ${pesan2 !== '-' ? `📝 **Pesan tambahan:** ${pesan2}` : ''}
                         <span style="font-size:13px;color:#888;">🆔 ${misi.id_misi || '-'} | Nama: ${buzzerName}</span><br>
                         <span style="font-size:13px;color:#ffaa00;">📊 Konfirmasi ke-${userCount + 1} / ${MAX_KONFIRMASI_PER_USER}</span><br>
                         <span style="font-size:13px;color:#00ffaa;">📱 Akun: ${platform} - ${username}</span>
-                        ${usedAccounts.length > 0 ? `<br><span style="font-size:12px;color:#888;">🔄 ${usedAccounts.length} akun sudah digunakan</span>` : ''}
                     `,
                     icon: 'success',
                     confirmButtonColor: '#ffaa00'
@@ -1440,6 +1408,7 @@ ${pesan2 !== '-' ? `📝 **Pesan tambahan:** ${pesan2}` : ''}
         console.log('👤 User:', getUserData().email);
         console.log('📊 Maks konfirmasi per user:', MAX_KONFIRMASI_PER_USER);
         console.log('🔐 Telegram Config loaded');
+        console.log('📱 Multi-account support: YES');
     </script>
 </body>
 </html>
