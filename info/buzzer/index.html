@@ -163,6 +163,19 @@
             font-weight: 600;
             font-size: 13px;
         }
+        .misi-card .desc-box {
+            background: #00ccff08;
+            border-left: 3px solid #00ccff;
+            padding: 10px 14px;
+            border-radius: 8px;
+            margin: 8px 0;
+            color: #bbb;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+        .misi-card .desc-box strong {
+            color: #00ccff;
+        }
         .misi-card .target {
             color: #00ccff;
             font-size: 13px;
@@ -559,7 +572,7 @@
         const CONFIG_API = '/api/config';
         const BUZZ_ACCOUNTS_URL = '/info/buzz.json';
         const RULES_URL = '/rules/';
-        const MAX_KONFIRMASI_PER_USER = 10;
+        const MAX_KONFIRMASI_PER_USER = 5;
         const LOGIN_PAGE = '/info/index.html';
 
         // ===================== VARIABEL =====================
@@ -864,7 +877,6 @@
                     const filteredAccounts = getFilteredAccounts(misiPlatform);
                     const hasMatchingAccount = filteredAccounts.length > 0;
                     
-                    // ===== CEK AKUN YANG TERSEDIA =====
                     const availableAccounts = getAvailableAccounts(misiPlatform, history, misi.id_misi);
                     const hasAvailableAccount = availableAccounts.length > 0;
                     
@@ -874,6 +886,17 @@
 
                     const activePesan = getActivePesan(misi);
                     
+                    // ===== DESKRIPSI =====
+                    let descHtml = '';
+                    if (misi.desc && misi.desc.trim() !== '') {
+                        descHtml = `
+                            <div class="desc-box">
+                                <strong>📄 Deskripsi Misi:</strong><br>
+                                ${misi.desc}
+                            </div>
+                        `;
+                    }
+
                     // ===== RIWAYAT =====
                     let historyHtml = '';
                     if (history.length > 0) {
@@ -981,7 +1004,7 @@
                         </div>
                     ` : '';
 
-                    // ===== AKUN BUZZER OPTIONS (hanya yang tersedia/belum digunakan) =====
+                    // ===== AKUN BUZZER OPTIONS =====
                     let accountOptions = '<option value="">Pilih akun yang digunakan...</option>';
                     
                     const accountsToShow = hasMatchingAccount ? availableAccounts : [];
@@ -1071,6 +1094,8 @@
                             <div class="progress-bar">
                                 <div class="fill ${isFull ? 'full' : ''}" style="width:${Math.min(progress, 100)}%;"></div>
                             </div>
+
+                            ${descHtml}
 
                             ${targetHtml}
 
@@ -1267,6 +1292,7 @@
                         <b>🆔 ID Misi:</b> ${misi.id_misi || '-'}<br>
                         <b>📋 Misi:</b> ${misi.Tugas}<br>
                         <b>🎯 Target:</b> ${misi.Target}<br>
+                        <b>📄 Deskripsi:</b> ${misi.desc || '-'}<br>
                         <b>👤 Nama Buzzer:</b> ${buzzerName}<br>
                         <b>📧 Email:</b> ${buzzerEmail}<br>
                         <b>📱 Akun Digunakan:</b> ${selectedAccount.replace('|', ' - ')}<br>
@@ -1309,6 +1335,7 @@
 ━━━━━━━━━━━━━━━━━━━━━
 🆔 **ID Misi:** ${misi.id_misi || '-'}
 📋 **Misi:** ${misi.Tugas}
+📄 **Deskripsi:** ${misi.desc || '-'}
 🎯 **Target:** ${misi.Target}
 💰 **Harga:** ${misi.Harga || 'Gratis'}
 
