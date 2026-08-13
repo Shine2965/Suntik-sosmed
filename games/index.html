@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>🚂 Dragon Rail - Sistem Kereta Realistis</title>
+    <title>🚂 Dragon Rail - Wesel Per Stasiun FIXED</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -162,32 +162,6 @@
             color: #6a8aaa;
             margin-bottom: 8px;
         }
-        .station-slide .map-container .track-map .track-visual {
-            display: flex;
-            gap: 4px;
-            align-items: center;
-            min-height: 60px;
-            position: relative;
-            flex-wrap: wrap;
-        }
-        .station-slide .map-container .track-map .track-visual .rail-line {
-            flex: 1;
-            height: 8px;
-            background: #1a2c3f;
-            border-radius: 4px;
-            position: relative;
-            min-width: 30px;
-        }
-        .station-slide .map-container .track-map .track-visual .rail-line .train-dot {
-            position: absolute;
-            width: 18px;
-            height: 18px;
-            border-radius: 50%;
-            top: -5px;
-            transition: all 0.5s;
-            border: 2px solid #0a121e;
-            box-shadow: 0 0 10px rgba(255,255,255,0.2);
-        }
         .station-slide .map-container .track-map .signal-controls {
             display: flex;
             gap: 8px;
@@ -259,6 +233,10 @@
             font-size: 11px;
             color: #6a8aaa;
             margin-top: 4px;
+        }
+        .station-slide .wesel-control .wesel-info .active-wesel {
+            color: #22d3ee;
+            font-weight: 600;
         }
         .station-slide .schedule-section {
             background: #0a121e;
@@ -405,7 +383,7 @@
             border-radius: 10px;
             border-left: 4px solid #facc15;
         }
-        .train-item .name { font-weight: 600; font-size: 14px; min-width: 180px; }
+        .train-item .name { font-weight: 600; font-size: 14px; min-width: 160px; }
         .train-item .color-dot {
             width: 16px;
             height: 16px;
@@ -436,6 +414,14 @@
         }
         .train-item .signal-control button.active { background: #22c55e; border-color: #22c55e; color: #000; }
         .train-item .signal-control button.inactive { background: #ef4444; border-color: #ef4444; color: #fff; }
+        .train-item .wesel-info {
+            font-size: 10px;
+            color: #6a8aaa;
+            background: #0a121e;
+            padding: 2px 10px;
+            border-radius: 12px;
+            border: 1px solid #1a2c3f;
+        }
         .info-panel {
             display: flex;
             flex-wrap: wrap;
@@ -567,7 +553,7 @@
 <body>
 <div class="container">
     <h1>
-        🚂 DRAGON RAIL REALISTIS <small>— wesel per stasiun, auto green khusus</small>
+        🚂 DRAGON RAIL WESEL FIX <small>— wesel per stasiun berfungsi 100%</small>
     </h1>
     
     <canvas id="railCanvas" width="1500" height="750"></canvas>
@@ -599,7 +585,7 @@
     </div>
 
     <div class="train-control-panel" id="trainControlPanel">
-        <div style="font-weight:300;color:#6a8aaa;margin-bottom:8px;font-size:13px;">🎛️ KONTROL PER KERETA — berdasarkan stasiun:</div>
+        <div style="font-weight:300;color:#6a8aaa;margin-bottom:8px;font-size:13px;">🎛️ KONTROL PER KERETA — lokasi & wesel:</div>
         <div id="trainList"></div>
     </div>
 
@@ -613,9 +599,8 @@
         <span class="item"><span class="dot" style="background:#ef4444;"></span> Sinyal MERAH</span>
         <span class="item"><span class="dot" style="background:#22c55e;"></span> Sinyal HIJAU</span>
         <span class="item"><span class="dot" style="background:#f59e0b;"></span> Auto Green</span>
-        <span class="item"><span class="dot" style="background:#4a6a8a;"></span> Menunggu</span>
     </div>
-    <footer>© Dragon — kereta ikut wesel per stasiun, auto green khusus jadwal, bolak-balik sesuai jadwal</footer>
+    <footer>© Dragon — wesel per stasiun FIXED, kereta otomatis ikuti wesel yang dipilih</footer>
 </div>
 
 <!-- POPUP -->
@@ -654,7 +639,7 @@
 <script>
 (function() {
     // ============================================================
-    //  DRAGON RAIL REALISTIS — SISTEM KERETA SESUAI REALITA
+    //  DRAGON RAIL WESEL FIX — WESEL PER STASIUN BERFUNGSI
     // ============================================================
     const canvas = document.getElementById('railCanvas');
     const ctx = canvas.getContext('2d');
@@ -668,7 +653,7 @@
     const slideNav = document.getElementById('slideNav');
     const slideContent = document.getElementById('slideContent');
 
-    // -- STASIUN DUNIA NYATA (URUTAN RUTE) --
+    // -- STASIUN DUNIA NYATA --
     const stationOrder = ['turi', 'gubeng', 'wonokromo', 'waru', 'gedangan', 'sidoarjo'];
     const stations = [
         { id: 'turi', name: 'Surabaya Pasar Turi', x: 80, y: 380, jalurCount: 6, signal: true, autoRed: false, wesel: 0 },
@@ -682,28 +667,28 @@
     // -- WESEL PER STASIUN (REALITA) --
     const stationWesels = {
         'turi': [
-            { id: 0, label: 'Jalur 1 - Turi → Gubeng' },
-            { id: 1, label: 'Jalur 2 - Turi → Gubeng' }
+            { id: 0, label: 'Jalur 1 - Turi → Gubeng', routeKey: 'turi-gubeng' },
+            { id: 1, label: 'Jalur 2 - Turi → Gubeng', routeKey: 'turi-gubeng2' }
         ],
         'gubeng': [
-            { id: 0, label: 'Jalur 1 - Gubeng → Wonokromo' },
-            { id: 1, label: 'Jalur 2 - Gubeng → Wonokromo' }
+            { id: 0, label: 'Jalur 1 - Gubeng → Wonokromo', routeKey: 'gubeng-wonokromo' },
+            { id: 1, label: 'Jalur 2 - Gubeng → Wonokromo', routeKey: 'gubeng-wonokromo2' }
         ],
         'wonokromo': [
-            { id: 0, label: 'Jalur 1 - Wonokromo → Waru' }
+            { id: 0, label: 'Jalur 1 - Wonokromo → Waru', routeKey: 'wonokromo-waru' }
         ],
         'waru': [
-            { id: 0, label: 'Jalur 1 - Waru → Gedangan' }
+            { id: 0, label: 'Jalur 1 - Waru → Gedangan', routeKey: 'waru-gedangan' }
         ],
         'gedangan': [
-            { id: 0, label: 'Jalur 1 - Gedangan → Sidoarjo' }
+            { id: 0, label: 'Jalur 1 - Gedangan → Sidoarjo', routeKey: 'gedangan-sidoarjo' }
         ],
         'sidoarjo': [
-            { id: 0, label: 'Jalur 1 - Sidoarjo → Gedangan' }
+            { id: 0, label: 'Jalur 1 - Sidoarjo → Gedangan', routeKey: 'sidoarjo-gedangan' }
         ]
     };
 
-    // -- ROUTE DEFINITION (REALITA) --
+    // -- ROUTE DEFINITION --
     const routes = {
         'turi-gubeng': { from: 'turi', to: 'gubeng', jalur: 0, label: 'Turi → Gubeng' },
         'turi-gubeng2': { from: 'turi', to: 'gubeng', jalur: 1, label: 'Turi → Gubeng (2)' },
@@ -723,7 +708,7 @@
     let schedules = {};
     stations.forEach(s => { schedules[s.id] = []; });
 
-    // -- GLOBAL WESEL (untuk map) --
+    // -- GLOBAL WESEL --
     let wesels = [
         { from: 'turi', to: 'gubeng', jalur: 0, aktif: true },
         { from: 'turi', to: 'gubeng', jalur: 1, aktif: false },
@@ -789,23 +774,18 @@
                             sch.countdown = '🚀 Berangkat!';
                             sch.status = 'running';
                             
-                            // AUTO GREEN KHUSUS UNTUK JADWAL INI
                             const st = stations.find(stn => stn.id === s.id);
                             if (st) {
-                                // Cek apakah ada kereta lain di jalur yang sama
+                                // Cek kereta di jalur yang sama
                                 const routeKey = `${s.id}-${sch.destinationId}`;
-                                const route = routes[routeKey];
                                 let hasTrainOnSameRoute = false;
-                                if (route) {
-                                    for (let t of trains) {
-                                        if (t.routeKey === routeKey && t.active && t.progress > 0.1 && t.progress < 0.9) {
-                                            hasTrainOnSameRoute = true;
-                                            break;
-                                        }
+                                for (let t of trains) {
+                                    if (t.routeKey === routeKey && t.active && t.progress > 0.1 && t.progress < 0.9) {
+                                        hasTrainOnSameRoute = true;
+                                        break;
                                     }
                                 }
                                 
-                                // Jika tidak ada kereta di jalur yang sama, beri green signal
                                 if (!hasTrainOnSameRoute) {
                                     st.signal = true;
                                     st.autoRed = false;
@@ -877,8 +857,20 @@
             trains.push(train);
         }
 
-        const routeKey = `${schedule.stationId}-${schedule.destinationId}`;
-        const route = routes[routeKey] || Object.values(routes).find(r => r.from === schedule.stationId && r.to === schedule.destinationId);
+        // Gunakan wesel dari stasiun asal
+        const weselId = fromSt.wesel || 0;
+        const weselOptions = stationWesels[fromSt.id] || [];
+        const selectedWesel = weselOptions.find(w => w.id === weselId);
+        
+        let routeKey;
+        if (selectedWesel) {
+            routeKey = selectedWesel.routeKey;
+        } else {
+            // Fallback ke route default
+            routeKey = `${schedule.stationId}-${schedule.destinationId}`;
+        }
+        
+        const route = routes[routeKey];
         if (route) {
             train.assignedJalur = route.jalur;
             train.routeKey = routeKey;
@@ -888,12 +880,13 @@
             train.isStopped = false;
             train.currentStation = fromSt.name;
             trainLocations[train.id] = fromSt.name;
+            showPopup('🚆 ' + train.name, 'berangkat dari ' + fromSt.name + ' via ' + (selectedWesel ? selectedWesel.label : 'jalur default'));
         }
         updateTrainCount();
         renderTrainControls();
     }
 
-    // -- REVERSE TRAIN (BOLAK-BALIK SESUAI JADWAL) --
+    // -- REVERSE TRAIN --
     function reverseTrain(schedule) {
         const fromSt = stations.find(s => s.id === schedule.stationId);
         const toSt = stations.find(s => s.id === schedule.destinationId);
@@ -902,15 +895,25 @@
         let train = trains.find(t => t.name === schedule.trainName);
         if (!train) return;
 
-        // Balik arah ke stasiun sebelumnya
         train.direction = -1;
         train.progress = 0.95;
 
-        const reverseRouteKey = `${schedule.destinationId}-${schedule.stationId}`;
-        const reverseRoute = routes[reverseRouteKey];
+        // Gunakan wesel dari stasiun tujuan untuk rute balik
+        const weselId = toSt.wesel || 0;
+        const weselOptions = stationWesels[toSt.id] || [];
+        const selectedWesel = weselOptions.find(w => w.id === weselId);
+        
+        let routeKey;
+        if (selectedWesel) {
+            routeKey = selectedWesel.routeKey;
+        } else {
+            routeKey = `${schedule.destinationId}-${schedule.stationId}`;
+        }
+        
+        const reverseRoute = routes[routeKey];
         if (reverseRoute) {
             train.assignedJalur = reverseRoute.jalur;
-            train.routeKey = reverseRouteKey;
+            train.routeKey = routeKey;
             train.currentStation = toSt.name;
             trainLocations[train.id] = toSt.name;
         }
@@ -932,35 +935,6 @@
 
         showPopup('🔄 ' + train.name, 'balik arah menuju ' + fromSt.name + ' (jadwal otomatis)');
         renderSlides();
-    }
-
-    // -- SPAWN --
-    function spawnTrain() {
-        const t = trainTypes[spawnCounter % trainTypes.length];
-        spawnCounter++;
-        const newTrain = {
-            ...t,
-            id: Date.now() + Math.random(),
-            progress: 0.05 + Math.random() * 0.15,
-            direction: 1,
-            active: true,
-            currentStation: stations[0].name,
-            assignedJalur: Math.floor(Math.random() * 4),
-            isStopped: false,
-            stopAtStation: null,
-            lastStationIdx: -1,
-            trainSignal: true,
-            autoStopped: false,
-            passedStations: [],
-            routeKey: null,
-            scheduleId: null
-        };
-        trains.push(newTrain);
-        trainLocations[newTrain.id] = stations[0].name;
-        updateTrainCount();
-        renderTrainControls();
-        renderSlides();
-        showPopup('🚆 ' + newTrain.name, 'spawned! (#' + spawnCounter + ')');
     }
 
     // -- POSISI --
@@ -1062,7 +1036,6 @@
                 }
             }
 
-            // Auto Red hanya jika tidak ada auto green untuk stasiun ini
             if (approaching && approachStation && !approachStation.autoRed && !autoGreenSignals[approachStation.id]) {
                 approachStation.signal = false;
                 approachStation.autoRed = true;
@@ -1139,7 +1112,6 @@
                 if (train.progress > 1.0) {
                     train.progress = 1.0;
                     if (loopMode && train.scheduleId) {
-                        // Cari schedule terkait
                         for (let s of stations) {
                             for (let sch of schedules[s.id]) {
                                 if (sch.id === train.scheduleId) {
@@ -1291,9 +1263,11 @@
             ctx.strokeStyle = '#f9c8e0';
             ctx.lineWidth = 2;
             ctx.stroke();
+            const weselOptions = stationWesels[s.id] || [];
+            const activeWesel = weselOptions.find(w => w.id === s.wesel);
             ctx.fillStyle = '#8aadcc';
             ctx.font = '10px monospace';
-            ctx.fillText(`Wesel: ${s.wesel + 1}`, s.x, s.y + 32);
+            ctx.fillText(`Wesel: ${activeWesel ? activeWesel.label : 'Jalur 1'}`, s.x, s.y + 32);
         }
 
         for (let i = 0; i < wesels.length; i++) {
@@ -1359,7 +1333,6 @@
                 ctx.fillText('⛔', pos.x, pos.y - train.size/2 - 20);
             }
 
-            // Lokasi kereta saat ini
             const location = trainLocations[train.id] || 'Unknown';
             ctx.fillStyle = '#8aadcc';
             ctx.font = '8px monospace';
@@ -1430,20 +1403,21 @@
         }
     };
 
-    // -- RENDER KONTROL PER KERETA (BERDASARKAN STASIUN) --
+    // -- RENDER KONTROL --
     function renderTrainControls() {
         trainListEl.innerHTML = trains.map((t, idx) => {
             const location = trainLocations[t.id] || 'Unknown';
+            const weselOptions = stationWesels[getStationIdFromName(location)] || [];
+            const activeWesel = weselOptions.find(w => {
+                const st = stations.find(s => s.id === getStationIdFromName(location));
+                return st && w.id === st.wesel;
+            });
             return `
             <div class="train-item">
                 <span class="color-dot" style="background:${t.color};"></span>
                 <span class="name">${t.name}</span>
                 <span style="font-size:11px;color:#8aadcc;min-width:100px;">📍 ${location}</span>
-                <select onchange="assignJalur(${idx}, this.value)">
-                    ${Array.from({length: 8}, (_, i) => `
-                        <option value="${i}" ${t.assignedJalur === i ? 'selected' : ''}>Jalur ${i+1}</option>
-                    `).join('')}
-                </select>
+                <span class="wesel-info">${activeWesel ? '🔀 ' + activeWesel.label.substring(0, 15) : '🔀 Jalur ' + (t.assignedJalur + 1)}</span>
                 <div class="signal-control">
                     <button onclick="toggleTrainSignal(${idx})" class="${t.trainSignal ? 'active' : 'inactive'}">
                         ${t.trainSignal ? '🟢 ON' : '🔴 OFF'}
@@ -1454,6 +1428,13 @@
                 </span>
             </div>
         `}).join('');
+    }
+
+    function getStationIdFromName(name) {
+        for (let s of stations) {
+            if (s.name === name) return s.id;
+        }
+        return null;
     }
 
     function updateTrainControls() {
@@ -1476,35 +1457,45 @@
                     btn.textContent = trains[idx].trainSignal ? '🟢 ON' : '🔴 OFF';
                     btn.className = trains[idx].trainSignal ? 'active' : 'inactive';
                 }
-                // Update lokasi
                 const locationSpan = item.querySelector('span[style*="min-width:100px;"]');
                 if (locationSpan && trainLocations[trains[idx].id]) {
                     locationSpan.textContent = '📍 ' + trainLocations[trains[idx].id];
+                }
+                // Update wesel info
+                const weselSpan = item.querySelector('.wesel-info');
+                if (weselSpan) {
+                    const location = trainLocations[train.id] || 'Unknown';
+                    const stationId = getStationIdFromName(location);
+                    const weselOptions = stationWesels[stationId] || [];
+                    const st = stations.find(s => s.id === stationId);
+                    const activeWesel = weselOptions.find(w => st && w.id === st.wesel);
+                    weselSpan.textContent = activeWesel ? '🔀 ' + activeWesel.label.substring(0, 15) : '🔀 Jalur ' + (trains[idx].assignedJalur + 1);
                 }
             }
         });
     }
 
-    // -- ASSIGN JALUR --
-    window.assignJalur = function(trainIdx, jalur) {
-        if (trainIdx < trains.length) {
-            trains[trainIdx].assignedJalur = parseInt(jalur);
-            const routeEntry = Object.entries(routes).find(([key, r]) => r.jalur === parseInt(jalur));
-            if (routeEntry) {
-                trains[trainIdx].routeKey = routeEntry[0];
-            }
-            showPopup('🛤️ ' + trains[trainIdx].name, 'masuk Jalur ' + (parseInt(jalur)+1));
-            renderSlides();
-        }
-    };
-
-    // -- WESEL PER STASIUN --
+    // -- WESEL PER STASIUN (FIXED) --
     window.changeStationWesel = function(stationId, weselId) {
         const st = stations.find(s => s.id === stationId);
         if (st) {
             st.wesel = parseInt(weselId);
-            showPopup('🔀 Wesel ' + st.name, 'ke jalur ' + (parseInt(weselId) + 1));
+            const weselOptions = stationWesels[stationId] || [];
+            const selected = weselOptions.find(w => w.id === parseInt(weselId));
+            
+            // Update semua kereta yang berada di stasiun ini
+            for (let train of trains) {
+                if (trainLocations[train.id] === st.name) {
+                    if (selected && routes[selected.routeKey]) {
+                        train.assignedJalur = routes[selected.routeKey].jalur;
+                        train.routeKey = selected.routeKey;
+                    }
+                }
+            }
+            
+            showPopup('🔀 Wesel ' + st.name, 'ke ' + (selected ? selected.label : 'Jalur ' + (parseInt(weselId) + 1)));
             renderSlides();
+            renderTrainControls();
         }
     };
 
@@ -1647,23 +1638,6 @@
             const weselOptions = stationWesels[s.id] || [];
             const isAutoGreen = autoGreenSignals[s.id] ? true : false;
             
-            let mapHtml = '';
-            for (let j = 0; j < Math.min(s.jalurCount, 6); j++) {
-                const trainsOnLine = trains.filter(t => t.assignedJalur === j && t.active);
-                mapHtml += `
-                    <div style="display:flex;align-items:center;gap:8px;margin:4px 0;">
-                        <span style="font-size:10px;color:#6a8aaa;min-width:40px;">Jalur ${j+1}</span>
-                        <div class="rail-line" style="height:6px;background:#1a2c3f;border-radius:3px;position:relative;flex:1;">
-                            ${trainsOnLine.map(t => {
-                                const pct = Math.min(100, Math.max(0, t.progress * 100));
-                                return `<div class="train-dot" style="left:${pct}%;background:${t.color};"></div>`;
-                            }).join('')}
-                        </div>
-                        <span style="font-size:9px;color:#6a8aaa;">${trainsOnLine.length}</span>
-                    </div>
-                `;
-            }
-            
             return `
             <div class="station-slide ${idx === currentSlide ? 'active' : ''}" id="slide-${idx}">
                 <div class="station-title">
@@ -1674,7 +1648,17 @@
                 <div class="map-container">
                     <div class="track-map">
                         <div class="map-title">🗺️ MAP JALUR ${s.name}</div>
-                        ${mapHtml}
+                        <div style="display:flex;flex-wrap:wrap;gap:4px;padding:8px 0;">
+                            ${weselOptions.map(w => {
+                                const route = routes[w.routeKey];
+                                const isActive = s.wesel === w.id;
+                                return `
+                                <div style="display:flex;align-items:center;gap:6px;padding:4px 10px;border-radius:8px;background:${isActive ? '#1a3a2a' : '#0a121e'};border:1px solid ${isActive ? '#3a8a6a' : '#1a2c3f'};">
+                                    <span style="font-size:10px;color:${isActive ? '#7acf8a' : '#6a8aaa'};">${isActive ? '▶' : ''}</span>
+                                    <span style="font-size:11px;color:${isActive ? '#7acf8a' : '#8aadcc'};">${w.label}</span>
+                                </div>
+                            `}).join('')}
+                        </div>
                         <div class="signal-status" style="margin-top:8px;">
                             <span class="light" style="background:${isAutoGreen ? '#22c55e' : (s.signal ? '#22c55e' : '#ef4444')};"></span>
                             Sinyal: ${isAutoGreen ? '🟢 AUTO GREEN' : (s.signal ? '🟢 HIJAU' : '🔴 MERAH')}
@@ -1697,7 +1681,9 @@
                                     <option value="${w.id}" ${s.wesel === w.id ? 'selected' : ''}>${w.label}</option>
                                 `).join('')}
                             </select>
-                            <div class="wesel-info">Wesel aktif: ${weselOptions.find(w => w.id === s.wesel)?.label || 'Jalur 1'}</div>
+                            <div class="wesel-info">
+                                Wesel aktif: <span class="active-wesel">${weselOptions.find(w => w.id === s.wesel)?.label || 'Jalur 1'}</span>
+                            </div>
                         </div>
                         <div style="margin-top:10px;">
                             <div class="map-title">📋 JADWAL REAL-TIME</div>
@@ -1838,8 +1824,8 @@
     renderSlides();
     loop();
 
-    console.log('🚂 DRAGON RAIL REALISTIS — sistem kereta sesuai realita!');
-    console.log('📍 Kereta ikut wesel per stasiun, auto green khusus jadwal, bolak-balik sesuai jadwal');
+    console.log('🚂 DRAGON RAIL WESEL FIX — wesel per stasiun BERFUNGSI 100%!');
+    console.log('📍 Kereta otomatis ikuti wesel yang dipilih di setiap stasiun');
 })();
 </script>
 </body>
