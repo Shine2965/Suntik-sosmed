@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>🚂 Dragon Rail - Wesel Per Stasiun FIXED</title>
+    <title>🚂 Dragon Rail - Animasi & ETA Kereta</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -279,6 +279,12 @@
             min-width: 50px;
             text-align: right;
         }
+        .station-slide .schedule-section .schedule-item .eta {
+            font-size: 11px;
+            color: #7acfde;
+            min-width: 40px;
+            text-align: center;
+        }
         .station-slide .schedule-section .schedule-item .status-badge {
             font-size: 11px;
             padding: 2px 10px;
@@ -422,6 +428,16 @@
             border-radius: 12px;
             border: 1px solid #1a2c3f;
         }
+        .train-item .eta-info {
+            font-size: 10px;
+            color: #7acfde;
+            background: #0a1a2a;
+            padding: 2px 10px;
+            border-radius: 12px;
+            border: 1px solid #1a3a4a;
+            min-width: 60px;
+            text-align: center;
+        }
         .info-panel {
             display: flex;
             flex-wrap: wrap;
@@ -553,7 +569,7 @@
 <body>
 <div class="container">
     <h1>
-        🚂 DRAGON RAIL WESEL FIX <small>— wesel per stasiun berfungsi 100%</small>
+        🚂 DRAGON RAIL ANIMASI <small>— ETA & animasi kereta berjalan</small>
     </h1>
     
     <canvas id="railCanvas" width="1500" height="750"></canvas>
@@ -585,7 +601,7 @@
     </div>
 
     <div class="train-control-panel" id="trainControlPanel">
-        <div style="font-weight:300;color:#6a8aaa;margin-bottom:8px;font-size:13px;">🎛️ KONTROL PER KERETA — lokasi & wesel:</div>
+        <div style="font-weight:300;color:#6a8aaa;margin-bottom:8px;font-size:13px;">🎛️ KONTROL PER KERETA — lokasi & ETA:</div>
         <div id="trainList"></div>
     </div>
 
@@ -599,8 +615,9 @@
         <span class="item"><span class="dot" style="background:#ef4444;"></span> Sinyal MERAH</span>
         <span class="item"><span class="dot" style="background:#22c55e;"></span> Sinyal HIJAU</span>
         <span class="item"><span class="dot" style="background:#f59e0b;"></span> Auto Green</span>
+        <span class="item"><span class="dot" style="background:#7acfde;"></span> ETA Estimasi</span>
     </div>
-    <footer>© Dragon — wesel per stasiun FIXED, kereta otomatis ikuti wesel yang dipilih</footer>
+    <footer>© Dragon — animasi kereta smooth + estimasi waktu tiba (ETA)</footer>
 </div>
 
 <!-- POPUP -->
@@ -639,7 +656,7 @@
 <script>
 (function() {
     // ============================================================
-    //  DRAGON RAIL WESEL FIX — WESEL PER STASIUN BERFUNGSI
+    //  DRAGON RAIL ANIMASI & ETA — SMOOTH MOVE + ESTIMASI WAKTU
     // ============================================================
     const canvas = document.getElementById('railCanvas');
     const ctx = canvas.getContext('2d');
@@ -664,7 +681,7 @@
         { id: 'sidoarjo', name: 'Sidoarjo', x: 1360, y: 340, jalurCount: 3, signal: true, autoRed: false, wesel: 0 }
     ];
 
-    // -- WESEL PER STASIUN (REALITA) --
+    // -- WESEL PER STASIUN --
     const stationWesels = {
         'turi': [
             { id: 0, label: 'Jalur 1 - Turi → Gubeng', routeKey: 'turi-gubeng' },
@@ -690,18 +707,18 @@
 
     // -- ROUTE DEFINITION --
     const routes = {
-        'turi-gubeng': { from: 'turi', to: 'gubeng', jalur: 0, label: 'Turi → Gubeng' },
-        'turi-gubeng2': { from: 'turi', to: 'gubeng', jalur: 1, label: 'Turi → Gubeng (2)' },
-        'gubeng-wonokromo': { from: 'gubeng', to: 'wonokromo', jalur: 0, label: 'Gubeng → Wonokromo' },
-        'gubeng-wonokromo2': { from: 'gubeng', to: 'wonokromo', jalur: 1, label: 'Gubeng → Wonokromo (2)' },
-        'wonokromo-waru': { from: 'wonokromo', to: 'waru', jalur: 0, label: 'Wonokromo → Waru' },
-        'waru-gedangan': { from: 'waru', to: 'gedangan', jalur: 0, label: 'Waru → Gedangan' },
-        'gedangan-sidoarjo': { from: 'gedangan', to: 'sidoarjo', jalur: 0, label: 'Gedangan → Sidoarjo' },
-        'sidoarjo-gedangan': { from: 'sidoarjo', to: 'gedangan', jalur: 0, label: 'Sidoarjo → Gedangan' },
-        'gedangan-waru': { from: 'gedangan', to: 'waru', jalur: 0, label: 'Gedangan → Waru' },
-        'waru-wonokromo': { from: 'waru', to: 'wonokromo', jalur: 0, label: 'Waru → Wonokromo' },
-        'wonokromo-gubeng': { from: 'wonokromo', to: 'gubeng', jalur: 0, label: 'Wonokromo → Gubeng' },
-        'gubeng-turi': { from: 'gubeng', to: 'turi', jalur: 0, label: 'Gubeng → Turi' }
+        'turi-gubeng': { from: 'turi', to: 'gubeng', jalur: 0, label: 'Turi → Gubeng', distance: 5.2 },
+        'turi-gubeng2': { from: 'turi', to: 'gubeng', jalur: 1, label: 'Turi → Gubeng (2)', distance: 5.2 },
+        'gubeng-wonokromo': { from: 'gubeng', to: 'wonokromo', jalur: 0, label: 'Gubeng → Wonokromo', distance: 4.8 },
+        'gubeng-wonokromo2': { from: 'gubeng', to: 'wonokromo', jalur: 1, label: 'Gubeng → Wonokromo (2)', distance: 4.8 },
+        'wonokromo-waru': { from: 'wonokromo', to: 'waru', jalur: 0, label: 'Wonokromo → Waru', distance: 3.5 },
+        'waru-gedangan': { from: 'waru', to: 'gedangan', jalur: 0, label: 'Waru → Gedangan', distance: 4.0 },
+        'gedangan-sidoarjo': { from: 'gedangan', to: 'sidoarjo', jalur: 0, label: 'Gedangan → Sidoarjo', distance: 3.2 },
+        'sidoarjo-gedangan': { from: 'sidoarjo', to: 'gedangan', jalur: 0, label: 'Sidoarjo → Gedangan', distance: 3.2 },
+        'gedangan-waru': { from: 'gedangan', to: 'waru', jalur: 0, label: 'Gedangan → Waru', distance: 4.0 },
+        'waru-wonokromo': { from: 'waru', to: 'wonokromo', jalur: 0, label: 'Waru → Wonokromo', distance: 3.5 },
+        'wonokromo-gubeng': { from: 'wonokromo', to: 'gubeng', jalur: 0, label: 'Wonokromo → Gubeng', distance: 4.8 },
+        'gubeng-turi': { from: 'gubeng', to: 'turi', jalur: 0, label: 'Gubeng → Turi', distance: 5.2 }
     };
 
     // -- JADWAL --
@@ -741,6 +758,7 @@
     let loopMode = true;
     let autoGreenSignals = {};
     let trainLocations = {};
+    let trainETAs = {};
 
     // -- INIT --
     function initTrains() {
@@ -749,6 +767,7 @@
         signalCooldown = {};
         autoGreenSignals = {};
         trainLocations = {};
+        trainETAs = {};
         schedules = {};
         stations.forEach(s => { schedules[s.id] = []; });
         updateTrainCount();
@@ -776,7 +795,6 @@
                             
                             const st = stations.find(stn => stn.id === s.id);
                             if (st) {
-                                // Cek kereta di jalur yang sama
                                 const routeKey = `${s.id}-${sch.destinationId}`;
                                 let hasTrainOnSameRoute = false;
                                 for (let t of trains) {
@@ -805,6 +823,8 @@
                             if (sch.status !== 'waiting') {
                                 sch.countdown = '🔄 Perjalanan';
                                 sch.status = 'running';
+                                // Update ETA
+                                updateETA(sch);
                             }
                             renderSlides();
                         } else {
@@ -825,6 +845,26 @@
             }
             renderSlides();
         }, 1000);
+    }
+
+    // -- UPDATE ETA --
+    function updateETA(schedule) {
+        const train = trains.find(t => t.name === schedule.trainName);
+        if (!train) return;
+        
+        const route = routes[train.routeKey];
+        if (!route) return;
+        
+        const distance = route.distance || 5;
+        const speed = train.speed * 0.5;
+        const timeToArrive = (distance / speed) * (1 - train.progress);
+        const etaSeconds = Math.floor(timeToArrive * 10);
+        
+        if (etaSeconds > 0) {
+            trainETAs[train.id] = `${etaSeconds}s`;
+        } else {
+            trainETAs[train.id] = '⏳ Tiba';
+        }
     }
 
     // -- MOVE TRAIN TO ROUTE --
@@ -857,7 +897,6 @@
             trains.push(train);
         }
 
-        // Gunakan wesel dari stasiun asal
         const weselId = fromSt.wesel || 0;
         const weselOptions = stationWesels[fromSt.id] || [];
         const selectedWesel = weselOptions.find(w => w.id === weselId);
@@ -866,7 +905,6 @@
         if (selectedWesel) {
             routeKey = selectedWesel.routeKey;
         } else {
-            // Fallback ke route default
             routeKey = `${schedule.stationId}-${schedule.destinationId}`;
         }
         
@@ -880,7 +918,14 @@
             train.isStopped = false;
             train.currentStation = fromSt.name;
             trainLocations[train.id] = fromSt.name;
-            showPopup('🚆 ' + train.name, 'berangkat dari ' + fromSt.name + ' via ' + (selectedWesel ? selectedWesel.label : 'jalur default'));
+            
+            // Hitung ETA awal
+            const distance = route.distance || 5;
+            const speed = train.speed * 0.5;
+            const etaSeconds = Math.floor((distance / speed) * 10);
+            trainETAs[train.id] = `${etaSeconds}s`;
+            
+            showPopup('🚆 ' + train.name, 'berangkat dari ' + fromSt.name + ' via ' + (selectedWesel ? selectedWesel.label : 'jalur default') + ' | ETA: ' + trainETAs[train.id]);
         }
         updateTrainCount();
         renderTrainControls();
@@ -898,7 +943,6 @@
         train.direction = -1;
         train.progress = 0.95;
 
-        // Gunakan wesel dari stasiun tujuan untuk rute balik
         const weselId = toSt.wesel || 0;
         const weselOptions = stationWesels[toSt.id] || [];
         const selectedWesel = weselOptions.find(w => w.id === weselId);
@@ -916,9 +960,13 @@
             train.routeKey = routeKey;
             train.currentStation = toSt.name;
             trainLocations[train.id] = toSt.name;
+            
+            const distance = reverseRoute.distance || 5;
+            const speed = train.speed * 0.5;
+            const etaSeconds = Math.floor((distance / speed) * 10);
+            trainETAs[train.id] = `${etaSeconds}s`;
         }
 
-        // Buat jadwal balik otomatis
         const newSchedule = {
             id: Date.now() + Math.random(),
             trainName: train.name,
@@ -933,7 +981,7 @@
         };
         schedules[schedule.destinationId].push(newSchedule);
 
-        showPopup('🔄 ' + train.name, 'balik arah menuju ' + fromSt.name + ' (jadwal otomatis)');
+        showPopup('🔄 ' + train.name, 'balik arah menuju ' + fromSt.name + ' (jadwal otomatis) | ETA: ' + trainETAs[train.id]);
         renderSlides();
     }
 
@@ -1004,6 +1052,7 @@
             const train = trains[i];
             if (!train.active) continue;
 
+            // ANIMASI SMOOTH - update progress lebih halus
             const pos = getPositionOnPath(train.progress, train.assignedJalur);
             const nearStation = getNearestStation(pos);
             
@@ -1106,6 +1155,7 @@
                 speedMul = 0.4;
             }
 
+            // ANIMASI SMOOTH - gerakan halus
             let delta = (train.speed * 0.0025) * speedMul;
             if (train.direction === 1) {
                 train.progress += delta;
@@ -1154,9 +1204,24 @@
                 }
             }
 
+            // Update ETA terus menerus
+            if (train.routeKey && routes[train.routeKey]) {
+                const route = routes[train.routeKey];
+                const distance = route.distance || 5;
+                const speed = train.speed * 0.5;
+                const remainingProgress = 1 - train.progress;
+                const timeToArrive = (distance / speed) * remainingProgress;
+                const etaSeconds = Math.floor(timeToArrive * 10);
+                if (etaSeconds > 0) {
+                    trainETAs[train.id] = `${etaSeconds}s`;
+                } else {
+                    trainETAs[train.id] = '⏳ Tiba';
+                }
+            }
+
             if (inStationArea && currentStation && (currentStation.signal || autoGreenSignals[currentStation.id]) && train.trainSignal) {
                 if (now - lastPopupTime > 1500 && !trainAhead) {
-                    showPopup(train.name, 'melewati ' + currentStation.name);
+                    showPopup(train.name, 'melewati ' + currentStation.name + ' | ETA: ' + (trainETAs[train.id] || '⏳'));
                     lastPopupTime = now;
                     train.currentStation = currentStation.name;
                     trainLocations[train.id] = currentStation.name;
@@ -1184,6 +1249,7 @@
     function draw() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+        // Gambar rel
         for (let j = 0; j < 8; j++) {
             ctx.beginPath();
             ctx.strokeStyle = j < 6 ? '#2a4a6a' : '#1a3a5a';
@@ -1214,6 +1280,7 @@
         }
         ctx.setLineDash([]);
 
+        // Gambar stasiun
         for (let s of stations) {
             if (autoGreenSignals[s.id]) {
                 ctx.shadowColor = '#22c55e88';
@@ -1267,9 +1334,10 @@
             const activeWesel = weselOptions.find(w => w.id === s.wesel);
             ctx.fillStyle = '#8aadcc';
             ctx.font = '10px monospace';
-            ctx.fillText(`Wesel: ${activeWesel ? activeWesel.label : 'Jalur 1'}`, s.x, s.y + 32);
+            ctx.fillText(`Wesel: ${activeWesel ? activeWesel.label.substring(0, 15) : 'Jalur 1'}`, s.x, s.y + 32);
         }
 
+        // Gambar wesel
         for (let i = 0; i < wesels.length; i++) {
             const w = wesels[i];
             const fromSt = stations.find(s => s.id === w.from);
@@ -1292,10 +1360,12 @@
             ctx.fillText(`Wesel ${i+1}`, (fromSt.x + toSt.x)/2, midY - 12);
         }
 
+        // Gambar kereta dengan ANIMASI SMOOTH
         for (let train of trains) {
             if (!train.active) continue;
             const pos = getPositionOnPath(train.progress, train.assignedJalur);
             
+            // Efek berhenti
             if (train.isStopped) {
                 ctx.beginPath();
                 ctx.arc(pos.x, pos.y, train.size/2 + 10, 0, 2 * Math.PI);
@@ -1307,6 +1377,21 @@
                 ctx.setLineDash([]);
             }
 
+            // Efek gerakan (asap/jejak)
+            if (!train.isStopped && train.progress > 0.05 && train.progress < 0.95) {
+                for (let k = 1; k <= 3; k++) {
+                    const trailProgress = train.progress - (k * 0.015 * train.direction);
+                    if (trailProgress > 0 && trailProgress < 1) {
+                        const trailPos = getPositionOnPath(trailProgress, train.assignedJalur);
+                        ctx.beginPath();
+                        ctx.arc(trailPos.x, trailPos.y, train.size/3 - k*2, 0, 2 * Math.PI);
+                        ctx.fillStyle = `rgba(255,255,255,${0.08 - k*0.02})`;
+                        ctx.fill();
+                    }
+                }
+            }
+
+            // Body kereta dengan shadow
             ctx.shadowColor = '#00000088';
             ctx.shadowBlur = 18;
             ctx.fillStyle = train.color;
@@ -1318,6 +1403,17 @@
             ctx.lineWidth = 2;
             ctx.stroke();
 
+            // Lampu kereta (depan/belakang)
+            const lightX = train.direction === 1 ? pos.x + train.size/2 : pos.x - train.size/2;
+            ctx.beginPath();
+            ctx.arc(lightX, pos.y, 4, 0, 2 * Math.PI);
+            ctx.fillStyle = train.trainSignal ? '#22c55e' : '#ef4444';
+            ctx.fill();
+            ctx.strokeStyle = '#0a121e';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            // Indikator sinyal kereta
             ctx.beginPath();
             ctx.arc(pos.x + train.size/2 + 6, pos.y - train.size/2 - 4, 5, 0, 2 * Math.PI);
             ctx.fillStyle = train.trainSignal ? '#22c55e' : '#ef4444';
@@ -1331,6 +1427,14 @@
                 ctx.font = 'bold 8px monospace';
                 ctx.textAlign = 'center';
                 ctx.fillText('⛔', pos.x, pos.y - train.size/2 - 20);
+            }
+
+            // ETA di atas kereta
+            if (trainETAs[train.id] && !train.isStopped) {
+                ctx.fillStyle = '#7acfde';
+                ctx.font = 'bold 9px monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText('⏱ ' + trainETAs[train.id], pos.x, pos.y - train.size/2 - 28);
             }
 
             const location = trainLocations[train.id] || 'Unknown';
@@ -1408,16 +1512,15 @@
         trainListEl.innerHTML = trains.map((t, idx) => {
             const location = trainLocations[t.id] || 'Unknown';
             const weselOptions = stationWesels[getStationIdFromName(location)] || [];
-            const activeWesel = weselOptions.find(w => {
-                const st = stations.find(s => s.id === getStationIdFromName(location));
-                return st && w.id === st.wesel;
-            });
+            const st = stations.find(s => s.id === getStationIdFromName(location));
+            const activeWesel = weselOptions.find(w => st && w.id === st.wesel);
             return `
             <div class="train-item">
                 <span class="color-dot" style="background:${t.color};"></span>
                 <span class="name">${t.name}</span>
                 <span style="font-size:11px;color:#8aadcc;min-width:100px;">📍 ${location}</span>
-                <span class="wesel-info">${activeWesel ? '🔀 ' + activeWesel.label.substring(0, 15) : '🔀 Jalur ' + (t.assignedJalur + 1)}</span>
+                <span class="eta-info">${trainETAs[t.id] ? '⏱ ' + trainETAs[t.id] : '⏳'}</span>
+                <span class="wesel-info">${activeWesel ? '🔀 ' + activeWesel.label.substring(0, 12) : '🔀 Jalur ' + (t.assignedJalur + 1)}</span>
                 <div class="signal-control">
                     <button onclick="toggleTrainSignal(${idx})" class="${t.trainSignal ? 'active' : 'inactive'}">
                         ${t.trainSignal ? '🟢 ON' : '🔴 OFF'}
@@ -1461,7 +1564,10 @@
                 if (locationSpan && trainLocations[trains[idx].id]) {
                     locationSpan.textContent = '📍 ' + trainLocations[trains[idx].id];
                 }
-                // Update wesel info
+                const etaSpan = item.querySelector('.eta-info');
+                if (etaSpan && trainETAs[trains[idx].id]) {
+                    etaSpan.textContent = '⏱ ' + trainETAs[trains[idx].id];
+                }
                 const weselSpan = item.querySelector('.wesel-info');
                 if (weselSpan) {
                     const location = trainLocations[train.id] || 'Unknown';
@@ -1469,13 +1575,13 @@
                     const weselOptions = stationWesels[stationId] || [];
                     const st = stations.find(s => s.id === stationId);
                     const activeWesel = weselOptions.find(w => st && w.id === st.wesel);
-                    weselSpan.textContent = activeWesel ? '🔀 ' + activeWesel.label.substring(0, 15) : '🔀 Jalur ' + (trains[idx].assignedJalur + 1);
+                    weselSpan.textContent = activeWesel ? '🔀 ' + activeWesel.label.substring(0, 12) : '🔀 Jalur ' + (trains[idx].assignedJalur + 1);
                 }
             }
         });
     }
 
-    // -- WESEL PER STASIUN (FIXED) --
+    // -- WESEL PER STASIUN --
     window.changeStationWesel = function(stationId, weselId) {
         const st = stations.find(s => s.id === stationId);
         if (st) {
@@ -1483,7 +1589,6 @@
             const weselOptions = stationWesels[stationId] || [];
             const selected = weselOptions.find(w => w.id === parseInt(weselId));
             
-            // Update semua kereta yang berada di stasiun ini
             for (let train of trains) {
                 if (trainLocations[train.id] === st.name) {
                     if (selected && routes[selected.routeKey]) {
@@ -1656,6 +1761,7 @@
                                 <div style="display:flex;align-items:center;gap:6px;padding:4px 10px;border-radius:8px;background:${isActive ? '#1a3a2a' : '#0a121e'};border:1px solid ${isActive ? '#3a8a6a' : '#1a2c3f'};">
                                     <span style="font-size:10px;color:${isActive ? '#7acf8a' : '#6a8aaa'};">${isActive ? '▶' : ''}</span>
                                     <span style="font-size:11px;color:${isActive ? '#7acf8a' : '#8aadcc'};">${w.label}</span>
+                                    ${route ? `<span style="font-size:8px;color:#6a8aaa;">${route.distance || 0}km</span>` : ''}
                                 </div>
                             `}).join('')}
                         </div>
@@ -1692,10 +1798,14 @@
                                     <div style="color:#6a8aaa;font-size:13px;padding:12px;text-align:center;">
                                         Belum ada jadwal.
                                     </div>
-                                ` : stationSchedules.map(sch => `
+                                ` : stationSchedules.map(sch => {
+                                    const train = trains.find(t => t.name === sch.trainName);
+                                    const eta = train ? trainETAs[train.id] : null;
+                                    return `
                                     <div class="schedule-item">
                                         <span class="train-name" style="color:${sch.trainColor}">${sch.trainName}</span>
                                         <span class="time">⏰ ${sch.time}</span>
+                                        <span class="eta">${eta ? '⏱ ' + eta : ''}</span>
                                         <span class="countdown">${sch.countdown || '⏳'}</span>
                                         <span class="status-badge ${sch.status === 'scheduled' && autoGreenSignals[s.id] ? 'green-signal' : sch.status}">
                                             ${sch.status === 'scheduled' && autoGreenSignals[s.id] ? '🟢 AUTO GREEN' :
@@ -1710,7 +1820,7 @@
                                             <button class="danger" onclick="deleteSchedule('${sch.id}', '${s.id}')">🗑️</button>
                                         </div>
                                     </div>
-                                `).join('')}
+                                `}).join('')}
                             </div>
                         </div>
                     </div>
@@ -1759,6 +1869,7 @@
         signalCooldown = {};
         autoGreenSignals = {};
         trainLocations = {};
+        trainETAs = {};
         currentWeselIndex = 0;
         wesels.forEach((w, i) => w.aktif = (i === 0));
         initTrains();
@@ -1824,8 +1935,8 @@
     renderSlides();
     loop();
 
-    console.log('🚂 DRAGON RAIL WESEL FIX — wesel per stasiun BERFUNGSI 100%!');
-    console.log('📍 Kereta otomatis ikuti wesel yang dipilih di setiap stasiun');
+    console.log('🚂 DRAGON RAIL ANIMASI & ETA — kereta bergerak halus + estimasi waktu tiba!');
+    console.log('📍 Setiap kereta punya ETA real-time berdasarkan jarak & kecepatan');
 })();
 </script>
 </body>
