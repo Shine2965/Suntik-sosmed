@@ -567,6 +567,66 @@
     </div>
 
     <script>
+        // ===================== USER ID =====================
+        function generateUserID() {
+            return 'user-' + Math.random().toString(36).substring(2, 10) + '-' + Date.now().toString(36);
+        }
+
+        async function getUserID() {
+            let id = localStorage.getItem("user_id");
+            if (!id) {
+                id = generateUserID();
+                localStorage.setItem("user_id", id);
+            }
+            return id;
+        }
+
+        // ===================== USER BAN =====================
+        async function checkUserBan() {
+            try {
+                const userID = await getUserID();
+                const res = await fetch("/sosmed-2/payment/user.json", { cache: "no-store" });
+                if (!res.ok) return;
+                const list = await res.json();
+                const banned = list.find(x => x.user === userID);
+                if (banned) {
+                    const reason = banned.reason || "Tidak ada keterangan";
+                    document.body.innerHTML = `
+                        <div style="display:flex;align-items:center;justify-content:center;height:100vh;background:linear-gradient(135deg,#0f2027,#203a43,#2c5364);color:white;text-align:center;">
+                            <div style="max-width:420px;background:rgba(255,255,255,.12);padding:30px;border-radius:22px;">
+                                <h1>🚫 Akses Diblokir</h1>
+                                <p>Akun kamu diblokir</p>
+                                <div>${reason}</div>
+                                <br>
+                                <small>User ID: ${userID}</small>
+                                <br><br>
+                                <a href="https://wa.me/6289518103883?text=Halo%20Admin%2C%20saya%20ingin%20mengajukan%20banding%20atas%20ban%20akun%20saya.%20User%20ID%3A%20${userID}" 
+                                   target="_blank" 
+                                   style="display:inline-block;margin-top:12px;padding:10px 24px;background:#ffaa0044;color:#ffaa00;border:1px solid #ffaa0055;border-radius:20px;text-decoration:none;font-size:14px;">
+                                   📱 Ajukan Banding
+                                </a>
+                            </div>
+                        </div>
+                    `;
+                    throw new Error("USER_BANNED");
+                }
+            } catch (e) {
+                if (e.message === "USER_BANNED") throw e;
+            }
+        }
+
+        // ===================== CEK BAN SEBELUM LOAD =====================
+        (async function() {
+            try {
+                await checkUserBan();
+            } catch (e) {
+                if (e.message === "USER_BANNED") {
+                    // Stop eksekusi script lain
+                    throw e;
+                }
+            }
+        })();
+
         // ===================== KONFIGURASI =====================
         const DATA_URL = '/info/buzzer/data.json';
         const CONFIG_API = '/api/config';
