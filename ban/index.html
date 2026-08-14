@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Riwayat Ban - Shine Shop</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: #0a0a0a;
+            min-height: 100vh;
+            padding: 30px 20px;
+            background: radial-gradient(circle at 20% 30%, #ff444410, transparent 50%),
+                        radial-gradient(circle at 80% 70%, #ff000010, transparent 50%),
+                        #0a0a0a;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        .card {
+            background: #1a1a1a;
+            border-radius: 24px;
+            padding: 30px 28px;
+            border: 1px solid #ff444433;
+            box-shadow: 0 0 40px rgba(255,68,68,0.05);
+            margin-bottom: 20px;
+        }
+        .card h1 {
+            color: #ff4444;
+            font-size: 28px;
+            margin-bottom: 4px;
+        }
+        .card .sub {
+            color: #888;
+            font-size: 14px;
+            margin-bottom: 20px;
+        }
+        .card .stats {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin: 12px 0 8px 0;
+        }
+        .card .stats .stat-item {
+            background: #0d0d0d;
+            padding: 10px 18px;
+            border-radius: 12px;
+            border: 1px solid #ff444415;
+        }
+        .card .stats .stat-item .num {
+            color: #ff4444;
+            font-size: 24px;
+            font-weight: 700;
+        }
+        .card .stats .stat-item .label {
+            color: #888;
+            font-size: 12px;
+        }
+        .btn {
+            padding: 10px 24px;
+            border-radius: 30px;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.3s;
+            font-size: 13px;
+            font-family: 'Poppins', sans-serif;
+        }
+        .btn-back {
+            background: #444;
+            color: #fff;
+        }
+        .btn-back:hover {
+            background: #555;
+        }
+        .btn-refresh {
+            background: #00ffaa22;
+            color: #00ffaa;
+            border: 1px solid #00ffaa44;
+        }
+        .btn-refresh:hover {
+            background: #00ffaa44;
+        }
+        .btn-appeal {
+            background: #ffaa0044;
+            color: #ffaa00;
+            border: 1px solid #ffaa0055;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .btn-appeal:hover {
+            background: #ffaa0066;
+        }
+        .header-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 10px;
+        }
+        .ban-item {
+            background: #0d0d0d;
+            border-radius: 14px;
+            padding: 16px 20px;
+            border-left: 4px solid #ff4444;
+            margin-bottom: 12px;
+            transition: 0.3s;
+            border: 1px solid #ff444415;
+            border-left-width: 4px;
+        }
+        .ban-item:hover {
+            border-color: #ff444455;
+            transform: translateX(4px);
+        }
+        .ban-item .user-id {
+            color: #00ffaa;
+            font-weight: 600;
+            font-size: 14px;
+            word-break: break-all;
+        }
+        .ban-item .reason {
+            color: #ddd;
+            font-size: 13px;
+            margin-top: 6px;
+            line-height: 1.6;
+            word-break: break-word;
+        }
+        .ban-item .reason .highlight {
+            color: #ff6666;
+        }
+        .ban-item .meta {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-top: 8px;
+            font-size: 11px;
+            color: #666;
+        }
+        .ban-item .meta .badge-ban {
+            background: #ff444422;
+            color: #ff4444;
+            padding: 2px 12px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 10px;
+            text-transform: uppercase;
+        }
+        .no-data {
+            color: #666;
+            text-align: center;
+            padding: 40px 0;
+            font-size: 14px;
+        }
+        .loading {
+            color: #888;
+            text-align: center;
+            padding: 20px 0;
+            font-size: 14px;
+        }
+        .last-update {
+            color: #555;
+            font-size: 11px;
+            text-align: right;
+            margin-top: 12px;
+        }
+        .env-status {
+            text-align: center;
+            font-size: 11px;
+            color: #555;
+            margin-top: 8px;
+        }
+        .security-badge {
+            text-align: center;
+            font-size: 10px;
+            color: #444;
+            margin-top: 12px;
+            border-top: 1px solid #ff444415;
+            padding-top: 12px;
+        }
+        @media (max-width: 600px) {
+            .card {
+                padding: 20px 16px;
+            }
+            .card .stats {
+                gap: 10px;
+            }
+            .card .stats .stat-item {
+                padding: 8px 14px;
+            }
+            .card .stats .stat-item .num {
+                font-size: 20px;
+            }
+            .ban-item {
+                padding: 14px 16px;
+            }
+            .header-actions {
+                flex-direction: column;
+                width: 100%;
+            }
+            .header-actions .btn {
+                width: 100%;
+                text-align: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- ===== HEADER ===== -->
+        <div class="card">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;">
+                <div>
+                    <h1>🚫 Riwayat Ban</h1>
+                    <div class="sub">Daftar akun yang diblokir secara real-time</div>
+                </div>
+                <div class="header-actions">
+                    <button class="btn btn-refresh" onclick="loadBannedUsers()">🔄 Refresh</button>
+                    <a href="https://wa.me/6289518103883?text=Halo%20Admin%2C%20saya%20ingin%20mengajukan%20banding%20atas%20ban%20akun%20saya.%20User%20ID%3A%20" 
+                       target="_blank" 
+                       class="btn btn-appeal">
+                       📱 Ajukan Banding
+                    </a>
+                    <button class="btn btn-back" onclick="location.href='/info/dashboard/index.html'">⬅️ Kembali</button>
+                </div>
+            </div>
+            <div class="stats" id="statsContainer">
+                <div class="stat-item">
+                    <div class="num" id="totalBanned">0</div>
+                    <div class="label">Total Diblokir</div>
+                </div>
+                <div class="stat-item">
+                    <div class="num" id="totalUsers">0</div>
+                    <div class="label">Total User Terdaftar</div>
+                </div>
+                <div class="stat-item">
+                    <div class="num" id="banRate">0%</div>
+                    <div class="label">Persentase Ban</div>
+                </div>
+            </div>
+            <div class="env-status" id="envStatus">🔌 Mengambil data dari server...</div>
+        </div>
+
+        <!-- ===== LIST BAN ===== -->
+        <div id="banContainer">
+            <div class="loading">⏳ Memuat daftar ban...</div>
+        </div>
+
+        <div class="text-muted" style="text-align:center;margin-top:20px;color:#666;font-size:12px;">
+            © Shine Shop · Riwayat Ban System
+        </div>
+        <div class="security-badge">🔒 Data real-time dari /sosmed-2/payment/user.json</div>
+    </div>
+
+    <script>
+        // ===================== KONFIGURASI =====================
+        const BAN_URL = '/sosmed-2/payment/user.json';
+        const DASHBOARD_URL = '/info/dashboard/index.html';
+        const LOGIN_PAGE = '/info/index.html';
+        const WHATSAPP_NUMBER = '6289518103883';
+
+        // ===================== CEK SESSION =====================
+        function checkSession() {
+            const loggedIn = localStorage.getItem('logged_in');
+            const userEmail = localStorage.getItem('user_email');
+            
+            if (loggedIn !== 'true' || !userEmail) {
+                window.location.href = LOGIN_PAGE;
+                return false;
+            }
+            return true;
+        }
+
+        if (!checkSession()) {
+            throw new Error('Redirect ke login');
+        }
+
+        // ===================== GET USER DATA =====================
+        function getUserData() {
+            return {
+                email: localStorage.getItem('user_email') || '',
+                role: localStorage.getItem('user_role') || 'user'
+            };
+        }
+
+        // ===================== FORMAT WAKTU =====================
+        function getCurrentTime() {
+            return new Date().toLocaleString('id-ID', {
+                day: '2-digit',
+                month: 'long',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+        }
+
+        // ===================== AMBIL DATA BAN =====================
+        async function loadBannedUsers() {
+            const container = document.getElementById('banContainer');
+            const statusEl = document.getElementById('envStatus');
+            container.innerHTML = '<div class="loading">⏳ Memuat data ban...</div>';
+
+            try {
+                statusEl.textContent = '⏳ Mengambil data dari server...';
+                statusEl.style.color = '#888';
+
+                const res = await fetch(BAN_URL + '?t=' + Date.now());
+                
+                if (!res.ok) {
+                    throw new Error('Gagal mengambil data: ' + res.status);
+                }
+
+                const data = await res.json();
+                
+                if (!Array.isArray(data)) {
+                    throw new Error('Format data tidak valid');
+                }
+
+                statusEl.textContent = '✅ ' + data.length + ' akun terban, diperbarui: ' + getCurrentTime();
+                statusEl.style.color = '#00ffaa';
+
+                // Update statistik
+                document.getElementById('totalBanned').textContent = data.length;
+
+                // Hitung total user (dari localStorage atau estimasi)
+                const totalUsers = 150; // Estimasi, bisa diambil dari data lain
+                document.getElementById('totalUsers').textContent = totalUsers;
+                const rate = totalUsers > 0 ? Math.round((data.length / totalUsers) * 100) : 0;
+                document.getElementById('banRate').textContent = rate + '%';
+
+                if (data.length === 0) {
+                    container.innerHTML = `
+                        <div class="card" style="border-color:#00ffaa33;">
+                            <div class="no-data" style="color:#00ffaa;">
+                                ✅ Tidak ada akun yang diblokir saat ini.
+                            </div>
+                        </div>
+                    `;
+                    return;
+                }
+
+                // Tampilkan data ban
+                let html = '';
+                data.forEach((item, index) => {
+                    const user = item.user || 'Unknown';
+                    const reason = item.reason || 'Tidak ada alasan';
+
+                    html += `
+                        <div class="ban-item">
+                            <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;">
+                                <span class="user-id">🆔 ${user}</span>
+                                <span class="badge-ban">#${index + 1}</span>
+                            </div>
+                            <div class="reason">${reason}</div>
+                            <div class="meta">
+                                <span>📅 Terban: ${getCurrentTime()}</span>
+                                <a href="https://wa.me/${WHATSAPP_NUMBER}?text=Halo%20Admin%2C%20saya%20ingin%20mengajukan%20banding%20atas%20ban%20akun%20saya.%20User%20ID%3A%20${encodeURIComponent(user)}" 
+                                   target="_blank" 
+                                   style="color:#ffaa00;text-decoration:underline;font-size:11px;">
+                                   📱 Ajukan Banding
+                                </a>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                container.innerHTML = html;
+
+            } catch (err) {
+                console.error('Error load banned users:', err);
+                statusEl.textContent = '❌ ' + err.message;
+                statusEl.style.color = '#ff6666';
+                container.innerHTML = `
+                    <div class="card" style="border-color:#ff444455;">
+                        <div class="no-data" style="color:#ff6666;">
+                            ❌ Gagal memuat data: ${err.message}
+                            <br><br>
+                            <button class="btn btn-refresh" onclick="loadBannedUsers()" style="margin-top:10px;">
+                                🔄 Coba Lagi
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        // ===================== AUTO REFRESH =====================
+        let refreshInterval = null;
+
+        function startAutoRefresh() {
+            if (refreshInterval) clearInterval(refreshInterval);
+            refreshInterval = setInterval(loadBannedUsers, 30000); // Refresh setiap 30 detik
+        }
+
+        // ===================== INIT =====================
+        document.addEventListener('DOMContentLoaded', function() {
+            loadBannedUsers();
+            startAutoRefresh();
+
+            console.log('🚫 Riwayat Ban siap!');
+            console.log('👤 User:', getUserData().email);
+            console.log('📡 Sumber data: ' + BAN_URL);
+        });
+
+        // Stop refresh saat halaman di-unload
+        window.addEventListener('beforeunload', function() {
+            if (refreshInterval) clearInterval(refreshInterval);
+        });
+    </script>
+</body>
+</html>
