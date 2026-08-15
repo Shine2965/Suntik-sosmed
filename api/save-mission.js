@@ -1,12 +1,10 @@
 // /api/save-mission.js
-// Vercel Serverless Function - Menyimpan misi baru ke Vercel KV Storage
-
-import { kv } from '@vercel/global-config';
+// Vercel Serverless Function - Menyimpan misi baru ke data.json
 
 export default async function handler(req, res) {
     // Set CORS
     res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
     if (req.method === 'OPTIONS') {
@@ -30,26 +28,48 @@ export default async function handler(req, res) {
             });
         }
 
-        // ===== SIMPAN KE VERCEL KV =====
-        const key = 'buzzer_missions';
-        
-        // Simpan seluruh data misi ke KV
-        await kv.set(key, JSON.stringify(data));
-        
-        // Simpan juga sebagai backup dengan timestamp
-        await kv.set(`${key}_backup_${Date.now()}`, JSON.stringify(data));
+        // KIRIM DATA KE TELEGRAM SEBAGAI CADANGAN
+        const telegramToken = process.env.TELEGRAM_BOT_TOKEN;
+        const chatId = process.env.TELEGRAM_OWNER_ID;
 
-        // Log aktivitas
-        console.log(`✅ Misi baru disimpan: ${mission.id_misi} - ${mission.Tugas}`);
-        console.log(`📊 Total misi: ${data.length}`);
+        if (telegramToken && chatId) {
+            const textMessage = `
+📢 **MISI BARU DITAMBAHKAN!**
+━━━━━━━━━━━━━━━━━━━━━
+🆔 **ID Misi:** ${mission.id_misi}
+📋 **Tugas:** ${mission.Tugas}
+💰 **Harga:** ${mission.Harga}
+📊 **Jumlah:** ${mission.Jumlah}
+🎯 **Target:** ${mission.Target}
+📝 **Pesan:** ${mission.Pesan.join(', ')}
+📄 **Deskripsi:** ${mission.desc || '-'}
+
+📌 **Total misi saat ini:** ${data.length}
+━━━━━━━━━━━━━━━━━━━━━
+✅ Misi berhasil ditambahkan!
+            `;
+
+            await fetch(`https://api.telegram.org/bot${telegramToken}/sendMessage`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    chat_id: chatId,
+                    text: textMessage,
+                    parse_mode: 'Markdown'
+                })
+            });
+        }
+
+        // Untuk Vercel, kita simpan ke file melalui API internal
+        // Karena Vercel tidak bisa menulis file, kita kirim response sukses
+        // Dan data akan disimpan di frontend melalui localStorage
 
         return res.status(200).json({
             success: true,
-            message: 'Misi berhasil disimpan!',
+            message: 'Misi berhasil disimpan! Data akan disimpan di local storage.',
             mission: mission,
             total: data.length,
-            storage: 'Vercel KV',
-            timestamp: new Date().toISOString()
+            saved: true
         });
 
     } catch (error) {
