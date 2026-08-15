@@ -1,7 +1,7 @@
 // /api/save-mission.js
 // Vercel Serverless Function - Menyimpan misi baru ke Vercel KV Storage
 
-import { kv } from '@vercel/kv';
+import { kv } from '@vercel/global-config';
 
 export default async function handler(req, res) {
     // Set CORS
