@@ -830,126 +830,29 @@ function searchLayanan(){
     }  
   }  
 }  
-
-// ===================== SYARAT & KETENTUAN =====================
-async function showRulesPopup() {
-  return new Promise(async (resolve) => {
-    try {
-      // Ambil data dari /rules/
-      const res = await fetch("/rules/?t=" + Date.now());
-      let rulesText = "Syarat & ketentuan tidak tersedia.";
-      
-      if (res.ok) {
-        rulesText = await res.text();
-      }
-
-      // Tampilkan popup SweetAlert2
-      const result = await Swal.fire({
-        title: '📋 Syarat & Ketentuan',
-        html: `
-          <div style="text-align:left;max-height:400px;overflow-y:auto;color:#ccc;font-size:13px;line-height:1.8;padding:10px;background:#0d0d0d;border-radius:12px;border:1px solid #00ffaa22;">
-            ${rulesText || 'Syarat & ketentuan belum tersedia.'}
-          </div>
-          <div style="margin-top:16px;padding:12px;background:#00ffaa10;border-radius:10px;border:1px solid #00ffaa33;">
-            <label style="color:#00ffaa;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;gap:10px;">
-              <input type="checkbox" id="rulesAgree" style="accent-color:#00ffaa;width:18px;height:18px;cursor:pointer;">
-              Saya sudah membaca dan menyetujui syarat & ketentuan
-            </label>
-          </div>
-        `,
-        icon: 'info',
-        confirmButtonText: '✅ Lanjutkan',
-        cancelButtonText: '❌ Batal',
-        showCancelButton: true,
-        confirmButtonColor: '#00ffaa',
-        cancelButtonColor: '#666',
-        backdrop: 'rgba(0,0,0,0.8)',
-        allowOutsideClick: false,
-        preConfirm: () => {
-          const agree = document.getElementById('rulesAgree');
-          if (!agree || !agree.checked) {
-            Swal.showValidationMessage('⚠️ Anda harus menyetujui syarat & ketentuan terlebih dahulu!');
-            return false;
-          }
-          return true;
-        }
-      });
-
-      resolve(result.isConfirmed);
-
-    } catch (err) {
-      console.error('Error showing rules:', err);
-      // Jika gagal, tetap lanjutkan dengan konfirmasi sederhana
-      const result = await Swal.fire({
-        title: '⚠️ Gagal memuat syarat',
-        text: 'Gagal mengambil syarat & ketentuan. Apakah Anda tetap ingin melanjutkan?',
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonText: '✅ Ya, Lanjutkan',
-        cancelButtonText: '❌ Batal',
-        confirmButtonColor: '#ffaa00',
-        cancelButtonColor: '#666'
-      });
-      resolve(result.isConfirmed);
-    }
-  });
-}
-
-// ===================== LANJUT PEMBAYARAN =====================
-async function lanjutPembayaran() {
-  // ===== VALIDASI FORM =====
-  if (!selectedService) {
-    Swal.fire({
-      title: '⚠️ Pilih Layanan',
-      text: 'Silakan pilih layanan terlebih dahulu!',
-      icon: 'warning',
-      confirmButtonColor: '#ffaa00'
-    });
-    return;
-  }
-
-  const jumlah = parseInt(document.getElementById("jumlah").value || "0");
-  if (jumlah < selectedService.min || jumlah > selectedService.max) {
-    Swal.fire({
-      title: '⚠️ Jumlah Tidak Valid',
-      text: `Jumlah harus antara ${selectedService.min} dan ${selectedService.max}`,
-      icon: 'warning',
-      confirmButtonColor: '#ffaa00'
-    });
-    return;
-  }
-
-  const target = document.getElementById("target").value.trim();
-  if (!target) {
-    Swal.fire({
-      title: '⚠️ Target Kosong',
-      text: 'Silakan masukkan target / link terlebih dahulu!',
-      icon: 'warning',
-      confirmButtonColor: '#ffaa00'
-    });
-    return;
-  }
-
-  // ===== TAMPILKAN POPUP SYARAT & KETENTUAN =====
-  const rulesAccepted = await showRulesPopup();
   
-  if (!rulesAccepted) {
-    return; // User batal atau tidak setuju
-  }
-
-  // ===== LANJUTKAN PEMBAYARAN =====
-  const trxID = generateTransactionID();
-  const kategori = document.getElementById("kategori").value;
-
+function lanjutPembayaran(){  
+  if(!selectedService){alert("Pilih layanan terlebih dahulu!");return;}  
+  
+  const jumlah=parseInt(document.getElementById("jumlah").value||"0");  
+  if(jumlah < selectedService.min || jumlah > selectedService.max){  
+    alert(`Jumlah harus antara ${selectedService.min} dan ${selectedService.max}`);  
+    return;  
+  }  
+  
+  const trxID=generateTransactionID();  
+  const kategori=document.getElementById("kategori").value;  
+  const target=document.getElementById("target").value;  
+  
   // Pake harga diskon jika ada
   const hargaAktif = (selectedService.diskon && selectedService.diskon < selectedService.pricePerFollower) 
     ? selectedService.diskon 
     : selectedService.pricePerFollower;
-
-  const total = jumlah * hargaAktif;
-
-  window.location.href = `payment/?trx=${trxID}&kategori=${kategori}&layanan=${selectedService.name}&id=${selectedService.id}&jumlah=${jumlah}&total=${total}&target=${encodeURIComponent(target)}`;
-}
+  
+  const total=jumlah * hargaAktif;  
+  
+  window.location.href=`payment/?trx=${trxID}&kategori=${kategori}&layanan=${selectedService.name}&id=${selectedService.id}&jumlah=${jumlah}&total=${total}&target=${encodeURIComponent(target)}`;  
+}  
    
 document.addEventListener("keydown", function(e){
   // F12
