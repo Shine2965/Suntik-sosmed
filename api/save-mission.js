@@ -1,8 +1,7 @@
 // /api/save-mission.js
-// Vercel Serverless Function - Menyimpan misi baru ke data.json
+// Vercel Serverless Function - Menyimpan misi baru ke Vercel KV Storage
 
-const fs = require('fs');
-const path = require('path');
+import { kv } from '@vercel/kv';
 
 export default async function handler(req, res) {
     // Set CORS
@@ -31,21 +30,26 @@ export default async function handler(req, res) {
             });
         }
 
-        // Path ke file data.json
-        // Untuk Vercel, kita menggunakan /tmp karena tidak bisa menulis ke filesystem
-        // Untuk production, sebaiknya gunakan database atau storage
-        const filePath = path.join(process.cwd(), '/', 'info', 'buzzer', 'data.json');
+        // ===== SIMPAN KE VERCEL KV =====
+        const key = 'buzzer_missions';
+        
+        // Simpan seluruh data misi ke KV
+        await kv.set(key, JSON.stringify(data));
+        
+        // Simpan juga sebagai backup dengan timestamp
+        await kv.set(`${key}_backup_${Date.now()}`, JSON.stringify(data));
 
-        // Tulis data ke file
-        // Note: Di Vercel, ini hanya akan bekerja di development
-        // Untuk production, gunakan database atau Vercel KV
-        fs.writeFileSync(filePath, JSON.stringify(data, null, 4), 'utf8');
+        // Log aktivitas
+        console.log(`✅ Misi baru disimpan: ${mission.id_misi} - ${mission.Tugas}`);
+        console.log(`📊 Total misi: ${data.length}`);
 
         return res.status(200).json({
             success: true,
             message: 'Misi berhasil disimpan!',
             mission: mission,
-            total: data.length
+            total: data.length,
+            storage: 'Vercel KV',
+            timestamp: new Date().toISOString()
         });
 
     } catch (error) {
