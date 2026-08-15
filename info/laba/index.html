@@ -83,6 +83,11 @@
             grid-template-columns: 1fr 1fr;
             gap: 16px;
         }
+        .form-row-3 {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 16px;
+        }
         .btn {
             padding: 10px 24px;
             border-radius: 30px;
@@ -115,6 +120,18 @@
             opacity: 0.5;
             cursor: not-allowed;
             transform: none;
+        }
+        .btn-income {
+            background: #00ccff44;
+            color: #00ccff;
+            border: 1px solid #00ccff44;
+            width: 100%;
+            padding: 14px;
+            font-size: 15px;
+        }
+        .btn-income:hover {
+            background: #00ccff66;
+            transform: scale(0.97);
         }
         .btn-danger {
             background: #ff444422;
@@ -157,6 +174,26 @@
             color: #555;
             margin-top: 8px;
         }
+        .role-badge {
+            display: inline-block;
+            padding: 2px 12px;
+            border-radius: 12px;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+        .role-badge.admin {
+            background: #ff444422;
+            color: #ff6666;
+        }
+        .role-badge.vip {
+            background: #ffaa0044;
+            color: #ffaa00;
+        }
+        .role-badge.user {
+            background: #444;
+            color: #888;
+        }
 
         /* ===== STATS ===== */
         .stats-grid {
@@ -187,6 +224,9 @@
         }
         .stats-grid .stat-item .num.blue {
             color: #00ccff;
+        }
+        .stats-grid .stat-item .num.purple {
+            color: #a78bfa;
         }
         .stats-grid .stat-item .label {
             color: #888;
@@ -222,14 +262,20 @@
         table tr:hover td {
             background: #ffffff05;
         }
-        table .profit-positive {
+        .profit-positive {
             color: #00ffaa;
         }
-        table .profit-negative {
+        .profit-negative {
             color: #ff4444;
         }
-        table .profit-zero {
+        .profit-zero {
             color: #888;
+        }
+        .income-text {
+            color: #00ccff;
+        }
+        .expense-text {
+            color: #ffaa00;
         }
         .no-data {
             color: #666;
@@ -255,7 +301,7 @@
         /* ===== FILTER ===== */
         .filter-group {
             display: flex;
-            gap: 10px;
+            gap: 8px;
             flex-wrap: wrap;
             margin: 12px 0;
         }
@@ -279,11 +325,42 @@
             border-color: #00ffaa44;
         }
 
+        .badge-income {
+            background: #00ccff22;
+            color: #00ccff;
+            padding: 2px 10px;
+            border-radius: 10px;
+            font-size: 9px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .badge-expense {
+            background: #ffaa0022;
+            color: #ffaa00;
+            padding: 2px 10px;
+            border-radius: 10px;
+            font-size: 9px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .badge-transaction {
+            background: #00ffaa22;
+            color: #00ffaa;
+            padding: 2px 10px;
+            border-radius: 10px;
+            font-size: 9px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
         @media (max-width: 600px) {
             .card {
                 padding: 20px 16px;
             }
             .form-row {
+                grid-template-columns: 1fr;
+            }
+            .form-row-3 {
                 grid-template-columns: 1fr;
             }
             .stats-grid {
@@ -323,8 +400,9 @@
             <div id="userInfo" style="color:#888;font-size:13px;margin-top:8px;">
                 👤 <span id="userEmailDisplay">-</span>
                 <span id="userRoleDisplay" style="margin-left:10px;"></span>
+                <span id="userStorageDisplay" style="margin-left:10px;font-size:11px;color:#555;"></span>
             </div>
-            <div class="env-status" id="envStatus">🔌 Memeriksa akses admin...</div>
+            <div class="env-status" id="envStatus">🔌 Memeriksa akses...</div>
         </div>
 
         <!-- ===== STATISTIK ===== -->
@@ -336,8 +414,8 @@
                     <div class="label">Total Profit</div>
                 </div>
                 <div class="stat-item">
-                    <div class="num blue" id="totalRevenue">Rp 0</div>
-                    <div class="label">Total Pendapatan</div>
+                    <div class="num blue" id="totalIncome">Rp 0</div>
+                    <div class="label">Total Pemasukan</div>
                 </div>
                 <div class="stat-item">
                     <div class="num yellow" id="totalModal">Rp 0</div>
@@ -346,6 +424,10 @@
                 <div class="stat-item">
                     <div class="num red" id="totalExpense">Rp 0</div>
                     <div class="label">Total Pengeluaran</div>
+                </div>
+                <div class="stat-item">
+                    <div class="num purple" id="totalRevenue">Rp 0</div>
+                    <div class="label">Total Penjualan</div>
                 </div>
                 <div class="stat-item">
                     <div class="num" id="totalTransactions" style="color:#fff;">0</div>
@@ -393,6 +475,35 @@
             </form>
         </div>
 
+        <!-- ===== FORM TAMBAH PEMASUKAN ===== -->
+        <div class="card" id="incomeCard">
+            <h2>💵 Tambah Pemasukan</h2>
+            <div class="sub">Catat pemasukan dari sumber lain</div>
+            <form id="incomeForm" onsubmit="return false;">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>📝 Nama Pemasukan <span class="required">*</span></label>
+                        <input type="text" id="namaPemasukan" placeholder="Contoh: Bonus, Refund, dll" required>
+                    </div>
+                    <div class="form-group">
+                        <label>📅 Tanggal</label>
+                        <input type="date" id="tanggalPemasukan">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>💵 Nominal <span class="required">*</span></label>
+                    <input type="number" id="nominalPemasukan" placeholder="0" required>
+                </div>
+                <div class="form-group">
+                    <label>📝 Catatan (opsional)</label>
+                    <input type="text" id="catatanPemasukan" placeholder="Catatan tambahan...">
+                </div>
+                <button type="submit" class="btn btn-income" id="incomeSubmitBtn">
+                    💵 Tambah Pemasukan
+                </button>
+            </form>
+        </div>
+
         <!-- ===== FORM TAMBAH PENGELUARAN ===== -->
         <div class="card" id="expenseCard">
             <h2>💸 Tambah Pengeluaran</h2>
@@ -404,9 +515,17 @@
                         <input type="text" id="namaPengeluaran" placeholder="Contoh: Biaya Admin" required>
                     </div>
                     <div class="form-group">
-                        <label>💸 Nominal <span class="required">*</span></label>
-                        <input type="number" id="nominalPengeluaran" placeholder="0" required>
+                        <label>📅 Tanggal</label>
+                        <input type="date" id="tanggalPengeluaran">
                     </div>
+                </div>
+                <div class="form-group">
+                    <label>💸 Nominal <span class="required">*</span></label>
+                    <input type="number" id="nominalPengeluaran" placeholder="0" required>
+                </div>
+                <div class="form-group">
+                    <label>📝 Catatan (opsional)</label>
+                    <input type="text" id="catatanPengeluaran" placeholder="Catatan tambahan...">
                 </div>
                 <button type="submit" class="btn btn-submit" id="expenseSubmitBtn" style="background:#ffaa0044;color:#ffaa00;border:1px solid #ffaa0055;">
                     💸 Tambah Pengeluaran
@@ -414,10 +533,10 @@
             </form>
         </div>
 
-        <!-- ===== LIST TRANSAKSI ===== -->
+        <!-- ===== LIST DATA ===== -->
         <div class="card" id="listCard">
             <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
-                <h2>📋 Riwayat Transaksi</h2>
+                <h2>📋 Riwayat</h2>
                 <div style="display:flex;gap:8px;flex-wrap:wrap;">
                     <button class="btn btn-danger" onclick="clearAllData()" style="padding:6px 16px;font-size:11px;">
                         🗑️ Hapus Semua
@@ -428,6 +547,7 @@
                 <button class="btn-filter active" data-filter="all" onclick="setFilter('all')">📋 Semua</button>
                 <button class="btn-filter" data-filter="profit" onclick="setFilter('profit')">✅ Untung</button>
                 <button class="btn-filter" data-filter="loss" onclick="setFilter('loss')">❌ Rugi</button>
+                <button class="btn-filter" data-filter="income" onclick="setFilter('income')">💵 Pemasukan</button>
                 <button class="btn-filter" data-filter="expense" onclick="setFilter('expense')">💸 Pengeluaran</button>
             </div>
             <div class="table-wrap" id="tableWrap">
@@ -438,7 +558,7 @@
         <div class="text-muted" style="text-align:center;margin-top:20px;">
             © Shine Shop · Laba/Rugi System
         </div>
-        <div class="security-badge">🔒 Hanya admin yang dapat mengakses</div>
+        <div class="security-badge">🔒 Hanya Admin & VIP yang dapat mengakses</div>
     </div>
 
     <script>
@@ -446,7 +566,7 @@
         const LOGIN_URL = '/info/index.html';
         const ACCOUNTS_FILE = '/info/accounts.json';
         const SESSION_TIMEOUT = 3600000;
-        const STORAGE_KEY = 'shine_transactions';
+        const STORAGE_PREFIX = 'shine_finance_';
 
         // ===================== CEK SESSION =====================
         function checkSession() {
@@ -481,48 +601,75 @@
             };
         }
 
-        // ===================== CEK ADMIN =====================
-        async function checkAdmin() {
+        // ===================== CEK AKSES (ADMIN ATAU VIP) =====================
+        async function checkAccess() {
             const statusEl = document.getElementById('envStatus');
             const user = getUserData();
 
             document.getElementById('userEmailDisplay').textContent = user.email;
-            document.getElementById('userRoleDisplay').textContent = `(${user.role})`;
+            
+            // Tampilkan role badge
+            let roleHtml = '';
+            if (user.role === 'admin') {
+                roleHtml = `<span class="role-badge admin">🔑 Admin</span>`;
+            } else if (user.role === 'vip') {
+                roleHtml = `<span class="role-badge vip">⭐ VIP</span>`;
+            } else {
+                roleHtml = `<span class="role-badge user">👤 User</span>`;
+            }
+            document.getElementById('userRoleDisplay').innerHTML = roleHtml;
 
-            if (user.role !== 'admin') {
-                statusEl.textContent = '❌ Akses ditolak! Hanya admin yang bisa mengakses halaman ini.';
+            // Cek apakah user bisa akses (admin atau vip)
+            const allowedRoles = ['admin', 'vip'];
+            if (!allowedRoles.includes(user.role)) {
+                statusEl.textContent = '❌ Akses ditolak! Hanya Admin & VIP yang bisa mengakses halaman ini.';
                 statusEl.style.color = '#ff6666';
                 document.getElementById('formCard').style.display = 'none';
+                document.getElementById('incomeCard').style.display = 'none';
                 document.getElementById('expenseCard').style.display = 'none';
                 document.getElementById('listCard').style.display = 'none';
                 document.getElementById('statsCard').style.display = 'none';
                 Swal.fire({
                     title: '⛔ Akses Ditolak',
-                    text: 'Hanya admin yang dapat mengakses halaman ini.',
+                    text: 'Hanya Admin & VIP yang dapat mengakses halaman ini.',
                     icon: 'error',
                     confirmButtonColor: '#00ffaa'
                 });
                 return false;
             }
 
-            statusEl.textContent = '✅ Akses admin terverifikasi';
+            // Tampilkan storage info
+            const storageKey = getStorageKey();
+            document.getElementById('userStorageDisplay').textContent = `📁 ${storageKey}`;
+
+            statusEl.textContent = `✅ Akses ${user.role.toUpperCase()} terverifikasi`;
             statusEl.style.color = '#00ffaa';
             return true;
+        }
+
+        // ===================== STORAGE KEY =====================
+        function getStorageKey() {
+            const email = localStorage.getItem('user_email') || 'default';
+            // Buat key unik berdasarkan email
+            const sanitized = email.replace(/[^a-zA-Z0-9]/g, '_');
+            return STORAGE_PREFIX + sanitized;
         }
 
         // ===================== DATA STORAGE =====================
         function getData() {
             try {
-                const raw = localStorage.getItem(STORAGE_KEY);
-                if (!raw) return { transactions: [], expenses: [] };
+                const key = getStorageKey();
+                const raw = localStorage.getItem(key);
+                if (!raw) return { transactions: [], incomes: [], expenses: [] };
                 return JSON.parse(raw);
             } catch {
-                return { transactions: [], expenses: [] };
+                return { transactions: [], incomes: [], expenses: [] };
             }
         }
 
         function saveData(data) {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+            const key = getStorageKey();
+            localStorage.setItem(key, JSON.stringify(data));
         }
 
         // ===================== GENERATE ID =====================
@@ -548,10 +695,12 @@
         function loadData() {
             const data = getData();
             const transactions = data.transactions || [];
+            const incomes = data.incomes || [];
             const expenses = data.expenses || [];
 
             // Hitung statistik
             let totalProfit = 0;
+            let totalIncome = 0;
             let totalRevenue = 0;
             let totalModal = 0;
             let totalExpense = 0;
@@ -563,24 +712,29 @@
                 totalModal += parseInt(t.modal) || 0;
             });
 
+            incomes.forEach(i => {
+                totalIncome += parseInt(i.nominal) || 0;
+            });
+
             expenses.forEach(e => {
                 totalExpense += parseInt(e.nominal) || 0;
             });
 
-            // Total profit setelah dikurangi pengeluaran
-            const netProfit = totalProfit - totalExpense;
+            // Total profit setelah ditambah pemasukan dan dikurangi pengeluaran
+            const netProfit = totalProfit + totalIncome - totalExpense;
 
             // Update stats
             document.getElementById('totalProfit').textContent = formatRupiah(netProfit);
+            document.getElementById('totalIncome').textContent = formatRupiah(totalIncome);
             document.getElementById('totalRevenue').textContent = formatRupiah(totalRevenue);
             document.getElementById('totalModal').textContent = formatRupiah(totalModal);
             document.getElementById('totalExpense').textContent = formatRupiah(totalExpense);
-            document.getElementById('totalTransactions').textContent = transactions.length + expenses.length;
+            document.getElementById('totalTransactions').textContent = transactions.length + incomes.length + expenses.length;
 
             // Render tabel
-            renderTable(transactions, expenses);
+            renderTable(transactions, incomes, expenses);
 
-            console.log('📊 Data dimuat:', transactions.length, 'transaksi,', expenses.length, 'pengeluaran');
+            console.log('📊 Data dimuat:', transactions.length, 'transaksi,', incomes.length, 'pemasukan,', expenses.length, 'pengeluaran');
         }
 
         // ===================== FILTER =====================
@@ -595,10 +749,9 @@
         }
 
         // ===================== RENDER TABLE =====================
-        function renderTable(transactions, expenses) {
+        function renderTable(transactions, incomes, expenses) {
             const container = document.getElementById('tableWrap');
 
-            // Gabungkan dan urutkan berdasarkan tanggal (terbaru di atas)
             let allItems = [];
 
             transactions.forEach(t => {
@@ -613,6 +766,20 @@
                     displayModal: t.modal || 0,
                     displayKomisi: t.komisi || 0,
                     displayCatatan: t.catatan || '-'
+                });
+            });
+
+            incomes.forEach(i => {
+                allItems.push({
+                    ...i,
+                    type: 'income',
+                    profit: parseInt(i.nominal) || 0,
+                    displayDate: i.tanggal || '-',
+                    displayName: i.nama || 'Pemasukan',
+                    displayAmount: i.nominal || 0,
+                    displayModal: '-',
+                    displayKomisi: '-',
+                    displayCatatan: i.catatan || '-'
                 });
             });
 
@@ -635,6 +802,8 @@
                 allItems = allItems.filter(item => item.type === 'transaction' && item.profit > 0);
             } else if (currentFilter === 'loss') {
                 allItems = allItems.filter(item => item.type === 'transaction' && item.profit < 0);
+            } else if (currentFilter === 'income') {
+                allItems = allItems.filter(item => item.type === 'income');
             } else if (currentFilter === 'expense') {
                 allItems = allItems.filter(item => item.type === 'expense');
             }
@@ -643,6 +812,9 @@
             allItems.sort((a, b) => {
                 if (a.tanggal && b.tanggal) {
                     return b.tanggal.localeCompare(a.tanggal);
+                }
+                if (a.createdAt && b.createdAt) {
+                    return b.createdAt.localeCompare(a.createdAt);
                 }
                 return 0;
             });
@@ -667,32 +839,60 @@
                     <tbody>
             `;
 
-            allItems.forEach((item, index) => {
+            allItems.forEach((item) => {
                 const isExpense = item.type === 'expense';
-                const profitClass = isExpense ? 'profit-negative' : 
-                                   item.profit > 0 ? 'profit-positive' : 
-                                   item.profit === 0 ? 'profit-zero' : 'profit-negative';
-                const profitDisplay = isExpense ? formatRupiah(-item.profit) : formatRupiah(item.profit);
-                const profitIcon = isExpense ? '💸' : 
-                                   item.profit > 0 ? '✅' : 
-                                   item.profit === 0 ? '➖' : '❌';
+                const isIncome = item.type === 'income';
+                const isTransaction = item.type === 'transaction';
+                
+                let profitClass = 'profit-zero';
+                let profitDisplay = formatRupiah(0);
+                let profitIcon = '➖';
+                let badgeHtml = '';
 
-                const modalDisplay = isExpense ? '-' : formatRupiah(item.modal);
-                const komisiDisplay = isExpense ? '-' : (item.komisi ? formatRupiah(item.komisi) : '0');
-                const jualDisplay = isExpense ? formatRupiah(item.nominal) : formatRupiah(item.hargaJual);
+                if (isIncome) {
+                    profitClass = 'income-text';
+                    profitDisplay = formatRupiah(item.profit);
+                    profitIcon = '💵';
+                    badgeHtml = `<span class="badge-income">PEMASUKAN</span>`;
+                } else if (isExpense) {
+                    profitClass = 'expense-text';
+                    profitDisplay = formatRupiah(-item.profit);
+                    profitIcon = '💸';
+                    badgeHtml = `<span class="badge-expense">PENGELUARAN</span>`;
+                } else {
+                    badgeHtml = `<span class="badge-transaction">TRANSAKSI</span>`;
+                    if (item.profit > 0) {
+                        profitClass = 'profit-positive';
+                        profitIcon = '✅';
+                    } else if (item.profit < 0) {
+                        profitClass = 'profit-negative';
+                        profitIcon = '❌';
+                    } else {
+                        profitIcon = '➖';
+                    }
+                    profitDisplay = formatRupiah(item.profit);
+                }
+
+                const modalDisplay = isExpense || isIncome ? '-' : formatRupiah(item.modal);
+                const komisiDisplay = isExpense || isIncome ? '-' : (item.komisi ? formatRupiah(item.komisi) : '0');
+                const amountDisplay = isIncome ? formatRupiah(item.nominal) : 
+                                      isExpense ? formatRupiah(item.nominal) : 
+                                      formatRupiah(item.hargaJual);
+                const amountLabel = isIncome ? 'Pemasukan' : isExpense ? 'Pengeluaran' : 'Penjualan';
 
                 html += `
                     <tr>
                         <td>
                             <strong>${item.displayName}</strong>
                             ${item.displayCatatan && item.displayCatatan !== '-' ? `<br><span style="font-size:10px;color:#666;">${item.displayCatatan}</span>` : ''}
-                            ${isExpense ? '<span style="font-size:9px;color:#ff4444;background:#ff444415;padding:2px 8px;border-radius:10px;">PENGELUARAN</span>' : ''}
+                            <br>${badgeHtml}
                         </td>
                         <td style="font-size:12px;color:#888;">${item.displayDate}</td>
                         <td>${modalDisplay}</td>
                         <td>
-                            ${isExpense ? '-' : jualDisplay}
-                            ${!isExpense && item.komisi ? `<br><span style="font-size:10px;color:#888;">Komisi: ${komisiDisplay}</span>` : ''}
+                            ${isExpense || isIncome ? amountDisplay : amountDisplay}
+                            ${!isExpense && !isIncome && item.komisi ? `<br><span style="font-size:10px;color:#888;">Komisi: ${komisiDisplay}</span>` : ''}
+                            ${!isExpense && !isIncome ? `<br><span style="font-size:9px;color:#555;">${amountLabel}</span>` : ''}
                         </td>
                         <td class="${profitClass}">
                             ${profitIcon} ${profitDisplay}
@@ -731,6 +931,8 @@
                     const data = getData();
                     if (type === 'transaction') {
                         data.transactions = data.transactions.filter(t => t.id !== id);
+                    } else if (type === 'income') {
+                        data.incomes = data.incomes.filter(i => i.id !== id);
                     } else if (type === 'expense') {
                         data.expenses = data.expenses.filter(e => e.id !== id);
                     }
@@ -751,7 +953,7 @@
         function clearAllData() {
             Swal.fire({
                 title: '⚠️ Hapus Semua Data?',
-                text: 'Semua transaksi dan pengeluaran akan dihapus permanen!',
+                text: 'Semua transaksi, pemasukan, dan pengeluaran akan dihapus permanen!',
                 icon: 'warning',
                 showCancelButton: true,
                 confirmButtonText: '✅ Ya, Hapus Semua!',
@@ -760,7 +962,7 @@
                 cancelButtonColor: '#666'
             }).then(result => {
                 if (result.isConfirmed) {
-                    saveData({ transactions: [], expenses: [] });
+                    saveData({ transactions: [], incomes: [], expenses: [] });
                     loadData();
                     Swal.fire({
                         title: '✅ Dihapus!',
@@ -787,7 +989,6 @@
                 const komisi = parseInt(document.getElementById('komisi').value) || 0;
                 const catatan = document.getElementById('catatan').value.trim() || '';
 
-                // Validasi
                 if (!nama) {
                     Swal.fire({ title: '⚠️ Validasi Gagal', text: 'Nama transaksi wajib diisi!', icon: 'warning', confirmButtonColor: '#ffaa00' });
                     submitBtn.disabled = false;
@@ -831,7 +1032,6 @@
                     confirmButtonColor: '#00ffaa'
                 });
 
-                // Reset form
                 document.getElementById('namaTransaksi').value = '';
                 document.getElementById('modal').value = '';
                 document.getElementById('hargaJual').value = '';
@@ -854,6 +1054,74 @@
             submitBtn.textContent = '✅ Simpan Transaksi';
         }
 
+        // ===================== SUBMIT PEMASUKAN =====================
+        async function submitIncome() {
+            const submitBtn = document.getElementById('incomeSubmitBtn');
+            submitBtn.disabled = true;
+            submitBtn.textContent = '⏳ Menyimpan...';
+
+            try {
+                const nama = document.getElementById('namaPemasukan').value.trim();
+                const tanggal = document.getElementById('tanggalPemasukan').value || new Date().toISOString().split('T')[0];
+                const nominal = parseInt(document.getElementById('nominalPemasukan').value) || 0;
+                const catatan = document.getElementById('catatanPemasukan').value.trim() || '';
+
+                if (!nama) {
+                    Swal.fire({ title: '⚠️ Validasi Gagal', text: 'Nama pemasukan wajib diisi!', icon: 'warning', confirmButtonColor: '#ffaa00' });
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = '💵 Tambah Pemasukan';
+                    return;
+                }
+                if (nominal < 1) {
+                    Swal.fire({ title: '⚠️ Validasi Gagal', text: 'Nominal pemasukan minimal 1!', icon: 'warning', confirmButtonColor: '#ffaa00' });
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = '💵 Tambah Pemasukan';
+                    return;
+                }
+
+                const data = getData();
+                const newIncome = {
+                    id: generateId(),
+                    nama: nama,
+                    tanggal: tanggal,
+                    nominal: nominal,
+                    catatan: catatan,
+                    createdAt: new Date().toISOString()
+                };
+
+                data.incomes.push(newIncome);
+                saveData(data);
+
+                Swal.fire({
+                    title: '✅ Berhasil!',
+                    html: `
+                        Pemasukan <b>"${nama}"</b> berhasil disimpan!<br>
+                        <span style="color:#00ccff;">${formatRupiah(nominal)}</span>
+                    `,
+                    icon: 'success',
+                    confirmButtonColor: '#00ccff'
+                });
+
+                document.getElementById('namaPemasukan').value = '';
+                document.getElementById('nominalPemasukan').value = '';
+                document.getElementById('catatanPemasukan').value = '';
+
+                loadData();
+
+            } catch (err) {
+                console.error('Error:', err);
+                Swal.fire({
+                    title: '❌ Gagal',
+                    text: err.message,
+                    icon: 'error',
+                    confirmButtonColor: '#ffaa00'
+                });
+            }
+
+            submitBtn.disabled = false;
+            submitBtn.textContent = '💵 Tambah Pemasukan';
+        }
+
         // ===================== SUBMIT PENGELUARAN =====================
         async function submitExpense() {
             const submitBtn = document.getElementById('expenseSubmitBtn');
@@ -862,7 +1130,9 @@
 
             try {
                 const nama = document.getElementById('namaPengeluaran').value.trim();
+                const tanggal = document.getElementById('tanggalPengeluaran').value || new Date().toISOString().split('T')[0];
                 const nominal = parseInt(document.getElementById('nominalPengeluaran').value) || 0;
+                const catatan = document.getElementById('catatanPengeluaran').value.trim() || '';
 
                 if (!nama) {
                     Swal.fire({ title: '⚠️ Validasi Gagal', text: 'Nama pengeluaran wajib diisi!', icon: 'warning', confirmButtonColor: '#ffaa00' });
@@ -881,9 +1151,9 @@
                 const newExpense = {
                     id: generateId(),
                     nama: nama,
+                    tanggal: tanggal,
                     nominal: nominal,
-                    tanggal: new Date().toISOString().split('T')[0],
-                    catatan: '',
+                    catatan: catatan,
                     createdAt: new Date().toISOString()
                 };
 
@@ -902,6 +1172,7 @@
 
                 document.getElementById('namaPengeluaran').value = '';
                 document.getElementById('nominalPengeluaran').value = '';
+                document.getElementById('catatanPengeluaran').value = '';
 
                 loadData();
 
@@ -921,8 +1192,14 @@
 
         // ===================== INIT =====================
         document.addEventListener('DOMContentLoaded', async function() {
-            const isAdmin = await checkAdmin();
-            if (!isAdmin) return;
+            const hasAccess = await checkAccess();
+            if (!hasAccess) return;
+
+            // Set default tanggal
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('tanggalTransaksi').value = today;
+            document.getElementById('tanggalPemasukan').value = today;
+            document.getElementById('tanggalPengeluaran').value = today;
 
             // Event listener
             document.getElementById('transactionForm').addEventListener('submit', function(e) {
@@ -930,20 +1207,23 @@
                 submitTransaction();
             });
 
+            document.getElementById('incomeForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                submitIncome();
+            });
+
             document.getElementById('expenseForm').addEventListener('submit', function(e) {
                 e.preventDefault();
                 submitExpense();
             });
-
-            // Set default tanggal
-            document.getElementById('tanggalTransaksi').value = new Date().toISOString().split('T')[0];
 
             // Load data
             loadData();
 
             console.log('📊 Halaman Laba/Rugi siap!');
             console.log('👤 User:', getUserData().email);
-            console.log('🔑 Role: admin');
+            console.log('🔑 Role:', getUserData().role);
+            console.log('📁 Storage Key:', getStorageKey());
         });
 
         // ===================== ANTI INSPECT =====================
