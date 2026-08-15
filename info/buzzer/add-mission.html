@@ -330,6 +330,7 @@
         const LOGIN_URL = '/info/index.html';
         const DASHBOARD_URL = '/info/dashboard/index.html';
         const SESSION_TIMEOUT = 3600000;
+        const API_SAVE = '/api/save-mission';
 
         // ===================== CEK SESSION & ADMIN =====================
         function checkSession() {
@@ -394,7 +395,6 @@
 
         // ===================== GENERATE ID MISI =====================
         function generateMissionId(existingIds) {
-            // Cari ID tertinggi
             let maxNum = 0;
             existingIds.forEach(id => {
                 const match = id.match(/MISI-(\d+)/);
@@ -448,7 +448,6 @@
                 return;
             }
             btn.closest('.pesan-item').remove();
-            // Renumber placeholder
             container.querySelectorAll('.pesan-item').forEach((item, idx) => {
                 const input = item.querySelector('.pesan-input');
                 if (input) input.placeholder = `Pesan ${idx + 1}`;
@@ -505,7 +504,6 @@
                 const target = document.getElementById('target').value.trim();
                 const desc = document.getElementById('desc').value.trim() || '';
 
-                // Ambil pesan
                 const pesanInputs = document.querySelectorAll('.pesan-input');
                 const pesanList = [];
                 pesanInputs.forEach(input => {
@@ -542,32 +540,28 @@
                 const existingData = await fetchExistingData();
                 const existingIds = existingData.map(m => m.id_misi).filter(id => id);
 
-                // Generate ID jika kosong
                 if (!idMisi) {
                     idMisi = generateMissionId(existingIds);
-                } else {
-                    // Cek apakah ID sudah ada
-                    if (existingIds.includes(idMisi)) {
-                        const result = await Swal.fire({
-                            title: '⚠️ ID Misi Sudah Ada',
-                            text: `ID "${idMisi}" sudah digunakan. Gunakan ID lain atau biarkan kosong untuk auto-generate.`,
-                            icon: 'warning',
-                            confirmButtonText: 'Ganti ID',
-                            cancelButtonText: 'Batal',
-                            showCancelButton: true,
-                            confirmButtonColor: '#ffaa00',
-                            cancelButtonColor: '#666'
-                        });
-                        if (result.isConfirmed) {
-                            document.getElementById('idMisi').focus();
-                            submitBtn.disabled = false;
-                            submitBtn.textContent = '✅ Simpan Misi';
-                            return;
-                        }
+                } else if (existingIds.includes(idMisi)) {
+                    const result = await Swal.fire({
+                        title: '⚠️ ID Misi Sudah Ada',
+                        text: `ID "${idMisi}" sudah digunakan. Gunakan ID lain atau biarkan kosong untuk auto-generate.`,
+                        icon: 'warning',
+                        confirmButtonText: 'Ganti ID',
+                        cancelButtonText: 'Batal',
+                        showCancelButton: true,
+                        confirmButtonColor: '#ffaa00',
+                        cancelButtonColor: '#666'
+                    });
+                    if (result.isConfirmed) {
+                        document.getElementById('idMisi').focus();
                         submitBtn.disabled = false;
                         submitBtn.textContent = '✅ Simpan Misi';
                         return;
                     }
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = '✅ Simpan Misi';
+                    return;
                 }
 
                 // Buat object misi baru
@@ -581,6 +575,8 @@
                     desc: desc || '',
                     History: []
                 };
+
+                const updatedData = [...existingData, newMission];
 
                 // Konfirmasi
                 const confirmResult = await Swal.fire({
@@ -609,10 +605,8 @@
                     return;
                 }
 
-                // Simpan ke data.json (via API)
-                const updatedData = [...existingData, newMission];
-
-                const saveRes = await fetch('/api/save-mission', {
+                // ===== SIMPAN VIA API =====
+                const saveRes = await fetch(API_SAVE, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -624,7 +618,23 @@
                 });
 
                 if (!saveRes.ok) {
-                    throw new Error('Gagal menyimpan data: ' + saveRes.status);
+                    // Jika API gagal, simpan ke localStorage sebagai backup
+                    console.warn('API gagal, menyimpan ke localStorage...');
+                    const localKey = 'buzzer_missions_backup';
+                    localStorage.setItem(localKey, JSON.stringify(updatedData));
+                    
+                    Swal.fire({
+                        title: '⚠️ Disimpan ke Local Storage',
+                        text: 'API tidak merespon. Data disimpan di localStorage sebagai backup.',
+                        icon: 'warning',
+                        confirmButtonColor: '#ffaa00'
+                    });
+                    
+                    // Refresh halaman
+                    setTimeout(() => location.reload(), 2000);
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = '✅ Simpan Misi';
+                    return;
                 }
 
                 const saveResult = await saveRes.json();
@@ -648,7 +658,6 @@
                     document.getElementById('target').value = '';
                     document.getElementById('desc').value = '';
                     
-                    // Reset pesan ke 1
                     const container = document.getElementById('pesanContainer');
                     container.innerHTML = `
                         <div class="pesan-item">
@@ -664,12 +673,46 @@
 
             } catch (err) {
                 console.error('Error submit mission:', err);
-                Swal.fire({
-                    title: '❌ Gagal',
-                    text: err.message || 'Terjadi error saat menyimpan misi.',
-                    icon: 'error',
-                    confirmButtonColor: '#ffaa00'
-                });
+                
+                // Jika error, simpan ke localStorage
+                try {
+                    const existingData = await fetchExistingData();
+                    const idMisi = document.getElementById('idMisi').value.trim() || 'MISI-' + Date.now().toString(36).toUpperCase();
+                    const tugas = document.getElementById('tugas').value.trim();
+                    const pesanInputs = document.querySelectorAll('.pesan-input');
+                    const pesanList = [];
+                    pesanInputs.forEach(input => {
+                        if (input.value.trim()) pesanList.push(input.value.trim());
+                    });
+                    
+                    const newMission = {
+                        id_misi: idMisi,
+                        Tugas: tugas,
+                        Harga: document.getElementById('harga').value.trim() || 'Gratis',
+                        Jumlah: parseInt(document.getElementById('jumlah').value) || 1,
+                        Pesan: pesanList,
+                        Target: document.getElementById('target').value.trim(),
+                        desc: document.getElementById('desc').value.trim() || '',
+                        History: []
+                    };
+                    
+                    const updatedData = [...existingData, newMission];
+                    localStorage.setItem('buzzer_missions_backup', JSON.stringify(updatedData));
+                    
+                    Swal.fire({
+                        title: '💾 Disimpan ke Local Storage',
+                        text: 'Data berhasil disimpan di localStorage karena server error. Hubungi admin untuk restore data.',
+                        icon: 'warning',
+                        confirmButtonColor: '#ffaa00'
+                    });
+                } catch (backupErr) {
+                    Swal.fire({
+                        title: '❌ Gagal Total',
+                        text: err.message || 'Terjadi error saat menyimpan misi.',
+                        icon: 'error',
+                        confirmButtonColor: '#ffaa00'
+                    });
+                }
             }
 
             submitBtn.disabled = false;
@@ -678,22 +721,18 @@
 
         // ===================== INIT =====================
         document.addEventListener('DOMContentLoaded', async function() {
-            // Cek admin
             const isAdmin = await checkAdmin();
             if (!isAdmin) return;
 
-            // Event listener form
             document.getElementById('missionForm').addEventListener('submit', function(e) {
                 e.preventDefault();
                 submitMission();
             });
 
-            // Event listener untuk preview
             document.querySelectorAll('#missionForm input, #missionForm textarea').forEach(el => {
                 el.addEventListener('input', updatePreview);
             });
 
-            // Update preview awal
             updatePreview();
 
             console.log('➕ Halaman Tambah Misi siap!');
