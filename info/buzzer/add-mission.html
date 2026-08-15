@@ -209,6 +209,15 @@
         .preview-box .preview-item strong {
             color: #00ffaa;
         }
+        .storage-badge {
+            display: inline-block;
+            background: #ffaa0022;
+            color: #ffaa00;
+            padding: 2px 12px;
+            border-radius: 20px;
+            font-size: 10px;
+            margin-top: 8px;
+        }
         @media (max-width: 600px) {
             .card {
                 padding: 20px 16px;
@@ -234,6 +243,7 @@
                 <div>
                     <h2>➕ Tambah Misi Baru</h2>
                     <div class="sub">Buat misi buzzer baru untuk dikerjakan oleh member</div>
+                    <span class="storage-badge">📦 Vercel KV Storage</span>
                 </div>
                 <div class="header-actions">
                     <button class="btn btn-back" onclick="location.href='/info/dashboard/index.html'">⬅️ Kembali</button>
@@ -253,7 +263,7 @@
                 <!-- ID Misi -->
                 <div class="form-group">
                     <label>🆔 ID Misi <span class="required">*</span></label>
-                    <input type="text" id="idMisi" placeholder="Contoh: MISI-009" required>
+                    <input type="text" id="idMisi" placeholder="Contoh: MISI-009 (kosongkan untuk auto-generate)" required>
                     <div class="hint">Format: MISI-XXX (akan otomatis di-generate jika kosong)</div>
                 </div>
 
@@ -285,12 +295,12 @@
                 <!-- Deskripsi -->
                 <div class="form-group">
                     <label>📄 Deskripsi</label>
-                    <textarea id="desc" placeholder="Deskripsi misi... Gunakan <br> untuk baris baru"></textarea>
+                    <textarea id="desc" placeholder="Deskripsi misi... Gunakan &lt;br&gt; untuk baris baru"></textarea>
                 </div>
 
                 <!-- Pesan (Custom Komentar) -->
                 <div class="form-group">
-                    <label>📝 Custom Pesan (Komentar)</label>
+                    <label>📝 Custom Pesan (Komentar) <span class="required">*</span></label>
                     <div id="pesanContainer">
                         <div class="pesan-item">
                             <input type="text" class="pesan-input" placeholder="Pesan 1" value="Follow ya">
@@ -303,7 +313,7 @@
 
                 <!-- Tombol Submit -->
                 <button type="submit" class="btn btn-submit" id="submitBtn" style="width:100%;margin-top:16px;padding:14px;">
-                    ✅ Simpan Misi
+                    ✅ Simpan Misi ke Vercel KV
                 </button>
             </form>
         </div>
@@ -325,10 +335,10 @@
 
     <script>
         // ===================== KONFIGURASI =====================
-        const DATA_URL = '/info/buzzer/data.json';
+        const API_GET = '/api/get-missions';
+        const API_SAVE = '/api/save-mission';
         const ACCOUNTS_FILE = '/info/accounts.json';
         const LOGIN_URL = '/info/index.html';
-        const DASHBOARD_URL = '/info/dashboard/index.html';
         const SESSION_TIMEOUT = 3600000;
 
         // ===================== CEK SESSION & ADMIN =====================
@@ -387,14 +397,13 @@
                 return false;
             }
 
-            statusEl.textContent = '✅ Akses admin terverifikasi';
+            statusEl.textContent = '✅ Akses admin terverifikasi | Storage: Vercel KV';
             statusEl.style.color = '#00ffaa';
             return true;
         }
 
         // ===================== GENERATE ID MISI =====================
         function generateMissionId(existingIds) {
-            // Cari ID tertinggi
             let maxNum = 0;
             existingIds.forEach(id => {
                 const match = id.match(/MISI-(\d+)/);
@@ -407,13 +416,14 @@
             return 'MISI-' + String(nextNum).padStart(3, '0');
         }
 
-        // ===================== AMBIL DATA EXISTING =====================
+        // ===================== AMBIL DATA EXISTING DARI API =====================
         async function fetchExistingData() {
             try {
-                const res = await fetch(DATA_URL + '?t=' + Date.now());
+                const res = await fetch(API_GET + '?t=' + Date.now());
                 if (!res.ok) throw new Error('Gagal mengambil data');
-                const data = await res.json();
-                return Array.isArray(data) ? data : [];
+                const result = await res.json();
+                if (!result.success) throw new Error(result.message || 'Gagal memuat data');
+                return result.missions || [];
             } catch (err) {
                 console.error('Error fetch data:', err);
                 return [];
@@ -448,7 +458,6 @@
                 return;
             }
             btn.closest('.pesan-item').remove();
-            // Renumber placeholder
             container.querySelectorAll('.pesan-item').forEach((item, idx) => {
                 const input = item.querySelector('.pesan-input');
                 if (input) input.placeholder = `Pesan ${idx + 1}`;
@@ -485,7 +494,7 @@
                 <div class="preview-item"><strong>📄 Deskripsi:</strong> ${desc}</div>
                 <div class="preview-item"><strong>📝 Pesan:</strong><br>${pesanHtml}</div>
                 <div class="preview-item" style="color:#00ffaa;font-size:12px;border-bottom:none;padding-top:8px;">
-                    ✅ Siap disimpan sebagai misi baru
+                    ✅ Siap disimpan ke Vercel KV Storage
                 </div>
             `;
         }
@@ -494,10 +503,9 @@
         async function submitMission() {
             const submitBtn = document.getElementById('submitBtn');
             submitBtn.disabled = true;
-            submitBtn.textContent = '⏳ Menyimpan...';
+            submitBtn.textContent = '⏳ Menyimpan ke Vercel KV...';
 
             try {
-                // Ambil nilai form
                 let idMisi = document.getElementById('idMisi').value.trim();
                 const tugas = document.getElementById('tugas').value.trim();
                 const harga = document.getElementById('harga').value.trim() || 'Gratis';
@@ -505,48 +513,43 @@
                 const target = document.getElementById('target').value.trim();
                 const desc = document.getElementById('desc').value.trim() || '';
 
-                // Ambil pesan
                 const pesanInputs = document.querySelectorAll('.pesan-input');
                 const pesanList = [];
                 pesanInputs.forEach(input => {
                     if (input.value.trim()) pesanList.push(input.value.trim());
                 });
 
-                // Validasi
                 if (!tugas) {
                     Swal.fire({ title: '⚠️ Validasi Gagal', text: 'Tugas wajib diisi!', icon: 'warning', confirmButtonColor: '#ffaa00' });
                     submitBtn.disabled = false;
-                    submitBtn.textContent = '✅ Simpan Misi';
+                    submitBtn.textContent = '✅ Simpan Misi ke Vercel KV';
                     return;
                 }
                 if (jumlah < 1) {
                     Swal.fire({ title: '⚠️ Validasi Gagal', text: 'Jumlah minimal 1!', icon: 'warning', confirmButtonColor: '#ffaa00' });
                     submitBtn.disabled = false;
-                    submitBtn.textContent = '✅ Simpan Misi';
+                    submitBtn.textContent = '✅ Simpan Misi ke Vercel KV';
                     return;
                 }
                 if (!target) {
                     Swal.fire({ title: '⚠️ Validasi Gagal', text: 'Target link wajib diisi!', icon: 'warning', confirmButtonColor: '#ffaa00' });
                     submitBtn.disabled = false;
-                    submitBtn.textContent = '✅ Simpan Misi';
+                    submitBtn.textContent = '✅ Simpan Misi ke Vercel KV';
                     return;
                 }
                 if (pesanList.length === 0) {
                     Swal.fire({ title: '⚠️ Validasi Gagal', text: 'Minimal 1 pesan wajib diisi!', icon: 'warning', confirmButtonColor: '#ffaa00' });
                     submitBtn.disabled = false;
-                    submitBtn.textContent = '✅ Simpan Misi';
+                    submitBtn.textContent = '✅ Simpan Misi ke Vercel KV';
                     return;
                 }
 
-                // Ambil data existing
                 const existingData = await fetchExistingData();
                 const existingIds = existingData.map(m => m.id_misi).filter(id => id);
 
-                // Generate ID jika kosong
                 if (!idMisi) {
                     idMisi = generateMissionId(existingIds);
                 } else {
-                    // Cek apakah ID sudah ada
                     if (existingIds.includes(idMisi)) {
                         const result = await Swal.fire({
                             title: '⚠️ ID Misi Sudah Ada',
@@ -561,16 +564,15 @@
                         if (result.isConfirmed) {
                             document.getElementById('idMisi').focus();
                             submitBtn.disabled = false;
-                            submitBtn.textContent = '✅ Simpan Misi';
+                            submitBtn.textContent = '✅ Simpan Misi ke Vercel KV';
                             return;
                         }
                         submitBtn.disabled = false;
-                        submitBtn.textContent = '✅ Simpan Misi';
+                        submitBtn.textContent = '✅ Simpan Misi ke Vercel KV';
                         return;
                     }
                 }
 
-                // Buat object misi baru
                 const newMission = {
                     id_misi: idMisi,
                     Tugas: tugas,
@@ -582,7 +584,8 @@
                     History: []
                 };
 
-                // Konfirmasi
+                const updatedData = [...existingData, newMission];
+
                 const confirmResult = await Swal.fire({
                     title: '📤 Konfirmasi Simpan',
                     html: `
@@ -593,6 +596,8 @@
                             <b>📊 Jumlah:</b> ${jumlah}<br>
                             <b>🎯 Target:</b> ${target}<br>
                             <b>📝 Pesan:</b> ${pesanList.length} pesan
+                            <br><br>
+                            <span style="color:#888;font-size:11px;">📦 Akan disimpan di Vercel KV Storage</span>
                         </div>
                     `,
                     icon: 'question',
@@ -605,14 +610,12 @@
 
                 if (!confirmResult.isConfirmed) {
                     submitBtn.disabled = false;
-                    submitBtn.textContent = '✅ Simpan Misi';
+                    submitBtn.textContent = '✅ Simpan Misi ke Vercel KV';
                     return;
                 }
 
-                // Simpan ke data.json (via API)
-                const updatedData = [...existingData, newMission];
-
-                const saveRes = await fetch('/api/save-mission', {
+                // ===== SIMPAN KE VERCEL KV =====
+                const saveRes = await fetch(API_SAVE, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -624,7 +627,8 @@
                 });
 
                 if (!saveRes.ok) {
-                    throw new Error('Gagal menyimpan data: ' + saveRes.status);
+                    const errorData = await saveRes.json();
+                    throw new Error(errorData.message || 'Gagal menyimpan data');
                 }
 
                 const saveResult = await saveRes.json();
@@ -634,13 +638,13 @@
                         title: '✅ Berhasil!',
                         html: `
                             Misi <b>"${tugas}"</b> berhasil ditambahkan!<br>
-                            <span style="font-size:13px;color:#888;">🆔 ${idMisi}</span>
+                            <span style="font-size:13px;color:#888;">🆔 ${idMisi}</span><br>
+                            <span style="font-size:11px;color:#ffaa00;">📦 Disimpan di Vercel KV Storage</span>
                         `,
                         icon: 'success',
                         confirmButtonColor: '#00ffaa'
                     });
 
-                    // Reset form
                     document.getElementById('idMisi').value = '';
                     document.getElementById('tugas').value = '';
                     document.getElementById('harga').value = '';
@@ -648,7 +652,6 @@
                     document.getElementById('target').value = '';
                     document.getElementById('desc').value = '';
                     
-                    // Reset pesan ke 1
                     const container = document.getElementById('pesanContainer');
                     container.innerHTML = `
                         <div class="pesan-item">
@@ -673,32 +676,29 @@
             }
 
             submitBtn.disabled = false;
-            submitBtn.textContent = '✅ Simpan Misi';
+            submitBtn.textContent = '✅ Simpan Misi ke Vercel KV';
         }
 
         // ===================== INIT =====================
         document.addEventListener('DOMContentLoaded', async function() {
-            // Cek admin
             const isAdmin = await checkAdmin();
             if (!isAdmin) return;
 
-            // Event listener form
             document.getElementById('missionForm').addEventListener('submit', function(e) {
                 e.preventDefault();
                 submitMission();
             });
 
-            // Event listener untuk preview
             document.querySelectorAll('#missionForm input, #missionForm textarea').forEach(el => {
                 el.addEventListener('input', updatePreview);
             });
 
-            // Update preview awal
             updatePreview();
 
             console.log('➕ Halaman Tambah Misi siap!');
             console.log('👤 User:', getUserData().email);
             console.log('🔑 Role: admin');
+            console.log('📦 Storage: Vercel KV');
         });
 
         // ===================== ANTI INSPECT =====================
