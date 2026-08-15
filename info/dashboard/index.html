@@ -121,6 +121,14 @@
         .btn-buzzer:hover {
             background: #ffaa0066;
         }
+        .btn-add-mission {
+            background: #00ffaa22;
+            color: #00ffaa;
+            border: 1px solid #00ffaa44;
+        }
+        .btn-add-mission:hover {
+            background: #00ffaa44;
+        }
         .header-actions {
             display: flex;
             gap: 10px;
@@ -281,14 +289,15 @@
                     <h2>👤 Dashboard</h2>
                     <div class="sub" id="userInfo">Memuat data...</div>
                 </div>
-              <div class="header-actions">
-    <button class="btn btn-refresh" onclick="loadDashboard()">🔄 Refresh</button>
-    <button class="btn btn-buzzer" onclick="location.href='/info/buzzer/'">📢 Jadi Buzzer</button>
-    <button class="btn btn-add-mission" onclick="location.href='/info/buzzer/add-mission.html'" style="background:#00ffaa22;color:#00ffaa;border:1px solid #00ffaa44;">
-        ➕ Tambah Misi
-    </button>
-    <button class="btn btn-logout" onclick="logout()">🚪 Keluar</button>
-</div>
+                <div class="header-actions" id="headerActions">
+                    <button class="btn btn-refresh" onclick="loadDashboard()">🔄 Refresh</button>
+                    <button class="btn btn-buzzer" onclick="location.href='/info/buzzer/'">📢 Jadi Buzzer</button>
+                    <!-- ===== TOMBOL TAMBAH MISI - HANYA UNTUK ADMIN ===== -->
+                    <button class="btn btn-add-mission" id="addMissionBtn" onclick="location.href='/info/buzzer/add-mission.html'" style="display:none;">
+                        ➕ Tambah Misi
+                    </button>
+                    <button class="btn btn-logout" onclick="logout()">🚪 Keluar</button>
+                </div>
             </div>
             <div class="env-status" id="envStatus">🔌 Mengambil data...</div>
             <div class="security-badge">📁 Data dari accounts.json</div>
@@ -495,6 +504,19 @@
             container.innerHTML = html || '<span class="text-muted">Tidak ada metode pembayaran</span>';
         }
 
+        // ===================== TAMPILKAN TOMBOL ADMIN =====================
+        function showAdminButtons(user) {
+            const addMissionBtn = document.getElementById('addMissionBtn');
+            
+            if (user.role === 'admin') {
+                addMissionBtn.style.display = 'inline-block';
+                console.log('🔑 Admin detected - showing Add Mission button');
+            } else {
+                addMissionBtn.style.display = 'none';
+                console.log('👤 User role:', user.role, '- hiding admin buttons');
+            }
+        }
+
         // ===================== AMBIL DATA DARI accounts.json =====================
         async function fetchAccounts() {
             const statusEl = document.getElementById('envStatus');
@@ -565,6 +587,9 @@
                 // Update UI
                 updateUserUI(updatedUser);
                 updatePaymentMethods(updatedUser);
+
+                // ===== TAMPILKAN TOMBOL ADMIN =====
+                showAdminButtons(updatedUser);
 
                 // === QRIS CARD ===
                 const qrisCard = document.getElementById('qrisCard');
