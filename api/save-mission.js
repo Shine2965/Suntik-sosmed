@@ -34,7 +34,7 @@ export default async function handler(req, res) {
         // Path ke file data.json
         // Untuk Vercel, kita menggunakan /tmp karena tidak bisa menulis ke filesystem
         // Untuk production, sebaiknya gunakan database atau storage
-        const filePath = path.join(process.cwd(), 'public', 'info', 'buzzer', 'data.json');
+        const filePath = path.join(process.cwd(), '/', 'info', 'buzzer', 'data.json');
 
         // Tulis data ke file
         // Note: Di Vercel, ini hanya akan bekerja di development
