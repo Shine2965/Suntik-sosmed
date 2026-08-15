@@ -1,0 +1,960 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Laba/Rugi - Shine Shop</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: #0a0a0a;
+            min-height: 100vh;
+            padding: 30px 20px;
+            background: radial-gradient(circle at 20% 30%, #00ffaa10, transparent 50%),
+                        radial-gradient(circle at 80% 70%, #00c6ff10, transparent 50%),
+                        #0a0a0a;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        .card {
+            background: #1a1a1a;
+            border-radius: 24px;
+            padding: 30px 28px;
+            border: 1px solid #00ffaa33;
+            box-shadow: 0 0 40px rgba(0,255,170,0.05);
+            margin-bottom: 20px;
+        }
+        .card h2 {
+            color: #00ffaa;
+            font-size: 22px;
+            margin-bottom: 6px;
+        }
+        .card .sub {
+            color: #888;
+            font-size: 14px;
+            margin-bottom: 20px;
+        }
+        .card .sub .highlight {
+            color: #00ffaa;
+        }
+        .form-group {
+            margin-bottom: 16px;
+        }
+        .form-group label {
+            color: #ccc;
+            font-size: 13px;
+            font-weight: 600;
+            display: block;
+            margin-bottom: 6px;
+        }
+        .form-group label .required {
+            color: #ff6666;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 12px 16px;
+            border-radius: 12px;
+            border: 1px solid #00ffaa33;
+            background: #0d0d0d;
+            color: #fff;
+            font-size: 14px;
+            outline: none;
+            transition: 0.3s;
+            font-family: 'Poppins', sans-serif;
+        }
+        .form-group input:focus {
+            border-color: #00ffaa;
+            box-shadow: 0 0 20px rgba(0,255,170,0.1);
+        }
+        .form-group input::placeholder {
+            color: #555;
+        }
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+        .btn {
+            padding: 10px 24px;
+            border-radius: 30px;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.3s;
+            font-size: 13px;
+            font-family: 'Poppins', sans-serif;
+        }
+        .btn-back {
+            background: #444;
+            color: #fff;
+        }
+        .btn-back:hover {
+            background: #555;
+        }
+        .btn-submit {
+            background: #00ffaa;
+            color: #0a0a0a;
+            width: 100%;
+            padding: 14px;
+            font-size: 15px;
+        }
+        .btn-submit:hover {
+            background: #00dd99;
+            transform: scale(0.97);
+        }
+        .btn-submit:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .btn-danger {
+            background: #ff444422;
+            color: #ff6666;
+            border: 1px solid #ff444455;
+        }
+        .btn-danger:hover {
+            background: #ff444466;
+            color: #fff;
+        }
+        .btn-refresh {
+            background: #00ffaa22;
+            color: #00ffaa;
+            border: 1px solid #00ffaa44;
+        }
+        .btn-refresh:hover {
+            background: #00ffaa44;
+        }
+        .header-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 10px;
+        }
+        .text-muted {
+            color: #666;
+            font-size: 12px;
+        }
+        .security-badge {
+            text-align: center;
+            font-size: 10px;
+            color: #444;
+            margin-top: 12px;
+            border-top: 1px solid #00ffaa15;
+            padding-top: 12px;
+        }
+        .env-status {
+            text-align: center;
+            font-size: 11px;
+            color: #555;
+            margin-top: 8px;
+        }
+
+        /* ===== STATS ===== */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 12px;
+            margin: 12px 0;
+        }
+        .stats-grid .stat-item {
+            background: #0d0d0d;
+            border-radius: 14px;
+            padding: 16px;
+            text-align: center;
+            border: 1px solid #00ffaa15;
+        }
+        .stats-grid .stat-item .num {
+            font-size: 24px;
+            font-weight: 700;
+        }
+        .stats-grid .stat-item .num.green {
+            color: #00ffaa;
+        }
+        .stats-grid .stat-item .num.red {
+            color: #ff4444;
+        }
+        .stats-grid .stat-item .num.yellow {
+            color: #ffaa00;
+        }
+        .stats-grid .stat-item .num.blue {
+            color: #00ccff;
+        }
+        .stats-grid .stat-item .label {
+            color: #888;
+            font-size: 11px;
+            margin-top: 4px;
+        }
+
+        /* ===== TABLE ===== */
+        .table-wrap {
+            overflow-x: auto;
+            margin-top: 12px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+        table th {
+            text-align: left;
+            padding: 10px 12px;
+            color: #888;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 10px;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid #00ffaa22;
+        }
+        table td {
+            padding: 10px 12px;
+            border-bottom: 1px solid #222;
+            color: #ddd;
+        }
+        table tr:hover td {
+            background: #ffffff05;
+        }
+        table .profit-positive {
+            color: #00ffaa;
+        }
+        table .profit-negative {
+            color: #ff4444;
+        }
+        table .profit-zero {
+            color: #888;
+        }
+        .no-data {
+            color: #666;
+            text-align: center;
+            padding: 30px 0;
+            font-size: 14px;
+        }
+        .btn-delete {
+            background: #ff444422;
+            color: #ff6666;
+            border: 1px solid #ff444455;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        .btn-delete:hover {
+            background: #ff444466;
+            color: #fff;
+        }
+
+        /* ===== FILTER ===== */
+        .filter-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin: 12px 0;
+        }
+        .filter-group .btn-filter {
+            background: #222;
+            color: #aaa;
+            border: 1px solid #333;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        .filter-group .btn-filter:hover {
+            background: #333;
+            color: #fff;
+        }
+        .filter-group .btn-filter.active {
+            background: #00ffaa22;
+            color: #00ffaa;
+            border-color: #00ffaa44;
+        }
+
+        @media (max-width: 600px) {
+            .card {
+                padding: 20px 16px;
+            }
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+            .stats-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+            .header-actions {
+                flex-direction: column;
+            }
+            .header-actions .btn {
+                width: 100%;
+                text-align: center;
+            }
+            table {
+                font-size: 11px;
+            }
+            table th,
+            table td {
+                padding: 6px 8px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- ===== HEADER ===== -->
+        <div class="card">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;">
+                <div>
+                    <h2>📊 Laba / Rugi</h2>
+                    <div class="sub">Kelola keuangan transaksi Anda</div>
+                </div>
+                <div class="header-actions">
+                    <button class="btn btn-refresh" onclick="loadData()">🔄 Refresh</button>
+                    <button class="btn btn-back" onclick="location.href='/info/dashboard/index.html'">⬅️ Kembali</button>
+                </div>
+            </div>
+            <div id="userInfo" style="color:#888;font-size:13px;margin-top:8px;">
+                👤 <span id="userEmailDisplay">-</span>
+                <span id="userRoleDisplay" style="margin-left:10px;"></span>
+            </div>
+            <div class="env-status" id="envStatus">🔌 Memeriksa akses admin...</div>
+        </div>
+
+        <!-- ===== STATISTIK ===== -->
+        <div class="card" id="statsCard">
+            <h2>📈 Ringkasan</h2>
+            <div class="stats-grid" id="statsGrid">
+                <div class="stat-item">
+                    <div class="num green" id="totalProfit">Rp 0</div>
+                    <div class="label">Total Profit</div>
+                </div>
+                <div class="stat-item">
+                    <div class="num blue" id="totalRevenue">Rp 0</div>
+                    <div class="label">Total Pendapatan</div>
+                </div>
+                <div class="stat-item">
+                    <div class="num yellow" id="totalModal">Rp 0</div>
+                    <div class="label">Total Modal</div>
+                </div>
+                <div class="stat-item">
+                    <div class="num red" id="totalExpense">Rp 0</div>
+                    <div class="label">Total Pengeluaran</div>
+                </div>
+                <div class="stat-item">
+                    <div class="num" id="totalTransactions" style="color:#fff;">0</div>
+                    <div class="label">Total Transaksi</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== FORM TAMBAH TRANSAKSI ===== -->
+        <div class="card" id="formCard">
+            <h2>➕ Tambah Transaksi</h2>
+            <div class="sub">Catat transaksi untuk menghitung laba/rugi</div>
+            <form id="transactionForm" onsubmit="return false;">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>📝 Nama Transaksi <span class="required">*</span></label>
+                        <input type="text" id="namaTransaksi" placeholder="Contoh: Jual Followers" required>
+                    </div>
+                    <div class="form-group">
+                        <label>📅 Tanggal</label>
+                        <input type="date" id="tanggalTransaksi">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>💰 Modal <span class="required">*</span></label>
+                        <input type="number" id="modal" placeholder="0" required>
+                    </div>
+                    <div class="form-group">
+                        <label>💵 Harga Jual <span class="required">*</span></label>
+                        <input type="number" id="hargaJual" placeholder="0" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>🤝 Komisi (opsional)</label>
+                    <input type="number" id="komisi" placeholder="0">
+                </div>
+                <div class="form-group">
+                    <label>📝 Catatan (opsional)</label>
+                    <input type="text" id="catatan" placeholder="Catatan tambahan...">
+                </div>
+                <button type="submit" class="btn btn-submit" id="submitBtn">
+                    ✅ Simpan Transaksi
+                </button>
+            </form>
+        </div>
+
+        <!-- ===== FORM TAMBAH PENGELUARAN ===== -->
+        <div class="card" id="expenseCard">
+            <h2>💸 Tambah Pengeluaran</h2>
+            <div class="sub">Catat pengeluaran operasional</div>
+            <form id="expenseForm" onsubmit="return false;">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>📝 Nama Pengeluaran <span class="required">*</span></label>
+                        <input type="text" id="namaPengeluaran" placeholder="Contoh: Biaya Admin" required>
+                    </div>
+                    <div class="form-group">
+                        <label>💸 Nominal <span class="required">*</span></label>
+                        <input type="number" id="nominalPengeluaran" placeholder="0" required>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-submit" id="expenseSubmitBtn" style="background:#ffaa0044;color:#ffaa00;border:1px solid #ffaa0055;">
+                    💸 Tambah Pengeluaran
+                </button>
+            </form>
+        </div>
+
+        <!-- ===== LIST TRANSAKSI ===== -->
+        <div class="card" id="listCard">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+                <h2>📋 Riwayat Transaksi</h2>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                    <button class="btn btn-danger" onclick="clearAllData()" style="padding:6px 16px;font-size:11px;">
+                        🗑️ Hapus Semua
+                    </button>
+                </div>
+            </div>
+            <div class="filter-group">
+                <button class="btn-filter active" data-filter="all" onclick="setFilter('all')">📋 Semua</button>
+                <button class="btn-filter" data-filter="profit" onclick="setFilter('profit')">✅ Untung</button>
+                <button class="btn-filter" data-filter="loss" onclick="setFilter('loss')">❌ Rugi</button>
+                <button class="btn-filter" data-filter="expense" onclick="setFilter('expense')">💸 Pengeluaran</button>
+            </div>
+            <div class="table-wrap" id="tableWrap">
+                <div class="no-data">Belum ada data transaksi.</div>
+            </div>
+        </div>
+
+        <div class="text-muted" style="text-align:center;margin-top:20px;">
+            © Shine Shop · Laba/Rugi System
+        </div>
+        <div class="security-badge">🔒 Hanya admin yang dapat mengakses</div>
+    </div>
+
+    <script>
+        // ===================== KONFIGURASI =====================
+        const LOGIN_URL = '/info/index.html';
+        const ACCOUNTS_FILE = '/info/accounts.json';
+        const SESSION_TIMEOUT = 3600000;
+        const STORAGE_KEY = 'shine_transactions';
+
+        // ===================== CEK SESSION =====================
+        function checkSession() {
+            const loggedIn = localStorage.getItem('logged_in');
+            const sessionToken = localStorage.getItem('session_token');
+            const sessionCreated = parseInt(localStorage.getItem('session_created') || '0');
+            const now = Date.now();
+
+            if (loggedIn !== 'true' || !sessionToken) {
+                window.location.href = LOGIN_URL;
+                return false;
+            }
+
+            if (now - sessionCreated > SESSION_TIMEOUT) {
+                console.log('⏰ Session expired');
+                window.location.href = LOGIN_URL;
+                return false;
+            }
+
+            return true;
+        }
+
+        if (!checkSession()) {
+            throw new Error('Redirect ke login');
+        }
+
+        // ===================== GET USER DATA =====================
+        function getUserData() {
+            return {
+                email: localStorage.getItem('user_email') || '',
+                role: localStorage.getItem('user_role') || 'user'
+            };
+        }
+
+        // ===================== CEK ADMIN =====================
+        async function checkAdmin() {
+            const statusEl = document.getElementById('envStatus');
+            const user = getUserData();
+
+            document.getElementById('userEmailDisplay').textContent = user.email;
+            document.getElementById('userRoleDisplay').textContent = `(${user.role})`;
+
+            if (user.role !== 'admin') {
+                statusEl.textContent = '❌ Akses ditolak! Hanya admin yang bisa mengakses halaman ini.';
+                statusEl.style.color = '#ff6666';
+                document.getElementById('formCard').style.display = 'none';
+                document.getElementById('expenseCard').style.display = 'none';
+                document.getElementById('listCard').style.display = 'none';
+                document.getElementById('statsCard').style.display = 'none';
+                Swal.fire({
+                    title: '⛔ Akses Ditolak',
+                    text: 'Hanya admin yang dapat mengakses halaman ini.',
+                    icon: 'error',
+                    confirmButtonColor: '#00ffaa'
+                });
+                return false;
+            }
+
+            statusEl.textContent = '✅ Akses admin terverifikasi';
+            statusEl.style.color = '#00ffaa';
+            return true;
+        }
+
+        // ===================== DATA STORAGE =====================
+        function getData() {
+            try {
+                const raw = localStorage.getItem(STORAGE_KEY);
+                if (!raw) return { transactions: [], expenses: [] };
+                return JSON.parse(raw);
+            } catch {
+                return { transactions: [], expenses: [] };
+            }
+        }
+
+        function saveData(data) {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+        }
+
+        // ===================== GENERATE ID =====================
+        function generateId() {
+            return Date.now().toString(36) + Math.random().toString(36).substring(2, 6);
+        }
+
+        // ===================== FORMAT RUPIAH =====================
+        function formatRupiah(amount) {
+            const num = parseInt(amount) || 0;
+            return 'Rp ' + num.toLocaleString('id-ID');
+        }
+
+        // ===================== HITUNG PROFIT =====================
+        function calculateProfit(modal, hargaJual, komisi) {
+            const m = parseInt(modal) || 0;
+            const h = parseInt(hargaJual) || 0;
+            const k = parseInt(komisi) || 0;
+            return h - m - k;
+        }
+
+        // ===================== LOAD DATA =====================
+        function loadData() {
+            const data = getData();
+            const transactions = data.transactions || [];
+            const expenses = data.expenses || [];
+
+            // Hitung statistik
+            let totalProfit = 0;
+            let totalRevenue = 0;
+            let totalModal = 0;
+            let totalExpense = 0;
+
+            transactions.forEach(t => {
+                const profit = calculateProfit(t.modal, t.hargaJual, t.komisi);
+                totalProfit += profit;
+                totalRevenue += parseInt(t.hargaJual) || 0;
+                totalModal += parseInt(t.modal) || 0;
+            });
+
+            expenses.forEach(e => {
+                totalExpense += parseInt(e.nominal) || 0;
+            });
+
+            // Total profit setelah dikurangi pengeluaran
+            const netProfit = totalProfit - totalExpense;
+
+            // Update stats
+            document.getElementById('totalProfit').textContent = formatRupiah(netProfit);
+            document.getElementById('totalRevenue').textContent = formatRupiah(totalRevenue);
+            document.getElementById('totalModal').textContent = formatRupiah(totalModal);
+            document.getElementById('totalExpense').textContent = formatRupiah(totalExpense);
+            document.getElementById('totalTransactions').textContent = transactions.length + expenses.length;
+
+            // Render tabel
+            renderTable(transactions, expenses);
+
+            console.log('📊 Data dimuat:', transactions.length, 'transaksi,', expenses.length, 'pengeluaran');
+        }
+
+        // ===================== FILTER =====================
+        let currentFilter = 'all';
+
+        function setFilter(filter) {
+            currentFilter = filter;
+            document.querySelectorAll('.btn-filter').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.filter === filter);
+            });
+            loadData();
+        }
+
+        // ===================== RENDER TABLE =====================
+        function renderTable(transactions, expenses) {
+            const container = document.getElementById('tableWrap');
+
+            // Gabungkan dan urutkan berdasarkan tanggal (terbaru di atas)
+            let allItems = [];
+
+            transactions.forEach(t => {
+                const profit = calculateProfit(t.modal, t.hargaJual, t.komisi);
+                allItems.push({
+                    ...t,
+                    type: 'transaction',
+                    profit: profit,
+                    displayDate: t.tanggal || '-',
+                    displayName: t.nama || 'Transaksi',
+                    displayAmount: t.hargaJual || 0,
+                    displayModal: t.modal || 0,
+                    displayKomisi: t.komisi || 0,
+                    displayCatatan: t.catatan || '-'
+                });
+            });
+
+            expenses.forEach(e => {
+                allItems.push({
+                    ...e,
+                    type: 'expense',
+                    profit: -parseInt(e.nominal) || 0,
+                    displayDate: e.tanggal || '-',
+                    displayName: e.nama || 'Pengeluaran',
+                    displayAmount: e.nominal || 0,
+                    displayModal: '-',
+                    displayKomisi: '-',
+                    displayCatatan: e.catatan || '-'
+                });
+            });
+
+            // Filter
+            if (currentFilter === 'profit') {
+                allItems = allItems.filter(item => item.type === 'transaction' && item.profit > 0);
+            } else if (currentFilter === 'loss') {
+                allItems = allItems.filter(item => item.type === 'transaction' && item.profit < 0);
+            } else if (currentFilter === 'expense') {
+                allItems = allItems.filter(item => item.type === 'expense');
+            }
+
+            // Urutkan berdasarkan tanggal (terbaru di atas)
+            allItems.sort((a, b) => {
+                if (a.tanggal && b.tanggal) {
+                    return b.tanggal.localeCompare(a.tanggal);
+                }
+                return 0;
+            });
+
+            if (allItems.length === 0) {
+                container.innerHTML = '<div class="no-data">📭 Tidak ada data untuk filter ini.</div>';
+                return;
+            }
+
+            let html = `
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Nama</th>
+                            <th>Tanggal</th>
+                            <th>Modal</th>
+                            <th>Jual/Komisi</th>
+                            <th>Profit</th>
+                            <th>Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            allItems.forEach((item, index) => {
+                const isExpense = item.type === 'expense';
+                const profitClass = isExpense ? 'profit-negative' : 
+                                   item.profit > 0 ? 'profit-positive' : 
+                                   item.profit === 0 ? 'profit-zero' : 'profit-negative';
+                const profitDisplay = isExpense ? formatRupiah(-item.profit) : formatRupiah(item.profit);
+                const profitIcon = isExpense ? '💸' : 
+                                   item.profit > 0 ? '✅' : 
+                                   item.profit === 0 ? '➖' : '❌';
+
+                const modalDisplay = isExpense ? '-' : formatRupiah(item.modal);
+                const komisiDisplay = isExpense ? '-' : (item.komisi ? formatRupiah(item.komisi) : '0');
+                const jualDisplay = isExpense ? formatRupiah(item.nominal) : formatRupiah(item.hargaJual);
+
+                html += `
+                    <tr>
+                        <td>
+                            <strong>${item.displayName}</strong>
+                            ${item.displayCatatan && item.displayCatatan !== '-' ? `<br><span style="font-size:10px;color:#666;">${item.displayCatatan}</span>` : ''}
+                            ${isExpense ? '<span style="font-size:9px;color:#ff4444;background:#ff444415;padding:2px 8px;border-radius:10px;">PENGELUARAN</span>' : ''}
+                        </td>
+                        <td style="font-size:12px;color:#888;">${item.displayDate}</td>
+                        <td>${modalDisplay}</td>
+                        <td>
+                            ${isExpense ? '-' : jualDisplay}
+                            ${!isExpense && item.komisi ? `<br><span style="font-size:10px;color:#888;">Komisi: ${komisiDisplay}</span>` : ''}
+                        </td>
+                        <td class="${profitClass}">
+                            ${profitIcon} ${profitDisplay}
+                        </td>
+                        <td>
+                            <button class="btn-delete" onclick="deleteItem('${item.id}', '${item.type}')">🗑️</button>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            html += `
+                    </tbody>
+                </table>
+                <div style="margin-top:12px;font-size:12px;color:#666;text-align:right;">
+                    Total: ${allItems.length} item
+                </div>
+            `;
+
+            container.innerHTML = html;
+        }
+
+        // ===================== DELETE ITEM =====================
+        function deleteItem(id, type) {
+            Swal.fire({
+                title: '⚠️ Hapus Data?',
+                text: 'Data yang dihapus tidak dapat dikembalikan!',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: '✅ Ya, Hapus!',
+                cancelButtonText: '❌ Batal',
+                confirmButtonColor: '#ff4444',
+                cancelButtonColor: '#666'
+            }).then(result => {
+                if (result.isConfirmed) {
+                    const data = getData();
+                    if (type === 'transaction') {
+                        data.transactions = data.transactions.filter(t => t.id !== id);
+                    } else if (type === 'expense') {
+                        data.expenses = data.expenses.filter(e => e.id !== id);
+                    }
+                    saveData(data);
+                    loadData();
+                    Swal.fire({
+                        title: '✅ Dihapus!',
+                        text: 'Data berhasil dihapus.',
+                        icon: 'success',
+                        timer: 1500,
+                        showConfirmButton: false
+                    });
+                }
+            });
+        }
+
+        // ===================== CLEAR ALL DATA =====================
+        function clearAllData() {
+            Swal.fire({
+                title: '⚠️ Hapus Semua Data?',
+                text: 'Semua transaksi dan pengeluaran akan dihapus permanen!',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: '✅ Ya, Hapus Semua!',
+                cancelButtonText: '❌ Batal',
+                confirmButtonColor: '#ff4444',
+                cancelButtonColor: '#666'
+            }).then(result => {
+                if (result.isConfirmed) {
+                    saveData({ transactions: [], expenses: [] });
+                    loadData();
+                    Swal.fire({
+                        title: '✅ Dihapus!',
+                        text: 'Semua data berhasil dihapus.',
+                        icon: 'success',
+                        timer: 1500,
+                        showConfirmButton: false
+                    });
+                }
+            });
+        }
+
+        // ===================== SUBMIT TRANSAKSI =====================
+        async function submitTransaction() {
+            const submitBtn = document.getElementById('submitBtn');
+            submitBtn.disabled = true;
+            submitBtn.textContent = '⏳ Menyimpan...';
+
+            try {
+                const nama = document.getElementById('namaTransaksi').value.trim();
+                const tanggal = document.getElementById('tanggalTransaksi').value || new Date().toISOString().split('T')[0];
+                const modal = parseInt(document.getElementById('modal').value) || 0;
+                const hargaJual = parseInt(document.getElementById('hargaJual').value) || 0;
+                const komisi = parseInt(document.getElementById('komisi').value) || 0;
+                const catatan = document.getElementById('catatan').value.trim() || '';
+
+                // Validasi
+                if (!nama) {
+                    Swal.fire({ title: '⚠️ Validasi Gagal', text: 'Nama transaksi wajib diisi!', icon: 'warning', confirmButtonColor: '#ffaa00' });
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = '✅ Simpan Transaksi';
+                    return;
+                }
+                if (modal === 0 && hargaJual === 0) {
+                    Swal.fire({ title: '⚠️ Validasi Gagal', text: 'Modal atau Harga Jual minimal 1!', icon: 'warning', confirmButtonColor: '#ffaa00' });
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = '✅ Simpan Transaksi';
+                    return;
+                }
+
+                const profit = calculateProfit(modal, hargaJual, komisi);
+
+                const data = getData();
+                const newTransaction = {
+                    id: generateId(),
+                    nama: nama,
+                    tanggal: tanggal,
+                    modal: modal,
+                    hargaJual: hargaJual,
+                    komisi: komisi,
+                    catatan: catatan,
+                    profit: profit,
+                    createdAt: new Date().toISOString()
+                };
+
+                data.transactions.push(newTransaction);
+                saveData(data);
+
+                Swal.fire({
+                    title: '✅ Berhasil!',
+                    html: `
+                        Transaksi <b>"${nama}"</b> berhasil disimpan!<br>
+                        <span style="color:${profit >= 0 ? '#00ffaa' : '#ff4444'};">
+                            Profit: ${formatRupiah(profit)}
+                        </span>
+                    `,
+                    icon: 'success',
+                    confirmButtonColor: '#00ffaa'
+                });
+
+                // Reset form
+                document.getElementById('namaTransaksi').value = '';
+                document.getElementById('modal').value = '';
+                document.getElementById('hargaJual').value = '';
+                document.getElementById('komisi').value = '';
+                document.getElementById('catatan').value = '';
+
+                loadData();
+
+            } catch (err) {
+                console.error('Error:', err);
+                Swal.fire({
+                    title: '❌ Gagal',
+                    text: err.message,
+                    icon: 'error',
+                    confirmButtonColor: '#ffaa00'
+                });
+            }
+
+            submitBtn.disabled = false;
+            submitBtn.textContent = '✅ Simpan Transaksi';
+        }
+
+        // ===================== SUBMIT PENGELUARAN =====================
+        async function submitExpense() {
+            const submitBtn = document.getElementById('expenseSubmitBtn');
+            submitBtn.disabled = true;
+            submitBtn.textContent = '⏳ Menyimpan...';
+
+            try {
+                const nama = document.getElementById('namaPengeluaran').value.trim();
+                const nominal = parseInt(document.getElementById('nominalPengeluaran').value) || 0;
+
+                if (!nama) {
+                    Swal.fire({ title: '⚠️ Validasi Gagal', text: 'Nama pengeluaran wajib diisi!', icon: 'warning', confirmButtonColor: '#ffaa00' });
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = '💸 Tambah Pengeluaran';
+                    return;
+                }
+                if (nominal < 1) {
+                    Swal.fire({ title: '⚠️ Validasi Gagal', text: 'Nominal pengeluaran minimal 1!', icon: 'warning', confirmButtonColor: '#ffaa00' });
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = '💸 Tambah Pengeluaran';
+                    return;
+                }
+
+                const data = getData();
+                const newExpense = {
+                    id: generateId(),
+                    nama: nama,
+                    nominal: nominal,
+                    tanggal: new Date().toISOString().split('T')[0],
+                    catatan: '',
+                    createdAt: new Date().toISOString()
+                };
+
+                data.expenses.push(newExpense);
+                saveData(data);
+
+                Swal.fire({
+                    title: '✅ Berhasil!',
+                    html: `
+                        Pengeluaran <b>"${nama}"</b> berhasil disimpan!<br>
+                        <span style="color:#ffaa00;">${formatRupiah(nominal)}</span>
+                    `,
+                    icon: 'success',
+                    confirmButtonColor: '#ffaa00'
+                });
+
+                document.getElementById('namaPengeluaran').value = '';
+                document.getElementById('nominalPengeluaran').value = '';
+
+                loadData();
+
+            } catch (err) {
+                console.error('Error:', err);
+                Swal.fire({
+                    title: '❌ Gagal',
+                    text: err.message,
+                    icon: 'error',
+                    confirmButtonColor: '#ffaa00'
+                });
+            }
+
+            submitBtn.disabled = false;
+            submitBtn.textContent = '💸 Tambah Pengeluaran';
+        }
+
+        // ===================== INIT =====================
+        document.addEventListener('DOMContentLoaded', async function() {
+            const isAdmin = await checkAdmin();
+            if (!isAdmin) return;
+
+            // Event listener
+            document.getElementById('transactionForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                submitTransaction();
+            });
+
+            document.getElementById('expenseForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                submitExpense();
+            });
+
+            // Set default tanggal
+            document.getElementById('tanggalTransaksi').value = new Date().toISOString().split('T')[0];
+
+            // Load data
+            loadData();
+
+            console.log('📊 Halaman Laba/Rugi siap!');
+            console.log('👤 User:', getUserData().email);
+            console.log('🔑 Role: admin');
+        });
+
+        // ===================== ANTI INSPECT =====================
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'F12' ||
+                (e.ctrlKey && e.shiftKey && ['I', 'C', 'J'].includes(e.key)) ||
+                (e.ctrlKey && e.key === 'u')) {
+                e.preventDefault();
+                return false;
+            }
+        });
+    </script>
+</body>
+</html>
