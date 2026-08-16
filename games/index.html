@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PPKA DAOP 8 Surabaya - Simulasi</title>
+    <title>PPKA DAOP 8 - Sistem Map Interaktif</title>
     <style>
         * {
             margin: 0;
@@ -12,22 +12,18 @@
         }
         body {
             font-family: 'Courier New', monospace;
-            background: linear-gradient(145deg, #0a0a0a 0%, #1a1a1a 100%);
+            background: #0a0a0a;
             color: #0f0;
             min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
             padding: 20px;
         }
-        .game-container {
-            max-width: 1200px;
-            width: 100%;
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
             background: #111;
             border: 2px solid #0f0;
             border-radius: 15px;
             padding: 25px;
-            box-shadow: 0 0 40px rgba(0,255,0,0.2);
         }
         .header {
             text-align: center;
@@ -36,159 +32,139 @@
             margin-bottom: 20px;
         }
         .header h1 {
-            font-size: 28px;
+            font-size: 30px;
             letter-spacing: 4px;
-            text-shadow: 0 0 10px #0f0;
+            text-shadow: 0 0 20px #0f0;
         }
         .header .sub {
+            color: #888;
             font-size: 14px;
-            color: #aaa;
-            margin-top: 5px;
         }
-        .status-board {
+        .main-layout {
             display: flex;
-            justify-content: space-between;
+            gap: 20px;
             flex-wrap: wrap;
-            background: #1a1a1a;
-            padding: 15px;
-            border-radius: 10px;
-            border: 1px solid #333;
-            margin-bottom: 20px;
         }
-        .status-item {
-            font-size: 14px;
-        }
-        .status-item span {
-            color: #fff;
-            font-weight: bold;
-        }
-        .track-area {
+        .map-panel {
+            flex: 2;
+            min-width: 300px;
             background: #0a0a0a;
             border-radius: 10px;
-            padding: 20px;
+            padding: 15px;
             border: 1px solid #2a2a2a;
-            margin-bottom: 20px;
-            min-height: 400px;
-            position: relative;
-            overflow-x: auto;
-        }
-        .track-line {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 10px 5px;
-            border-bottom: 1px dashed #2a2a2a;
-            flex-wrap: wrap;
-            gap: 10px;
-        }
-        .track-line:last-child {
-            border-bottom: none;
-        }
-        .train {
-            display: inline-block;
-            background: #0f0;
-            color: #000;
-            font-weight: bold;
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 11px;
-            letter-spacing: 1px;
-            transition: all 0.3s;
-            box-shadow: 0 0 20px rgba(0,255,0,0.3);
-            margin: 2px;
-            white-space: nowrap;
-        }
-        .train-arrive {
-            background: #ffaa00;
-            box-shadow: 0 0 20px rgba(255,170,0,0.5);
-        }
-        .train-depart {
-            background: #ff3333;
-            box-shadow: 0 0 20px rgba(255,0,0,0.5);
-        }
-        .train-commuter {
-            background: #00ccff;
-            color: #000;
-            box-shadow: 0 0 20px rgba(0,204,255,0.5);
-        }
-        .station-name {
-            color: #0f0;
-            font-size: 15px;
-            font-weight: bold;
-            min-width: 120px;
-        }
-        .station-name .daop {
-            color: #666;
-            font-size: 10px;
-            display: block;
-        }
-        .schedule {
-            color: #fff;
-            font-size: 12px;
-            flex: 1;
-            display: flex;
-            flex-wrap: wrap;
-            gap: 5px;
-            align-items: center;
-        }
-        .signal {
-            display: inline-block;
-            width: 16px;
-            height: 16px;
-            border-radius: 50%;
-            margin: 0 5px;
-        }
-        .signal-green {
-            background: #0f0;
-            box-shadow: 0 0 20px #0f0;
-        }
-        .signal-red {
-            background: #f00;
-            box-shadow: 0 0 20px #f00;
-        }
-        .signal-yellow {
-            background: #ff0;
-            box-shadow: 0 0 20px #ff0;
-        }
-        .signal-blue {
-            background: #00ccff;
-            box-shadow: 0 0 20px #00ccff;
         }
         .control-panel {
+            flex: 1;
+            min-width: 280px;
+            background: #0a0a0a;
+            border-radius: 10px;
+            padding: 15px;
+            border: 1px solid #2a2a2a;
+        }
+        .map-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .station-card {
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+        }
+        .station-card:hover {
+            border-color: #0f0;
+            transform: scale(1.02);
+            box-shadow: 0 0 20px rgba(0,255,0,0.1);
+        }
+        .station-card.active {
+            border-color: #0f0;
+            background: #0f0;
+            color: #000;
+        }
+        .station-card .s-name {
+            font-weight: bold;
+            font-size: 13px;
+        }
+        .station-card .s-daop {
+            font-size: 10px;
+            color: #666;
+        }
+        .station-card .s-trains {
+            font-size: 11px;
+            color: #0f0;
+            margin-top: 5px;
+        }
+        .station-card.active .s-trains {
+            color: #000;
+        }
+        .detail-area {
+            margin-top: 15px;
+        }
+        .detail-area .label {
+            color: #666;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .detail-area .value {
+            font-size: 18px;
+            font-weight: bold;
+            margin: 5px 0;
+        }
+        .train-list {
+            margin-top: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .train-item {
             display: flex;
+            justify-content: space-between;
+            padding: 6px 10px;
+            border-bottom: 1px solid #1a1a1a;
+            font-size: 13px;
+            align-items: center;
+        }
+        .train-item .badge {
+            padding: 2px 10px;
+            border-radius: 20px;
+            font-size: 10px;
+            font-weight: bold;
+        }
+        .badge-arrive { background: #ffaa00; color: #000; }
+        .badge-depart { background: #ff3333; color: #fff; }
+        .badge-standby { background: #0f0; color: #000; }
+        .badge-commuter { background: #00ccff; color: #000; }
+        .btn-group {
+            display: flex;
+            gap: 10px;
             flex-wrap: wrap;
-            gap: 15px;
-            justify-content: center;
-            margin-top: 20px;
+            margin-top: 15px;
         }
         .btn {
             background: #1a1a1a;
             color: #0f0;
             border: 2px solid #0f0;
-            padding: 12px 25px;
-            border-radius: 30px;
+            padding: 10px 20px;
+            border-radius: 25px;
             font-family: 'Courier New', monospace;
-            font-size: 13px;
+            font-size: 12px;
             font-weight: bold;
             cursor: pointer;
             transition: all 0.2s;
             text-transform: uppercase;
-            letter-spacing: 2px;
+            letter-spacing: 1px;
+            flex: 1;
+            min-width: 100px;
         }
         .btn:hover {
             background: #0f0;
             color: #000;
             box-shadow: 0 0 30px rgba(0,255,0,0.3);
-            transform: scale(1.05);
-        }
-        .btn-danger {
-            border-color: #f00;
-            color: #f00;
-        }
-        .btn-danger:hover {
-            background: #f00;
-            color: #000;
-            box-shadow: 0 0 30px rgba(255,0,0,0.3);
         }
         .btn-commuter {
             border-color: #00ccff;
@@ -199,84 +175,126 @@
             color: #000;
             box-shadow: 0 0 30px rgba(0,204,255,0.3);
         }
-        .log-area {
-            margin-top: 20px;
-            background: #0a0a0a;
-            border-radius: 10px;
-            padding: 15px;
+        .btn-danger {
+            border-color: #f00;
+            color: #f00;
+        }
+        .btn-danger:hover {
+            background: #f00;
+            color: #000;
+            box-shadow: 0 0 30px rgba(255,0,0,0.3);
+        }
+        .btn-warning {
+            border-color: #ffaa00;
+            color: #ffaa00;
+        }
+        .btn-warning:hover {
+            background: #ffaa00;
+            color: #000;
+        }
+        .status-bar {
+            display: flex;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            background: #1a1a1a;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 15px;
             border: 1px solid #2a2a2a;
-            max-height: 150px;
+        }
+        .status-item {
+            font-size: 13px;
+        }
+        .status-item span {
+            color: #fff;
+            font-weight: bold;
+        }
+        .log-area {
+            margin-top: 15px;
+            background: #0a0a0a;
+            border-radius: 8px;
+            padding: 12px;
+            border: 1px solid #2a2a2a;
+            max-height: 120px;
             overflow-y: auto;
             font-size: 12px;
-            color: #0f0;
         }
         .log-area .log-entry {
             padding: 3px 0;
             border-bottom: 1px solid #1a1a1a;
         }
-        .log-area .log-time {
-            color: #666;
-            margin-right: 10px;
-        }
-        .log-area .log-commuter {
-            color: #00ccff;
-        }
-        ::-webkit-scrollbar {
-            width: 8px;
-            background: #1a1a1a;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #0f0;
-            border-radius: 10px;
-        }
+        .log-time { color: #666; margin-right: 10px; }
+        .log-commuter { color: #00ccff; }
+        ::-webkit-scrollbar { width: 6px; background: #1a1a1a; }
+        ::-webkit-scrollbar-thumb { background: #0f0; border-radius: 10px; }
         @media (max-width: 700px) {
-            .station-name { min-width: 80px; font-size: 12px; }
-            .train { font-size: 9px; padding: 3px 8px; }
-            .btn { padding: 8px 15px; font-size: 11px; }
-            .track-line { flex-direction: column; align-items: flex-start; }
+            .main-layout { flex-direction: column; }
+            .map-grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
         }
     </style>
 </head>
 <body>
-<div class="game-container">
+<div class="container">
     <div class="header">
-        <h1>🚂 PPKA DAOP 8 SURABAYA</h1>
-        <div class="sub">WILAYAH JAWA TIMUR • COMMUTER LINE AKTIF</div>
+        <h1>🗺️ PPKA DAOP 8 MAP</h1>
+        <div class="sub">SURABAYA • JAWA TIMUR • SISTEM KONTROL TERPUSAT</div>
     </div>
 
-    <div class="status-board">
+    <div class="status-bar">
         <div class="status-item">⏰ WAKTU: <span id="gameTime">06:00</span></div>
-        <div class="status-item">🚆 KERETA AKTIF: <span id="trainCount">0</span></div>
-        <div class="status-item">🚉 COMMUTER: <span id="commuterCount">0</span></div>
-        <div class="status-item">📋 PERINTAH: <span id="lastCommand">-</span></div>
+        <div class="status-item">🚆 TOTAL KERETA: <span id="totalTrains">0</span></div>
+        <div class="status-item">🚃 COMMUTER: <span id="totalCommuter">0</span></div>
+        <div class="status-item">📍 STASIUN AKTIF: <span id="activeStation">-</span></div>
     </div>
 
-    <div class="track-area" id="trackArea">
-        <!-- akan diisi JS -->
-    </div>
+    <div class="main-layout">
+        <!-- MAP PANEL -->
+        <div class="map-panel">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                <span class="label">📍 PETA STASIUN DAOP 8</span>
+                <button class="btn" style="padding:5px 15px;font-size:10px;" onclick="refreshMap()">🔄 REFRESH</button>
+            </div>
+            <div class="map-grid" id="mapGrid">
+                <!-- diisi JS -->
+            </div>
+            <div class="detail-area" id="detailArea">
+                <div class="label">Pilih stasiun untuk melihat detail</div>
+            </div>
+        </div>
 
-    <div class="control-panel">
-        <button class="btn" onclick="tambahKereta()">➕ TAMBAH KERETA</button>
-        <button class="btn btn-commuter" onclick="tambahCommuter()">🚆 COMMUTER</button>
-        <button class="btn" onclick="gerakkanKereta()">▶️ GERAKKAN</button>
-        <button class="btn" onclick="acakJadwal()">🔄 ACAK</button>
-        <button class="btn btn-danger" onclick="resetSimulasi()">💥 RESET</button>
-    </div>
-
-    <div class="log-area" id="logArea">
-        <div class="log-entry"><span class="log-time">[06:00]</span> DAOP 8 Surabaya aktif. Selamat datang di sistem PPKA.</div>
+        <!-- CONTROL PANEL -->
+        <div class="control-panel">
+            <div style="margin-bottom:10px;">
+                <span class="label">🎛️ KONTROL PPKA</span>
+            </div>
+            <div id="controlContent">
+                <div style="color:#666;font-size:13px;">Pilih stasiun di map untuk mengontrol</div>
+            </div>
+            <div class="btn-group" style="margin-top:15px;">
+                <button class="btn" onclick="tambahKereta()">➕ KA JAUH</button>
+                <button class="btn btn-commuter" onclick="tambahCommuter()">🚃 COMMUTER</button>
+                <button class="btn" onclick="gerakkanSemua()">▶️ GERAKKAN</button>
+            </div>
+            <div class="btn-group">
+                <button class="btn btn-warning" onclick="acakJadwal()">🔄 ACAK</button>
+                <button class="btn btn-danger" onclick="resetSimulasi()">💥 RESET</button>
+            </div>
+            <div class="log-area" id="logArea">
+                <div class="log-entry"><span class="log-time">[06:00]</span> Sistem PPKA DAOP 8 siap.</div>
+            </div>
+        </div>
     </div>
 </div>
 
 <script>
-    // ========== DATA DAOP 8 ==========
+    // ========== DATA ==========
     const stasiunDAOP8 = [
-        { name: 'Surabaya Pasar Turi', daop: 'DAOP 8' },
-        { name: 'Surabaya Kota', daop: 'DAOP 8' },
-        { name: 'Wonokromo', daop: 'DAOP 8' },
-        { name: 'Waru', daop: 'DAOP 8' },
-        { name: 'Gedangan', daop: 'DAOP 8' },
-        { name: 'Sidoarjo', daop: 'DAOP 8' }
+        { id: 0, name: 'Surabaya Pasar Turi', daop: 'DAOP 8', x: 100, y: 200 },
+        { id: 1, name: 'Surabaya Kota', daop: 'DAOP 8', x: 180, y: 250 },
+        { id: 2, name: 'Wonokromo', daop: 'DAOP 8', x: 260, y: 300 },
+        { id: 3, name: 'Waru', daop: 'DAOP 8', x: 340, y: 350 },
+        { id: 4, name: 'Gedangan', daop: 'DAOP 8', x: 420, y: 400 },
+        { id: 5, name: 'Sidoarjo', daop: 'DAOP 8', x: 500, y: 450 }
     ];
 
     const commuterLines = [
@@ -287,17 +305,15 @@
         { name: 'Supas', route: ['Surabaya Pasar Turi', 'Surabaya Kota', 'Wonokromo', 'Waru'] }
     ];
 
-    const namaKeretaJauh = [
-        'Argo Bromo', 'Gajayana', 'Bima', 'Sembrani', 'Taksaka',
-        'Purwojaya', 'Bangunkarta', 'Jayabaya', 'Mutiara Timur', 'Ranggajati'
-    ];
+    const namaKeretaJauh = ['Argo Bromo','Gajayana','Bima','Sembrani','Taksaka','Purwojaya','Bangunkarta','Jayabaya','Mutiara Timur','Ranggajati'];
 
     let trains = [];
     let gameTime = 360;
     let logEntries = [];
     let trainIdCounter = 0;
-    let commuterIdCounter = 0;
+    let selectedStation = 0;
 
+    // ========== FUNGSI ==========
     function formatTime(m) {
         let h = Math.floor(m / 60);
         let min = m % 60;
@@ -308,67 +324,114 @@
         let timeStr = formatTime(gameTime);
         let cls = isCommuter ? 'log-commuter' : '';
         logEntries.push(`<div class="log-entry"><span class="log-time">[${timeStr}]</span> <span class="${cls}">${msg}</span></div>`);
-        if (logEntries.length > 60) logEntries.shift();
-        renderLog();
-    }
-
-    function renderLog() {
+        if (logEntries.length > 50) logEntries.shift();
         document.getElementById('logArea').innerHTML = logEntries.join('');
-        let area = document.getElementById('logArea');
-        area.scrollTop = area.scrollHeight;
+        document.getElementById('logArea').scrollTop = document.getElementById('logArea').scrollHeight;
     }
 
-    function renderTrack() {
-        let area = document.getElementById('trackArea');
-        let html = '';
-        
+    function renderMap() {
+        let grid = document.getElementById('mapGrid');
+        grid.innerHTML = '';
         stasiunDAOP8.forEach((st, idx) => {
-            let trainOnStation = trains.filter(t => t.stationIndex === idx);
-            let trainHtml = trainOnStation.map(t => {
-                let cls = 'train';
-                if (t.isCommuter) cls += ' train-commuter';
-                else if (t.status === 'arrive') cls += ' train-arrive';
-                else if (t.status === 'depart') cls += ' train-depart';
-                let icon = t.isCommuter ? '🚃' : '🚆';
-                return `<span class="${cls}" style="margin:0 3px;">${icon}${t.name}</span>`;
-            }).join(' ');
-
-            // sinyal
-            let signalClass = 'signal-green';
-            let commuterCount = trainOnStation.filter(t => t.isCommuter).length;
-            let totalCount = trainOnStation.length;
+            let trainCount = trains.filter(t => t.stationIndex === idx).length;
+            let commuterCount = trains.filter(t => t.stationIndex === idx && t.isCommuter).length;
+            let isActive = (selectedStation === idx);
             
-            if (commuterCount >= 2) signalClass = 'signal-blue';
-            else if (totalCount >= 3) signalClass = 'signal-red';
-            else if (totalCount >= 2) signalClass = 'signal-yellow';
-
-            html += `
-                <div class="track-line">
-                    <div class="station-name">
-                        ${st.name}
-                        <span class="daop">${st.daop}</span>
-                    </div>
-                    <div class="schedule">${trainHtml || '⚪ Kosong'}</div>
-                    <div class="signal ${signalClass}"></div>
-                </div>
+            let card = document.createElement('div');
+            card.className = 'station-card' + (isActive ? ' active' : '');
+            card.innerHTML = `
+                <div class="s-name">${st.name}</div>
+                <div class="s-daop">${st.daop}</div>
+                <div class="s-trains">🚆${trainCount} 🚃${commuterCount}</div>
             `;
+            card.onclick = () => selectStation(idx);
+            grid.appendChild(card);
         });
+        updateStatus();
+    }
 
+    function selectStation(idx) {
+        selectedStation = idx;
+        renderMap();
+        renderDetail();
+        renderControl();
+        document.getElementById('activeStation').innerText = stasiunDAOP8[idx].name;
+    }
+
+    function renderDetail() {
+        let area = document.getElementById('detailArea');
+        let st = stasiunDAOP8[selectedStation];
+        let trainsHere = trains.filter(t => t.stationIndex === selectedStation);
+        
+        let html = `
+            <div style="margin-top:10px;">
+                <div class="label">📍 ${st.name}</div>
+                <div class="value" style="font-size:14px;">${st.daop}</div>
+                <div style="margin-top:5px;font-size:13px;">
+                    🚆 Kereta: ${trainsHere.length} | 🚃 Commuter: ${trainsHere.filter(t=>t.isCommuter).length}
+                </div>
+                <div class="train-list">
+        `;
+        
+        if (trainsHere.length === 0) {
+            html += `<div style="color:#666;font-size:12px;padding:10px 0;">Tidak ada kereta di stasiun ini</div>`;
+        } else {
+            trainsHere.forEach(t => {
+                let badgeClass = 'badge-standby';
+                if (t.isCommuter) badgeClass = 'badge-commuter';
+                else if (t.status === 'arrive') badgeClass = 'badge-arrive';
+                else if (t.status === 'depart') badgeClass = 'badge-depart';
+                
+                let label = t.isCommuter ? 'COMMUTER' : t.status.toUpperCase();
+                html += `
+                    <div class="train-item">
+                        <span>${t.isCommuter ? '🚃' : '🚆'} ${t.name}</span>
+                        <span class="badge ${badgeClass}">${label}</span>
+                    </div>
+                `;
+            });
+        }
+        
+        html += `</div></div>`;
         area.innerHTML = html;
-        document.getElementById('trainCount').innerText = trains.length;
-        document.getElementById('commuterCount').innerText = trains.filter(t => t.isCommuter).length;
+    }
+
+    function renderControl() {
+        let area = document.getElementById('controlContent');
+        let st = stasiunDAOP8[selectedStation];
+        area.innerHTML = `
+            <div style="margin-bottom:10px;">
+                <div style="font-size:14px;font-weight:bold;">${st.name}</div>
+                <div style="font-size:12px;color:#666;">Kontrol perjalanan kereta di stasiun ini</div>
+            </div>
+            <div class="btn-group">
+                <button class="btn" style="flex:1;padding:8px;" onclick="spawnKeretaDiStasiun(${selectedStation})">🚆 Spawn KA</button>
+                <button class="btn btn-commuter" style="flex:1;padding:8px;" onclick="spawnCommuterDiStasiun(${selectedStation})">🚃 Spawn Commuter</button>
+            </div>
+            <div class="btn-group">
+                <button class="btn btn-warning" style="flex:1;padding:8px;" onclick="ubahStatusSemua(${selectedStation})">🔄 Ubah Status</button>
+                <button class="btn btn-danger" style="flex:1;padding:8px;" onclick="hapusKeretaDiStasiun(${selectedStation})">🗑️ Hapus Semua</button>
+            </div>
+            <div style="margin-top:10px;font-size:11px;color:#666;">
+                Klik tombol di atas untuk mengatur kereta di stasiun ini
+            </div>
+        `;
+    }
+
+    function updateStatus() {
+        document.getElementById('totalTrains').innerText = trains.length;
+        document.getElementById('totalCommuter').innerText = trains.filter(t => t.isCommuter).length;
         document.getElementById('gameTime').innerText = formatTime(gameTime);
     }
 
-    // ========== PERINTAH ==========
-    function tambahKereta() {
-        if (trains.length >= 25) {
-            addLog('⚠️ Jalur penuh! Maksimal 25 kereta.');
+    // ========== PERINTAH PPKA ==========
+    function spawnKeretaDiStasiun(stationIdx) {
+        if (trains.length >= 30) {
+            addLog('⚠️ Sistem penuh! Maksimal 30 kereta.');
             return;
         }
         let name = namaKeretaJauh[Math.floor(Math.random() * namaKeretaJauh.length)];
-        let stationIdx = Math.floor(Math.random() * stasiunDAOP8.length);
-        let status = ['arrive', 'depart', 'standby'][Math.floor(Math.random() * 3)];
+        let status = ['arrive','depart','standby'][Math.floor(Math.random() * 3)];
         trains.push({
             id: trainIdCounter++,
             name: name + '-' + (Math.floor(Math.random() * 900) + 100),
@@ -377,19 +440,19 @@
             isCommuter: false,
             delay: 0
         });
-        addLog(`🚆 Kereta jarak jauh ${name} masuk di ${stasiunDAOP8[stationIdx].name}`);
-        renderTrack();
-        document.getElementById('lastCommand').innerText = 'Tambah KA';
+        addLog(`🚆 KA ${name} muncul di ${stasiunDAOP8[stationIdx].name}`);
+        renderMap();
+        renderDetail();
+        renderControl();
+        updateStatus();
     }
 
-    function tambahCommuter() {
-        if (trains.length >= 25) {
-            addLog('⚠️ Jalur penuh! Maksimal 25 kereta.');
+    function spawnCommuterDiStasiun(stationIdx) {
+        if (trains.length >= 30) {
+            addLog('⚠️ Sistem penuh! Maksimal 30 kereta.');
             return;
         }
         let line = commuterLines[Math.floor(Math.random() * commuterLines.length)];
-        let stationIdx = Math.floor(Math.random() * stasiunDAOP8.length);
-        
         trains.push({
             id: trainIdCounter++,
             name: line.name + '-' + (Math.floor(Math.random() * 90) + 10),
@@ -399,17 +462,59 @@
             commuterRoute: line.route,
             delay: 0
         });
-        addLog(`🚃 Commuter ${line.name} berhenti di ${stasiunDAOP8[stationIdx].name}`, true);
-        renderTrack();
-        document.getElementById('lastCommand').innerText = 'Tambah Commuter';
+        addLog(`🚃 Commuter ${line.name} muncul di ${stasiunDAOP8[stationIdx].name}`, true);
+        renderMap();
+        renderDetail();
+        renderControl();
+        updateStatus();
     }
 
-    function gerakkanKereta() {
+    function ubahStatusSemua(stationIdx) {
+        let trainsHere = trains.filter(t => t.stationIndex === stationIdx);
+        if (trainsHere.length === 0) {
+            addLog('⚠️ Tidak ada kereta di stasiun ini.');
+            return;
+        }
+        trainsHere.forEach(t => {
+            t.status = ['arrive','depart','standby'][Math.floor(Math.random() * 3)];
+        });
+        addLog(`🔄 Status ${trainsHere.length} kereta di ${stasiunDAOP8[stationIdx].name} diubah`);
+        renderMap();
+        renderDetail();
+        renderControl();
+    }
+
+    function hapusKeretaDiStasiun(stationIdx) {
+        let before = trains.length;
+        trains = trains.filter(t => t.stationIndex !== stationIdx);
+        let removed = before - trains.length;
+        if (removed === 0) {
+            addLog('⚠️ Tidak ada kereta di stasiun ini.');
+            return;
+        }
+        addLog(`🗑️ ${removed} kereta dihapus dari ${stasiunDAOP8[stationIdx].name}`);
+        renderMap();
+        renderDetail();
+        renderControl();
+        updateStatus();
+    }
+
+    // ========== PERINTAH GLOBAL ==========
+    function tambahKereta() {
+        let randomSt = Math.floor(Math.random() * stasiunDAOP8.length);
+        spawnKeretaDiStasiun(randomSt);
+    }
+
+    function tambahCommuter() {
+        let randomSt = Math.floor(Math.random() * stasiunDAOP8.length);
+        spawnCommuterDiStasiun(randomSt);
+    }
+
+    function gerakkanSemua() {
         if (trains.length === 0) {
             addLog('⚠️ Tidak ada kereta.');
             return;
         }
-        
         gameTime += 15;
         if (gameTime >= 1440) gameTime -= 1440;
 
@@ -417,14 +522,10 @@
         let commuterMoved = 0;
 
         trains.forEach(t => {
-            // commuter lebih sering bergerak
             let moveChance = t.isCommuter ? 0.6 : 0.35;
-            
             if (Math.random() < moveChance) {
                 let newIdx = (t.stationIndex + 1) % stasiunDAOP8.length;
-                // commuter bisa skip stasiun sesuai route
                 if (t.isCommuter && t.commuterRoute) {
-                    // cari stasiun berikutnya di route
                     let currentStation = stasiunDAOP8[t.stationIndex].name;
                     let routeIdx = t.commuterRoute.indexOf(currentStation);
                     if (routeIdx !== -1 && routeIdx < t.commuterRoute.length - 1) {
@@ -432,68 +533,72 @@
                         let nextIdx = stasiunDAOP8.findIndex(s => s.name === nextStation);
                         if (nextIdx !== -1) newIdx = nextIdx;
                     } else {
-                        // reset ke awal route
                         let firstStation = t.commuterRoute[0];
                         let firstIdx = stasiunDAOP8.findIndex(s => s.name === firstStation);
                         if (firstIdx !== -1) newIdx = firstIdx;
                     }
                 }
                 t.stationIndex = newIdx;
-                t.status = ['arrive', 'depart', 'standby'][Math.floor(Math.random() * 3)];
+                t.status = ['arrive','depart','standby'][Math.floor(Math.random() * 3)];
                 moved++;
                 if (t.isCommuter) commuterMoved++;
-            } else {
-                if (Math.random() < 0.3) {
-                    t.status = ['arrive', 'depart', 'standby'][Math.floor(Math.random() * 3)];
-                }
             }
-            
-            if (Math.random() < 0.1) t.delay += Math.floor(Math.random() * 3);
         });
 
         let msg = `⏩ Waktu +15 menit. ${moved} kereta berpindah.`;
         if (commuterMoved > 0) msg += ` (${commuterMoved} commuter)`;
         addLog(msg);
-        document.getElementById('lastCommand').innerText = 'Gerakkan';
-        renderTrack();
+        renderMap();
+        renderDetail();
+        renderControl();
+        updateStatus();
     }
 
     function acakJadwal() {
         trains.forEach(t => {
             t.stationIndex = Math.floor(Math.random() * stasiunDAOP8.length);
-            t.status = ['arrive', 'depart', 'standby'][Math.floor(Math.random() * 3)];
-            t.delay = Math.floor(Math.random() * 10);
+            t.status = ['arrive','depart','standby'][Math.floor(Math.random() * 3)];
         });
-        addLog('🔄 Jadwal diacak total!');
-        document.getElementById('lastCommand').innerText = 'Acak';
-        renderTrack();
+        addLog('🔄 Semua jadwal diacak!');
+        renderMap();
+        renderDetail();
+        renderControl();
+        updateStatus();
     }
 
     function resetSimulasi() {
         trains = [];
         gameTime = 360;
         trainIdCounter = 0;
-        logEntries = ['<div class="log-entry"><span class="log-time">[06:00]</span> DAOP 8 Surabaya aktif. Selamat datang di sistem PPKA.</div>'];
-        addLog('💥 Simulasi di-reset!');
-        document.getElementById('lastCommand').innerText = 'Reset';
-        renderTrack();
+        logEntries = ['<div class="log-entry"><span class="log-time">[06:00]</span> Sistem PPKA DAOP 8 siap.</div>'];
+        addLog('💥 Simulasi di-reset total!');
+        renderMap();
+        renderDetail();
+        renderControl();
+        updateStatus();
+    }
+
+    function refreshMap() {
+        renderMap();
+        renderDetail();
+        renderControl();
+        addLog('🔄 Map direfresh');
     }
 
     // ========== INIT ==========
     // seeding awal
-    for (let i = 0; i < 3; i++) {
-        if (i < 2) tambahCommuter();
-        else tambahKereta();
+    for (let i = 0; i < 5; i++) {
+        if (i < 3) spawnCommuterDiStasiun(Math.floor(Math.random() * stasiunDAOP8.length));
+        else spawnKeretaDiStasiun(Math.floor(Math.random() * stasiunDAOP8.length));
     }
-    
-    // auto update tiap 8 detik
-    setInterval(() => {
-        if (trains.length > 0 && Math.random() < 0.35) {
-            gerakkanKereta();
-        }
-    }, 8000);
+    selectStation(0);
 
-    renderTrack();
+    // auto update tiap 10 detik
+    setInterval(() => {
+        if (trains.length > 0 && Math.random() < 0.4) {
+            gerakkanSemua();
+        }
+    }, 10000);
 </script>
 </body>
 </html>
