@@ -43,9 +43,6 @@
             font-size: 14px;
             margin-bottom: 20px;
         }
-        .card .sub .highlight {
-            color: #00ffaa;
-        }
         .form-group {
             margin-bottom: 16px;
         }
@@ -150,6 +147,30 @@
         .btn-refresh:hover {
             background: #00ffaa44;
         }
+        .btn-export {
+            background: #a78bfa44;
+            color: #a78bfa;
+            border: 1px solid #a78bfa44;
+        }
+        .btn-export:hover {
+            background: #a78bfa66;
+        }
+        .btn-import {
+            background: #f59e0b44;
+            color: #f59e0b;
+            border: 1px solid #f59e0b44;
+            position: relative;
+            overflow: hidden;
+        }
+        .btn-import:hover {
+            background: #f59e0b66;
+        }
+        .btn-import input[type="file"] {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            cursor: pointer;
+        }
         .header-actions {
             display: flex;
             gap: 10px;
@@ -193,6 +214,37 @@
         .role-badge.user {
             background: #444;
             color: #888;
+        }
+        .storage-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-top: 6px;
+            font-size: 11px;
+            color: #666;
+        }
+        .storage-info .bar {
+            flex: 1;
+            min-width: 100px;
+            height: 4px;
+            background: #222;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .storage-info .bar .fill {
+            height: 100%;
+            border-radius: 10px;
+            transition: width 0.5s ease;
+        }
+        .storage-info .bar .fill.green {
+            background: #00ffaa;
+        }
+        .storage-info .bar .fill.yellow {
+            background: #ffaa00;
+        }
+        .storage-info .bar .fill.red {
+            background: #ff4444;
         }
 
         /* ===== STATS ===== */
@@ -353,6 +405,16 @@
             text-transform: uppercase;
         }
 
+        .storage-warning {
+            background: #ffaa0015;
+            border: 1px solid #ffaa0044;
+            border-radius: 10px;
+            padding: 10px 14px;
+            margin-top: 8px;
+            font-size: 12px;
+            color: #ffaa00;
+        }
+
         @media (max-width: 600px) {
             .card {
                 padding: 20px 16px;
@@ -394,13 +456,21 @@
                 </div>
                 <div class="header-actions">
                     <button class="btn btn-refresh" onclick="loadData()">🔄 Refresh</button>
+                    <button class="btn btn-export" onclick="exportData()">💾 Export Data</button>
+                    <button class="btn btn-import" id="importBtn">📥 Import Data<input type="file" id="importFile" accept=".json" onchange="importData(event)"></button>
                     <button class="btn btn-back" onclick="location.href='/info/dashboard/index.html'">⬅️ Kembali</button>
                 </div>
             </div>
             <div id="userInfo" style="color:#888;font-size:13px;margin-top:8px;">
                 👤 <span id="userEmailDisplay">-</span>
                 <span id="userRoleDisplay" style="margin-left:10px;"></span>
-                <span id="userStorageDisplay" style="margin-left:10px;font-size:11px;color:#555;"></span>
+            </div>
+            <div class="storage-info" id="storageInfo">
+                <span id="storageUsage">💾 Storage: 0 KB digunakan</span>
+                <div class="bar">
+                    <div class="fill green" id="storageBar" style="width:0%"></div>
+                </div>
+                <span id="storageCount">📦 0 item</span>
             </div>
             <div class="env-status" id="envStatus">🔌 Memeriksa akses...</div>
         </div>
@@ -567,6 +637,7 @@
         const ACCOUNTS_FILE = '/info/accounts.json';
         const SESSION_TIMEOUT = 3600000;
         const STORAGE_PREFIX = 'shine_finance_';
+        const BACKUP_PREFIX = 'shine_finance_backup_';
 
         // ===================== CEK SESSION =====================
         function checkSession() {
@@ -601,14 +672,13 @@
             };
         }
 
-        // ===================== CEK AKSES (ADMIN ATAU VIP) =====================
+        // ===================== CEK AKSES =====================
         async function checkAccess() {
             const statusEl = document.getElementById('envStatus');
             const user = getUserData();
 
             document.getElementById('userEmailDisplay').textContent = user.email;
             
-            // Tampilkan role badge
             let roleHtml = '';
             if (user.role === 'admin') {
                 roleHtml = `<span class="role-badge admin">🔑 Admin</span>`;
@@ -619,7 +689,6 @@
             }
             document.getElementById('userRoleDisplay').innerHTML = roleHtml;
 
-            // Cek apakah user bisa akses (admin atau vip)
             const allowedRoles = ['admin', 'vip'];
             if (!allowedRoles.includes(user.role)) {
                 statusEl.textContent = '❌ Akses ditolak! Hanya Admin & VIP yang bisa mengakses halaman ini.';
@@ -638,10 +707,6 @@
                 return false;
             }
 
-            // Tampilkan storage info
-            const storageKey = getStorageKey();
-            document.getElementById('userStorageDisplay').textContent = `📁 ${storageKey}`;
-
             statusEl.textContent = `✅ Akses ${user.role.toUpperCase()} terverifikasi`;
             statusEl.style.color = '#00ffaa';
             return true;
@@ -650,16 +715,32 @@
         // ===================== STORAGE KEY =====================
         function getStorageKey() {
             const email = localStorage.getItem('user_email') || 'default';
-            // Buat key unik berdasarkan email
             const sanitized = email.replace(/[^a-zA-Z0-9]/g, '_');
             return STORAGE_PREFIX + sanitized;
         }
 
-        // ===================== DATA STORAGE =====================
+        function getBackupKey() {
+            const email = localStorage.getItem('user_email') || 'default';
+            const sanitized = email.replace(/[^a-zA-Z0-9]/g, '_');
+            return BACKUP_PREFIX + sanitized;
+        }
+
+        // ===================== DATA STORAGE DENGAN BACKUP =====================
         function getData() {
             try {
                 const key = getStorageKey();
-                const raw = localStorage.getItem(key);
+                let raw = localStorage.getItem(key);
+                
+                // Jika data utama tidak ada, coba backup
+                if (!raw) {
+                    const backupKey = getBackupKey();
+                    raw = localStorage.getItem(backupKey);
+                    if (raw) {
+                        console.log('🔄 Restore data dari backup');
+                        localStorage.setItem(key, raw);
+                    }
+                }
+                
                 if (!raw) return { transactions: [], incomes: [], expenses: [] };
                 return JSON.parse(raw);
             } catch {
@@ -670,6 +751,130 @@
         function saveData(data) {
             const key = getStorageKey();
             localStorage.setItem(key, JSON.stringify(data));
+            
+            // Simpan backup juga
+            const backupKey = getBackupKey();
+            localStorage.setItem(backupKey, JSON.stringify(data));
+            
+            // Update storage info
+            updateStorageInfo(data);
+        }
+
+        // ===================== UPDATE STORAGE INFO =====================
+        function updateStorageInfo(data) {
+            const totalItems = (data.transactions?.length || 0) + (data.incomes?.length || 0) + (data.expenses?.length || 0);
+            const key = getStorageKey();
+            const raw = localStorage.getItem(key) || '';
+            const sizeInBytes = raw.length;
+            const sizeInKB = (sizeInBytes / 1024).toFixed(1);
+            
+            document.getElementById('storageCount').textContent = `📦 ${totalItems} item`;
+            document.getElementById('storageUsage').textContent = `💾 Storage: ${sizeInKB} KB digunakan`;
+            
+            // Progress bar (max 5MB = 5120KB)
+            const maxSize = 5120; // 5MB
+            const percentage = Math.min((sizeInBytes / (maxSize * 1024)) * 100, 100);
+            const bar = document.getElementById('storageBar');
+            bar.style.width = percentage + '%';
+            
+            // Warna berdasarkan usage
+            if (percentage < 50) {
+                bar.className = 'fill green';
+            } else if (percentage < 80) {
+                bar.className = 'fill yellow';
+            } else {
+                bar.className = 'fill red';
+            }
+            
+            // Tampilkan warning jika hampir penuh
+            if (percentage > 80) {
+                const warningDiv = document.getElementById('storageWarning');
+                if (!warningDiv) {
+                    const warning = document.createElement('div');
+                    warning.id = 'storageWarning';
+                    warning.className = 'storage-warning';
+                    warning.innerHTML = '⚠️ Storage hampir penuh! Segera export data atau hapus data lama.';
+                    document.getElementById('storageInfo').after(warning);
+                }
+            } else {
+                const warningDiv = document.getElementById('storageWarning');
+                if (warningDiv) warningDiv.remove();
+            }
+        }
+
+        // ===================== EXPORT DATA =====================
+        function exportData() {
+            const data = getData();
+            const json = JSON.stringify(data, null, 2);
+            const blob = new Blob([json], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `laba_rugi_${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            
+            Swal.fire({
+                title: '✅ Data Diexport!',
+                text: 'File JSON berhasil diunduh.',
+                icon: 'success',
+                timer: 2000,
+                showConfirmButton: false
+            });
+        }
+
+        // ===================== IMPORT DATA =====================
+        function importData(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    if (!data.transactions || !data.incomes || !data.expenses) {
+                        throw new Error('Format data tidak valid');
+                    }
+                    
+                    Swal.fire({
+                        title: '📥 Import Data?',
+                        html: `
+                            Data yang akan diimport:<br>
+                            📊 Transaksi: ${data.transactions.length}<br>
+                            💵 Pemasukan: ${data.incomes.length}<br>
+                            💸 Pengeluaran: ${data.expenses.length}<br><br>
+                            <span style="color:#ffaa00;">⚠️ Data saat ini akan diganti!</span>
+                        `,
+                        icon: 'warning',
+                        showCancelButton: true,
+                        confirmButtonText: '✅ Import',
+                        cancelButtonText: '❌ Batal',
+                        confirmButtonColor: '#00ffaa',
+                        cancelButtonColor: '#666'
+                    }).then(result => {
+                        if (result.isConfirmed) {
+                            saveData(data);
+                            loadData();
+                            Swal.fire({
+                                title: '✅ Import Berhasil!',
+                                text: 'Data berhasil diimport.',
+                                icon: 'success',
+                                timer: 1500,
+                                showConfirmButton: false
+                            });
+                        }
+                    });
+                } catch (err) {
+                    Swal.fire({
+                        title: '❌ Gagal Import',
+                        text: 'File JSON tidak valid: ' + err.message,
+                        icon: 'error',
+                        confirmButtonColor: '#ffaa00'
+                    });
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = '';
         }
 
         // ===================== GENERATE ID =====================
@@ -698,7 +903,6 @@
             const incomes = data.incomes || [];
             const expenses = data.expenses || [];
 
-            // Hitung statistik
             let totalProfit = 0;
             let totalIncome = 0;
             let totalRevenue = 0;
@@ -720,10 +924,8 @@
                 totalExpense += parseInt(e.nominal) || 0;
             });
 
-            // Total profit setelah ditambah pemasukan dan dikurangi pengeluaran
             const netProfit = totalProfit + totalIncome - totalExpense;
 
-            // Update stats
             document.getElementById('totalProfit').textContent = formatRupiah(netProfit);
             document.getElementById('totalIncome').textContent = formatRupiah(totalIncome);
             document.getElementById('totalRevenue').textContent = formatRupiah(totalRevenue);
@@ -731,7 +933,7 @@
             document.getElementById('totalExpense').textContent = formatRupiah(totalExpense);
             document.getElementById('totalTransactions').textContent = transactions.length + incomes.length + expenses.length;
 
-            // Render tabel
+            updateStorageInfo(data);
             renderTable(transactions, incomes, expenses);
 
             console.log('📊 Data dimuat:', transactions.length, 'transaksi,', incomes.length, 'pemasukan,', expenses.length, 'pengeluaran');
@@ -797,7 +999,6 @@
                 });
             });
 
-            // Filter
             if (currentFilter === 'profit') {
                 allItems = allItems.filter(item => item.type === 'transaction' && item.profit > 0);
             } else if (currentFilter === 'loss') {
@@ -808,7 +1009,6 @@
                 allItems = allItems.filter(item => item.type === 'expense');
             }
 
-            // Urutkan berdasarkan tanggal (terbaru di atas)
             allItems.sort((a, b) => {
                 if (a.tanggal && b.tanggal) {
                     return b.tanggal.localeCompare(a.tanggal);
@@ -842,7 +1042,6 @@
             allItems.forEach((item) => {
                 const isExpense = item.type === 'expense';
                 const isIncome = item.type === 'income';
-                const isTransaction = item.type === 'transaction';
                 
                 let profitClass = 'profit-zero';
                 let profitDisplay = formatRupiah(0);
@@ -878,7 +1077,6 @@
                 const amountDisplay = isIncome ? formatRupiah(item.nominal) : 
                                       isExpense ? formatRupiah(item.nominal) : 
                                       formatRupiah(item.hargaJual);
-                const amountLabel = isIncome ? 'Pemasukan' : isExpense ? 'Pengeluaran' : 'Penjualan';
 
                 html += `
                     <tr>
@@ -890,9 +1088,8 @@
                         <td style="font-size:12px;color:#888;">${item.displayDate}</td>
                         <td>${modalDisplay}</td>
                         <td>
-                            ${isExpense || isIncome ? amountDisplay : amountDisplay}
+                            ${amountDisplay}
                             ${!isExpense && !isIncome && item.komisi ? `<br><span style="font-size:10px;color:#888;">Komisi: ${komisiDisplay}</span>` : ''}
-                            ${!isExpense && !isIncome ? `<br><span style="font-size:9px;color:#555;">${amountLabel}</span>` : ''}
                         </td>
                         <td class="${profitClass}">
                             ${profitIcon} ${profitDisplay}
@@ -975,7 +1172,7 @@
             });
         }
 
-        // ===================== SUBMIT TRANSAKSI =====================
+        // ===================== SUBMIT FUNCTIONS =====================
         async function submitTransaction() {
             const submitBtn = document.getElementById('submitBtn');
             submitBtn.disabled = true;
@@ -1003,7 +1200,6 @@
                 }
 
                 const profit = calculateProfit(modal, hargaJual, komisi);
-
                 const data = getData();
                 const newTransaction = {
                     id: generateId(),
@@ -1054,7 +1250,6 @@
             submitBtn.textContent = '✅ Simpan Transaksi';
         }
 
-        // ===================== SUBMIT PEMASUKAN =====================
         async function submitIncome() {
             const submitBtn = document.getElementById('incomeSubmitBtn');
             submitBtn.disabled = true;
@@ -1122,7 +1317,6 @@
             submitBtn.textContent = '💵 Tambah Pemasukan';
         }
 
-        // ===================== SUBMIT PENGELUARAN =====================
         async function submitExpense() {
             const submitBtn = document.getElementById('expenseSubmitBtn');
             submitBtn.disabled = true;
@@ -1195,13 +1389,11 @@
             const hasAccess = await checkAccess();
             if (!hasAccess) return;
 
-            // Set default tanggal
             const today = new Date().toISOString().split('T')[0];
             document.getElementById('tanggalTransaksi').value = today;
             document.getElementById('tanggalPemasukan').value = today;
             document.getElementById('tanggalPengeluaran').value = today;
 
-            // Event listener
             document.getElementById('transactionForm').addEventListener('submit', function(e) {
                 e.preventDefault();
                 submitTransaction();
@@ -1217,13 +1409,11 @@
                 submitExpense();
             });
 
-            // Load data
             loadData();
 
             console.log('📊 Halaman Laba/Rugi siap!');
             console.log('👤 User:', getUserData().email);
             console.log('🔑 Role:', getUserData().role);
-            console.log('📁 Storage Key:', getStorageKey());
         });
 
         // ===================== ANTI INSPECT =====================
