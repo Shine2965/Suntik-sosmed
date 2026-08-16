@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PPKA Stasiun Indonesia - Simulasi</title>
+    <title>PPKA DAOP 8 Surabaya - Simulasi</title>
     <style>
         * {
             margin: 0;
@@ -21,7 +21,7 @@
             padding: 20px;
         }
         .game-container {
-            max-width: 1000px;
+            max-width: 1200px;
             width: 100%;
             background: #111;
             border: 2px solid #0f0;
@@ -68,15 +68,18 @@
             padding: 20px;
             border: 1px solid #2a2a2a;
             margin-bottom: 20px;
-            min-height: 300px;
+            min-height: 400px;
             position: relative;
+            overflow-x: auto;
         }
         .track-line {
             display: flex;
-            justify-content: space-around;
+            justify-content: space-between;
             align-items: center;
-            padding: 10px 0;
+            padding: 10px 5px;
             border-bottom: 1px dashed #2a2a2a;
+            flex-wrap: wrap;
+            gap: 10px;
         }
         .track-line:last-child {
             border-bottom: none;
@@ -86,12 +89,14 @@
             background: #0f0;
             color: #000;
             font-weight: bold;
-            padding: 6px 14px;
+            padding: 4px 12px;
             border-radius: 20px;
-            font-size: 12px;
+            font-size: 11px;
             letter-spacing: 1px;
             transition: all 0.3s;
             box-shadow: 0 0 20px rgba(0,255,0,0.3);
+            margin: 2px;
+            white-space: nowrap;
         }
         .train-arrive {
             background: #ffaa00;
@@ -101,22 +106,37 @@
             background: #ff3333;
             box-shadow: 0 0 20px rgba(255,0,0,0.5);
         }
+        .train-commuter {
+            background: #00ccff;
+            color: #000;
+            box-shadow: 0 0 20px rgba(0,204,255,0.5);
+        }
         .station-name {
-            color: #aaa;
-            font-size: 16px;
+            color: #0f0;
+            font-size: 15px;
             font-weight: bold;
-            width: 100px;
+            min-width: 120px;
+        }
+        .station-name .daop {
+            color: #666;
+            font-size: 10px;
+            display: block;
         }
         .schedule {
             color: #fff;
-            font-size: 13px;
+            font-size: 12px;
+            flex: 1;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            align-items: center;
         }
         .signal {
             display: inline-block;
-            width: 20px;
-            height: 20px;
+            width: 16px;
+            height: 16px;
             border-radius: 50%;
-            margin: 0 10px;
+            margin: 0 5px;
         }
         .signal-green {
             background: #0f0;
@@ -129,6 +149,10 @@
         .signal-yellow {
             background: #ff0;
             box-shadow: 0 0 20px #ff0;
+        }
+        .signal-blue {
+            background: #00ccff;
+            box-shadow: 0 0 20px #00ccff;
         }
         .control-panel {
             display: flex;
@@ -144,7 +168,7 @@
             padding: 12px 25px;
             border-radius: 30px;
             font-family: 'Courier New', monospace;
-            font-size: 14px;
+            font-size: 13px;
             font-weight: bold;
             cursor: pointer;
             transition: all 0.2s;
@@ -166,6 +190,15 @@
             color: #000;
             box-shadow: 0 0 30px rgba(255,0,0,0.3);
         }
+        .btn-commuter {
+            border-color: #00ccff;
+            color: #00ccff;
+        }
+        .btn-commuter:hover {
+            background: #00ccff;
+            color: #000;
+            box-shadow: 0 0 30px rgba(0,204,255,0.3);
+        }
         .log-area {
             margin-top: 20px;
             background: #0a0a0a;
@@ -174,16 +207,19 @@
             border: 1px solid #2a2a2a;
             max-height: 150px;
             overflow-y: auto;
-            font-size: 13px;
+            font-size: 12px;
             color: #0f0;
         }
         .log-area .log-entry {
-            padding: 4px 0;
+            padding: 3px 0;
             border-bottom: 1px solid #1a1a1a;
         }
         .log-area .log-time {
             color: #666;
             margin-right: 10px;
+        }
+        .log-area .log-commuter {
+            color: #00ccff;
         }
         ::-webkit-scrollbar {
             width: 8px;
@@ -193,23 +229,25 @@
             background: #0f0;
             border-radius: 10px;
         }
-        @media (max-width: 600px) {
-            .station-name { width: 70px; font-size: 12px; }
-            .train { font-size: 10px; padding: 4px 10px; }
-            .btn { padding: 8px 15px; font-size: 12px; }
+        @media (max-width: 700px) {
+            .station-name { min-width: 80px; font-size: 12px; }
+            .train { font-size: 9px; padding: 3px 8px; }
+            .btn { padding: 8px 15px; font-size: 11px; }
+            .track-line { flex-direction: column; align-items: flex-start; }
         }
     </style>
 </head>
 <body>
 <div class="game-container">
     <div class="header">
-        <h1>🚂 PPKA STASIUN</h1>
-        <div class="sub">PT KERETA API INDONESIA (PERSERO) • SIMULASI</div>
+        <h1>🚂 PPKA DAOP 8 SURABAYA</h1>
+        <div class="sub">WILAYAH JAWA TIMUR • COMMUTER LINE AKTIF</div>
     </div>
 
     <div class="status-board">
         <div class="status-item">⏰ WAKTU: <span id="gameTime">06:00</span></div>
         <div class="status-item">🚆 KERETA AKTIF: <span id="trainCount">0</span></div>
+        <div class="status-item">🚉 COMMUTER: <span id="commuterCount">0</span></div>
         <div class="status-item">📋 PERINTAH: <span id="lastCommand">-</span></div>
     </div>
 
@@ -219,149 +257,215 @@
 
     <div class="control-panel">
         <button class="btn" onclick="tambahKereta()">➕ TAMBAH KERETA</button>
+        <button class="btn btn-commuter" onclick="tambahCommuter()">🚆 COMMUTER</button>
         <button class="btn" onclick="gerakkanKereta()">▶️ GERAKKAN</button>
-        <button class="btn" onclick="acakJadwal()">🔄 ACAK JADWAL</button>
+        <button class="btn" onclick="acakJadwal()">🔄 ACAK</button>
         <button class="btn btn-danger" onclick="resetSimulasi()">💥 RESET</button>
     </div>
 
     <div class="log-area" id="logArea">
-        <div class="log-entry"><span class="log-time">[06:00]</span> Sistem PPKA siap. Stasiun Gambir aktif.</div>
+        <div class="log-entry"><span class="log-time">[06:00]</span> DAOP 8 Surabaya aktif. Selamat datang di sistem PPKA.</div>
     </div>
 </div>
 
 <script>
-    // ========== DATA ==========
-    const stasiunList = [
-        'Gambir', 'Jakarta Kota', 'Pasar Senen', 'Bandung', 'Surabaya Gubeng',
-        'Yogyakarta', 'Semarang Tawang', 'Medan', 'Palembang', 'Makassar'
+    // ========== DATA DAOP 8 ==========
+    const stasiunDAOP8 = [
+        { name: 'Surabaya Pasar Turi', daop: 'DAOP 8' },
+        { name: 'Surabaya Kota', daop: 'DAOP 8' },
+        { name: 'Wonokromo', daop: 'DAOP 8' },
+        { name: 'Waru', daop: 'DAOP 8' },
+        { name: 'Gedangan', daop: 'DAOP 8' },
+        { name: 'Sidoarjo', daop: 'DAOP 8' }
     ];
 
-    const namaKereta = [
-        'Argo Bromo', 'Argo Lawu', 'Argo Dwipangga', 'Gajayana', 'Bima',
-        'Sembrani', 'Taksaka', 'Purwojaya', 'Bangunkarta', 'Jayabaya'
+    const commuterLines = [
+        { name: 'Arjonegoro', route: ['Surabaya Pasar Turi', 'Sidoarjo'] },
+        { name: 'Jenggala', route: ['Surabaya Kota', 'Wonokromo', 'Waru', 'Gedangan', 'Sidoarjo'] },
+        { name: 'Penataran', route: ['Surabaya Pasar Turi', 'Wonokromo', 'Sidoarjo'] },
+        { name: 'Dhoho', route: ['Surabaya Kota', 'Waru', 'Gedangan'] },
+        { name: 'Supas', route: ['Surabaya Pasar Turi', 'Surabaya Kota', 'Wonokromo', 'Waru'] }
+    ];
+
+    const namaKeretaJauh = [
+        'Argo Bromo', 'Gajayana', 'Bima', 'Sembrani', 'Taksaka',
+        'Purwojaya', 'Bangunkarta', 'Jayabaya', 'Mutiara Timur', 'Ranggajati'
     ];
 
     let trains = [];
-    let gameTime = 360; // menit dari 06:00
+    let gameTime = 360;
     let logEntries = [];
     let trainIdCounter = 0;
+    let commuterIdCounter = 0;
 
-    // ========== FUNGSI ==========
     function formatTime(m) {
         let h = Math.floor(m / 60);
         let min = m % 60;
         return `${String(h).padStart(2,'0')}:${String(min).padStart(2,'0')}`;
     }
 
-    function addLog(msg) {
+    function addLog(msg, isCommuter = false) {
         let timeStr = formatTime(gameTime);
-        logEntries.push(`[${timeStr}] ${msg}`);
-        if (logEntries.length > 50) logEntries.shift();
+        let cls = isCommuter ? 'log-commuter' : '';
+        logEntries.push(`<div class="log-entry"><span class="log-time">[${timeStr}]</span> <span class="${cls}">${msg}</span></div>`);
+        if (logEntries.length > 60) logEntries.shift();
         renderLog();
     }
 
     function renderLog() {
+        document.getElementById('logArea').innerHTML = logEntries.join('');
         let area = document.getElementById('logArea');
-        area.innerHTML = logEntries.map(e => `<div class="log-entry">${e}</div>`).join('');
         area.scrollTop = area.scrollHeight;
     }
 
     function renderTrack() {
         let area = document.getElementById('trackArea');
         let html = '';
-        // tampilkan 5 stasiun dengan kereta
-        let displayStations = stasiunList.slice(0, 5);
-        displayStations.forEach((stasiun, idx) => {
+        
+        stasiunDAOP8.forEach((st, idx) => {
             let trainOnStation = trains.filter(t => t.stationIndex === idx);
             let trainHtml = trainOnStation.map(t => {
                 let cls = 'train';
-                if (t.status === 'arrive') cls += ' train-arrive';
+                if (t.isCommuter) cls += ' train-commuter';
+                else if (t.status === 'arrive') cls += ' train-arrive';
                 else if (t.status === 'depart') cls += ' train-depart';
-                return `<span class="${cls}" style="margin:0 5px;">🚆${t.name}</span>`;
+                let icon = t.isCommuter ? '🚃' : '🚆';
+                return `<span class="${cls}" style="margin:0 3px;">${icon}${t.name}</span>`;
             }).join(' ');
 
             // sinyal
             let signalClass = 'signal-green';
-            if (trainOnStation.length > 0 && trainOnStation.some(t => t.status === 'arrive')) {
-                signalClass = 'signal-yellow';
-            } else if (trainOnStation.length > 2) {
-                signalClass = 'signal-red';
-            }
+            let commuterCount = trainOnStation.filter(t => t.isCommuter).length;
+            let totalCount = trainOnStation.length;
+            
+            if (commuterCount >= 2) signalClass = 'signal-blue';
+            else if (totalCount >= 3) signalClass = 'signal-red';
+            else if (totalCount >= 2) signalClass = 'signal-yellow';
 
             html += `
                 <div class="track-line">
-                    <div class="station-name">${stasiun}</div>
+                    <div class="station-name">
+                        ${st.name}
+                        <span class="daop">${st.daop}</span>
+                    </div>
                     <div class="schedule">${trainHtml || '⚪ Kosong'}</div>
                     <div class="signal ${signalClass}"></div>
                 </div>
             `;
         });
+
         area.innerHTML = html;
         document.getElementById('trainCount').innerText = trains.length;
+        document.getElementById('commuterCount').innerText = trains.filter(t => t.isCommuter).length;
         document.getElementById('gameTime').innerText = formatTime(gameTime);
     }
 
     // ========== PERINTAH ==========
     function tambahKereta() {
-        if (trains.length >= 20) {
-            addLog('⚠️ Stasiun penuh! Maksimal 20 kereta.');
+        if (trains.length >= 25) {
+            addLog('⚠️ Jalur penuh! Maksimal 25 kereta.');
             return;
         }
-        let name = namaKereta[Math.floor(Math.random() * namaKereta.length)];
-        let stationIdx = Math.floor(Math.random() * 5);
+        let name = namaKeretaJauh[Math.floor(Math.random() * namaKeretaJauh.length)];
+        let stationIdx = Math.floor(Math.random() * stasiunDAOP8.length);
         let status = ['arrive', 'depart', 'standby'][Math.floor(Math.random() * 3)];
         trains.push({
             id: trainIdCounter++,
             name: name + '-' + (Math.floor(Math.random() * 900) + 100),
             stationIndex: stationIdx,
             status: status,
+            isCommuter: false,
             delay: 0
         });
-        addLog(`🚆 Kereta ${name} ditambahkan di ${stasiunList[stationIdx]} (${status})`);
+        addLog(`🚆 Kereta jarak jauh ${name} masuk di ${stasiunDAOP8[stationIdx].name}`);
         renderTrack();
-        document.getElementById('lastCommand').innerText = 'Tambah Kereta';
+        document.getElementById('lastCommand').innerText = 'Tambah KA';
+    }
+
+    function tambahCommuter() {
+        if (trains.length >= 25) {
+            addLog('⚠️ Jalur penuh! Maksimal 25 kereta.');
+            return;
+        }
+        let line = commuterLines[Math.floor(Math.random() * commuterLines.length)];
+        let stationIdx = Math.floor(Math.random() * stasiunDAOP8.length);
+        
+        trains.push({
+            id: trainIdCounter++,
+            name: line.name + '-' + (Math.floor(Math.random() * 90) + 10),
+            stationIndex: stationIdx,
+            status: 'standby',
+            isCommuter: true,
+            commuterRoute: line.route,
+            delay: 0
+        });
+        addLog(`🚃 Commuter ${line.name} berhenti di ${stasiunDAOP8[stationIdx].name}`, true);
+        renderTrack();
+        document.getElementById('lastCommand').innerText = 'Tambah Commuter';
     }
 
     function gerakkanKereta() {
         if (trains.length === 0) {
-            addLog('⚠️ Tidak ada kereta untuk digerakkan.');
+            addLog('⚠️ Tidak ada kereta.');
             return;
         }
-        // naikkan waktu 15 menit
+        
         gameTime += 15;
-        if (gameTime >= 1440) gameTime -= 1440; // reset ke 00:00
+        if (gameTime >= 1440) gameTime -= 1440;
 
-        // gerakkan kereta
         let moved = 0;
+        let commuterMoved = 0;
+
         trains.forEach(t => {
-            // 40% chance pindah ke stasiun berikutnya
-            if (Math.random() < 0.4) {
-                t.stationIndex = (t.stationIndex + 1) % 5;
+            // commuter lebih sering bergerak
+            let moveChance = t.isCommuter ? 0.6 : 0.35;
+            
+            if (Math.random() < moveChance) {
+                let newIdx = (t.stationIndex + 1) % stasiunDAOP8.length;
+                // commuter bisa skip stasiun sesuai route
+                if (t.isCommuter && t.commuterRoute) {
+                    // cari stasiun berikutnya di route
+                    let currentStation = stasiunDAOP8[t.stationIndex].name;
+                    let routeIdx = t.commuterRoute.indexOf(currentStation);
+                    if (routeIdx !== -1 && routeIdx < t.commuterRoute.length - 1) {
+                        let nextStation = t.commuterRoute[routeIdx + 1];
+                        let nextIdx = stasiunDAOP8.findIndex(s => s.name === nextStation);
+                        if (nextIdx !== -1) newIdx = nextIdx;
+                    } else {
+                        // reset ke awal route
+                        let firstStation = t.commuterRoute[0];
+                        let firstIdx = stasiunDAOP8.findIndex(s => s.name === firstStation);
+                        if (firstIdx !== -1) newIdx = firstIdx;
+                    }
+                }
+                t.stationIndex = newIdx;
                 t.status = ['arrive', 'depart', 'standby'][Math.floor(Math.random() * 3)];
                 moved++;
+                if (t.isCommuter) commuterMoved++;
             } else {
-                // ubah status random
                 if (Math.random() < 0.3) {
                     t.status = ['arrive', 'depart', 'standby'][Math.floor(Math.random() * 3)];
                 }
             }
-            // tambah delay random
-            if (Math.random() < 0.1) t.delay += Math.floor(Math.random() * 5);
+            
+            if (Math.random() < 0.1) t.delay += Math.floor(Math.random() * 3);
         });
 
-        addLog(`⏩ Waktu maju 15 menit. ${moved} kereta berpindah.`);
+        let msg = `⏩ Waktu +15 menit. ${moved} kereta berpindah.`;
+        if (commuterMoved > 0) msg += ` (${commuterMoved} commuter)`;
+        addLog(msg);
         document.getElementById('lastCommand').innerText = 'Gerakkan';
         renderTrack();
     }
 
     function acakJadwal() {
         trains.forEach(t => {
-            t.stationIndex = Math.floor(Math.random() * 5);
+            t.stationIndex = Math.floor(Math.random() * stasiunDAOP8.length);
             t.status = ['arrive', 'depart', 'standby'][Math.floor(Math.random() * 3)];
             t.delay = Math.floor(Math.random() * 10);
         });
-        addLog('🔄 Jadwal diacak! Semua kereta berpindah posisi.');
-        document.getElementById('lastCommand').innerText = 'Acak Jadwal';
+        addLog('🔄 Jadwal diacak total!');
+        document.getElementById('lastCommand').innerText = 'Acak';
         renderTrack();
     }
 
@@ -369,22 +473,25 @@
         trains = [];
         gameTime = 360;
         trainIdCounter = 0;
-        logEntries = ['[06:00] Sistem PPKA siap. Stasiun Gambir aktif.'];
+        logEntries = ['<div class="log-entry"><span class="log-time">[06:00]</span> DAOP 8 Surabaya aktif. Selamat datang di sistem PPKA.</div>'];
         addLog('💥 Simulasi di-reset!');
         document.getElementById('lastCommand').innerText = 'Reset';
         renderTrack();
     }
 
     // ========== INIT ==========
-    // tambah 3 kereta awal
-    for (let i = 0; i < 3; i++) tambahKereta();
-    // auto update tiap 10 detik
+    // seeding awal
+    for (let i = 0; i < 3; i++) {
+        if (i < 2) tambahCommuter();
+        else tambahKereta();
+    }
+    
+    // auto update tiap 8 detik
     setInterval(() => {
-        // gerakkan otomatis pelan
-        if (trains.length > 0 && Math.random() < 0.3) {
+        if (trains.length > 0 && Math.random() < 0.35) {
             gerakkanKereta();
         }
-    }, 10000);
+    }, 8000);
 
     renderTrack();
 </script>
