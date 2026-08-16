@@ -1,2091 +1,392 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>🚂 Dragon Rail - Map Premium + Animasi Kereta</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PPKA Stasiun Indonesia - Simulasi</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
         body {
-            font-family: 'Segoe UI', Tahoma, sans-serif;
-            background: #060a12;
-            color: #d0dcec;
-            display: flex;
-            justify-content: center;
-            padding: 15px;
+            font-family: 'Courier New', monospace;
+            background: linear-gradient(145deg, #0a0a0a 0%, #1a1a1a 100%);
+            color: #0f0;
             min-height: 100vh;
-        }
-        .container {
-            max-width: 1500px;
-            width: 100%;
-            background: linear-gradient(145deg, #0d1624, #0a121e);
-            border-radius: 28px;
-            padding: 22px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.95), inset 0 0 80px rgba(10,30,60,0.2);
-            border: 1px solid #1a2c3f;
-        }
-        h1 {
-            font-size: 26px;
-            color: #f5c97a;
             display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 2px solid #1a2c3f;
-            padding-bottom: 14px;
-            margin-bottom: 18px;
-            flex-wrap: wrap;
-            gap: 10px;
-            text-shadow: 0 0 30px rgba(245,201,122,0.1);
-        }
-        h1 small { font-size: 13px; font-weight: 300; color: #7a94b0; }
-        #railCanvas {
-            width: 100%;
-            height: auto;
-            background: #0a121e;
-            border-radius: 16px;
-            border: 1px solid #1f3448;
-            display: block;
-            box-shadow: inset 0 0 60px rgba(0,0,0,0.6);
-        }
-        .controls {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 12px;
-            margin: 16px 0 12px;
-            align-items: center;
-        }
-        .controls button {
-            background: linear-gradient(145deg, #1a2a3c, #111f2e);
-            border: 1px solid #2a4a6a;
-            color: #dce6f0;
-            padding: 9px 22px;
-            border-radius: 40px;
-            font-weight: 600;
-            font-size: 13px;
-            cursor: pointer;
-            transition: all 0.3s;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-            text-shadow: 0 1px 2px rgba(0,0,0,0.5);
-        }
-        .controls button:hover {
-            background: linear-gradient(145deg, #2a405a, #1a2a3c);
-            transform: translateY(-2px);
-            box-shadow: 0 6px 25px rgba(0,40,80,0.3);
-            border-color: #4a708f;
-        }
-        .controls button.danger {
-            background: linear-gradient(145deg, #4d2732, #3a1a22);
-            border-color: #6a3a4a;
-        }
-        .controls button.danger:hover {
-            background: linear-gradient(145deg, #6d3747, #4d2732);
-            border-color: #8a5a6a;
-        }
-        .controls button.success {
-            background: linear-gradient(145deg, #1d4a3a, #143a2a);
-            border-color: #2a6a4a;
-        }
-        .controls button.success:hover {
-            background: linear-gradient(145deg, #2d6a4a, #1d4a3a);
-            border-color: #3a8a6a;
-        }
-        .badge {
-            background: linear-gradient(145deg, #0f1a26, #0a121e);
-            padding: 7px 18px;
-            border-radius: 40px;
-            border: 1px solid #2a435c;
-            font-size: 13px;
-            color: #b8cddf;
-            box-shadow: inset 0 2px 10px rgba(0,0,0,0.3);
-        }
-        .slide-container {
-            background: linear-gradient(145deg, #0a121e, #0d1624);
-            border: 1px solid #1d3245;
-            border-radius: 16px;
-            padding: 16px;
-            margin: 12px 0;
-            box-shadow: inset 0 2px 20px rgba(0,0,0,0.3);
-        }
-        .slide-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 12px;
-            flex-wrap: wrap;
-            gap: 8px;
-        }
-        .slide-header h3 { font-weight: 300; color: #8aadcc; font-size: 14px; }
-        .slide-nav {
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-        }
-        .slide-nav button {
-            background: linear-gradient(145deg, #1a2a3c, #111f2e);
-            border: 1px solid #2a4a6a;
-            color: #dce6f0;
-            padding: 4px 16px;
-            border-radius: 20px;
-            cursor: pointer;
-            font-size: 13px;
-            transition: all 0.3s;
-        }
-        .slide-nav button.active {
-            background: linear-gradient(145deg, #2a4a6a, #1a3a5a);
-            border-color: #4a8aaa;
-            box-shadow: 0 0 20px rgba(42,74,106,0.3);
-        }
-        .slide-nav button:hover { background: linear-gradient(145deg, #2a405a, #1a2a3c); }
-        .slide-content {
-            min-height: 400px;
-            max-height: 550px;
-            overflow-y: auto;
-            padding: 8px;
-            background: linear-gradient(145deg, #0c1522, #0a121e);
-            border-radius: 12px;
-            border: 1px solid #15283a;
-        }
-        .slide-content::-webkit-scrollbar { width: 6px; background: #0a121e; }
-        .slide-content::-webkit-scrollbar-thumb { background: linear-gradient(145deg, #2a4a6a, #1a3a5a); border-radius: 10px; }
-        .station-slide { display: none; }
-        .station-slide.active { display: block; }
-        .station-slide .station-title {
-            font-size: 20px;
-            font-weight: 700;
-            color: #f5c97a;
-            margin-bottom: 10px;
-            border-bottom: 1px solid #1a2c3f;
-            padding-bottom: 8px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            text-shadow: 0 0 20px rgba(245,201,122,0.05);
-        }
-        .station-slide .station-title .train-indicator {
-            font-size: 13px;
-            font-weight: 300;
-            color: #8aadcc;
-        }
-        .station-slide .map-container {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-            margin: 12px 0;
-        }
-        .station-slide .map-container .track-map {
-            background: linear-gradient(145deg, #0a121e, #0d1624);
-            border: 1px solid #1a2c3f;
-            border-radius: 12px;
-            padding: 12px;
-            min-height: 150px;
-            box-shadow: inset 0 2px 20px rgba(0,0,0,0.3);
-        }
-        .station-slide .map-container .track-map .map-title {
-            font-size: 12px;
-            color: #6a8aaa;
-            margin-bottom: 8px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-        .station-slide .map-container .track-map .signal-controls {
-            display: flex;
-            gap: 8px;
-            margin-top: 10px;
-            flex-wrap: wrap;
-        }
-        .station-slide .map-container .track-map .signal-controls button {
-            padding: 4px 14px;
-            border-radius: 20px;
-            font-size: 11px;
-            font-weight: 600;
-            cursor: pointer;
-            border: 1px solid #2a4a6a;
-            background: linear-gradient(145deg, #1a2a3c, #111f2e);
-            color: #dce6f0;
-            transition: all 0.3s;
-        }
-        .station-slide .map-container .track-map .signal-controls button:hover { background: linear-gradient(145deg, #2a405a, #1a2a3c); }
-        .station-slide .map-container .track-map .signal-controls button.green {
-            background: linear-gradient(145deg, #1d4a3a, #143a2a);
-            border-color: #2a6a4a;
-            color: #7acf8a;
-        }
-        .station-slide .map-container .track-map .signal-controls button.green:hover { background: linear-gradient(145deg, #2d6a4a, #1d4a3a); }
-        .station-slide .map-container .track-map .signal-controls button.red {
-            background: linear-gradient(145deg, #4d2732, #3a1a22);
-            border-color: #6a3a4a;
-            color: #f77a7a;
-        }
-        .station-slide .map-container .track-map .signal-controls button.red:hover { background: linear-gradient(145deg, #6d3747, #4d2732); }
-        .station-slide .map-container .track-map .signal-status {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 12px;
-            margin-top: 6px;
-        }
-        .station-slide .map-container .track-map .signal-status .light {
-            width: 16px;
-            height: 16px;
-            border-radius: 50%;
-            border: 2px solid #2a4a6a;
-            box-shadow: 0 0 15px rgba(0,0,0,0.3);
-        }
-        .station-slide .wesel-control {
-            background: linear-gradient(145deg, #0a121e, #0d1624);
-            border: 1px solid #1a2c3f;
-            border-radius: 12px;
-            padding: 12px;
-            margin-top: 8px;
-        }
-        .station-slide .wesel-control .wesel-title {
-            font-size: 13px;
-            font-weight: 600;
-            color: #8aadcc;
-            margin-bottom: 8px;
-        }
-        .station-slide .wesel-control select {
-            background: linear-gradient(145deg, #1a2a3c, #111f2e);
-            color: #dce6f0;
-            border: 1px solid #2a4a6a;
-            padding: 6px 14px;
-            border-radius: 30px;
-            font-size: 12px;
-            cursor: pointer;
-            width: 100%;
-            max-width: 300px;
-        }
-        .station-slide .wesel-control .wesel-info {
-            font-size: 11px;
-            color: #6a8aaa;
-            margin-top: 4px;
-        }
-        .station-slide .wesel-control .wesel-info .active-wesel {
-            color: #22d3ee;
-            font-weight: 600;
-        }
-        .station-slide .schedule-section {
-            background: linear-gradient(145deg, #0a121e, #0d1624);
-            border: 1px solid #1a2c3f;
-            border-radius: 12px;
-            padding: 12px;
-            margin-top: 12px;
-        }
-        .station-slide .schedule-section .schedule-title {
-            font-size: 14px;
-            font-weight: 600;
-            color: #8aadcc;
-            margin-bottom: 8px;
-        }
-        .station-slide .schedule-section .schedule-list {
-            max-height: 180px;
-            overflow-y: auto;
-        }
-        .station-slide .schedule-section .schedule-list::-webkit-scrollbar { width: 4px; background: #0a121e; }
-        .station-slide .schedule-section .schedule-list::-webkit-scrollbar-thumb { background: linear-gradient(145deg, #2a4a6a, #1a3a5a); border-radius: 10px; }
-        .station-slide .schedule-section .schedule-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 6px 10px;
-            margin: 3px 0;
-            background: linear-gradient(145deg, #0f1a28, #0a121e);
-            border-radius: 6px;
-            border-left: 3px solid #facc15;
-            font-size: 13px;
-            flex-wrap: wrap;
-            gap: 4px;
-        }
-        .station-slide .schedule-section .schedule-item .train-name { font-weight: 600; }
-        .station-slide .schedule-section .schedule-item .time { color: #8aadcc; font-size: 12px; }
-        .station-slide .schedule-section .schedule-item .countdown {
-            font-size: 12px;
-            font-weight: 600;
-            color: #f5c97a;
-            min-width: 50px;
-            text-align: right;
-        }
-        .station-slide .schedule-section .schedule-item .eta {
-            font-size: 11px;
-            color: #7acfde;
-            min-width: 40px;
-            text-align: center;
-        }
-        .station-slide .schedule-section .schedule-item .status-badge {
-            font-size: 11px;
-            padding: 2px 10px;
-            border-radius: 12px;
-        }
-        .station-slide .schedule-section .schedule-item .status-badge.arrived { background: linear-gradient(145deg, #1d4a3a, #143a2a); color: #7acf8a; }
-        .station-slide .schedule-section .schedule-item .status-badge.departed { background: linear-gradient(145deg, #4d2732, #3a1a22); color: #f77a7a; }
-        .station-slide .schedule-section .schedule-item .status-badge.scheduled { background: linear-gradient(145deg, #1a2a3c, #111f2e); color: #8aadcc; }
-        .station-slide .schedule-section .schedule-item .status-badge.approaching {
-            background: linear-gradient(145deg, #3a4a2a, #2a3a1a);
-            color: #f5c97a;
-            animation: pulse 1s infinite;
-        }
-        .station-slide .schedule-section .schedule-item .status-badge.running {
-            background: linear-gradient(145deg, #1a3a4a, #0a2a3a);
-            color: #7acfde;
-            animation: pulse 0.5s infinite;
-        }
-        .station-slide .schedule-section .schedule-item .status-badge.green-signal {
-            background: linear-gradient(145deg, #1d4a3a, #143a2a);
-            color: #7acf8a;
-            border: 1px solid #22c55e;
-        }
-        .station-slide .schedule-section .schedule-item .status-badge.waiting {
-            background: linear-gradient(145deg, #3a3a1a, #2a2a1a);
-            color: #f5c97a;
-        }
-        @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.5; }
-            100% { opacity: 1; }
-        }
-        .station-slide .schedule-section .schedule-item .schedule-actions {
-            display: flex;
-            gap: 4px;
-        }
-        .station-slide .schedule-section .schedule-item .schedule-actions button {
-            padding: 2px 10px;
-            border-radius: 12px;
-            font-size: 10px;
-            cursor: pointer;
-            border: 1px solid #2a4a6a;
-            background: linear-gradient(145deg, #1a2a3c, #111f2e);
-            color: #dce6f0;
-            transition: all 0.3s;
-        }
-        .station-slide .schedule-section .schedule-item .schedule-actions button:hover { background: linear-gradient(145deg, #2a405a, #1a2a3c); }
-        .station-slide .schedule-section .schedule-item .schedule-actions button.danger {
-            background: linear-gradient(145deg, #4d2732, #3a1a22);
-            border-color: #6a3a4a;
-            color: #f77a7a;
-        }
-        .station-slide .schedule-section .schedule-item .schedule-actions button.danger:hover { background: linear-gradient(145deg, #6d3747, #4d2732); }
-        .station-slide .notification-box {
-            background: linear-gradient(145deg, #1a2a3c, #111f2e);
-            border-left: 4px solid #22c55e;
-            padding: 10px 16px;
-            border-radius: 8px;
-            margin: 8px 0;
-            font-size: 13px;
-            display: none;
-        }
-        .station-slide .notification-box.show {
-            display: block;
-            animation: slideIn 0.5s ease;
-        }
-        @keyframes slideIn {
-            0% { opacity: 0; transform: translateX(-20px); }
-            100% { opacity: 1; transform: translateX(0); }
-        }
-        .station-slide .notification-box .train-name { font-weight: 600; color: #7acf8a; }
-        .station-slide .notification-box .action-btn {
-            background: linear-gradient(145deg, #1d4a3a, #143a2a);
-            border: 1px solid #2a6a4a;
-            color: #dce6f0;
-            padding: 4px 16px;
-            border-radius: 20px;
-            cursor: pointer;
-            font-size: 12px;
-            margin-left: 10px;
-        }
-        .station-slide .notification-box .action-btn:hover { background: linear-gradient(145deg, #2d6a4a, #1d4a3a); }
-        .train-control-panel {
-            background: linear-gradient(145deg, #0a121e, #0d1624);
-            border: 1px solid #1d3245;
-            border-radius: 16px;
-            padding: 16px;
-            margin: 12px 0;
-            max-height: 250px;
-            overflow-y: auto;
-            box-shadow: inset 0 2px 20px rgba(0,0,0,0.3);
-        }
-        .train-control-panel::-webkit-scrollbar { width: 6px; background: #0a121e; }
-        .train-control-panel::-webkit-scrollbar-thumb { background: linear-gradient(145deg, #2a4a6a, #1a3a5a); border-radius: 10px; }
-        .train-item {
-            display: flex;
-            flex-wrap: wrap;
-            align-items: center;
-            gap: 12px;
-            padding: 8px 12px;
-            margin: 4px 0;
-            background: linear-gradient(145deg, #0f1a28, #0a121e);
-            border-radius: 10px;
-            border-left: 4px solid #facc15;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-        }
-        .train-item .name { font-weight: 600; font-size: 14px; min-width: 160px; }
-        .train-item .color-dot {
-            width: 16px;
-            height: 16px;
-            border-radius: 50%;
-            display: inline-block;
-            border: 1px solid #2a4a6a;
-            box-shadow: 0 0 10px rgba(0,0,0,0.3);
-        }
-        .train-item .status {
-            font-size: 12px;
-            color: #8aadcc;
-            margin-left: auto;
-        }
-        .train-item .status.stop { color: #f77a7a; }
-        .train-item .status.run { color: #7acf8a; }
-        .train-item .signal-control {
-            display: flex;
-            gap: 6px;
-            align-items: center;
-        }
-        .train-item .signal-control button {
-            padding: 3px 12px;
-            font-size: 11px;
-            border-radius: 20px;
-            background: linear-gradient(145deg, #1a2a3c, #111f2e);
-            border: 1px solid #2a4a6a;
-            color: #dce6f0;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-        .train-item .signal-control button.active { background: linear-gradient(145deg, #1d4a3a, #143a2a); border-color: #2a6a4a; color: #7acf8a; }
-        .train-item .signal-control button.inactive { background: linear-gradient(145deg, #4d2732, #3a1a22); border-color: #6a3a4a; color: #f77a7a; }
-        .train-item .wesel-info {
-            font-size: 10px;
-            color: #6a8aaa;
-            background: linear-gradient(145deg, #0a121e, #0d1624);
-            padding: 2px 10px;
-            border-radius: 12px;
-            border: 1px solid #1a2c3f;
-        }
-        .train-item .eta-info {
-            font-size: 10px;
-            color: #7acfde;
-            background: linear-gradient(145deg, #0a1a2a, #0d1624);
-            padding: 2px 10px;
-            border-radius: 12px;
-            border: 1px solid #1a3a4a;
-            min-width: 60px;
-            text-align: center;
-        }
-        .info-panel {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 16px;
-            padding: 12px 0 8px;
-            border-top: 1px solid #14222f;
-            margin-top: 14px;
-            font-size: 13px;
-        }
-        .info-panel .item { display: flex; align-items: center; gap: 6px; }
-        .info-panel .dot {
-            width: 14px;
-            height: 14px;
-            border-radius: 50%;
-            border: 1px solid #2a4a6a;
-        }
-        .popup-train {
-            position: fixed;
-            bottom: 30px;
-            right: 30px;
-            background: linear-gradient(145deg, #0c1622, #0a121e);
-            border-left: 6px solid #f5c97a;
-            padding: 16px 26px;
-            border-radius: 16px;
-            border: 1px solid #2a4660;
-            box-shadow: 0 12px 40px rgba(0,0,0,0.95);
-            color: #ecf4fa;
-            font-weight: 600;
-            font-size: 18px;
-            max-width: 380px;
-            z-index: 9999;
-            transition: all 0.4s ease;
-            transform: translateY(30px);
-            opacity: 0;
-            pointer-events: none;
-            backdrop-filter: blur(8px);
-        }
-        .popup-train.show { transform: translateY(0); opacity: 1; }
-        .popup-train small {
-            display: block;
-            font-weight: 300;
-            font-size: 13px;
-            color: #9ab0cc;
-            margin-top: 4px;
-        }
-        .signal-indicator {
-            display: flex;
-            gap: 20px;
-            flex-wrap: wrap;
-            margin: 8px 0;
-        }
-        .signal-indicator .sig {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 13px;
-        }
-        .signal-indicator .sig .light {
-            width: 18px;
-            height: 18px;
-            border-radius: 50%;
-            border: 2px solid #2a4a6a;
-            box-shadow: 0 0 15px rgba(0,0,0,0.3);
-        }
-        footer {
-            text-align: center;
-            margin-top: 20px;
-            color: #3a5670;
-            font-size: 12px;
-            border-top: 1px solid #14212e;
-            padding-top: 16px;
-        }
-        .modal-overlay {
-            display: none;
-            position: fixed;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0,0,0,0.85);
-            z-index: 10000;
             justify-content: center;
             align-items: center;
-            backdrop-filter: blur(4px);
+            padding: 20px;
         }
-        .modal-overlay.show { display: flex; }
-        .modal {
-            background: linear-gradient(145deg, #0f1824, #0a121e);
-            border: 1px solid #1a2c3f;
-            border-radius: 20px;
-            padding: 24px;
-            max-width: 500px;
-            width: 90%;
-            max-height: 80vh;
-            overflow-y: auto;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.8);
-        }
-        .modal h2 { color: #f5c97a; margin-bottom: 16px; border-bottom: 1px solid #1a2c3f; padding-bottom: 10px; }
-        .modal .form-group { margin-bottom: 12px; }
-        .modal .form-group label { display: block; font-size: 13px; color: #8aadcc; margin-bottom: 4px; }
-        .modal .form-group input, .modal .form-group select {
+        .game-container {
+            max-width: 1000px;
             width: 100%;
-            padding: 8px 12px;
-            border-radius: 8px;
-            border: 1px solid #1a2c3f;
-            background: linear-gradient(145deg, #0a121e, #0d1624);
-            color: #dce6f0;
+            background: #111;
+            border: 2px solid #0f0;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 0 40px rgba(0,255,0,0.2);
+        }
+        .header {
+            text-align: center;
+            border-bottom: 2px solid #0f0;
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+        }
+        .header h1 {
+            font-size: 28px;
+            letter-spacing: 4px;
+            text-shadow: 0 0 10px #0f0;
+        }
+        .header .sub {
+            font-size: 14px;
+            color: #aaa;
+            margin-top: 5px;
+        }
+        .status-board {
+            display: flex;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            background: #1a1a1a;
+            padding: 15px;
+            border-radius: 10px;
+            border: 1px solid #333;
+            margin-bottom: 20px;
+        }
+        .status-item {
             font-size: 14px;
         }
-        .modal .form-group input:focus, .modal .form-group select:focus { outline: none; border-color: #4a8aaa; box-shadow: 0 0 20px rgba(42,74,106,0.2); }
-        .modal .modal-actions { display: flex; gap: 12px; margin-top: 16px; justify-content: flex-end; }
-        .modal .modal-actions button {
-            padding: 8px 24px;
-            border-radius: 30px;
-            border: 1px solid #2a4a6a;
-            background: linear-gradient(145deg, #1a2a3c, #111f2e);
-            color: #dce6f0;
-            cursor: pointer;
-            font-weight: 600;
+        .status-item span {
+            color: #fff;
+            font-weight: bold;
+        }
+        .track-area {
+            background: #0a0a0a;
+            border-radius: 10px;
+            padding: 20px;
+            border: 1px solid #2a2a2a;
+            margin-bottom: 20px;
+            min-height: 300px;
+            position: relative;
+        }
+        .track-line {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px dashed #2a2a2a;
+        }
+        .track-line:last-child {
+            border-bottom: none;
+        }
+        .train {
+            display: inline-block;
+            background: #0f0;
+            color: #000;
+            font-weight: bold;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 12px;
+            letter-spacing: 1px;
             transition: all 0.3s;
+            box-shadow: 0 0 20px rgba(0,255,0,0.3);
         }
-        .modal .modal-actions button:hover { background: linear-gradient(145deg, #2a405a, #1a2a3c); }
-        .modal .modal-actions button.primary {
-            background: linear-gradient(145deg, #1d4a3a, #143a2a);
-            border-color: #2a6a4a;
-            color: #7acf8a;
+        .train-arrive {
+            background: #ffaa00;
+            box-shadow: 0 0 20px rgba(255,170,0,0.5);
         }
-        .modal .modal-actions button.primary:hover { background: linear-gradient(145deg, #2d6a4a, #1d4a3a); }
-        .modal .modal-actions button.danger {
-            background: linear-gradient(145deg, #4d2732, #3a1a22);
-            border-color: #6a3a4a;
-            color: #f77a7a;
+        .train-depart {
+            background: #ff3333;
+            box-shadow: 0 0 20px rgba(255,0,0,0.5);
         }
-        .modal .modal-actions button.danger:hover { background: linear-gradient(145deg, #6d3747, #4d2732); }
-        @media (max-width: 800px) {
-            .controls { flex-direction: column; align-items: stretch; }
-            .train-item { flex-direction: column; align-items: stretch; }
-            .train-item .status { margin-left: 0; }
-            .station-slide .map-container { grid-template-columns: 1fr; }
+        .station-name {
+            color: #aaa;
+            font-size: 16px;
+            font-weight: bold;
+            width: 100px;
+        }
+        .schedule {
+            color: #fff;
+            font-size: 13px;
+        }
+        .signal {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            margin: 0 10px;
+        }
+        .signal-green {
+            background: #0f0;
+            box-shadow: 0 0 20px #0f0;
+        }
+        .signal-red {
+            background: #f00;
+            box-shadow: 0 0 20px #f00;
+        }
+        .signal-yellow {
+            background: #ff0;
+            box-shadow: 0 0 20px #ff0;
+        }
+        .control-panel {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 20px;
+        }
+        .btn {
+            background: #1a1a1a;
+            color: #0f0;
+            border: 2px solid #0f0;
+            padding: 12px 25px;
+            border-radius: 30px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+        .btn:hover {
+            background: #0f0;
+            color: #000;
+            box-shadow: 0 0 30px rgba(0,255,0,0.3);
+            transform: scale(1.05);
+        }
+        .btn-danger {
+            border-color: #f00;
+            color: #f00;
+        }
+        .btn-danger:hover {
+            background: #f00;
+            color: #000;
+            box-shadow: 0 0 30px rgba(255,0,0,0.3);
+        }
+        .log-area {
+            margin-top: 20px;
+            background: #0a0a0a;
+            border-radius: 10px;
+            padding: 15px;
+            border: 1px solid #2a2a2a;
+            max-height: 150px;
+            overflow-y: auto;
+            font-size: 13px;
+            color: #0f0;
+        }
+        .log-area .log-entry {
+            padding: 4px 0;
+            border-bottom: 1px solid #1a1a1a;
+        }
+        .log-area .log-time {
+            color: #666;
+            margin-right: 10px;
+        }
+        ::-webkit-scrollbar {
+            width: 8px;
+            background: #1a1a1a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #0f0;
+            border-radius: 10px;
+        }
+        @media (max-width: 600px) {
+            .station-name { width: 70px; font-size: 12px; }
+            .train { font-size: 10px; padding: 4px 10px; }
+            .btn { padding: 8px 15px; font-size: 12px; }
         }
     </style>
 </head>
 <body>
-<div class="container">
-    <h1>
-        🚂 DRAGON RAIL PREMIUM <small>— map 3D + animasi kereta real-time</small>
-    </h1>
-    
-    <canvas id="railCanvas" width="1500" height="750"></canvas>
-    
-    <div class="controls">
-        <button id="addScheduleBtn" class="success">📋 Tambah Jadwal</button>
-        <button id="resetBtn" class="danger">⟳ Reset</button>
-        <button id="toggleLoopBtn">🔄 Bolak-Balik ON</button>
-        <div class="badge" id="trainCount">🚆 0 kereta</div>
-        <div class="badge" id="weselStatus">🔀 Wesel Global: 1</div>
-        <div class="badge" style="background:linear-gradient(145deg,#1d3a2a,#143a2a);border-color:#2a6a4a;">🔄 Real-Time ON</div>
+<div class="game-container">
+    <div class="header">
+        <h1>🚂 PPKA STASIUN</h1>
+        <div class="sub">PT KERETA API INDONESIA (PERSERO) • SIMULASI</div>
     </div>
 
-    <div class="signal-indicator" id="signalIndicators">
-        <!-- Dinamis dari JS -->
+    <div class="status-board">
+        <div class="status-item">⏰ WAKTU: <span id="gameTime">06:00</span></div>
+        <div class="status-item">🚆 KERETA AKTIF: <span id="trainCount">0</span></div>
+        <div class="status-item">📋 PERINTAH: <span id="lastCommand">-</span></div>
     </div>
 
-    <!-- SLIDE PER STASIUN -->
-    <div class="slide-container">
-        <div class="slide-header">
-            <h3>📍 JADWAL & WESEL PER STASIUN</h3>
-            <div class="slide-nav" id="slideNav">
-                <!-- Dinamis dari JS -->
-            </div>
-        </div>
-        <div class="slide-content" id="slideContent">
-            <!-- Dinamis dari JS -->
-        </div>
+    <div class="track-area" id="trackArea">
+        <!-- akan diisi JS -->
     </div>
 
-    <div class="train-control-panel" id="trainControlPanel">
-        <div style="font-weight:300;color:#6a8aaa;margin-bottom:8px;font-size:13px;">🎛️ KONTROL PER KERETA — lokasi & ETA:</div>
-        <div id="trainList"></div>
+    <div class="control-panel">
+        <button class="btn" onclick="tambahKereta()">➕ TAMBAH KERETA</button>
+        <button class="btn" onclick="gerakkanKereta()">▶️ GERAKKAN</button>
+        <button class="btn" onclick="acakJadwal()">🔄 ACAK JADWAL</button>
+        <button class="btn btn-danger" onclick="resetSimulasi()">💥 RESET</button>
     </div>
 
-    <div class="info-panel">
-        <span class="item"><span class="dot" style="background:#facc15;box-shadow:0 0 10px rgba(250,204,21,0.3);"></span> Commuter Line</span>
-        <span class="item"><span class="dot" style="background:#f97316;box-shadow:0 0 10px rgba(249,115,22,0.3);"></span> KA Harina</span>
-        <span class="item"><span class="dot" style="background:#3b82f6;box-shadow:0 0 10px rgba(59,130,246,0.3);"></span> KA Pandalungan</span>
-        <span class="item"><span class="dot" style="background:#a855f7;box-shadow:0 0 10px rgba(168,85,247,0.3);"></span> KA Anggrek</span>
-        <span class="item"><span class="dot" style="background:#ec4899;box-shadow:0 0 10px rgba(236,72,153,0.3);"></span> Stasiun</span>
-        <span class="item"><span class="dot" style="background:#22d3ee;box-shadow:0 0 10px rgba(34,211,238,0.3);"></span> Wesel aktif</span>
-        <span class="item"><span class="dot" style="background:#ef4444;box-shadow:0 0 10px rgba(239,68,68,0.3);"></span> Sinyal MERAH</span>
-        <span class="item"><span class="dot" style="background:#22c55e;box-shadow:0 0 10px rgba(34,197,94,0.3);"></span> Sinyal HIJAU</span>
-        <span class="item"><span class="dot" style="background:#f59e0b;box-shadow:0 0 10px rgba(245,158,11,0.3);"></span> Auto Green</span>
-        <span class="item"><span class="dot" style="background:#7acfde;box-shadow:0 0 10px rgba(122,207,222,0.3);"></span> ETA Estimasi</span>
-    </div>
-    <footer>© Dragon — map premium dengan animasi kereta halus & ETA real-time</footer>
-</div>
-
-<!-- POPUP -->
-<div id="trainPopup" class="popup-train">
-    🚆 <span id="popupName">Commuter Line</span>
-    <small id="popupStation">melewati stasiun</small>
-</div>
-
-<!-- MODAL EDIT JADWAL -->
-<div class="modal-overlay" id="scheduleModal">
-    <div class="modal">
-        <h2>✏️ Atur Jadwal</h2>
-        <div class="form-group">
-            <label>Kereta</label>
-            <select id="editTrainName"></select>
-        </div>
-        <div class="form-group">
-            <label>Stasiun Keberangkatan</label>
-            <select id="editStation"></select>
-        </div>
-        <div class="form-group">
-            <label>Stasiun Tujuan</label>
-            <select id="editDestination"></select>
-        </div>
-        <div class="form-group">
-            <label>Waktu Keberangkatan (detik dari sekarang)</label>
-            <input type="number" id="editDelay" value="10" min="3" max="60" />
-        </div>
-        <div class="modal-actions">
-            <button onclick="closeScheduleModal()">Batal</button>
-            <button class="primary" onclick="saveSchedule()">💾 Simpan Jadwal</button>
-        </div>
+    <div class="log-area" id="logArea">
+        <div class="log-entry"><span class="log-time">[06:00]</span> Sistem PPKA siap. Stasiun Gambir aktif.</div>
     </div>
 </div>
 
 <script>
-(function() {
-    // ============================================================
-    //  DRAGON RAIL PREMIUM — MAP 3D + ANIMASI KERETA + ETA
-    // ============================================================
-    const canvas = document.getElementById('railCanvas');
-    const ctx = canvas.getContext('2d');
-    const popup = document.getElementById('trainPopup');
-    const popupName = document.getElementById('popupName');
-    const popupStation = document.getElementById('popupStation');
-    const trainCountBadge = document.getElementById('trainCount');
-    const weselStatus = document.getElementById('weselStatus');
-    const trainListEl = document.getElementById('trainList');
-    const signalIndicatorsEl = document.getElementById('signalIndicators');
-    const slideNav = document.getElementById('slideNav');
-    const slideContent = document.getElementById('slideContent');
-
-    // -- STASIUN DUNIA NYATA --
-    const stationOrder = ['turi', 'gubeng', 'wonokromo', 'waru', 'gedangan', 'sidoarjo'];
-    const stations = [
-        { id: 'turi', name: 'Surabaya Pasar Turi', x: 80, y: 380, jalurCount: 6, signal: true, autoRed: false, wesel: 0 },
-        { id: 'gubeng', name: 'Gubeng', x: 320, y: 250, jalurCount: 8, signal: true, autoRed: false, wesel: 0 },
-        { id: 'wonokromo', name: 'Wonokromo', x: 580, y: 480, jalurCount: 4, signal: true, autoRed: false, wesel: 0 },
-        { id: 'waru', name: 'Waru', x: 840, y: 300, jalurCount: 2, signal: true, autoRed: false, wesel: 0 },
-        { id: 'gedangan', name: 'Gedangan', x: 1100, y: 420, jalurCount: 2, signal: true, autoRed: false, wesel: 0 },
-        { id: 'sidoarjo', name: 'Sidoarjo', x: 1360, y: 340, jalurCount: 3, signal: true, autoRed: false, wesel: 0 }
+    // ========== DATA ==========
+    const stasiunList = [
+        'Gambir', 'Jakarta Kota', 'Pasar Senen', 'Bandung', 'Surabaya Gubeng',
+        'Yogyakarta', 'Semarang Tawang', 'Medan', 'Palembang', 'Makassar'
     ];
 
-    // -- WESEL PER STASIUN --
-    const stationWesels = {
-        'turi': [
-            { id: 0, label: 'Jalur 1 - Turi → Gubeng', routeKey: 'turi-gubeng' },
-            { id: 1, label: 'Jalur 2 - Turi → Gubeng', routeKey: 'turi-gubeng2' }
-        ],
-        'gubeng': [
-            { id: 0, label: 'Jalur 1 - Gubeng → Wonokromo', routeKey: 'gubeng-wonokromo' },
-            { id: 1, label: 'Jalur 2 - Gubeng → Wonokromo', routeKey: 'gubeng-wonokromo2' }
-        ],
-        'wonokromo': [
-            { id: 0, label: 'Jalur 1 - Wonokromo → Waru', routeKey: 'wonokromo-waru' }
-        ],
-        'waru': [
-            { id: 0, label: 'Jalur 1 - Waru → Gedangan', routeKey: 'waru-gedangan' }
-        ],
-        'gedangan': [
-            { id: 0, label: 'Jalur 1 - Gedangan → Sidoarjo', routeKey: 'gedangan-sidoarjo' }
-        ],
-        'sidoarjo': [
-            { id: 0, label: 'Jalur 1 - Sidoarjo → Gedangan', routeKey: 'sidoarjo-gedangan' }
-        ]
-    };
-
-    // -- ROUTE DEFINITION --
-    const routes = {
-        'turi-gubeng': { from: 'turi', to: 'gubeng', jalur: 0, label: 'Turi → Gubeng', distance: 5.2 },
-        'turi-gubeng2': { from: 'turi', to: 'gubeng', jalur: 1, label: 'Turi → Gubeng (2)', distance: 5.2 },
-        'gubeng-wonokromo': { from: 'gubeng', to: 'wonokromo', jalur: 0, label: 'Gubeng → Wonokromo', distance: 4.8 },
-        'gubeng-wonokromo2': { from: 'gubeng', to: 'wonokromo', jalur: 1, label: 'Gubeng → Wonokromo (2)', distance: 4.8 },
-        'wonokromo-waru': { from: 'wonokromo', to: 'waru', jalur: 0, label: 'Wonokromo → Waru', distance: 3.5 },
-        'waru-gedangan': { from: 'waru', to: 'gedangan', jalur: 0, label: 'Waru → Gedangan', distance: 4.0 },
-        'gedangan-sidoarjo': { from: 'gedangan', to: 'sidoarjo', jalur: 0, label: 'Gedangan → Sidoarjo', distance: 3.2 },
-        'sidoarjo-gedangan': { from: 'sidoarjo', to: 'gedangan', jalur: 0, label: 'Sidoarjo → Gedangan', distance: 3.2 },
-        'gedangan-waru': { from: 'gedangan', to: 'waru', jalur: 0, label: 'Gedangan → Waru', distance: 4.0 },
-        'waru-wonokromo': { from: 'waru', to: 'wonokromo', jalur: 0, label: 'Waru → Wonokromo', distance: 3.5 },
-        'wonokromo-gubeng': { from: 'wonokromo', to: 'gubeng', jalur: 0, label: 'Wonokromo → Gubeng', distance: 4.8 },
-        'gubeng-turi': { from: 'gubeng', to: 'turi', jalur: 0, label: 'Gubeng → Turi', distance: 5.2 }
-    };
-
-    // -- JADWAL --
-    let schedules = {};
-    stations.forEach(s => { schedules[s.id] = []; });
-
-    // -- GLOBAL WESEL --
-    let wesels = [
-        { from: 'turi', to: 'gubeng', jalur: 0, aktif: true },
-        { from: 'turi', to: 'gubeng', jalur: 1, aktif: false },
-        { from: 'gubeng', to: 'wonokromo', jalur: 0, aktif: false },
-        { from: 'gubeng', to: 'wonokromo', jalur: 1, aktif: false },
-        { from: 'wonokromo', to: 'waru', jalur: 0, aktif: false },
-        { from: 'waru', to: 'gedangan', jalur: 0, aktif: false },
-        { from: 'gedangan', to: 'sidoarjo', jalur: 0, aktif: false }
-    ];
-    let currentWeselIndex = 0;
-
-    // -- DATA KERETA --
-    const trainTypes = [
-        { name: 'Commuter Line Arjonegoro', color: '#facc15', speed: 0.6, size: 18 },
-        { name: 'Commuter Line Penataran', color: '#facc15', speed: 0.5, size: 18 },
-        { name: 'KA HARINA', color: '#f97316', speed: 0.8, size: 20 },
-        { name: 'KA PANDALUNGAN', color: '#3b82f6', speed: 0.9, size: 20 },
-        { name: 'KA ANGGREK', color: '#a855f7', speed: 0.7, size: 20 }
+    const namaKereta = [
+        'Argo Bromo', 'Argo Lawu', 'Argo Dwipangga', 'Gajayana', 'Bima',
+        'Sembrani', 'Taksaka', 'Purwojaya', 'Bangunkarta', 'Jayabaya'
     ];
 
     let trains = [];
-    let lastPopupTime = 0;
-    let popupTimer = null;
-    let animationId = null;
-    let spawnCounter = 0;
-    let currentSlide = 0;
-    let signalCooldown = {};
-    let countdownInterval = null;
-    let editingSchedule = null;
-    let loopMode = true;
-    let autoGreenSignals = {};
-    let trainLocations = {};
-    let trainETAs = {};
-    let frameCount = 0;
+    let gameTime = 360; // menit dari 06:00
+    let logEntries = [];
+    let trainIdCounter = 0;
 
-    // -- INIT --
-    function initTrains() {
-        trains = [];
-        stations.forEach(s => { s.signal = true; s.autoRed = false; s.wesel = 0; });
-        signalCooldown = {};
-        autoGreenSignals = {};
-        trainLocations = {};
-        trainETAs = {};
-        schedules = {};
-        stations.forEach(s => { schedules[s.id] = []; });
-        updateTrainCount();
-        renderTrainControls();
-        renderSlides();
-        updateSignalIndicators();
-        startCountdown();
+    // ========== FUNGSI ==========
+    function formatTime(m) {
+        let h = Math.floor(m / 60);
+        let min = m % 60;
+        return `${String(h).padStart(2,'0')}:${String(min).padStart(2,'0')}`;
     }
 
-    // -- COUNTDOWN --
-    function startCountdown() {
-        if (countdownInterval) clearInterval(countdownInterval);
-        countdownInterval = setInterval(() => {
-            const now = Date.now();
-            for (let s of stations) {
-                for (let sch of schedules[s.id]) {
-                    if (sch.status === 'scheduled' && sch.departureTime) {
-                        const remaining = sch.departureTime - now;
-                        if (remaining > 0) {
-                            const secs = Math.floor(remaining / 1000);
-                            sch.countdown = `${secs}s`;
-                        } else if (remaining > -5000) {
-                            sch.countdown = '🚀 Berangkat!';
-                            sch.status = 'running';
-                            
-                            const st = stations.find(stn => stn.id === s.id);
-                            if (st) {
-                                const routeKey = `${s.id}-${sch.destinationId}`;
-                                let hasTrainOnSameRoute = false;
-                                for (let t of trains) {
-                                    if (t.routeKey === routeKey && t.active && t.progress > 0.1 && t.progress < 0.9) {
-                                        hasTrainOnSameRoute = true;
-                                        break;
-                                    }
-                                }
-                                
-                                if (!hasTrainOnSameRoute) {
-                                    st.signal = true;
-                                    st.autoRed = false;
-                                    autoGreenSignals[s.id] = { time: now, trainName: sch.trainName, scheduleId: sch.id };
-                                    showPopup('🟢 ' + sch.trainName, 'SINYAL HIJAU OTOMATIS dari ' + s.name);
-                                } else {
-                                    sch.status = 'waiting';
-                                    sch.countdown = '⏳ Menunggu...';
-                                    showPopup('⏳ ' + sch.trainName, 'menunggu jalur kosong di ' + s.name);
-                                }
-                            }
-                            
-                            moveTrainToRoute(sch);
-                            renderSlides();
-                            updateSignalIndicators();
-                        } else if (remaining > -15000) {
-                            if (sch.status !== 'waiting') {
-                                sch.countdown = '🔄 Perjalanan';
-                                sch.status = 'running';
-                                updateETA(sch);
-                            }
-                            renderSlides();
-                        } else {
-                            sch.countdown = '✅ Tiba';
-                            sch.status = 'arrived';
-                            if (loopMode) {
-                                reverseTrain(sch);
-                            }
-                            setTimeout(() => {
-                                delete autoGreenSignals[s.id];
-                                renderSlides();
-                                updateSignalIndicators();
-                            }, 10000);
-                            renderSlides();
-                        }
-                    }
-                }
-            }
-            renderSlides();
-        }, 1000);
+    function addLog(msg) {
+        let timeStr = formatTime(gameTime);
+        logEntries.push(`[${timeStr}] ${msg}`);
+        if (logEntries.length > 50) logEntries.shift();
+        renderLog();
     }
 
-    // -- UPDATE ETA --
-    function updateETA(schedule) {
-        const train = trains.find(t => t.name === schedule.trainName);
-        if (!train) return;
-        
-        const route = routes[train.routeKey];
-        if (!route) return;
-        
-        const distance = route.distance || 5;
-        const speed = train.speed * 0.5;
-        const timeToArrive = (distance / speed) * (1 - train.progress);
-        const etaSeconds = Math.floor(timeToArrive * 10);
-        
-        if (etaSeconds > 0) {
-            trainETAs[train.id] = `${etaSeconds}s`;
-        } else {
-            trainETAs[train.id] = '⏳ Tiba';
-        }
+    function renderLog() {
+        let area = document.getElementById('logArea');
+        area.innerHTML = logEntries.map(e => `<div class="log-entry">${e}</div>`).join('');
+        area.scrollTop = area.scrollHeight;
     }
 
-    // -- MOVE TRAIN TO ROUTE --
-    function moveTrainToRoute(schedule) {
-        const fromSt = stations.find(s => s.id === schedule.stationId);
-        const toSt = stations.find(s => s.id === schedule.destinationId);
-        if (!fromSt || !toSt) return;
+    function renderTrack() {
+        let area = document.getElementById('trackArea');
+        let html = '';
+        // tampilkan 5 stasiun dengan kereta
+        let displayStations = stasiunList.slice(0, 5);
+        displayStations.forEach((stasiun, idx) => {
+            let trainOnStation = trains.filter(t => t.stationIndex === idx);
+            let trainHtml = trainOnStation.map(t => {
+                let cls = 'train';
+                if (t.status === 'arrive') cls += ' train-arrive';
+                else if (t.status === 'depart') cls += ' train-depart';
+                return `<span class="${cls}" style="margin:0 5px;">🚆${t.name}</span>`;
+            }).join(' ');
 
-        let train = trains.find(t => t.name === schedule.trainName);
-        if (!train) {
-            const t = trainTypes.find(tp => tp.name === schedule.trainName);
-            if (!t) return;
-            train = {
-                ...t,
-                id: Date.now() + Math.random(),
-                progress: 0,
-                direction: 1,
-                active: true,
-                currentStation: fromSt.name,
-                assignedJalur: 0,
-                isStopped: false,
-                stopAtStation: null,
-                lastStationIdx: -1,
-                trainSignal: true,
-                autoStopped: false,
-                passedStations: [],
-                routeKey: null,
-                scheduleId: schedule.id,
-                glowIntensity: 0
-            };
-            trains.push(train);
-        }
-
-        const weselId = fromSt.wesel || 0;
-        const weselOptions = stationWesels[fromSt.id] || [];
-        const selectedWesel = weselOptions.find(w => w.id === weselId);
-        
-        let routeKey;
-        if (selectedWesel) {
-            routeKey = selectedWesel.routeKey;
-        } else {
-            routeKey = `${schedule.stationId}-${schedule.destinationId}`;
-        }
-        
-        const route = routes[routeKey];
-        if (route) {
-            train.assignedJalur = route.jalur;
-            train.routeKey = routeKey;
-            train.direction = 1;
-            train.progress = 0.05;
-            train.active = true;
-            train.isStopped = false;
-            train.currentStation = fromSt.name;
-            trainLocations[train.id] = fromSt.name;
-            
-            const distance = route.distance || 5;
-            const speed = train.speed * 0.5;
-            const etaSeconds = Math.floor((distance / speed) * 10);
-            trainETAs[train.id] = `${etaSeconds}s`;
-            
-            showPopup('🚆 ' + train.name, 'berangkat dari ' + fromSt.name + ' via ' + (selectedWesel ? selectedWesel.label : 'jalur default') + ' | ETA: ' + trainETAs[train.id]);
-        }
-        updateTrainCount();
-        renderTrainControls();
-    }
-
-    // -- REVERSE TRAIN --
-    function reverseTrain(schedule) {
-        const fromSt = stations.find(s => s.id === schedule.stationId);
-        const toSt = stations.find(s => s.id === schedule.destinationId);
-        if (!fromSt || !toSt) return;
-
-        let train = trains.find(t => t.name === schedule.trainName);
-        if (!train) return;
-
-        train.direction = -1;
-        train.progress = 0.95;
-
-        const weselId = toSt.wesel || 0;
-        const weselOptions = stationWesels[toSt.id] || [];
-        const selectedWesel = weselOptions.find(w => w.id === weselId);
-        
-        let routeKey;
-        if (selectedWesel) {
-            routeKey = selectedWesel.routeKey;
-        } else {
-            routeKey = `${schedule.destinationId}-${schedule.stationId}`;
-        }
-        
-        const reverseRoute = routes[routeKey];
-        if (reverseRoute) {
-            train.assignedJalur = reverseRoute.jalur;
-            train.routeKey = routeKey;
-            train.currentStation = toSt.name;
-            trainLocations[train.id] = toSt.name;
-            
-            const distance = reverseRoute.distance || 5;
-            const speed = train.speed * 0.5;
-            const etaSeconds = Math.floor((distance / speed) * 10);
-            trainETAs[train.id] = `${etaSeconds}s`;
-        }
-
-        const newSchedule = {
-            id: Date.now() + Math.random(),
-            trainName: train.name,
-            trainColor: train.color,
-            time: new Date().toLocaleTimeString(),
-            departureTime: Date.now() + 5000,
-            countdown: '⏳',
-            status: 'scheduled',
-            stationId: schedule.destinationId,
-            destinationId: schedule.stationId,
-            destinationName: fromSt.name
-        };
-        schedules[schedule.destinationId].push(newSchedule);
-
-        showPopup('🔄 ' + train.name, 'balik arah menuju ' + fromSt.name + ' (jadwal otomatis) | ETA: ' + trainETAs[train.id]);
-        renderSlides();
-    }
-
-    // -- POSISI dengan efek 3D --
-    function getPositionOnPath(progress, jalurIndex = 0) {
-        const offset = jalurIndex * 14;
-        const pts = [
-            { x: 30, y: 320 + offset },
-            { x: stations[0].x, y: stations[0].y + offset - 6 },
-            { x: stations[1].x, y: stations[1].y + offset - 4 },
-            { x: stations[2].x, y: stations[2].y + offset + 4 },
-            { x: stations[3].x, y: stations[3].y + offset - 2 },
-            { x: stations[4].x, y: stations[4].y + offset + 6 },
-            { x: stations[5].x, y: stations[5].y + offset },
-            { x: 1470, y: 320 + offset }
-        ];
-
-        const t = Math.min(1, Math.max(0, progress));
-        const seg = t * 7;
-        const segIdx = Math.min(6, Math.floor(seg));
-        const localT = seg - segIdx;
-
-        const idx = segIdx;
-        const a = pts[Math.max(0, idx - 1)];
-        const b = pts[idx];
-        const c = pts[Math.min(7, idx + 1)];
-        const d = pts[Math.min(7, idx + 2)];
-
-        const t2 = localT * localT;
-        const t3 = t2 * localT;
-        const x = 0.5 * ( (2*b.x) + (-a.x + c.x)*localT + (2*a.x - 5*b.x + 4*c.x - d.x)*t2 + (-a.x + 3*b.x - 3*c.x + d.x)*t3 );
-        const y = 0.5 * ( (2*b.y) + (-a.y + c.y)*localT + (2*a.y - 5*b.y + 4*c.y - d.y)*t2 + (-a.y + 3*b.y - 3*c.y + d.y)*t3 );
-        return { x, y };
-    }
-
-    // -- CEK STASIUN TERDEKAT --
-    function getNearestStation(pos) {
-        let minDist = 50;
-        let found = null;
-        for (let s of stations) {
-            const dx = pos.x - s.x;
-            const dy = pos.y - s.y;
-            const dist = Math.sqrt(dx*dx + dy*dy);
-            if (dist < minDist) {
-                minDist = dist;
-                found = s;
-            }
-        }
-        return found;
-    }
-
-    // -- UPDATE KERETA dengan animasi halus --
-    function updateTrains() {
-        const now = Date.now();
-        frameCount++;
-        
-        for (let s of stations) {
-            if (s.autoRed) {
-                if (!signalCooldown[s.id]) signalCooldown[s.id] = 0;
-                if (now - signalCooldown[s.id] > 2000) {
-                    s.signal = true;
-                    s.autoRed = false;
-                    delete signalCooldown[s.id];
-                }
-            }
-        }
-
-        for (let i = 0; i < trains.length; i++) {
-            const train = trains[i];
-            if (!train.active) continue;
-
-            // Update glow intensity untuk animasi
-            train.glowIntensity = (train.glowIntensity || 0) + 0.02;
-            if (train.glowIntensity > 1) train.glowIntensity = 0;
-
-            const pos = getPositionOnPath(train.progress, train.assignedJalur);
-            const nearStation = getNearestStation(pos);
-            
-            let inStationArea = false;
-            let currentStation = null;
-            if (nearStation) {
-                const dx = pos.x - nearStation.x;
-                const dy = pos.y - nearStation.y;
-                if (Math.sqrt(dx*dx + dy*dy) < 45) {
-                    inStationArea = true;
-                    currentStation = nearStation;
-                    trainLocations[train.id] = nearStation.name;
-                }
+            // sinyal
+            let signalClass = 'signal-green';
+            if (trainOnStation.length > 0 && trainOnStation.some(t => t.status === 'arrive')) {
+                signalClass = 'signal-yellow';
+            } else if (trainOnStation.length > 2) {
+                signalClass = 'signal-red';
             }
 
-            let approaching = false;
-            let approachStation = null;
-            for (let s of stations) {
-                const dx = pos.x - s.x;
-                const dy = pos.y - s.y;
-                const dist = Math.sqrt(dx*dx + dy*dy);
-                if (dist < 80 && dist > 30) {
-                    const nextPos = getPositionOnPath(train.progress + 0.01, train.assignedJalur);
-                    const distNext = Math.sqrt((nextPos.x - s.x)**2 + (nextPos.y - s.y)**2);
-                    if (distNext < dist) {
-                        approaching = true;
-                        approachStation = s;
-                        break;
-                    }
-                }
-            }
-
-            if (approaching && approachStation && !approachStation.autoRed && !autoGreenSignals[approachStation.id]) {
-                approachStation.signal = false;
-                approachStation.autoRed = true;
-                signalCooldown[approachStation.id] = now;
-                if (now - lastPopupTime > 1500) {
-                    showPopup('🔴 ' + approachStation.name, 'SINYAL OTOMATIS MERAH!');
-                    lastPopupTime = now;
-                }
-                updateSignalIndicators();
-                renderSlides();
-            }
-
-            let trainAhead = false;
-            for (let j = 0; j < trains.length; j++) {
-                if (i === j) continue;
-                const other = trains[j];
-                if (!other.active) continue;
-                if (other.assignedJalur !== train.assignedJalur) continue;
-                
-                const otherPos = getPositionOnPath(other.progress, other.assignedJalur);
-                const dx = otherPos.x - pos.x;
-                const dy = otherPos.y - pos.y;
-                const dist = Math.sqrt(dx*dx + dy*dy);
-                
-                if (other.progress > train.progress && dist < 60) {
-                    trainAhead = true;
-                    break;
-                }
-                if (other.progress < train.progress && dist < 40) {
-                    trainAhead = true;
-                    break;
-                }
-            }
-
-            let shouldStop = false;
-            let stopReason = '';
-            
-            if (inStationArea && currentStation && !currentStation.signal && !autoGreenSignals[currentStation.id]) {
-                shouldStop = true;
-                stopReason = 'SINYAL MERAH';
-            }
-            
-            if (inStationArea && currentStation && !train.trainSignal) {
-                shouldStop = true;
-                stopReason = 'SINYAL KERETA MATI';
-            }
-            
-            if (trainAhead) {
-                shouldStop = true;
-                stopReason = 'ADA KERETA DI DEPAN';
-                train.autoStopped = true;
-            } else {
-                train.autoStopped = false;
-            }
-
-            if (shouldStop) {
-                train.isStopped = true;
-                train.stopAtStation = currentStation ? currentStation.id : null;
-                continue;
-            } else {
-                train.isStopped = false;
-                train.stopAtStation = null;
-            }
-
-            let speedMul = 0.8;
-            const aktifWesel = wesels[currentWeselIndex];
-            if (aktifWesel && !aktifWesel.aktif) {
-                speedMul = 0.4;
-            }
-
-            // ANIMASI HALUS
-            let delta = (train.speed * 0.0025) * speedMul;
-            if (train.direction === 1) {
-                train.progress += delta;
-                if (train.progress > 1.0) {
-                    train.progress = 1.0;
-                    if (loopMode && train.scheduleId) {
-                        for (let s of stations) {
-                            for (let sch of schedules[s.id]) {
-                                if (sch.id === train.scheduleId) {
-                                    sch.status = 'arrived';
-                                    sch.countdown = '✅ Tiba';
-                                    reverseTrain(sch);
-                                    break;
-                                }
-                            }
-                        }
-                    } else if (loopMode) {
-                        train.direction = -1;
-                        train.progress = 0.95;
-                        showPopup('🔄 ' + train.name, 'balik arah!');
-                    } else {
-                        train.direction = -1;
-                    }
-                }
-            } else {
-                train.progress -= delta;
-                if (train.progress < 0.0) {
-                    train.progress = 0.0;
-                    if (loopMode && train.scheduleId) {
-                        for (let s of stations) {
-                            for (let sch of schedules[s.id]) {
-                                if (sch.id === train.scheduleId) {
-                                    sch.status = 'arrived';
-                                    sch.countdown = '✅ Tiba';
-                                    break;
-                                }
-                            }
-                        }
-                    } else if (loopMode) {
-                        train.direction = 1;
-                        train.progress = 0.05;
-                        showPopup('🔄 ' + train.name, 'balik arah!');
-                    } else {
-                        train.direction = 1;
-                    }
-                }
-            }
-
-            // Update ETA
-            if (train.routeKey && routes[train.routeKey]) {
-                const route = routes[train.routeKey];
-                const distance = route.distance || 5;
-                const speed = train.speed * 0.5;
-                const remainingProgress = 1 - train.progress;
-                const timeToArrive = (distance / speed) * remainingProgress;
-                const etaSeconds = Math.floor(timeToArrive * 10);
-                if (etaSeconds > 0) {
-                    trainETAs[train.id] = `${etaSeconds}s`;
-                } else {
-                    trainETAs[train.id] = '⏳ Tiba';
-                }
-            }
-
-            if (inStationArea && currentStation && (currentStation.signal || autoGreenSignals[currentStation.id]) && train.trainSignal) {
-                if (now - lastPopupTime > 1500 && !trainAhead) {
-                    showPopup(train.name, 'melewati ' + currentStation.name + ' | ETA: ' + (trainETAs[train.id] || '⏳'));
-                    lastPopupTime = now;
-                    train.currentStation = currentStation.name;
-                    trainLocations[train.id] = currentStation.name;
-                }
-            }
-        }
-        
-        updateTrainControls();
-        updateSignalIndicators();
-        renderSlides();
-    }
-
-    // -- POPUP --
-    function showPopup(name, station) {
-        popupName.textContent = name;
-        popupStation.textContent = station;
-        popup.classList.add('show');
-        if (popupTimer) clearTimeout(popupTimer);
-        popupTimer = setTimeout(() => {
-            popup.classList.remove('show');
-        }, 3000);
-    }
-
-    // -- DRAW dengan efek premium --
-    function draw() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-        // Background efek
-        const grad = ctx.createRadialGradient(750, 375, 100, 750, 375, 800);
-        grad.addColorStop(0, '#0d1a2a');
-        grad.addColorStop(1, '#060a12');
-        ctx.fillStyle = grad;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-        // Gambar rel dengan efek glow
-        for (let j = 0; j < 8; j++) {
-            ctx.beginPath();
-            const isActive = j < 6;
-            ctx.strokeStyle = isActive ? '#2a4a6a' : '#1a3a5a';
-            ctx.lineWidth = isActive ? 4 : 2.5;
-            ctx.setLineDash(j % 2 === 0 ? [] : [6, 8]);
-            const offset = j * 14;
-            const pts = [
-                { x: 30, y: 320 + offset },
-                { x: stations[0].x, y: stations[0].y + offset - 6 },
-                { x: stations[1].x, y: stations[1].y + offset - 4 },
-                { x: stations[2].x, y: stations[2].y + offset + 4 },
-                { x: stations[3].x, y: stations[3].y + offset - 2 },
-                { x: stations[4].x, y: stations[4].y + offset + 6 },
-                { x: stations[5].x, y: stations[5].y + offset },
-                { x: 1470, y: 320 + offset }
-            ];
-            ctx.moveTo(pts[0].x, pts[0].y);
-            for (let i = 1; i < pts.length; i++) {
-                const prev = pts[i-1];
-                const curr = pts[i];
-                const cp1x = prev.x + (curr.x - prev.x) * 0.4;
-                const cp1y = prev.y;
-                const cp2x = curr.x - (curr.x - prev.x) * 0.4;
-                const cp2y = curr.y;
-                ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, curr.x, curr.y);
-            }
-            ctx.stroke();
-            
-            // Glow rel untuk jalur aktif
-            if (isActive && j < 4) {
-                ctx.shadowColor = '#22d3ee22';
-                ctx.shadowBlur = 15;
-                ctx.stroke();
-                ctx.shadowBlur = 0;
-            }
-        }
-        ctx.setLineDash([]);
-
-        // Gambar stasiun dengan efek premium
-        for (let s of stations) {
-            // Shadow stasiun
-            ctx.shadowColor = 'rgba(0,0,0,0.5)';
-            ctx.shadowBlur = 20;
-            
-            if (autoGreenSignals[s.id]) {
-                ctx.shadowColor = '#22c55e44';
-                ctx.shadowBlur = 40;
-            }
-            if (s.autoRed) {
-                ctx.shadowColor = '#ef444444';
-                ctx.shadowBlur = 30;
-            }
-            
-            // Tiang sinyal
-            const gradPole = ctx.createLinearGradient(s.x, s.y - 65, s.x, s.y);
-            gradPole.addColorStop(0, '#2a3a4a');
-            gradPole.addColorStop(1, '#1a2a3c');
-            ctx.fillStyle = gradPole;
-            ctx.fillRect(s.x - 3, s.y - 65, 6, 65);
-            
-            let signalColor = s.signal ? '#22c55e' : '#ef4444';
-            if (autoGreenSignals[s.id]) signalColor = '#22c55e';
-            
-            // Lampu sinyal dengan glow
-            ctx.shadowBlur = 25;
-            ctx.shadowColor = signalColor + '66';
-            ctx.beginPath();
-            ctx.arc(s.x, s.y - 72, 12, 0, 2 * Math.PI);
-            const gradLight = ctx.createRadialGradient(s.x, s.y - 72, 2, s.x, s.y - 72, 12);
-            gradLight.addColorStop(0, '#1a2a3a');
-            gradLight.addColorStop(1, '#0a121e');
-            ctx.fillStyle = gradLight;
-            ctx.fill();
-            ctx.strokeStyle = '#2a4a6a';
-            ctx.lineWidth = 2;
-            ctx.stroke();
-            ctx.shadowBlur = 30;
-            ctx.shadowColor = signalColor + '88';
-            ctx.beginPath();
-            ctx.arc(s.x, s.y - 72, 8, 0, 2 * Math.PI);
-            ctx.fillStyle = signalColor;
-            ctx.fill();
-            ctx.shadowBlur = 0;
-            
-            let label = s.signal ? 'HIJAU' : 'MERAH';
-            if (autoGreenSignals[s.id]) label = '🟢 AUTO';
-            ctx.fillStyle = autoGreenSignals[s.id] ? '#7acf8a' : (s.signal ? '#8fde7a' : '#f77a7a');
-            ctx.font = 'bold 10px monospace';
-            ctx.textAlign = 'center';
-            ctx.fillText(label, s.x, s.y - 92);
-            if (s.autoRed) {
-                ctx.fillStyle = '#ef444488';
-                ctx.font = 'bold 8px monospace';
-                ctx.fillText('⚡', s.x, s.y - 105);
-            }
-            
-            // Nama stasiun dengan shadow
-            ctx.shadowColor = 'rgba(0,0,0,0.8)';
-            ctx.shadowBlur = 10;
-            ctx.fillStyle = '#d4e6f5';
-            ctx.font = 'bold 13px "Segoe UI"';
-            ctx.fillText(s.name, s.x, s.y - 110);
-            
-            // Marker stasiun dengan glow
-            ctx.shadowBlur = 20;
-            ctx.shadowColor = '#ec489944';
-            ctx.beginPath();
-            ctx.arc(s.x, s.y, 14, 0, 2 * Math.PI);
-            const gradMarker = ctx.createRadialGradient(s.x, s.y, 4, s.x, s.y, 14);
-            gradMarker.addColorStop(0, '#f06aae');
-            gradMarker.addColorStop(1, '#ec4899');
-            ctx.fillStyle = gradMarker;
-            ctx.fill();
-            ctx.strokeStyle = '#f9c8e0';
-            ctx.lineWidth = 2;
-            ctx.stroke();
-            ctx.shadowBlur = 0;
-            
-            // Info wesel
-            const weselOptions = stationWesels[s.id] || [];
-            const activeWesel = weselOptions.find(w => w.id === s.wesel);
-            ctx.fillStyle = '#8aadcc';
-            ctx.font = '10px monospace';
-            ctx.fillText(`🔀 ${activeWesel ? activeWesel.label.substring(0, 15) : 'Jalur 1'}`, s.x, s.y + 32);
-        }
-
-        // Gambar wesel dengan efek
-        for (let i = 0; i < wesels.length; i++) {
-            const w = wesels[i];
-            const fromSt = stations.find(s => s.id === w.from);
-            const toSt = stations.find(s => s.id === w.to);
-            if (!fromSt || !toSt) continue;
-            const isActive = i === currentWeselIndex && w.aktif;
-            ctx.beginPath();
-            ctx.strokeStyle = isActive ? '#22d3ee' : '#2a4a6a';
-            ctx.lineWidth = isActive ? 6 : 2;
-            ctx.setLineDash(isActive ? [] : [6, 8]);
-            const midX = (fromSt.x + toSt.x) / 2;
-            const midY = (fromSt.y + toSt.y) / 2 - 30;
-            ctx.moveTo(fromSt.x + 20, fromSt.y + 10);
-            ctx.quadraticCurveTo(midX, midY, toSt.x - 20, toSt.y + 10);
-            ctx.stroke();
-            
-            if (isActive) {
-                ctx.shadowColor = '#22d3ee44';
-                ctx.shadowBlur = 20;
-                ctx.stroke();
-                ctx.shadowBlur = 0;
-            }
-            ctx.setLineDash([]);
-            ctx.fillStyle = isActive ? '#22d3ee' : '#3a5a7a';
-            ctx.font = 'bold 10px monospace';
-            ctx.textAlign = 'center';
-            ctx.fillText(`Wesel ${i+1}`, (fromSt.x + toSt.x)/2, midY - 12);
-        }
-
-        // Gambar kereta dengan ANIMASI PREMIUM
-        for (let train of trains) {
-            if (!train.active) continue;
-            const pos = getPositionOnPath(train.progress, train.assignedJalur);
-            
-            // Efek berhenti
-            if (train.isStopped) {
-                ctx.shadowColor = train.autoStopped ? '#f59e0b44' : '#ef444444';
-                ctx.shadowBlur = 30;
-                ctx.beginPath();
-                ctx.arc(pos.x, pos.y, train.size/2 + 10, 0, 2 * Math.PI);
-                ctx.strokeStyle = train.autoStopped ? '#f59e0b88' : '#ef444488';
-                ctx.lineWidth = 3;
-                ctx.setLineDash([4, 6]);
-                ctx.stroke();
-                ctx.setLineDash([]);
-                ctx.shadowBlur = 0;
-            }
-
-            // Efek asap/jejak (ANIMASI)
-            if (!train.isStopped && train.progress > 0.05 && train.progress < 0.95) {
-                for (let k = 1; k <= 4; k++) {
-                    const trailProgress = train.progress - (k * 0.015 * train.direction);
-                    if (trailProgress > 0 && trailProgress < 1) {
-                        const trailPos = getPositionOnPath(trailProgress, train.assignedJalur);
-                        const alpha = 0.12 - k * 0.025;
-                        const size = train.size/3 - k * 1.5;
-                        if (size > 2) {
-                            ctx.beginPath();
-                            ctx.arc(trailPos.x + (Math.random() - 0.5) * 2, trailPos.y + (Math.random() - 0.5) * 2, size, 0, 2 * Math.PI);
-                            ctx.fillStyle = `rgba(255,255,255,${alpha})`;
-                            ctx.fill();
-                        }
-                    }
-                }
-            }
-
-            // Glow body kereta (ANIMASI)
-            const glowPulse = 0.7 + 0.3 * Math.sin(frameCount * 0.05 + train.id);
-            ctx.shadowColor = train.color + '66';
-            ctx.shadowBlur = 25 * glowPulse;
-
-            // Body kereta dengan gradien
-            const gradTrain = ctx.createRadialGradient(
-                pos.x - train.size/4, pos.y - train.size/4, 2,
-                pos.x, pos.y, train.size
-            );
-            gradTrain.addColorStop(0, lightenColor(train.color, 30));
-            gradTrain.addColorStop(1, train.color);
-            ctx.fillStyle = gradTrain;
-            ctx.beginPath();
-            ctx.roundRect(pos.x - train.size/2, pos.y - train.size/2, train.size, train.size, 4);
-            ctx.fill();
-            ctx.shadowBlur = 0;
-            ctx.strokeStyle = '#0b141e';
-            ctx.lineWidth = 2;
-            ctx.stroke();
-
-            // Headlamp (ANIMASI)
-            const headlightX = train.direction === 1 ? pos.x + train.size/2 : pos.x - train.size/2;
-            const headlightPulse = 0.6 + 0.4 * Math.sin(frameCount * 0.08);
-            ctx.shadowColor = '#ffdd44';
-            ctx.shadowBlur = 20 * headlightPulse;
-            ctx.beginPath();
-            ctx.arc(headlightX, pos.y, 5, 0, 2 * Math.PI);
-            const headlightGrad = ctx.createRadialGradient(headlightX, pos.y, 1, headlightX, pos.y, 5);
-            headlightGrad.addColorStop(0, '#ffee88');
-            headlightGrad.addColorStop(1, '#ffaa44');
-            ctx.fillStyle = headlightGrad;
-            ctx.fill();
-            ctx.shadowBlur = 0;
-
-            // Lampu belakang
-            const backX = train.direction === 1 ? pos.x - train.size/2 : pos.x + train.size/2;
-            ctx.beginPath();
-            ctx.arc(backX, pos.y, 3, 0, 2 * Math.PI);
-            ctx.fillStyle = '#ff444466';
-            ctx.fill();
-
-            // Indikator sinyal kereta
-            ctx.beginPath();
-            ctx.arc(pos.x + train.size/2 + 6, pos.y - train.size/2 - 4, 5, 0, 2 * Math.PI);
-            ctx.fillStyle = train.trainSignal ? '#22c55e' : '#ef4444';
-            ctx.fill();
-            ctx.strokeStyle = '#0a121e';
-            ctx.lineWidth = 1;
-            ctx.stroke();
-
-            if (train.autoStopped) {
-                ctx.fillStyle = '#f59e0b';
-                ctx.font = 'bold 8px monospace';
-                ctx.textAlign = 'center';
-                ctx.fillText('⛔', pos.x, pos.y - train.size/2 - 20);
-            }
-
-            // ETA di atas kereta (ANIMASI)
-            if (trainETAs[train.id] && !train.isStopped) {
-                ctx.shadowColor = 'rgba(0,0,0,0.8)';
-                ctx.shadowBlur = 8;
-                ctx.fillStyle = '#7acfde';
-                ctx.font = 'bold 9px monospace';
-                ctx.textAlign = 'center';
-                ctx.fillText('⏱ ' + trainETAs[train.id], pos.x, pos.y - train.size/2 - 28);
-                ctx.shadowBlur = 0;
-            }
-
-            // Lokasi
-            const location = trainLocations[train.id] || 'Unknown';
-            ctx.fillStyle = '#8aadcc';
-            ctx.font = '8px monospace';
-            ctx.textAlign = 'center';
-            ctx.fillText(location.substring(0, 12), pos.x, pos.y + train.size/2 + 14);
-
-            // Rute
-            if (train.routeKey && routes[train.routeKey]) {
-                ctx.fillStyle = '#6a8aaa';
-                ctx.font = '7px monospace';
-                ctx.textAlign = 'center';
-                ctx.fillText(routes[train.routeKey].label.substring(0, 12), pos.x, pos.y + train.size/2 + 26);
-            }
-
-            // Nama kereta
-            ctx.shadowColor = 'rgba(0,0,0,0.8)';
-            ctx.shadowBlur = 6;
-            ctx.fillStyle = '#ffffff';
-            ctx.font = 'bold 10px monospace';
-            ctx.textAlign = 'center';
-            ctx.fillText(train.name.substring(0, 12), pos.x, pos.y - train.size/2 - 8);
-            ctx.shadowBlur = 0;
-            
-            // Arah
-            ctx.fillStyle = '#ffffffcc';
-            ctx.font = '14px sans-serif';
-            ctx.fillText(train.direction === 1 ? '▶' : '◀', pos.x, pos.y + 4);
-
-            // Jalur
-            ctx.fillStyle = '#8aadcc';
-            ctx.font = '9px monospace';
-            ctx.fillText(`J${train.assignedJalur+1}`, pos.x + train.size/2 + 12, pos.y + 4);
-        }
-
-        const aktifWesel = wesels[currentWeselIndex] || wesels[0];
-        weselStatus.textContent = `🔀 Wesel Global: ${currentWeselIndex + 1}`;
-        updateTrainCount();
-    }
-
-    // -- Helper lighten color --
-    function lightenColor(color, percent) {
-        const num = parseInt(color.replace('#',''), 16);
-        const amt = Math.round(2.55 * percent);
-        const R = Math.min(255, (num >> 16) + amt);
-        const G = Math.min(255, ((num >> 8) & 0x00FF) + amt);
-        const B = Math.min(255, (num & 0x0000FF) + amt);
-        return `#${(1 << 24 | R << 16 | G << 8 | B).toString(16).slice(1)}`;
-    }
-
-    // -- SIGNAL INDICATORS --
-    function updateSignalIndicators() {
-        signalIndicatorsEl.innerHTML = stations.map(s => {
-            const isAutoGreen = autoGreenSignals[s.id] ? true : false;
-            return `
-            <div class="sig">
-                <span class="light" style="background:${isAutoGreen ? '#22c55e' : (s.signal ? '#22c55e' : '#ef4444')};"></span>
-                ${s.name} ${isAutoGreen ? '🟢 AUTO' : (s.signal ? '🟢' : '🔴')}
-                ${s.autoRed ? '⚡' : ''}
-                <button onclick="toggleStationSignal('${s.id}')" style="background:linear-gradient(145deg,#1a2a3c,#111f2e);border:1px solid #2a4a6a;color:#dce6f0;border-radius:20px;padding:2px 12px;cursor:pointer;font-size:11px;">Toggle</button>
-            </div>
-        `}).join('');
-    }
-
-    // -- TOGGLE SINYAL STASIUN --
-    window.toggleStationSignal = function(stationId) {
-        const st = stations.find(s => s.id === stationId);
-        if (st) {
-            st.signal = !st.signal;
-            st.autoRed = false;
-            delete signalCooldown[st.id];
-            delete autoGreenSignals[st.id];
-            showPopup('🚦 Sinyal ' + (st.signal ? 'HIJAU' : 'MERAH'), st.name + ' (manual)');
-            updateSignalIndicators();
-            renderSlides();
-        }
-    };
-
-    // -- TOGGLE SINYAL KERETA --
-    window.toggleTrainSignal = function(trainIdx) {
-        if (trainIdx < trains.length) {
-            trains[trainIdx].trainSignal = !trains[trainIdx].trainSignal;
-            const status = trains[trainIdx].trainSignal ? 'ON' : 'OFF';
-            showPopup('🚦 Sinyal ' + trains[trainIdx].name, status);
-            renderTrainControls();
-        }
-    };
-
-    // -- RENDER KONTROL --
-    function renderTrainControls() {
-        trainListEl.innerHTML = trains.map((t, idx) => {
-            const location = trainLocations[t.id] || 'Unknown';
-            const weselOptions = stationWesels[getStationIdFromName(location)] || [];
-            const st = stations.find(s => s.id === getStationIdFromName(location));
-            const activeWesel = weselOptions.find(w => st && w.id === st.wesel);
-            return `
-            <div class="train-item">
-                <span class="color-dot" style="background:${t.color};"></span>
-                <span class="name">${t.name}</span>
-                <span style="font-size:11px;color:#8aadcc;min-width:100px;">📍 ${location}</span>
-                <span class="eta-info">${trainETAs[t.id] ? '⏱ ' + trainETAs[t.id] : '⏳'}</span>
-                <span class="wesel-info">${activeWesel ? '🔀 ' + activeWesel.label.substring(0, 12) : '🔀 Jalur ' + (t.assignedJalur + 1)}</span>
-                <div class="signal-control">
-                    <button onclick="toggleTrainSignal(${idx})" class="${t.trainSignal ? 'active' : 'inactive'}">
-                        ${t.trainSignal ? '🟢 ON' : '🔴 OFF'}
-                    </button>
+            html += `
+                <div class="track-line">
+                    <div class="station-name">${stasiun}</div>
+                    <div class="schedule">${trainHtml || '⚪ Kosong'}</div>
+                    <div class="signal ${signalClass}"></div>
                 </div>
-                <span class="status ${t.isStopped ? 'stop' : 'run'}">
-                    ${t.isStopped ? (t.autoStopped ? '⛔ TUMPUK' : '⏹ BERHENTI') : '▶ BERJALAN'}
-                </span>
-            </div>
-        `}).join('');
-    }
-
-    function getStationIdFromName(name) {
-        for (let s of stations) {
-            if (s.name === name) return s.id;
-        }
-        return null;
-    }
-
-    function updateTrainControls() {
-        const items = trainListEl.querySelectorAll('.train-item');
-        items.forEach((item, idx) => {
-            if (idx < trains.length) {
-                const statusEl = item.querySelector('.status');
-                if (statusEl) {
-                    const t = trains[idx];
-                    if (t.isStopped) {
-                        statusEl.textContent = t.autoStopped ? '⛔ TUMPUK' : '⏹ BERHENTI';
-                        statusEl.className = 'status stop';
-                    } else {
-                        statusEl.textContent = '▶ BERJALAN';
-                        statusEl.className = 'status run';
-                    }
-                }
-                const btn = item.querySelector('.signal-control button');
-                if (btn) {
-                    btn.textContent = trains[idx].trainSignal ? '🟢 ON' : '🔴 OFF';
-                    btn.className = trains[idx].trainSignal ? 'active' : 'inactive';
-                }
-                const locationSpan = item.querySelector('span[style*="min-width:100px;"]');
-                if (locationSpan && trainLocations[trains[idx].id]) {
-                    locationSpan.textContent = '📍 ' + trainLocations[trains[idx].id];
-                }
-                const etaSpan = item.querySelector('.eta-info');
-                if (etaSpan && trainETAs[trains[idx].id]) {
-                    etaSpan.textContent = '⏱ ' + trainETAs[trains[idx].id];
-                }
-                const weselSpan = item.querySelector('.wesel-info');
-                if (weselSpan) {
-                    const location = trainLocations[train.id] || 'Unknown';
-                    const stationId = getStationIdFromName(location);
-                    const weselOptions = stationWesels[stationId] || [];
-                    const st = stations.find(s => s.id === stationId);
-                    const activeWesel = weselOptions.find(w => st && w.id === st.wesel);
-                    weselSpan.textContent = activeWesel ? '🔀 ' + activeWesel.label.substring(0, 12) : '🔀 Jalur ' + (trains[idx].assignedJalur + 1);
-                }
-            }
-        });
-    }
-
-    // -- WESEL PER STASIUN --
-    window.changeStationWesel = function(stationId, weselId) {
-        const st = stations.find(s => s.id === stationId);
-        if (st) {
-            st.wesel = parseInt(weselId);
-            const weselOptions = stationWesels[stationId] || [];
-            const selected = weselOptions.find(w => w.id === parseInt(weselId));
-            
-            for (let train of trains) {
-                if (trainLocations[train.id] === st.name) {
-                    if (selected && routes[selected.routeKey]) {
-                        train.assignedJalur = routes[selected.routeKey].jalur;
-                        train.routeKey = selected.routeKey;
-                    }
-                }
-            }
-            
-            showPopup('🔀 Wesel ' + st.name, 'ke ' + (selected ? selected.label : 'Jalur ' + (parseInt(weselId) + 1)));
-            renderSlides();
-            renderTrainControls();
-        }
-    };
-
-    // -- OPEN SCHEDULE MODAL --
-    window.openScheduleModal = function(scheduleId, stationId) {
-        const modal = document.getElementById('scheduleModal');
-        const station = stations.find(s => s.id === stationId);
-        if (!station) return;
-
-        const trainSelect = document.getElementById('editTrainName');
-        trainSelect.innerHTML = trainTypes.map(t => 
-            `<option value="${t.name}">${t.name}</option>`
-        ).join('');
-
-        const stationSelect = document.getElementById('editStation');
-        stationSelect.innerHTML = stations.map(s => 
-            `<option value="${s.id}" ${s.id === stationId ? 'selected' : ''}>${s.name}</option>`
-        ).join('');
-
-        const destSelect = document.getElementById('editDestination');
-        const currentIdx = stationOrder.indexOf(stationId);
-        const nextStations = stationOrder.slice(currentIdx + 1);
-        destSelect.innerHTML = nextStations.map(id => {
-            const s = stations.find(st => st.id === id);
-            return s ? `<option value="${s.id}">${s.name}</option>` : '';
-        }).join('');
-
-        if (scheduleId) {
-            const sch = schedules[stationId].find(s => s.id === scheduleId);
-            if (sch) {
-                document.getElementById('editTrainName').value = sch.trainName;
-                document.getElementById('editStation').value = stationId;
-                document.getElementById('editDestination').value = sch.destinationId || '';
-                document.getElementById('editDelay').value = Math.max(3, Math.floor((sch.departureTime - Date.now()) / 1000));
-                editingSchedule = { id: sch.id, stationId: stationId };
-            }
-        } else {
-            editingSchedule = null;
-        }
-
-        modal.classList.add('show');
-    };
-
-    // -- CLOSE MODAL --
-    window.closeScheduleModal = function() {
-        document.getElementById('scheduleModal').classList.remove('show');
-        editingSchedule = null;
-    };
-
-    // -- SAVE SCHEDULE --
-    window.saveSchedule = function() {
-        const trainName = document.getElementById('editTrainName').value;
-        const stationId = document.getElementById('editStation').value;
-        const destinationId = document.getElementById('editDestination').value;
-        const delay = parseInt(document.getElementById('editDelay').value) || 10;
-
-        if (!trainName || !stationId || !destinationId) return;
-
-        const trainType = trainTypes.find(t => t.name === trainName);
-        if (!trainType) return;
-
-        const departureTime = Date.now() + (delay * 1000);
-        const destStation = stations.find(s => s.id === destinationId);
-        const fromStation = stations.find(s => s.id === stationId);
-
-        const schedule = {
-            id: editingSchedule ? editingSchedule.id : Date.now() + Math.random(),
-            trainName: trainType.name,
-            trainColor: trainType.color,
-            time: new Date().toLocaleTimeString(),
-            departureTime: departureTime,
-            countdown: '⏳',
-            status: 'scheduled',
-            stationId: stationId,
-            destinationId: destinationId,
-            destinationName: destStation ? destStation.name : 'Tujuan'
-        };
-
-        if (editingSchedule) {
-            const idx = schedules[editingSchedule.stationId].findIndex(s => s.id === editingSchedule.id);
-            if (idx !== -1) {
-                schedules[editingSchedule.stationId][idx] = schedule;
-            }
-        } else {
-            schedules[stationId].push(schedule);
-        }
-
-        let existingTrain = trains.find(t => t.name === trainType.name);
-        if (!existingTrain) {
-            const newTrain = {
-                ...trainType,
-                id: Date.now() + Math.random(),
-                progress: 0.05,
-                direction: 1,
-                active: true,
-                currentStation: fromStation.name,
-                assignedJalur: 0,
-                isStopped: false,
-                stopAtStation: null,
-                lastStationIdx: -1,
-                trainSignal: true,
-                autoStopped: false,
-                passedStations: [],
-                routeKey: null,
-                scheduleId: schedule.id,
-                glowIntensity: 0
-            };
-            trains.push(newTrain);
-            trainLocations[newTrain.id] = fromStation.name;
-            showPopup('🚆 ' + trainType.name, 'dispawn untuk jadwal dari ' + fromStation.name + ' ke ' + destStation.name);
-        } else {
-            existingTrain.scheduleId = schedule.id;
-            showPopup('📋 Jadwal ' + trainType.name, 'dari ' + fromStation.name + ' ke ' + destStation.name);
-        }
-
-        updateTrainCount();
-        renderTrainControls();
-        renderSlides();
-        closeScheduleModal();
-    };
-
-    // -- DELETE SCHEDULE --
-    window.deleteSchedule = function(scheduleId, stationId) {
-        if (confirm('Hapus jadwal ini?')) {
-            schedules[stationId] = schedules[stationId].filter(s => s.id !== scheduleId);
-            renderSlides();
-            showPopup('🗑️ Jadwal dihapus', '');
-        }
-    };
-
-    // -- RENDER SLIDES --
-    function renderSlides() {
-        slideNav.innerHTML = stations.map((s, idx) => `
-            <button onclick="goToSlide(${idx})" class="${idx === currentSlide ? 'active' : ''}">
-                ${idx + 1}
-            </button>
-        `).join('');
-
-        slideContent.innerHTML = stations.map((s, idx) => {
-            const stationSchedules = schedules[s.id] || [];
-            const weselOptions = stationWesels[s.id] || [];
-            const isAutoGreen = autoGreenSignals[s.id] ? true : false;
-            
-            return `
-            <div class="station-slide ${idx === currentSlide ? 'active' : ''}" id="slide-${idx}">
-                <div class="station-title">
-                    <span>📍 ${s.name} ${isAutoGreen ? '🟢 AUTO GREEN' : ''} ${s.autoRed ? '⚡AUTO RED' : ''}</span>
-                    <span class="train-indicator">${stationSchedules.length} jadwal</span>
-                </div>
-
-                <div class="map-container">
-                    <div class="track-map">
-                        <div class="map-title">🗺️ MAP JALUR ${s.name}</div>
-                        <div style="display:flex;flex-wrap:wrap;gap:4px;padding:8px 0;">
-                            ${weselOptions.map(w => {
-                                const route = routes[w.routeKey];
-                                const isActive = s.wesel === w.id;
-                                return `
-                                <div style="display:flex;align-items:center;gap:6px;padding:4px 10px;border-radius:8px;background:${isActive ? 'linear-gradient(145deg,#1a3a2a,#143a2a)' : 'linear-gradient(145deg,#0a121e,#0d1624)'};border:1px solid ${isActive ? '#3a8a6a' : '#1a2c3f'};">
-                                    <span style="font-size:10px;color:${isActive ? '#7acf8a' : '#6a8aaa'};">${isActive ? '▶' : ''}</span>
-                                    <span style="font-size:11px;color:${isActive ? '#7acf8a' : '#8aadcc'};">${w.label}</span>
-                                    ${route ? `<span style="font-size:8px;color:#6a8aaa;">${route.distance || 0}km</span>` : ''}
-                                </div>
-                            `}).join('')}
-                        </div>
-                        <div class="signal-status" style="margin-top:8px;">
-                            <span class="light" style="background:${isAutoGreen ? '#22c55e' : (s.signal ? '#22c55e' : '#ef4444')};"></span>
-                            Sinyal: ${isAutoGreen ? '🟢 AUTO GREEN' : (s.signal ? '🟢 HIJAU' : '🔴 MERAH')}
-                            ${s.autoRed ? '(Otomatis)' : ''}
-                        </div>
-                        <div class="signal-controls">
-                            <button class="green" onclick="setSignal('${s.id}', true)">🟢 Hijau</button>
-                            <button class="red" onclick="setSignal('${s.id}', false)">🔴 Merah</button>
-                            <button onclick="openScheduleModal(null, '${s.id}')" style="background:linear-gradient(145deg,#1d4a3a,#143a2a);border-color:#2a6a4a;color:#7acf8a;">
-                                ➕ Jadwal
-                            </button>
-                        </div>
-                    </div>
-                    <div class="track-map">
-                        <div class="map-title">🔀 WESEL ${s.name}</div>
-                        <div class="wesel-control">
-                            <div class="wesel-title">Pilih Wesel:</div>
-                            <select onchange="changeStationWesel('${s.id}', this.value)">
-                                ${weselOptions.map(w => `
-                                    <option value="${w.id}" ${s.wesel === w.id ? 'selected' : ''}>${w.label}</option>
-                                `).join('')}
-                            </select>
-                            <div class="wesel-info">
-                                Wesel aktif: <span class="active-wesel">${weselOptions.find(w => w.id === s.wesel)?.label || 'Jalur 1'}</span>
-                            </div>
-                        </div>
-                        <div style="margin-top:10px;">
-                            <div class="map-title">📋 JADWAL REAL-TIME</div>
-                            <div class="schedule-list">
-                                ${stationSchedules.length === 0 ? `
-                                    <div style="color:#6a8aaa;font-size:13px;padding:12px;text-align:center;">
-                                        Belum ada jadwal.
-                                    </div>
-                                ` : stationSchedules.map(sch => {
-                                    const train = trains.find(t => t.name === sch.trainName);
-                                    const eta = train ? trainETAs[train.id] : null;
-                                    return `
-                                    <div class="schedule-item">
-                                        <span class="train-name" style="color:${sch.trainColor}">${sch.trainName}</span>
-                                        <span class="time">⏰ ${sch.time}</span>
-                                        <span class="eta">${eta ? '⏱ ' + eta : ''}</span>
-                                        <span class="countdown">${sch.countdown || '⏳'}</span>
-                                        <span class="status-badge ${sch.status === 'scheduled' && autoGreenSignals[s.id] ? 'green-signal' : sch.status}">
-                                            ${sch.status === 'scheduled' && autoGreenSignals[s.id] ? '🟢 AUTO GREEN' :
-                                              sch.status === 'scheduled' ? '📅 Terjadwal' : 
-                                              sch.status === 'waiting' ? '⏳ Menunggu' :
-                                              sch.status === 'running' ? '🔄 Perjalanan' :
-                                              sch.status === 'arrived' ? '✅ Tiba' : 
-                                              sch.status === 'departed' ? '🚀 Berangkat' : sch.status}
-                                        </span>
-                                        <div class="schedule-actions">
-                                            <button onclick="openScheduleModal('${sch.id}', '${s.id}')">✏️</button>
-                                            <button class="danger" onclick="deleteSchedule('${sch.id}', '${s.id}')">🗑️</button>
-                                        </div>
-                                    </div>
-                                `}).join('')}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
             `;
-        }).join('');
+        });
+        area.innerHTML = html;
+        document.getElementById('trainCount').innerText = trains.length;
+        document.getElementById('gameTime').innerText = formatTime(gameTime);
     }
 
-    // -- SET SIGNAL --
-    window.setSignal = function(stationId, status) {
-        const st = stations.find(s => s.id === stationId);
-        if (st) {
-            st.signal = status;
-            st.autoRed = false;
-            delete signalCooldown[st.id];
-            delete autoGreenSignals[st.id];
-            showPopup('🚦 Sinyal ' + (status ? 'HIJAU' : 'MERAH'), st.name);
-            updateSignalIndicators();
-            renderSlides();
+    // ========== PERINTAH ==========
+    function tambahKereta() {
+        if (trains.length >= 20) {
+            addLog('⚠️ Stasiun penuh! Maksimal 20 kereta.');
+            return;
         }
-    };
-
-    // -- TOGGLE LOOP --
-    function toggleLoop() {
-        loopMode = !loopMode;
-        showPopup('🔄 Bolak-balik ' + (loopMode ? 'ON' : 'OFF'), '');
-        document.getElementById('toggleLoopBtn').textContent = loopMode ? '🔄 Bolak-Balik ON' : '⏹ Bolak-Balik OFF';
-        document.getElementById('toggleLoopBtn').style.background = loopMode ? 'linear-gradient(145deg,#1d4a3a,#143a2a)' : 'linear-gradient(145deg,#4d2732,#3a1a22)';
-        document.getElementById('toggleLoopBtn').style.borderColor = loopMode ? '#2a6a4a' : '#6a3a4a';
+        let name = namaKereta[Math.floor(Math.random() * namaKereta.length)];
+        let stationIdx = Math.floor(Math.random() * 5);
+        let status = ['arrive', 'depart', 'standby'][Math.floor(Math.random() * 3)];
+        trains.push({
+            id: trainIdCounter++,
+            name: name + '-' + (Math.floor(Math.random() * 900) + 100),
+            stationIndex: stationIdx,
+            status: status,
+            delay: 0
+        });
+        addLog(`🚆 Kereta ${name} ditambahkan di ${stasiunList[stationIdx]} (${status})`);
+        renderTrack();
+        document.getElementById('lastCommand').innerText = 'Tambah Kereta';
     }
 
-    // -- GO TO SLIDE --
-    window.goToSlide = function(idx) {
-        currentSlide = Math.min(Math.max(0, idx), stations.length - 1);
-        renderSlides();
-        const el = document.getElementById('slide-' + currentSlide);
-        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    };
+    function gerakkanKereta() {
+        if (trains.length === 0) {
+            addLog('⚠️ Tidak ada kereta untuk digerakkan.');
+            return;
+        }
+        // naikkan waktu 15 menit
+        gameTime += 15;
+        if (gameTime >= 1440) gameTime -= 1440; // reset ke 00:00
 
-    // -- RESET --
-    function resetAll() {
-        if (animationId) cancelAnimationFrame(animationId);
-        if (countdownInterval) clearInterval(countdownInterval);
-        stations.forEach(s => { s.signal = true; s.autoRed = false; s.wesel = 0; });
-        signalCooldown = {};
-        autoGreenSignals = {};
-        trainLocations = {};
-        trainETAs = {};
-        currentWeselIndex = 0;
-        wesels.forEach((w, i) => w.aktif = (i === 0));
-        initTrains();
-        lastPopupTime = 0;
-        if (popupTimer) clearTimeout(popupTimer);
-        popup.classList.remove('show');
-        updateSignalIndicators();
-        renderSlides();
-        loop();
-    }
-
-    // -- HELPERS --
-    function updateTrainCount() {
-        const active = trains.filter(t => t.active).length;
-        trainCountBadge.textContent = `🚆 ${active} kereta`;
-    }
-
-    // -- EVENT: KLIK STASIUN --
-    canvas.addEventListener('click', (e) => {
-        const rect = canvas.getBoundingClientRect();
-        const scaleX = canvas.width / rect.width;
-        const scaleY = canvas.height / rect.height;
-        const mx = (e.clientX - rect.left) * scaleX;
-        const my = (e.clientY - rect.top) * scaleY;
-
-        for (let i = 0; i < stations.length; i++) {
-            const s = stations[i];
-            const dx = mx - s.x;
-            const dy = my - s.y;
-            if (Math.sqrt(dx*dx + dy*dy) < 40) {
-                s.signal = !s.signal;
-                s.autoRed = false;
-                delete signalCooldown[s.id];
-                delete autoGreenSignals[s.id];
-                showPopup('🚦 Sinyal ' + (s.signal ? 'HIJAU' : 'MERAH'), s.name + ' (manual)');
-                updateSignalIndicators();
-                renderSlides();
-                goToSlide(i);
-                return;
+        // gerakkan kereta
+        let moved = 0;
+        trains.forEach(t => {
+            // 40% chance pindah ke stasiun berikutnya
+            if (Math.random() < 0.4) {
+                t.stationIndex = (t.stationIndex + 1) % 5;
+                t.status = ['arrive', 'depart', 'standby'][Math.floor(Math.random() * 3)];
+                moved++;
+            } else {
+                // ubah status random
+                if (Math.random() < 0.3) {
+                    t.status = ['arrive', 'depart', 'standby'][Math.floor(Math.random() * 3)];
+                }
             }
-        }
-    });
+            // tambah delay random
+            if (Math.random() < 0.1) t.delay += Math.floor(Math.random() * 5);
+        });
 
-    // -- LOOP --
-    function loop() {
-        updateTrains();
-        draw();
-        animationId = requestAnimationFrame(loop);
+        addLog(`⏩ Waktu maju 15 menit. ${moved} kereta berpindah.`);
+        document.getElementById('lastCommand').innerText = 'Gerakkan';
+        renderTrack();
     }
 
-    // -- BIND BUTTONS --
-    document.getElementById('addScheduleBtn').addEventListener('click', () => {
-        if (stations[currentSlide]) {
-            openScheduleModal(null, stations[currentSlide].id);
+    function acakJadwal() {
+        trains.forEach(t => {
+            t.stationIndex = Math.floor(Math.random() * 5);
+            t.status = ['arrive', 'depart', 'standby'][Math.floor(Math.random() * 3)];
+            t.delay = Math.floor(Math.random() * 10);
+        });
+        addLog('🔄 Jadwal diacak! Semua kereta berpindah posisi.');
+        document.getElementById('lastCommand').innerText = 'Acak Jadwal';
+        renderTrack();
+    }
+
+    function resetSimulasi() {
+        trains = [];
+        gameTime = 360;
+        trainIdCounter = 0;
+        logEntries = ['[06:00] Sistem PPKA siap. Stasiun Gambir aktif.'];
+        addLog('💥 Simulasi di-reset!');
+        document.getElementById('lastCommand').innerText = 'Reset';
+        renderTrack();
+    }
+
+    // ========== INIT ==========
+    // tambah 3 kereta awal
+    for (let i = 0; i < 3; i++) tambahKereta();
+    // auto update tiap 10 detik
+    setInterval(() => {
+        // gerakkan otomatis pelan
+        if (trains.length > 0 && Math.random() < 0.3) {
+            gerakkanKereta();
         }
-    });
-    document.getElementById('resetBtn').addEventListener('click', resetAll);
-    document.getElementById('toggleLoopBtn').addEventListener('click', toggleLoop);
+    }, 10000);
 
-    // -- START --
-    initTrains();
-    updateSignalIndicators();
-    renderSlides();
-    loop();
-
-    console.log('🚂 DRAGON RAIL PREMIUM — map 3D + animasi kereta halus + ETA real-time!');
-    console.log('📍 Setiap kereta punya efek glow, headlamp, dan asap!');
-})();
+    renderTrack();
 </script>
 </body>
 </html>
