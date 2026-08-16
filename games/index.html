@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PPKA DAOP 8 - GAPEKA 2026 REAL TIME</title>
+    <title>PPKA DAOP 8 - GAPEKA 2026 WIB (GMT+7)</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -68,7 +68,7 @@
         .railway-map {
             position: relative;
             width: 100%;
-            height: 450px;
+            height: 550px;
             background: #ffffff;
             border-radius: 8px;
             border: 1px solid #ddd;
@@ -105,7 +105,7 @@
         .station-info .s-name { font-size: 18px; font-weight: bold; color: #000; }
         .station-info .s-detail { font-size: 12px; color: #888; }
         .train-list {
-            max-height: 250px;
+            max-height: 200px;
             overflow-y: auto;
             margin: 10px 0;
         }
@@ -130,7 +130,6 @@
         .badge-standby { background: #28a745; color: #fff; }
         .badge-commuter { background: #17a2b8; color: #fff; }
         .badge-ka { background: #6c757d; color: #fff; }
-        .badge-info { background: #007bff; color: #fff; }
         .train-item .schedule-info {
             font-size: 10px;
             color: #888;
@@ -189,14 +188,7 @@
         ::-webkit-scrollbar-thumb { background: #888; border-radius: 10px; }
         @media (max-width: 700px) {
             .main-layout { flex-direction: column; }
-            .railway-map { height: 300px; }
-        }
-        .blink {
-            animation: blink 1s infinite;
-        }
-        @keyframes blink {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.3; }
+            .railway-map { height: 350px; }
         }
     </style>
 </head>
@@ -205,11 +197,11 @@
     <div class="header">
         <h1>🚂 PPKA DAOP 8</h1>
         <div class="sub">SURABAYA - JAWA TIMUR</div>
-        <div class="gapeka">📅 GAPEKA 2026 • REAL-TIME CLOCK • JADWAL DUNIA NYATA</div>
+        <div class="gapeka">📅 GAPEKA 2026 • WIB (GMT+7) • GRESIK - MALANG</div>
     </div>
 
     <div class="status-bar">
-        <div class="status-item">⏰ WAKTU REAL: <span class="realtime" id="realTime">--:--:--</span></div>
+        <div class="status-item">⏰ WAKTU WIB: <span class="realtime" id="realTime">--:--:--</span></div>
         <div class="status-item">🚆 KA AKTIF: <span id="totalTrains">0</span></div>
         <div class="status-item">🚃 COMMUTER: <span id="totalCommuter">0</span></div>
         <div class="status-item">📍 PPKA: <span id="activeStation">-</span></div>
@@ -217,7 +209,7 @@
 
     <div class="main-layout">
         <div class="map-panel">
-            <span class="label">🗺️ JALUR KERETA DAOP 8</span>
+            <span class="label">🗺️ JALUR KERETA GRESIK - MALANG</span>
             <div class="railway-map" id="railwayMap">
                 <canvas id="mapCanvas"></canvas>
             </div>
@@ -243,101 +235,129 @@
                 </div>
             </div>
             <div class="log-area" id="logArea">
-                <div class="log-entry"><span class="log-time">[--:--]</span> Sistem PPKA DAOP 8 real-time siap. Menunggu sinkronisasi...</div>
+                <div class="log-entry"><span class="log-time">[--:--:--]</span> Sistem PPKA DAOP 8 WIB siap. GAPEKA 2026 loaded.</div>
             </div>
         </div>
     </div>
 </div>
 
 <script>
-    // ========== STASIUN ==========
+    // ========== STASIUN DUNIA NYATA (GRESIK - MALANG) ==========
     const stasiunData = [
-        { id: 0, name: 'Surabaya Pasar Turi', daop: 'DAOP 8', x: 0.10, y: 0.12, type: 'utama' },
-        { id: 1, name: 'Surabaya Kota', daop: 'DAOP 8', x: 0.20, y: 0.28, type: 'utama' },
-        { id: 2, name: 'Surabaya Gubeng', daop: 'DAOP 8', x: 0.30, y: 0.20, type: 'utama' },
-        { id: 3, name: 'Wonokromo', daop: 'DAOP 8', x: 0.42, y: 0.40, type: 'besar' },
-        { id: 4, name: 'Waru', daop: 'DAOP 8', x: 0.55, y: 0.52, type: 'sedang' },
-        { id: 5, name: 'Gedangan', daop: 'DAOP 8', x: 0.70, y: 0.58, type: 'sedang' },
-        { id: 6, name: 'Sidoarjo', daop: 'DAOP 8', x: 0.88, y: 0.70, type: 'besar' }
+        { id: 0, name: 'Gresik', daop: 'DAOP 8', x: 0.05, y: 0.08, type: 'kecil' },
+        { id: 1, name: 'Bojonegoro', daop: 'DAOP 8', x: 0.12, y: 0.12, type: 'sedang' },
+        { id: 2, name: 'Babat', daop: 'DAOP 8', x: 0.18, y: 0.18, type: 'kecil' },
+        { id: 3, name: 'Lamongan', daop: 'DAOP 8', x: 0.25, y: 0.22, type: 'sedang' },
+        { id: 4, name: 'Pasar Turi', daop: 'DAOP 8', x: 0.35, y: 0.15, type: 'utama' },
+        { id: 5, name: 'Surabaya Gubeng', daop: 'DAOP 8', x: 0.42, y: 0.22, type: 'utama' },
+        { id: 6, name: 'Surabaya Kota', daop: 'DAOP 8', x: 0.38, y: 0.30, type: 'utama' },
+        { id: 7, name: 'Wonokromo', daop: 'DAOP 8', x: 0.48, y: 0.38, type: 'besar' },
+        { id: 8, name: 'Waru', daop: 'DAOP 8', x: 0.55, y: 0.48, type: 'sedang' },
+        { id: 9, name: 'Gedangan', daop: 'DAOP 8', x: 0.62, y: 0.55, type: 'sedang' },
+        { id: 10, name: 'Sidoarjo', daop: 'DAOP 8', x: 0.70, y: 0.60, type: 'besar' },
+        { id: 11, name: 'Porong', daop: 'DAOP 8', x: 0.78, y: 0.65, type: 'sedang' },
+        { id: 12, name: 'Bangil', daop: 'DAOP 8', x: 0.85, y: 0.72, type: 'besar' },
+        { id: 13, name: 'Pasuruan', daop: 'DAOP 8', x: 0.90, y: 0.78, type: 'sedang' },
+        { id: 14, name: 'Probolinggo', daop: 'DAOP 8', x: 0.95, y: 0.85, type: 'sedang' },
+        // Jalur selatan ke Malang
+        { id: 15, name: 'Lawang', daop: 'DAOP 8', x: 0.85, y: 0.88, type: 'sedang' },
+        { id: 16, name: 'Malang Kotalama', daop: 'DAOP 8', x: 0.88, y: 0.95, type: 'besar' },
+        { id: 17, name: 'Malang', daop: 'DAOP 8', x: 0.92, y: 0.98, type: 'utama' }
     ];
 
+    // Jalur utama & cabang (dari Gresik ke Malang)
     const jalur = [
-        [2,0], [0,2], [2,1], [1,2], [2,3], [3,2],
-        [3,4], [4,3], [4,5], [5,4], [5,6], [6,5],
-        [3,6], [6,3]
+        // Gresik - Surabaya
+        [0,1], [1,2], [2,3], [3,4],
+        // Surabaya loop
+        [4,5], [5,6], [6,4],
+        // Surabaya - Sidoarjo
+        [5,7], [7,8], [8,9], [9,10],
+        // Sidoarjo - Pasuruan - Probolinggo
+        [10,11], [11,12], [12,13], [13,14],
+        // Cabang ke Malang (dari Bangil)
+        [12,15], [15,16], [16,17],
+        // Jalur alternatif
+        [6,7], [7,10]
     ];
 
-    // ========== GAPEKA 2026 24 JAM ==========
+    // ========== GAPEKA 2026 24 JAM (WIB) ==========
     const gapeka2026 = {
         ka: [
-            ['Argo Bromo', 'ka', 0, 120, [0,6]],
-            ['Gajayana', 'ka', 1, 90, [6,0]],
-            ['Bima', 'ka', 2, 120, [0,6]],
-            ['Sembrani', 'ka', 3, 90, [6,0]],
-            ['Taksaka', 'ka', 4, 180, [0,6]],
-            ['Purwojaya', 'ka', 5, 120, [6,0]],
-            ['Bangunkarta', 'ka', 6, 90, [0,6]],
-            ['Mutiara Timur', 'ka', 7, 120, [6,0]],
-            ['Ranggajati', 'ka', 8, 180, [0,6]],
-            ['Argo Wilis', 'ka', 9, 150, [6,0]],
-            ['Brantas', 'ka', 10, 120, [0,6]],
-            ['Kahuripan', 'ka', 11, 90, [6,0]],
-            ['Logawa', 'ka', 12, 180, [0,6]],
-            ['Jayakarta', 'ka', 13, 120, [6,0]],
-            ['Senja Utama', 'ka', 14, 150, [0,6]],
-            ['Mutiara Selatan', 'ka', 15, 120, [6,0]],
-            ['Singasari', 'ka', 16, 180, [0,6]],
-            ['Gumarang', 'ka', 17, 90, [6,0]],
-            ['Dharmawangsa', 'ka', 18, 120, [0,6]],
-            ['Sancaka', 'ka', 19, 150, [6,0]],
-            ['Rapih Dharma', 'ka', 20, 120, [0,6]],
-            ['Airlangga', 'ka', 21, 90, [6,0]],
-            ['Bojonegoro', 'ka', 22, 180, [0,6]],
-            ['Cepu', 'ka', 23, 120, [6,0]],
+            // KA Jarak Jauh
+            ['Argo Bromo', 'ka', 0, 120, [4,17]],
+            ['Gajayana', 'ka', 1, 90, [17,4]],
+            ['Bima', 'ka', 2, 120, [4,17]],
+            ['Sembrani', 'ka', 3, 90, [17,4]],
+            ['Taksaka', 'ka', 4, 180, [4,17]],
+            ['Purwojaya', 'ka', 5, 120, [17,4]],
+            ['Bangunkarta', 'ka', 6, 90, [4,17]],
+            ['Mutiara Timur', 'ka', 7, 120, [17,4]],
+            ['Ranggajati', 'ka', 8, 180, [4,17]],
+            ['Brantas', 'ka', 9, 150, [17,4]],
+            ['Kahuripan', 'ka', 10, 120, [4,17]],
+            ['Logawa', 'ka', 11, 90, [17,4]],
+            ['Jayakarta', 'ka', 12, 120, [4,17]],
+            ['Senja Utama', 'ka', 13, 150, [17,4]],
+            ['Singasari', 'ka', 14, 180, [4,17]],
+            ['Gumarang', 'ka', 15, 90, [17,4]],
+            ['Dharmawangsa', 'ka', 16, 120, [4,17]],
+            ['Rapih Dharma', 'ka', 17, 150, [17,4]],
+            ['Airlangga', 'ka', 18, 120, [4,17]],
+            ['Bojonegoro Express', 'ka', 19, 90, [17,4]],
+            ['Sancaka', 'ka', 20, 120, [4,17]],
+            ['Penataran Utama', 'ka', 21, 150, [17,4]],
+            ['Wilis', 'ka', 22, 180, [4,17]],
+            ['Bromo', 'ka', 23, 120, [17,4]]
         ],
         commuter: [
-            ['Arjonegoro', 'commuter', 0, 25, [0,6]],
-            ['Jenggala', 'commuter', 1, 30, [2,3,4,5,6]],
-            ['Penataran', 'commuter', 2, 35, [0,3,6]],
-            ['Dhoho', 'commuter', 3, 40, [2,4,5]],
-            ['Supas', 'commuter', 4, 20, [0,2,3,4]],
-            ['Sindoro', 'commuter', 5, 30, [6,0]],
-            ['Lawu', 'commuter', 6, 35, [0,6]],
-            ['Merbabu', 'commuter', 7, 40, [2,6]],
-            ['Bromo', 'commuter', 8, 25, [6,2]],
-            ['Semeru', 'commuter', 9, 30, [0,2,3,6]],
-            ['Wilis', 'commuter', 10, 35, [2,4,6]],
-            ['Kelud', 'commuter', 11, 40, [6,3,0]],
-            ['Rinjani', 'commuter', 12, 25, [0,6]],
-            ['Tengger', 'commuter', 13, 30, [2,6]],
-            ['Ijen', 'commuter', 14, 35, [6,2]],
-            ['Raung', 'commuter', 15, 40, [0,2,3,6]],
-            ['Kawi', 'commuter', 16, 25, [2,3,4,5,6]],
-            ['Arjuno', 'commuter', 17, 30, [0,2,6]],
-            ['Welirang', 'commuter', 18, 35, [6,0]],
-            ['Anjasmoro', 'commuter', 19, 40, [2,6]],
-            ['Kendeng', 'commuter', 20, 25, [0,3,6]],
-            ['Muria', 'commuter', 21, 30, [6,2]],
-            ['Panderman', 'commuter', 22, 35, [0,6]],
-            ['Galunggung', 'commuter', 23, 40, [2,3,4,5,6]],
+            ['Arjonegoro', 'commuter', 0, 25, [4,17]],
+            ['Jenggala', 'commuter', 1, 30, [5,6,7,8,9,10]],
+            ['Penataran', 'commuter', 2, 35, [4,7,10]],
+            ['Dhoho', 'commuter', 3, 40, [5,8,9]],
+            ['Supas', 'commuter', 4, 20, [4,5,6,7,8]],
+            ['Sindoro', 'commuter', 5, 30, [17,4]],
+            ['Lawu', 'commuter', 6, 35, [4,17]],
+            ['Merbabu', 'commuter', 7, 40, [5,17]],
+            ['Bromo Commuter', 'commuter', 8, 25, [17,5]],
+            ['Semeru', 'commuter', 9, 30, [4,5,7,17]],
+            ['Wilis Commuter', 'commuter', 10, 35, [5,8,10,17]],
+            ['Kelud', 'commuter', 11, 40, [17,7,4]],
+            ['Rinjani', 'commuter', 12, 25, [4,17]],
+            ['Tengger', 'commuter', 13, 30, [5,17]],
+            ['Ijen', 'commuter', 14, 35, [17,5]],
+            ['Raung', 'commuter', 15, 40, [4,5,7,17]],
+            ['Kawi', 'commuter', 16, 25, [5,7,8,9,10,17]],
+            ['Arjuno', 'commuter', 17, 30, [4,5,17]],
+            ['Welirang', 'commuter', 18, 35, [17,4]],
+            ['Anjasmoro', 'commuter', 19, 40, [5,17]],
+            ['Kendeng', 'commuter', 20, 25, [4,7,17]],
+            ['Muria', 'commuter', 21, 30, [17,5]],
+            ['Panderman', 'commuter', 22, 35, [4,17]],
+            ['Galunggung', 'commuter', 23, 40, [5,7,8,9,10,17]]
         ]
     };
 
     // ========== STATE ==========
     let trains = [];
-    let selectedStation = 0;
+    let selectedStation = 4; // default Pasar Turi
     let trainIdCounter = 0;
     let logEntries = [];
     let autoSpawnEnabled = true;
     let lastSpawnMinute = -1;
     let timeOffset = 0;
 
-    // ========== FUNGSI WAKTU REAL ==========
+    // ========== FUNGSI WAKTU WIB (GMT+7) ==========
     function getRealTime() {
         const now = new Date();
-        const hours = now.getHours();
-        const minutes = now.getMinutes();
-        const seconds = now.getSeconds();
+        // GMT+7 (WIB)
+        const offset = 7;
+        const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+        const wib = new Date(utc + (3600000 * offset));
+        
+        const hours = wib.getHours();
+        const minutes = wib.getMinutes();
+        const seconds = wib.getSeconds();
         return {
             hours, minutes, seconds,
             totalMinutes: hours * 60 + minutes,
@@ -361,17 +381,10 @@
         return `${String(h).padStart(2,'0')}:${String(min).padStart(2,'0')}`;
     }
 
-    function formatTimeFull(m) {
-        let h = Math.floor(m / 60) % 24;
-        let min = m % 60;
-        let sec = Math.floor((m % 1) * 60);
-        return `${String(h).padStart(2,'0')}:${String(min).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
-    }
-
     function syncTime() {
         timeOffset = 0;
         const real = getRealTime();
-        addLog(`🔄 Waktu disinkronkan ke ${real.timeString} (real-time)`, 'info');
+        addLog(`🔄 Waktu disinkronkan ke ${real.timeString} WIB (GMT+7)`, 'info');
         document.getElementById('realTime').textContent = real.string;
         updateStatus();
     }
@@ -389,52 +402,51 @@
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, W, H);
 
+        // Grid halus
         ctx.strokeStyle = '#e5e5e5';
         ctx.lineWidth = 0.5;
         for (let i = 0; i < W; i += 30) { ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,H); ctx.stroke(); }
         for (let i = 0; i < H; i += 30) { ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(W,i); ctx.stroke(); }
 
+        // Draw jalur
         jalur.forEach(([a,b]) => {
             const p1 = stasiunData[a], p2 = stasiunData[b];
             const x1 = p1.x*W, y1 = p1.y*H, x2 = p2.x*W, y2 = p2.y*H;
-            const isSpecial = (a===0&&b===2)||(a===2&&b===0);
+            
+            // Jalur utama vs cabang
+            const isMain = (a <= 14 && b <= 14) || (a >= 15 && b >= 15);
             
             ctx.shadowColor = 'rgba(0,0,0,0.1)';
             ctx.shadowBlur = 10;
-            ctx.strokeStyle = isSpecial ? '#007bff' : '#222';
-            ctx.lineWidth = isSpecial ? 5 : 4;
+            ctx.strokeStyle = isMain ? '#222' : '#555';
+            ctx.lineWidth = isMain ? 4 : 2.5;
             ctx.beginPath();
             ctx.moveTo(x1, y1);
             ctx.lineTo(x2, y2);
             ctx.stroke();
 
             ctx.shadowBlur = 0;
-            ctx.strokeStyle = isSpecial ? '#66b3ff' : '#888';
-            ctx.lineWidth = 2;
+            ctx.strokeStyle = isMain ? '#888' : '#aaa';
+            ctx.lineWidth = isMain ? 2 : 1.5;
             ctx.beginPath();
             ctx.moveTo(x1, y1);
             ctx.lineTo(x2, y2);
             ctx.stroke();
 
-            if (isSpecial) {
-                ctx.strokeStyle = '#007bff';
-                ctx.lineWidth = 1;
-                ctx.setLineDash([4,6]);
-                const ang = Math.atan2(y2-y1, x2-x1);
-                const offX = Math.sin(ang)*6, offY = -Math.cos(ang)*6;
-                ctx.beginPath();
-                ctx.moveTo(x1+offX, y1+offY);
-                ctx.lineTo(x2+offX, y2+offY);
-                ctx.stroke();
-                ctx.setLineDash([]);
-                
-                ctx.fillStyle = '#007bff';
-                ctx.font = '8px monospace';
-                ctx.textAlign = 'center';
-                ctx.fillText('JALUR KHUSUS', (x1+x2)/2, (y1+y2)/2 - 10);
-            }
+            // Jalur ganda
+            ctx.strokeStyle = '#ccc';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([4,6]);
+            const ang = Math.atan2(y2-y1, x2-x1);
+            const offX = Math.sin(ang)*5, offY = -Math.cos(ang)*5;
+            ctx.beginPath();
+            ctx.moveTo(x1+offX, y1+offY);
+            ctx.lineTo(x2+offX, y2+offY);
+            ctx.stroke();
+            ctx.setLineDash([]);
         });
 
+        // Draw stations
         stasiunData.forEach((st, idx) => {
             const x = st.x*W, y = st.y*H;
             const isActive = (selectedStation === idx);
@@ -442,25 +454,34 @@
             const hasCommuter = trains.some(t => t.stationIndex === idx && t.isCommuter);
 
             if (isActive) {
-                ctx.shadowColor = 'rgba(0,0,0,0.1)';
+                ctx.shadowColor = 'rgba(0,0,0,0.15)';
                 ctx.shadowBlur = 30;
                 ctx.beginPath();
-                ctx.arc(x, y, 25, 0, Math.PI*2);
-                ctx.fillStyle = 'rgba(0,0,0,0.03)';
+                ctx.arc(x, y, 28, 0, Math.PI*2);
+                ctx.fillStyle = 'rgba(0,0,0,0.05)';
                 ctx.fill();
                 ctx.shadowBlur = 0;
             }
 
-            ctx.strokeStyle = isActive ? '#000' : '#aaa';
-            ctx.lineWidth = isActive ? 3 : 1;
+            // Outer ring
+            let ringColor = '#aaa';
+            let ringWidth = 1;
+            if (isActive) { ringColor = '#000'; ringWidth = 3; }
+            else if (st.type === 'utama') { ringColor = '#222'; ringWidth = 2; }
+            else if (st.type === 'besar') { ringColor = '#444'; ringWidth = 1.5; }
+            
+            ctx.strokeStyle = ringColor;
+            ctx.lineWidth = ringWidth;
             ctx.beginPath();
             ctx.arc(x, y, 14, 0, Math.PI*2);
             ctx.stroke();
 
+            // Inner dot
             let color = '#ffffff';
             if (isActive) color = '#000';
             else if (hasCommuter) color = '#17a2b8';
             else if (trainCount > 0) color = '#888';
+            else if (st.type === 'utama') color = '#eee';
             
             ctx.shadowColor = isActive ? 'rgba(0,0,0,0.2)' : 'transparent';
             ctx.shadowBlur = isActive ? 20 : 0;
@@ -475,12 +496,21 @@
             ctx.textAlign = 'center';
             ctx.fillText(trainCount > 0 ? `🚆${trainCount}` : '', x, y + 30);
 
-            ctx.fillStyle = isActive ? '#000' : '#555';
-            ctx.font = isActive ? 'bold 10px monospace' : '9px monospace';
+            // Label stasiun (dengan ukuran berbeda)
+            let fontSize = 9;
+            let fontStyle = 'monospace';
+            let colorText = '#555';
+            if (isActive) { fontSize = 10; fontStyle = 'bold monospace'; colorText = '#000'; }
+            else if (st.type === 'utama') { fontSize = 10; fontStyle = 'bold monospace'; colorText = '#222'; }
+            else if (st.type === 'besar') { fontSize = 9; fontStyle = 'monospace'; colorText = '#444'; }
+            
+            ctx.fillStyle = colorText;
+            ctx.font = `${fontStyle} ${fontSize}px monospace`;
             ctx.textAlign = 'center';
             ctx.fillText(st.name, x, y - 20);
         });
 
+        // Legend
         ctx.fillStyle = '#666';
         ctx.font = '9px monospace';
         ctx.textAlign = 'left';
@@ -490,8 +520,16 @@
         ctx.fillText('● Commuter Line', 12, 38);
         ctx.fillStyle = '#000';
         ctx.fillText('● Stasiun Aktif (PPKA)', 12, 54);
-        ctx.fillStyle = '#007bff';
-        ctx.fillText('━ Jalur Khusus Gubeng-PasarTuri', 12, 70);
+        ctx.fillStyle = '#666';
+        ctx.fillText('━ Jalur Utama', 12, 70);
+        ctx.fillStyle = '#aaa';
+        ctx.fillText('━ Jalur Cabang', 12, 86);
+        ctx.fillStyle = '#d4880f';
+        ctx.font = 'bold 9px monospace';
+        ctx.fillText('📍 GRESIK — MALANG', W - 120, 22);
+        ctx.fillStyle = '#666';
+        ctx.font = '8px monospace';
+        ctx.fillText('DAOP 8 | GAPEKA 2026', W - 100, 38);
     }
 
     // ========== CLICK MAP ==========
@@ -500,7 +538,7 @@
         const x = (e.clientX - rect.left) / rect.width;
         const y = (e.clientY - rect.top) / rect.height;
         
-        let minDist = 0.08, found = -1;
+        let minDist = 0.07, found = -1;
         stasiunData.forEach((st, idx) => {
             const dx = x - st.x, dy = y - st.y;
             const dist = Math.sqrt(dx*dx + dy*dy);
@@ -514,7 +552,7 @@
         selectedStation = idx;
         document.getElementById('activeStation').innerText = stasiunData[idx].name;
         document.getElementById('stName').innerText = stasiunData[idx].name;
-        document.getElementById('stDetail').innerText = `${stasiunData[idx].daop} | PPKA Aktif | Real-Time`;
+        document.getElementById('stDetail').innerText = `${stasiunData[idx].daop} | PPKA Aktif | WIB (GMT+7)`;
         renderStationTrains();
         drawMap();
     }
@@ -560,7 +598,6 @@
         document.getElementById('totalCommuter').innerText = trains.filter(t => t.isCommuter).length;
         document.getElementById('gameTime').innerHTML = formatTime(gameTime);
         
-        // Update real time
         const real = getRealTime();
         document.getElementById('realTime').textContent = real.string;
         
@@ -578,14 +615,13 @@
         document.getElementById('logArea').scrollTop = document.getElementById('logArea').scrollHeight;
     }
 
-    // ========== SPAWN OTOMATIS GAPEKA 24JAM (REAL-TIME) ==========
+    // ========== SPAWN OTOMATIS GAPEKA ==========
     function spawnDariGapeka() {
         if (!autoSpawnEnabled) return;
         
         const gameTime = getGameTime();
         const currentMinute = Math.floor(gameTime);
         
-        // Cek setiap menit sekali
         if (currentMinute === lastSpawnMinute) return;
         lastSpawnMinute = currentMinute;
 
@@ -616,7 +652,7 @@
                         departTime: departTime,
                         delay: 0
                     });
-                    addLog(`🚆 ${ka[0]} tiba di ${stasiunData[stIdx].name} (GAPEKA 2026 REAL-TIME)`, 'ka');
+                    addLog(`🚆 ${ka[0]} tiba di ${stasiunData[stIdx].name} (GAPEKA 2026 WIB)`, 'ka');
                 }
             }
         });
@@ -649,7 +685,7 @@
                         departTime: departTime,
                         delay: 0
                     });
-                    addLog(`🚃 ${com[0]} tiba di ${stasiunData[stIdx].name} (GAPEKA 2026 REAL-TIME)`, 'commuter');
+                    addLog(`🚃 ${com[0]} tiba di ${stasiunData[stIdx].name} (GAPEKA 2026 WIB)`, 'commuter');
                 }
             }
         });
@@ -665,13 +701,11 @@
         let moved = 0, commuterMoved = 0;
 
         trains.forEach(t => {
-            // Update status berdasarkan waktu
             if (t.status === 'arrive' && t.departTime !== undefined && gameTime >= t.departTime) {
                 t.status = 'depart';
                 addLog(`🚂 ${t.name} berangkat dari ${stasiunData[t.stationIndex].name}`, 'ka');
             }
 
-            // Kereta yang sudah depart dan waktunya pindah
             if (t.status === 'depart' && t.departTime !== undefined && gameTime >= t.departTime + 2) {
                 let newIdx;
                 if (t.isCommuter && t.commuterRoute) {
@@ -796,46 +830,42 @@
         trains = [];
         trainIdCounter = 0;
         const real = getRealTime();
-        logEntries = [`<div class="log-entry"><span class="log-time">[${real.string}]</span> Sistem PPKA DAOP 8 real-time siap.</div>`];
+        logEntries = [`<div class="log-entry"><span class="log-time">[${real.string}]</span> Sistem PPKA DAOP 8 WIB siap. GAPEKA 2026 loaded.</div>`];
         addLog('💥 Simulasi di-reset!', 'danger');
         updateStatus();
         document.getElementById('stName').innerText = stasiunData[selectedStation].name;
-        document.getElementById('stDetail').innerText = `${stasiunData[selectedStation].daop} | PPKA Aktif | Real-Time`;
+        document.getElementById('stDetail').innerText = `${stasiunData[selectedStation].daop} | PPKA Aktif | WIB (GMT+7)`;
     }
 
     // ========== INIT ==========
     function init() {
-        selectStation(0);
+        selectStation(4); // Pasar Turi sebagai default
+        
         syncTime();
         
-        // Timer per detik untuk update jam
         setInterval(() => {
             const real = getRealTime();
             document.getElementById('realTime').textContent = real.string;
             document.getElementById('gameTime').innerHTML = formatTime(getGameTime());
         }, 1000);
 
-        // Spawn setiap menit (cek jadwal)
         setInterval(() => {
             spawnDariGapeka();
         }, 10000);
 
-        // Gerakkan kereta setiap 15 detik
         setInterval(() => {
             gerakkanKereta();
         }, 15000);
 
-        // Update UI setiap 5 detik
         setInterval(() => {
             updateStatus();
         }, 5000);
 
         window.addEventListener('resize', () => drawMap());
         
-        // Initial spawn
         setTimeout(() => spawnDariGapeka(), 2000);
         
-        addLog('🕐 Sistem real-time aktif. Waktu disinkronkan dengan jam sistem.', 'info');
+        addLog('🕐 Sistem WIB (GMT+7) aktif. Jalur Gresik - Malang tersedia.', 'info');
     }
 
     init();
