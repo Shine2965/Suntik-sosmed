@@ -74,6 +74,15 @@
             transform: scale(0.97);
         }
 
+        .nav-btn.info-btn {
+            border-color: rgba(0, 255, 170, 0.3);
+            background: rgba(0, 255, 170, 0.05);
+        }
+
+        .nav-btn.info-btn:hover {
+            background: rgba(0, 255, 170, 0.15);
+        }
+
         /* FOOTER */
         .footer {
             margin-top: 25px;
@@ -125,6 +134,18 @@
         .user-bubble .bubble-close:hover {
             background: #ff6666;
             transform: scale(1.1);
+        }
+
+        /* USER ID DISPLAY DI BAWAH */
+        .user-id-footer {
+            margin-top: 12px;
+            font-size: 10px;
+            color: #444;
+            font-family: 'Courier New', monospace;
+        }
+
+        .user-id-footer span {
+            color: #00ffaa;
         }
 
         /* RESPONSIVE */
@@ -181,8 +202,13 @@
             📱 Telegram Market
         </button>
 
-       
+        
         <div class="footer">© Shine Shop - 2023</div>
+        
+        <!-- ===== USER ID DISPLAY ===== -->
+        <div class="user-id-footer">
+            🆔 User ID: <span id="userIdDisplay">-</span>
+        </div>
     </div>
 
     <div id="userBubble" class="user-bubble">
@@ -191,21 +217,50 @@
     </div>
 
     <script>
-        // ===================== USER ID =====================
+        // ===================== USER ID (PERSISTEN - TIDAK BUAT ULANG) =====================
         function generateUserID() {
             return 'user-' + Math.random().toString(36).substring(2, 10) + '-' + Date.now().toString(36);
         }
 
-        function getUserID() {
-            let id = localStorage.getItem("user_id");
-            if (!id) {
-                id = generateUserID();
-                localStorage.setItem("user_id", id);
+        function getOrCreateUserID() {
+            // CEK APAKAH SUDAH ADA DI LOCAL STORAGE
+            let id = localStorage.getItem('user_id');
+            
+            // JIKA SUDAH ADA, LANGSUNG KEMBALIKAN (TIDAK BUAT BARU)
+            if (id) {
+                console.log('✅ User ID sudah ada (persisten):', id);
+                return id;
             }
+            
+            // JIKA BELUM ADA, BUAT BARU
+            id = generateUserID();
+            localStorage.setItem('user_id', id);
+            console.log('🆕 User ID baru dibuat:', id);
             return id;
         }
 
-        const userID = getUserID();
+        function getUserID() {
+            // HANYA MENGAMBIL, TIDAK MEMBUAT BARU
+            return localStorage.getItem('user_id') || null;
+        }
+
+        // ===================== DAPATKAN USER ID =====================
+        const userID = getOrCreateUserID();
+
+        // ===================== TAMPILKAN USER ID =====================
+        function displayUserID() {
+            const displayEl = document.getElementById('userIdDisplay');
+            if (displayEl) {
+                const id = getUserID();
+                if (id) {
+                    displayEl.textContent = id;
+                    displayEl.style.color = '#00ffaa';
+                } else {
+                    displayEl.textContent = 'Belum ada';
+                    displayEl.style.color = '#666';
+                }
+            }
+        }
 
         // ===================== BUBBLE =====================
         const bubble = document.getElementById('userBubble');
@@ -220,14 +275,13 @@
             `;
             bubble.classList.add('show');
 
-            // Hapus timeout lama jika ada
             if (bubbleTimeout) clearTimeout(bubbleTimeout);
 
             bubbleTimeout = setTimeout(() => {
                 bubble.classList.remove('show');
                 bubbleTimeout = null;
                 setTimeout(cekPesan, 500);
-            }, 3000);
+            }, 3500);
         }
 
         function closeBubble() {
@@ -280,7 +334,6 @@
                     });
                 }
 
-                // Tampilkan alert secara berurutan
                 for (const alert of alerts) {
                     await Swal.fire({
                         title: alert.title,
@@ -298,7 +351,6 @@
 
         // ===================== NAVIGASI =====================
         function goTo(url) {
-            // Efek loading pada tombol
             const btns = document.querySelectorAll('.nav-btn');
             btns.forEach(btn => {
                 btn.classList.add('loading');
@@ -312,9 +364,13 @@
 
         // ===================== INIT =====================
         window.addEventListener('load', function() {
+            // Tampilkan User ID
+            displayUserID();
+            
+            // Tampilkan bubble
             showUserBubble();
 
-            // Jika bubble tidak muncul otomatis (fallback)
+            // Fallback jika bubble tidak muncul
             setTimeout(() => {
                 if (!bubble.classList.contains('show')) {
                     showUserBubble();
@@ -335,6 +391,7 @@
         // ===================== LOG =====================
         console.log('🛒 Shine Shop siap!');
         console.log('👤 User ID:', userID);
+        console.log('📌 Status: ' + (localStorage.getItem('user_id') ? '✅ Persisten' : '🆕 Baru dibuat'));
     </script>
 
 </body>
