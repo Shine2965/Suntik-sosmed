@@ -427,6 +427,126 @@ input:focus, select:focus {
 }
 
 /* ===============================  
+   SYARAT & KETENTUAN  
+=================================*/  
+.terms-container {
+  margin-top: 24px;
+  padding: 16px 20px;
+  background: var(--glass);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  transition: all 0.3s ease;
+}
+
+.terms-container:hover {
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.terms-container .terms-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.terms-container .terms-header input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--accent2);
+  cursor: pointer;
+  flex-shrink: 0;
+  margin: 0;
+}
+
+.terms-container .terms-header label {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  text-transform: none;
+  letter-spacing: 0;
+  cursor: pointer;
+}
+
+.terms-container .terms-header label a {
+  color: var(--accent2);
+  text-decoration: underline;
+  transition: color 0.3s ease;
+}
+
+.terms-container .terms-header label a:hover {
+  color: var(--accent1);
+}
+
+.terms-container .terms-content {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.terms-container .terms-content.open {
+  max-height: 400px;
+}
+
+.terms-container .terms-content-inner {
+  margin-top: 12px;
+  padding: 14px 16px;
+  background: rgba(15, 23, 42, 0.5);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.8;
+  max-height: 300px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+}
+
+.terms-container .terms-content-inner::-webkit-scrollbar {
+  width: 4px;
+}
+
+.terms-container .terms-content-inner::-webkit-scrollbar-thumb {
+  background: var(--accent1);
+  border-radius: 10px;
+}
+
+.terms-container .terms-toggle {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 4px 0;
+  margin-top: 8px;
+  text-decoration: underline;
+  transition: color 0.3s ease;
+  width: auto;
+  box-shadow: none;
+}
+
+.terms-container .terms-toggle:hover {
+  color: white;
+  transform: none;
+  box-shadow: none;
+}
+
+.terms-container .terms-toggle::after {
+  display: none;
+}
+
+.terms-error {
+  color: var(--danger);
+  font-size: 12px;
+  margin-top: 8px;
+  display: none;
+}
+
+.terms-error.show {
+  display: block;
+}
+
+/* ===============================  
    BUTTON  
 =================================*/  
 button {  
@@ -551,6 +671,10 @@ p.info {
     font-size: 14px;
     padding: 14px 20px;
   }
+
+  .terms-container {
+    padding: 12px 14px;
+  }
 }
 
 @media (max-width: 400px) {
@@ -599,7 +723,7 @@ p.info {
 @keyframes shimmer {
   0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }
-	}
+}
 	
 </style> 
   
@@ -636,9 +760,9 @@ p.info {
   </header>  
   
   <ul class="menu-list">  
-    <li><a href="/index.html/">🏠 Home</a>/</li>
-	<li><a href="/sosmed-1/">⚜️ Suntik Sosmed 1</a></li>  
-     </ul>  
+    <li><a href="/index.html/">🏠 Home</a></li>
+    <li><a href="/sosmed-1/">⚜️ Suntik Sosmed 1</a></li>  
+  </ul>  
 </nav>  
   
 <script>  
@@ -691,27 +815,131 @@ overlay.onclick=closeMenu;
   
 <label>Total Harga (Rp):</label>  
 <input type="text" id="total" readonly>  
-  
-<button onclick="lanjutPembayaran()">Lanjut ke Pembayaran</button>  
-  
+
+<!-- ===== SYARAT & KETENTUAN ===== -->
+<div class="terms-container" id="termsContainer">
+  <div class="terms-header">
+    <input type="checkbox" id="termsCheckbox">
+    <label for="termsCheckbox">
+      Saya menyetujui <a href="#" id="termsLink" onclick="toggleTerms(event)">Syarat & Ketentuan</a> yang berlaku
+    </label>
+  </div>
+  <div class="terms-content" id="termsContent">
+    <div class="terms-content-inner" id="termsContentInner">
+      <div style="text-align:center;color:#666;padding:20px;">
+        ⏳ Memuat syarat & ketentuan...
+      </div>
+    </div>
+    <button class="terms-toggle" id="termsToggleBtn" onclick="toggleTerms(event)">📖 Sembunyikan</button>
+  </div>
+  <div class="terms-error" id="termsError">⚠️ Anda harus menyetujui syarat & ketentuan terlebih dahulu!</div>
+</div>
+
+<button onclick="lanjutPembayaran()">Lanjut ke Pembayaran</button>
+
 </div>  
-  
+
 <script>  
-	const audio = document.getElementById("bgm");  
-  
+const audio = document.getElementById("bgm");  
+
 // setelah audio mulai, unmute otomatis  
 audio.addEventListener("canplay", () => {  
   audio.muted = false;  
   audio.volume = 1.0; // atur volume (0.0 - 1.0)  
 });  
-  
+
 // fallback jika browser nahan autoplay  
 setTimeout(() => {  
   audio.muted = false;  
   audio.play().catch(()=>{});  
 }, 1000);  
-	  
-// DATA LAYANAN
+
+// ===================== SYARAT & KETENTUAN =====================
+const termsCheckbox = document.getElementById('termsCheckbox');
+const termsError = document.getElementById('termsError');
+const termsContent = document.getElementById('termsContent');
+const termsContentInner = document.getElementById('termsContentInner');
+const termsToggleBtn = document.getElementById('termsToggleBtn');
+
+let termsData = '';
+let isTermsLoaded = false;
+
+// Fungsi untuk mengambil syarat & ketentuan dari /rules/
+async function loadTerms() {
+  try {
+    const res = await fetch('/rules/?t=' + Date.now());
+    if (!res.ok) {
+      throw new Error('Gagal mengambil syarat & ketentuan');
+    }
+    const html = await res.text();
+    termsData = html || 'Syarat & ketentuan belum tersedia.';
+    termsContentInner.innerHTML = termsData;
+    isTermsLoaded = true;
+    console.log('✅ Syarat & ketentuan berhasil dimuat');
+  } catch (err) {
+    console.error('Error load terms:', err);
+    termsContentInner.innerHTML = `
+      <div style="color:#ff6666;">
+        ❌ Gagal memuat syarat & ketentuan.<br>
+        <span style="font-size:12px;color:#888;">${err.message}</span>
+        <br><br>
+        <button onclick="loadTerms()" style="background:#444;color:white;border:none;padding:8px 20px;border-radius:8px;cursor:pointer;width:auto;margin-top:8px;box-shadow:none;">
+          🔄 Coba Lagi
+        </button>
+      </div>
+    `;
+  }
+}
+
+// Toggle tampilan syarat & ketentuan
+function toggleTerms(e) {
+  if (e) e.preventDefault();
+  
+  const isOpen = termsContent.classList.contains('open');
+  
+  if (!isOpen) {
+    // Jika belum dimuat, muat dulu
+    if (!isTermsLoaded) {
+      loadTerms();
+    }
+    termsContent.classList.add('open');
+    termsToggleBtn.textContent = '📖 Sembunyikan';
+  } else {
+    termsContent.classList.remove('open');
+    termsToggleBtn.textContent = '📖 Baca Syarat & Ketentuan';
+  }
+}
+
+// Tampilkan error jika checkbox belum dicentang
+function validateTerms() {
+  if (!termsCheckbox.checked) {
+    termsError.classList.add('show');
+    termsCheckbox.style.borderColor = 'var(--danger)';
+    setTimeout(() => {
+      termsError.classList.remove('show');
+    }, 3000);
+    return false;
+  }
+  termsError.classList.remove('show');
+  termsCheckbox.style.borderColor = '';
+  return true;
+}
+
+// Event listener checkbox
+termsCheckbox.addEventListener('change', function() {
+  if (this.checked) {
+    termsError.classList.remove('show');
+    termsCheckbox.style.borderColor = '';
+    // Auto buka terms jika belum terbuka
+    if (!termsContent.classList.contains('open') && !isTermsLoaded) {
+      loadTerms();
+      termsContent.classList.add('open');
+      termsToggleBtn.textContent = '📖 Sembunyikan';
+    }
+  }
+});
+
+// ===================== DATA LAYANAN =====================
 let layananData = {};
 let selectedService = null;
 
@@ -742,9 +970,13 @@ async function loadData() {
 }
 
 // Jalankan saat halaman selesai dimuat
-window.addEventListener("load", loadData);
+window.addEventListener("load", function() {
+  loadData();
+  // Load syarat & ketentuan di background
+  loadTerms();
+});
 	
-	function loadLayanan(){  
+function loadLayanan(){  
   const kategori=document.getElementById("kategori").value;  
   const layanan=document.getElementById("layanan");  
   layanan.innerHTML="<option value=''>-- Pilih Layanan --</option>";  
@@ -765,7 +997,7 @@ window.addEventListener("load", loadData);
   document.getElementById("infoLayanan").innerHTML="";  
   selectedService=null;  
 }  
-  
+
 function showInfo(){  
   const kategori=document.getElementById("kategori").value;  
   const layananID=document.getElementById("layanan").value;  
@@ -792,7 +1024,7 @@ function showInfo(){
    Min: ${selectedService.min} | Max: ${selectedService.max}<br>  
    ${selectedService.desc || ''}`;  
 }  
-  
+
 function hitungTotal(){  
   if(!selectedService) return;  
   const jumlah=parseInt(document.getElementById("jumlah").value||"0");  
@@ -808,11 +1040,11 @@ function hitungTotal(){
   
   document.getElementById("total").value=jumlah * hargaAktif;  
 }  
-  
+
 function generateTransactionID(){  
   return `TRX${Date.now()}${Math.floor(Math.random()*1000)}`;  
 }  
-  
+
 function searchLayanan(){  
   const q=document.getElementById("search").value.toLowerCase();  
   const kategori=document.getElementById("kategori");  
@@ -830,8 +1062,20 @@ function searchLayanan(){
     }  
   }  
 }  
-  
+
 function lanjutPembayaran(){  
+  // ===== VALIDASI SYARAT & KETENTUAN =====
+  if (!termsCheckbox.checked) {
+    termsError.classList.add('show');
+    termsCheckbox.style.borderColor = 'var(--danger)';
+    // Scroll ke terms
+    document.getElementById('termsContainer').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setTimeout(() => {
+      termsError.classList.remove('show');
+    }, 3000);
+    return;
+  }
+  
   if(!selectedService){alert("Pilih layanan terlebih dahulu!");return;}  
   
   const jumlah=parseInt(document.getElementById("jumlah").value||"0");  
@@ -880,4 +1124,4 @@ setInterval(() => {
 </script>  
   
 </body>  
-	</html>
+</html>
