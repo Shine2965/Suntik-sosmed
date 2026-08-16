@@ -3,57 +3,47 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PPKA DAOP 8 - GAPEKA 2026</title>
+    <title>PPKA DAOP 8 - GAPEKA 2026 REAL TIME</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Courier New', monospace;
-            background: #0a0a0a;
-            color: #0f0;
+            background: #f0f0f0;
+            color: #222;
             min-height: 100vh;
             padding: 15px;
         }
         .container {
-            max-width: 1400px;
+            max-width: 1500px;
             margin: 0 auto;
-            background: #111;
-            border: 2px solid #0f0;
+            background: #ffffff;
+            border: 2px solid #222;
             border-radius: 15px;
             padding: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
         }
         .header {
             text-align: center;
-            border-bottom: 2px solid #0f0;
+            border-bottom: 2px solid #222;
             padding-bottom: 10px;
             margin-bottom: 15px;
         }
-        .header h1 {
-            font-size: 26px;
-            letter-spacing: 3px;
-            text-shadow: 0 0 20px #0f0;
-        }
-        .header .sub {
-            color: #888;
-            font-size: 13px;
-        }
-        .header .gapeka {
-            color: #ffaa00;
-            font-size: 12px;
-            margin-top: 5px;
-            letter-spacing: 2px;
-        }
+        .header h1 { font-size: 26px; letter-spacing: 3px; color: #222; }
+        .header .sub { color: #666; font-size: 13px; }
+        .header .gapeka { color: #d4880f; font-size: 12px; margin-top: 5px; letter-spacing: 2px; }
         .status-bar {
             display: flex;
             justify-content: space-between;
             flex-wrap: wrap;
-            background: #1a1a1a;
+            background: #f8f8f8;
             padding: 10px 15px;
             border-radius: 8px;
             margin-bottom: 15px;
-            border: 1px solid #2a2a2a;
+            border: 1px solid #ddd;
         }
-        .status-item { font-size: 13px; }
-        .status-item span { color: #fff; font-weight: bold; }
+        .status-item { font-size: 13px; color: #444; }
+        .status-item span { color: #000; font-weight: bold; }
+        .status-item .realtime { color: #007bff; font-weight: bold; }
         .main-layout {
             display: flex;
             gap: 15px;
@@ -62,12 +52,10 @@
         .map-panel {
             flex: 2;
             min-width: 350px;
-            background: #0a0a0a;
+            background: #ffffff;
             border-radius: 10px;
             padding: 15px;
-            border: 1px solid #2a2a2a;
-            position: relative;
-            overflow: hidden;
+            border: 1px solid #ddd;
         }
         .map-panel .label {
             color: #666;
@@ -81,56 +69,24 @@
             position: relative;
             width: 100%;
             height: 450px;
-            background: #0a0a0a;
+            background: #ffffff;
             border-radius: 8px;
-            border: 1px solid #1a1a1a;
+            border: 1px solid #ddd;
             overflow: hidden;
         }
         .railway-map canvas {
             width: 100%;
             height: 100%;
             display: block;
-        }
-        .station-dot {
-            position: absolute;
-            cursor: pointer;
-            transition: all 0.3s;
-            z-index: 10;
-        }
-        .station-dot:hover { transform: scale(1.2); }
-        .station-dot .dot {
-            width: 18px;
-            height: 18px;
-            border-radius: 50%;
-            border: 2px solid #0f0;
-            background: #111;
-            display: block;
-            margin: 0 auto;
-        }
-        .station-dot.active .dot {
-            background: #0f0;
-            box-shadow: 0 0 30px #0f0;
-        }
-        .station-dot .s-label {
-            font-size: 9px;
-            color: #0f0;
-            text-align: center;
-            margin-top: 3px;
-            text-shadow: 0 0 10px #000;
-            white-space: nowrap;
-        }
-        .station-dot .s-count {
-            font-size: 8px;
-            color: #888;
-            text-align: center;
+            background: #ffffff;
         }
         .control-panel {
             flex: 1;
-            min-width: 280px;
-            background: #0a0a0a;
+            min-width: 320px;
+            background: #fafafa;
             border-radius: 10px;
             padding: 15px;
-            border: 1px solid #2a2a2a;
+            border: 1px solid #ddd;
         }
         .control-panel .label {
             color: #666;
@@ -139,44 +95,47 @@
             letter-spacing: 1px;
         }
         .station-info {
-            background: #1a1a1a;
+            background: #ffffff;
             border-radius: 8px;
             padding: 12px;
             margin: 10px 0;
-            border-left: 3px solid #0f0;
+            border-left: 4px solid #222;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
         }
-        .station-info .s-name {
-            font-size: 18px;
-            font-weight: bold;
-        }
-        .station-info .s-detail {
-            font-size: 12px;
-            color: #888;
-        }
+        .station-info .s-name { font-size: 18px; font-weight: bold; color: #000; }
+        .station-info .s-detail { font-size: 12px; color: #888; }
         .train-list {
-            max-height: 180px;
+            max-height: 250px;
             overflow-y: auto;
             margin: 10px 0;
         }
         .train-item {
             display: flex;
             justify-content: space-between;
-            padding: 5px 8px;
-            border-bottom: 1px solid #1a1a1a;
+            padding: 6px 8px;
+            border-bottom: 1px solid #eee;
             font-size: 12px;
             align-items: center;
+            color: #222;
         }
         .train-item .badge {
             padding: 2px 10px;
             border-radius: 15px;
             font-size: 9px;
             font-weight: bold;
+            white-space: nowrap;
         }
         .badge-arrive { background: #ffaa00; color: #000; }
-        .badge-depart { background: #ff3333; color: #fff; }
-        .badge-standby { background: #0f0; color: #000; }
-        .badge-commuter { background: #00ccff; color: #000; }
-        .badge-ka { background: #0f0; color: #000; }
+        .badge-depart { background: #dc3545; color: #fff; }
+        .badge-standby { background: #28a745; color: #fff; }
+        .badge-commuter { background: #17a2b8; color: #fff; }
+        .badge-ka { background: #6c757d; color: #fff; }
+        .badge-info { background: #007bff; color: #fff; }
+        .train-item .schedule-info {
+            font-size: 10px;
+            color: #888;
+            text-align: right;
+        }
         .btn-group {
             display: flex;
             gap: 8px;
@@ -184,9 +143,9 @@
             margin-top: 10px;
         }
         .btn {
-            background: #1a1a1a;
-            color: #0f0;
-            border: 2px solid #0f0;
+            background: #f8f8f8;
+            color: #222;
+            border: 2px solid #222;
             padding: 8px 16px;
             border-radius: 25px;
             font-family: 'Courier New', monospace;
@@ -199,41 +158,46 @@
             flex: 1;
             min-width: 80px;
         }
-        .btn:hover {
-            background: #0f0;
-            color: #000;
-            box-shadow: 0 0 30px rgba(0,255,0,0.3);
-        }
-        .btn-commuter { border-color: #00ccff; color: #00ccff; }
-        .btn-commuter:hover { background: #00ccff; color: #000; }
-        .btn-danger { border-color: #f00; color: #f00; }
-        .btn-danger:hover { background: #f00; color: #000; }
-        .btn-warning { border-color: #ffaa00; color: #ffaa00; }
+        .btn:hover { background: #222; color: #fff; box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+        .btn-commuter { border-color: #17a2b8; color: #17a2b8; }
+        .btn-commuter:hover { background: #17a2b8; color: #fff; }
+        .btn-danger { border-color: #dc3545; color: #dc3545; }
+        .btn-danger:hover { background: #dc3545; color: #fff; }
+        .btn-warning { border-color: #ffaa00; color: #d4880f; }
         .btn-warning:hover { background: #ffaa00; color: #000; }
+        .btn-info { border-color: #007bff; color: #007bff; }
+        .btn-info:hover { background: #007bff; color: #fff; }
         .log-area {
             margin-top: 10px;
-            background: #0a0a0a;
+            background: #ffffff;
             border-radius: 8px;
             padding: 10px;
-            border: 1px solid #2a2a2a;
+            border: 1px solid #ddd;
             max-height: 100px;
             overflow-y: auto;
             font-size: 11px;
+            color: #222;
         }
-        .log-entry { padding: 2px 0; border-bottom: 1px solid #1a1a1a; }
-        .log-time { color: #666; margin-right: 8px; }
-        .log-commuter { color: #00ccff; }
-        .log-ka { color: #0f0; }
-        .log-warning { color: #ffaa00; }
-        .log-danger { color: #ff3333; }
-        ::-webkit-scrollbar { width: 5px; background: #1a1a1a; }
-        ::-webkit-scrollbar-thumb { background: #0f0; border-radius: 10px; }
+        .log-entry { padding: 2px 0; border-bottom: 1px solid #f0f0f0; }
+        .log-time { color: #999; margin-right: 8px; }
+        .log-commuter { color: #17a2b8; }
+        .log-ka { color: #6c757d; }
+        .log-warning { color: #d4880f; }
+        .log-danger { color: #dc3545; }
+        .log-info { color: #007bff; }
+        ::-webkit-scrollbar { width: 5px; background: #f0f0f0; }
+        ::-webkit-scrollbar-thumb { background: #888; border-radius: 10px; }
         @media (max-width: 700px) {
             .main-layout { flex-direction: column; }
             .railway-map { height: 300px; }
-            .station-dot .s-label { font-size: 7px; }
         }
-        .glow-text { text-shadow: 0 0 10px currentColor; }
+        .blink {
+            animation: blink 1s infinite;
+        }
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
     </style>
 </head>
 <body>
@@ -241,11 +205,11 @@
     <div class="header">
         <h1>🚂 PPKA DAOP 8</h1>
         <div class="sub">SURABAYA - JAWA TIMUR</div>
-        <div class="gapeka">📅 GAPEKA 2026 • JADWAL OTOMATIS</div>
+        <div class="gapeka">📅 GAPEKA 2026 • REAL-TIME CLOCK • JADWAL DUNIA NYATA</div>
     </div>
 
     <div class="status-bar">
-        <div class="status-item">⏰ WAKTU: <span id="gameTime">06:00</span></div>
+        <div class="status-item">⏰ WAKTU REAL: <span class="realtime" id="realTime">--:--:--</span></div>
         <div class="status-item">🚆 KA AKTIF: <span id="totalTrains">0</span></div>
         <div class="status-item">🚃 COMMUTER: <span id="totalCommuter">0</span></div>
         <div class="status-item">📍 PPKA: <span id="activeStation">-</span></div>
@@ -274,65 +238,143 @@
                 </div>
                 <div class="btn-group">
                     <button class="btn btn-commuter" onclick="toggleAutoSpawn()">⏸️ AUTO SPAWN</button>
-                    <button class="btn" onclick="cepatkanWaktu()">⏩ SKIP 30m</button>
+                    <button class="btn btn-info" onclick="syncTime()">🔄 SYNC WAKTU</button>
+                    <button class="btn btn-danger" onclick="resetSimulasi()">💥 RESET</button>
                 </div>
             </div>
             <div class="log-area" id="logArea">
-                <div class="log-entry"><span class="log-time">[06:00]</span> Sistem PPKA DAOP 8 siap. GAPEKA 2026 loaded.</div>
+                <div class="log-entry"><span class="log-time">[--:--]</span> Sistem PPKA DAOP 8 real-time siap. Menunggu sinkronisasi...</div>
             </div>
         </div>
     </div>
 </div>
 
 <script>
-    // ========== KONFIGURASI MAP ==========
+    // ========== STASIUN ==========
     const stasiunData = [
-        { id: 0, name: 'Surabaya Pasar Turi', daop: 'DAOP 8', x: 0.12, y: 0.15, type: 'utama' },
-        { id: 1, name: 'Surabaya Kota', daop: 'DAOP 8', x: 0.22, y: 0.30, type: 'utama' },
-        { id: 2, name: 'Wonokromo', daop: 'DAOP 8', x: 0.35, y: 0.45, type: 'besar' },
-        { id: 3, name: 'Waru', daop: 'DAOP 8', x: 0.50, y: 0.55, type: 'sedang' },
-        { id: 4, name: 'Gedangan', daop: 'DAOP 8', x: 0.68, y: 0.60, type: 'sedang' },
-        { id: 5, name: 'Sidoarjo', daop: 'DAOP 8', x: 0.85, y: 0.70, type: 'besar' }
+        { id: 0, name: 'Surabaya Pasar Turi', daop: 'DAOP 8', x: 0.10, y: 0.12, type: 'utama' },
+        { id: 1, name: 'Surabaya Kota', daop: 'DAOP 8', x: 0.20, y: 0.28, type: 'utama' },
+        { id: 2, name: 'Surabaya Gubeng', daop: 'DAOP 8', x: 0.30, y: 0.20, type: 'utama' },
+        { id: 3, name: 'Wonokromo', daop: 'DAOP 8', x: 0.42, y: 0.40, type: 'besar' },
+        { id: 4, name: 'Waru', daop: 'DAOP 8', x: 0.55, y: 0.52, type: 'sedang' },
+        { id: 5, name: 'Gedangan', daop: 'DAOP 8', x: 0.70, y: 0.58, type: 'sedang' },
+        { id: 6, name: 'Sidoarjo', daop: 'DAOP 8', x: 0.88, y: 0.70, type: 'besar' }
     ];
 
-    // Relasi jalur (garis)
     const jalur = [
-        [0,1], [1,2], [2,3], [3,4], [4,5],
-        [0,2], [2,5] // jalur alternatif
+        [2,0], [0,2], [2,1], [1,2], [2,3], [3,2],
+        [3,4], [4,3], [4,5], [5,4], [5,6], [6,5],
+        [3,6], [6,3]
     ];
 
-    // ========== GAPEKA 2026 DATA ==========
+    // ========== GAPEKA 2026 24 JAM ==========
     const gapeka2026 = {
-        // Format: [nama, type, jam_mulai, interval_menit, rute_stasiun_ids]
         ka: [
-            ['Argo Bromo', 'ka', 6, 45, [0,5]],
-            ['Gajayana', 'ka', 7, 60, [5,0]],
-            ['Bima', 'ka', 8, 90, [0,5]],
-            ['Sembrani', 'ka', 9, 60, [5,0]],
-            ['Taksaka', 'ka', 10, 120, [0,5]],
-            ['Purwojaya', 'ka', 11, 90, [5,0]],
-            ['Bangunkarta', 'ka', 12, 60, [0,5]],
-            ['Mutiara Timur', 'ka', 13, 75, [5,0]],
-            ['Ranggajati', 'ka', 14, 120, [0,5]],
+            ['Argo Bromo', 'ka', 0, 120, [0,6]],
+            ['Gajayana', 'ka', 1, 90, [6,0]],
+            ['Bima', 'ka', 2, 120, [0,6]],
+            ['Sembrani', 'ka', 3, 90, [6,0]],
+            ['Taksaka', 'ka', 4, 180, [0,6]],
+            ['Purwojaya', 'ka', 5, 120, [6,0]],
+            ['Bangunkarta', 'ka', 6, 90, [0,6]],
+            ['Mutiara Timur', 'ka', 7, 120, [6,0]],
+            ['Ranggajati', 'ka', 8, 180, [0,6]],
+            ['Argo Wilis', 'ka', 9, 150, [6,0]],
+            ['Brantas', 'ka', 10, 120, [0,6]],
+            ['Kahuripan', 'ka', 11, 90, [6,0]],
+            ['Logawa', 'ka', 12, 180, [0,6]],
+            ['Jayakarta', 'ka', 13, 120, [6,0]],
+            ['Senja Utama', 'ka', 14, 150, [0,6]],
+            ['Mutiara Selatan', 'ka', 15, 120, [6,0]],
+            ['Singasari', 'ka', 16, 180, [0,6]],
+            ['Gumarang', 'ka', 17, 90, [6,0]],
+            ['Dharmawangsa', 'ka', 18, 120, [0,6]],
+            ['Sancaka', 'ka', 19, 150, [6,0]],
+            ['Rapih Dharma', 'ka', 20, 120, [0,6]],
+            ['Airlangga', 'ka', 21, 90, [6,0]],
+            ['Bojonegoro', 'ka', 22, 180, [0,6]],
+            ['Cepu', 'ka', 23, 120, [6,0]],
         ],
         commuter: [
-            ['Arjonegoro', 'commuter', 5, 30, [0,5]],
-            ['Jenggala', 'commuter', 5, 35, [1,2,3,4,5]],
-            ['Penataran', 'commuter', 6, 40, [0,2,5]],
-            ['Dhoho', 'commuter', 6, 45, [1,3,4]],
-            ['Supas', 'commuter', 7, 25, [0,1,2,3]],
+            ['Arjonegoro', 'commuter', 0, 25, [0,6]],
+            ['Jenggala', 'commuter', 1, 30, [2,3,4,5,6]],
+            ['Penataran', 'commuter', 2, 35, [0,3,6]],
+            ['Dhoho', 'commuter', 3, 40, [2,4,5]],
+            ['Supas', 'commuter', 4, 20, [0,2,3,4]],
+            ['Sindoro', 'commuter', 5, 30, [6,0]],
+            ['Lawu', 'commuter', 6, 35, [0,6]],
+            ['Merbabu', 'commuter', 7, 40, [2,6]],
+            ['Bromo', 'commuter', 8, 25, [6,2]],
+            ['Semeru', 'commuter', 9, 30, [0,2,3,6]],
+            ['Wilis', 'commuter', 10, 35, [2,4,6]],
+            ['Kelud', 'commuter', 11, 40, [6,3,0]],
+            ['Rinjani', 'commuter', 12, 25, [0,6]],
+            ['Tengger', 'commuter', 13, 30, [2,6]],
+            ['Ijen', 'commuter', 14, 35, [6,2]],
+            ['Raung', 'commuter', 15, 40, [0,2,3,6]],
+            ['Kawi', 'commuter', 16, 25, [2,3,4,5,6]],
+            ['Arjuno', 'commuter', 17, 30, [0,2,6]],
+            ['Welirang', 'commuter', 18, 35, [6,0]],
+            ['Anjasmoro', 'commuter', 19, 40, [2,6]],
+            ['Kendeng', 'commuter', 20, 25, [0,3,6]],
+            ['Muria', 'commuter', 21, 30, [6,2]],
+            ['Panderman', 'commuter', 22, 35, [0,6]],
+            ['Galunggung', 'commuter', 23, 40, [2,3,4,5,6]],
         ]
     };
 
     // ========== STATE ==========
     let trains = [];
-    let gameTime = 360; // menit dari 00:00
     let selectedStation = 0;
     let trainIdCounter = 0;
     let logEntries = [];
     let autoSpawnEnabled = true;
-    let spawnTimer = null;
-    let lastSpawnCheck = 0;
+    let lastSpawnMinute = -1;
+    let timeOffset = 0;
+
+    // ========== FUNGSI WAKTU REAL ==========
+    function getRealTime() {
+        const now = new Date();
+        const hours = now.getHours();
+        const minutes = now.getMinutes();
+        const seconds = now.getSeconds();
+        return {
+            hours, minutes, seconds,
+            totalMinutes: hours * 60 + minutes,
+            totalSeconds: hours * 3600 + minutes * 60 + seconds,
+            string: `${String(hours).padStart(2,'0')}:${String(minutes).padStart(2,'0')}:${String(seconds).padStart(2,'0')}`,
+            timeString: `${String(hours).padStart(2,'0')}:${String(minutes).padStart(2,'0')}`
+        };
+    }
+
+    function getGameTime() {
+        const real = getRealTime();
+        let total = real.totalMinutes + timeOffset;
+        if (total >= 1440) total -= 1440;
+        if (total < 0) total += 1440;
+        return total;
+    }
+
+    function formatTime(m) {
+        let h = Math.floor(m / 60) % 24;
+        let min = m % 60;
+        return `${String(h).padStart(2,'0')}:${String(min).padStart(2,'0')}`;
+    }
+
+    function formatTimeFull(m) {
+        let h = Math.floor(m / 60) % 24;
+        let min = m % 60;
+        let sec = Math.floor((m % 1) * 60);
+        return `${String(h).padStart(2,'0')}:${String(min).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+    }
+
+    function syncTime() {
+        timeOffset = 0;
+        const real = getRealTime();
+        addLog(`🔄 Waktu disinkronkan ke ${real.timeString} (real-time)`, 'info');
+        document.getElementById('realTime').textContent = real.string;
+        updateStatus();
+    }
 
     // ========== FUNGSI MAP ==========
     function drawMap() {
@@ -344,133 +386,112 @@
         const W = canvas.width, H = canvas.height;
 
         ctx.clearRect(0, 0, W, H);
-
-        // Background
-        const grad = ctx.createRadialGradient(W/2, H/2, 50, W/2, H/2, 400);
-        grad.addColorStop(0, '#1a2a1a');
-        grad.addColorStop(1, '#0a0a0a');
-        ctx.fillStyle = grad;
+        ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, W, H);
 
-        // Grid
-        ctx.strokeStyle = '#1a1a1a';
+        ctx.strokeStyle = '#e5e5e5';
         ctx.lineWidth = 0.5;
-        for (let i = 0; i < W; i += 30) {
-            ctx.beginPath();
-            ctx.moveTo(i, 0);
-            ctx.lineTo(i, H);
-            ctx.stroke();
-        }
-        for (let i = 0; i < H; i += 30) {
-            ctx.beginPath();
-            ctx.moveTo(0, i);
-            ctx.lineTo(W, i);
-            ctx.stroke();
-        }
+        for (let i = 0; i < W; i += 30) { ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,H); ctx.stroke(); }
+        for (let i = 0; i < H; i += 30) { ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(W,i); ctx.stroke(); }
 
-        // Draw jalur
         jalur.forEach(([a,b]) => {
-            const p1 = stasiunData[a];
-            const p2 = stasiunData[b];
-            const x1 = p1.x * W, y1 = p1.y * H;
-            const x2 = p2.x * W, y2 = p2.y * H;
-
-            // Shadow glow
-            ctx.shadowColor = '#0f0';
-            ctx.shadowBlur = 15;
-            ctx.strokeStyle = '#0f0';
-            ctx.lineWidth = 3;
+            const p1 = stasiunData[a], p2 = stasiunData[b];
+            const x1 = p1.x*W, y1 = p1.y*H, x2 = p2.x*W, y2 = p2.y*H;
+            const isSpecial = (a===0&&b===2)||(a===2&&b===0);
+            
+            ctx.shadowColor = 'rgba(0,0,0,0.1)';
+            ctx.shadowBlur = 10;
+            ctx.strokeStyle = isSpecial ? '#007bff' : '#222';
+            ctx.lineWidth = isSpecial ? 5 : 4;
             ctx.beginPath();
             ctx.moveTo(x1, y1);
             ctx.lineTo(x2, y2);
             ctx.stroke();
 
-            // Garis utama
             ctx.shadowBlur = 0;
-            ctx.strokeStyle = '#1a3a1a';
-            ctx.lineWidth = 1;
+            ctx.strokeStyle = isSpecial ? '#66b3ff' : '#888';
+            ctx.lineWidth = 2;
             ctx.beginPath();
             ctx.moveTo(x1, y1);
             ctx.lineTo(x2, y2);
             ctx.stroke();
 
-            // Jalur ganda (paralel)
-            ctx.strokeStyle = '#0a2a0a';
-            ctx.lineWidth = 1;
-            ctx.setLineDash([4, 6]);
-            const ang = Math.atan2(y2-y1, x2-x1);
-            const offX = Math.sin(ang) * 6;
-            const offY = -Math.cos(ang) * 6;
-            ctx.beginPath();
-            ctx.moveTo(x1 + offX, y1 + offY);
-            ctx.lineTo(x2 + offX, y2 + offY);
-            ctx.stroke();
-            ctx.setLineDash([]);
+            if (isSpecial) {
+                ctx.strokeStyle = '#007bff';
+                ctx.lineWidth = 1;
+                ctx.setLineDash([4,6]);
+                const ang = Math.atan2(y2-y1, x2-x1);
+                const offX = Math.sin(ang)*6, offY = -Math.cos(ang)*6;
+                ctx.beginPath();
+                ctx.moveTo(x1+offX, y1+offY);
+                ctx.lineTo(x2+offX, y2+offY);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                
+                ctx.fillStyle = '#007bff';
+                ctx.font = '8px monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText('JALUR KHUSUS', (x1+x2)/2, (y1+y2)/2 - 10);
+            }
         });
 
-        // Draw station dots
         stasiunData.forEach((st, idx) => {
-            const x = st.x * W, y = st.y * H;
+            const x = st.x*W, y = st.y*H;
             const isActive = (selectedStation === idx);
             const trainCount = trains.filter(t => t.stationIndex === idx).length;
-            const isCommuter = trains.some(t => t.stationIndex === idx && t.isCommuter);
+            const hasCommuter = trains.some(t => t.stationIndex === idx && t.isCommuter);
 
-            // Glow
             if (isActive) {
-                ctx.shadowColor = '#0f0';
-                ctx.shadowBlur = 40;
+                ctx.shadowColor = 'rgba(0,0,0,0.1)';
+                ctx.shadowBlur = 30;
                 ctx.beginPath();
                 ctx.arc(x, y, 25, 0, Math.PI*2);
-                ctx.fillStyle = 'rgba(0,255,0,0.05)';
+                ctx.fillStyle = 'rgba(0,0,0,0.03)';
                 ctx.fill();
                 ctx.shadowBlur = 0;
             }
 
-            // Outer ring
-            ctx.strokeStyle = isActive ? '#0f0' : '#2a2a2a';
+            ctx.strokeStyle = isActive ? '#000' : '#aaa';
             ctx.lineWidth = isActive ? 3 : 1;
             ctx.beginPath();
             ctx.arc(x, y, 14, 0, Math.PI*2);
             ctx.stroke();
 
-            // Inner dot
-            const color = isActive ? '#0f0' : (isCommuter ? '#00ccff' : '#1a3a1a');
-            ctx.shadowColor = isActive ? '#0f0' : 'transparent';
-            ctx.shadowBlur = isActive ? 30 : 0;
+            let color = '#ffffff';
+            if (isActive) color = '#000';
+            else if (hasCommuter) color = '#17a2b8';
+            else if (trainCount > 0) color = '#888';
+            
+            ctx.shadowColor = isActive ? 'rgba(0,0,0,0.2)' : 'transparent';
+            ctx.shadowBlur = isActive ? 20 : 0;
             ctx.fillStyle = color;
             ctx.beginPath();
             ctx.arc(x, y, 8, 0, Math.PI*2);
             ctx.fill();
 
-            // Train count
             ctx.shadowBlur = 0;
-            ctx.fillStyle = '#888';
-            ctx.font = '8px monospace';
+            ctx.fillStyle = '#666';
+            ctx.font = '9px monospace';
             ctx.textAlign = 'center';
-            ctx.fillText(trainCount > 0 ? `🚆${trainCount}` : '', x, y + 28);
+            ctx.fillText(trainCount > 0 ? `🚆${trainCount}` : '', x, y + 30);
 
-            // Label
-            ctx.fillStyle = isActive ? '#0f0' : '#555';
-            ctx.font = isActive ? 'bold 10px monospace' : '8px monospace';
+            ctx.fillStyle = isActive ? '#000' : '#555';
+            ctx.font = isActive ? 'bold 10px monospace' : '9px monospace';
             ctx.textAlign = 'center';
-            ctx.fillText(st.name, x, y - 18);
-
-            // Interactive overlay (untuk click)
-            ctx.fillStyle = 'rgba(0,0,0,0)';
-            ctx.beginPath();
-            ctx.arc(x, y, 20, 0, Math.PI*2);
-            ctx.fill();
+            ctx.fillText(st.name, x, y - 20);
         });
 
-        // Legend
-        ctx.fillStyle = '#444';
-        ctx.font = '8px monospace';
+        ctx.fillStyle = '#666';
+        ctx.font = '9px monospace';
         ctx.textAlign = 'left';
-        ctx.fillText('● KA Jarak Jauh', 10, 20);
-        ctx.fillStyle = '#00ccff';
-        ctx.fillText('● Commuter Line', 10, 35);
-        ctx.fillStyle = '#0f0';
-        ctx.fillText('● Stasiun Aktif (PPKA)', 10, 50);
+        ctx.fillStyle = '#222';
+        ctx.fillText('● KA Jarak Jauh', 12, 22);
+        ctx.fillStyle = '#17a2b8';
+        ctx.fillText('● Commuter Line', 12, 38);
+        ctx.fillStyle = '#000';
+        ctx.fillText('● Stasiun Aktif (PPKA)', 12, 54);
+        ctx.fillStyle = '#007bff';
+        ctx.fillText('━ Jalur Khusus Gubeng-PasarTuri', 12, 70);
     }
 
     // ========== CLICK MAP ==========
@@ -479,20 +500,13 @@
         const x = (e.clientX - rect.left) / rect.width;
         const y = (e.clientY - rect.top) / rect.height;
         
-        let minDist = 0.08;
-        let found = -1;
+        let minDist = 0.08, found = -1;
         stasiunData.forEach((st, idx) => {
-            const dx = x - st.x;
-            const dy = y - st.y;
+            const dx = x - st.x, dy = y - st.y;
             const dist = Math.sqrt(dx*dx + dy*dy);
-            if (dist < minDist) {
-                minDist = dist;
-                found = idx;
-            }
+            if (dist < minDist) { minDist = dist; found = idx; }
         });
-        if (found !== -1) {
-            selectStation(found);
-        }
+        if (found !== -1) selectStation(found);
     });
 
     // ========== FUNGSI UTAMA ==========
@@ -500,7 +514,7 @@
         selectedStation = idx;
         document.getElementById('activeStation').innerText = stasiunData[idx].name;
         document.getElementById('stName').innerText = stasiunData[idx].name;
-        document.getElementById('stDetail').innerText = `${stasiunData[idx].daop} | PPKA Aktif`;
+        document.getElementById('stDetail').innerText = `${stasiunData[idx].daop} | PPKA Aktif | Real-Time`;
         renderStationTrains();
         drawMap();
     }
@@ -510,32 +524,29 @@
         const trainsHere = trains.filter(t => t.stationIndex === selectedStation);
         
         if (trainsHere.length === 0) {
-            list.innerHTML = `<div style="color:#666;font-size:12px;padding:10px 0;">Tidak ada kereta di stasiun ini</div>`;
+            list.innerHTML = `<div style="color:#999;font-size:12px;padding:10px 0;">Tidak ada kereta di stasiun ini</div>`;
             return;
         }
 
         let html = '';
         trainsHere.forEach(t => {
-            let badgeClass = 'badge-standby';
-            let label = 'Standby';
-            if (t.isCommuter) {
-                badgeClass = 'badge-commuter';
-                label = 'Commuter';
-            } else if (t.status === 'arrive') {
-                badgeClass = 'badge-arrive';
-                label = 'Arrive';
-            } else if (t.status === 'depart') {
-                badgeClass = 'badge-depart';
-                label = 'Depart';
-            }
+            let badgeClass = 'badge-standby', label = 'Standby';
+            if (t.isCommuter) { badgeClass = 'badge-commuter'; label = 'Commuter'; }
+            else if (t.status === 'arrive') { badgeClass = 'badge-arrive'; label = 'Arrive'; }
+            else if (t.status === 'depart') { badgeClass = 'badge-depart'; label = 'Depart'; }
             
-            let waktu = t.scheduledTime ? formatTime(t.scheduledTime) : '-';
+            const arriveTime = t.arriveTime !== undefined ? formatTime(t.arriveTime) : '-';
+            const departTime = t.departTime !== undefined ? formatTime(t.departTime) : '-';
+            
             html += `
                 <div class="train-item">
-                    <span>${t.isCommuter ? '🚃' : '🚆'} ${t.name}</span>
                     <div>
-                        <span style="font-size:10px;color:#666;margin-right:8px;">${waktu}</span>
-                        <span class="badge ${badgeClass}">${label}</span>
+                        <span>${t.isCommuter ? '🚃' : '🚆'} ${t.name}</span>
+                        <span class="badge ${badgeClass}" style="margin-left:6px;">${label}</span>
+                    </div>
+                    <div class="schedule-info">
+                        <div>📥 ${arriveTime}</div>
+                        <div>📤 ${departTime}</div>
                     </div>
                 </div>
             `;
@@ -544,51 +555,55 @@
     }
 
     function updateStatus() {
+        const gameTime = getGameTime();
         document.getElementById('totalTrains').innerText = trains.length;
         document.getElementById('totalCommuter').innerText = trains.filter(t => t.isCommuter).length;
-        document.getElementById('gameTime').innerText = formatTime(gameTime);
+        document.getElementById('gameTime').innerHTML = formatTime(gameTime);
+        
+        // Update real time
+        const real = getRealTime();
+        document.getElementById('realTime').textContent = real.string;
+        
         drawMap();
         renderStationTrains();
     }
 
-    function formatTime(m) {
-        let h = Math.floor(m / 60);
-        let min = m % 60;
-        return `${String(h).padStart(2,'0')}:${String(min).padStart(2,'0')}`;
-    }
-
     function addLog(msg, type = '') {
-        let timeStr = formatTime(gameTime);
+        const real = getRealTime();
+        let timeStr = real.string;
         let cls = type ? `log-${type}` : '';
         logEntries.push(`<div class="log-entry"><span class="log-time">[${timeStr}]</span> <span class="${cls}">${msg}</span></div>`);
-        if (logEntries.length > 60) logEntries.shift();
+        if (logEntries.length > 80) logEntries.shift();
         document.getElementById('logArea').innerHTML = logEntries.join('');
         document.getElementById('logArea').scrollTop = document.getElementById('logArea').scrollHeight;
     }
 
-    // ========== SPAWN OTOMATIS GAPEKA ==========
+    // ========== SPAWN OTOMATIS GAPEKA 24JAM (REAL-TIME) ==========
     function spawnDariGapeka() {
         if (!autoSpawnEnabled) return;
         
-        const currentHour = Math.floor(gameTime / 60);
-        const currentMin = gameTime % 60;
-        const currentTotal = currentHour * 60 + currentMin;
+        const gameTime = getGameTime();
+        const currentMinute = Math.floor(gameTime);
+        
+        // Cek setiap menit sekali
+        if (currentMinute === lastSpawnMinute) return;
+        lastSpawnMinute = currentMinute;
 
-        // Spawn KA jarak jauh
+        // KA Jarak Jauh
         gapeka2026.ka.forEach(ka => {
-            const startTime = ka[2] * 60; // jam ke menit
+            const startTime = ka[2] * 60;
             const interval = ka[3];
-            const elapsed = (currentTotal - startTime + 1440) % 1440;
+            const elapsed = (currentMinute - startTime + 1440) % 1440;
             
-            if (elapsed % interval < 2 && elapsed < 1440) {
-                // Cek apakah udah ada kereta dengan nama ini di rute
+            if (elapsed % interval === 0 || elapsed % interval === 1) {
                 const exists = trains.some(t => t.name.startsWith(ka[0]) && 
-                    t.stationIndex === ka[4][0] && 
-                    Math.abs(t.scheduledTime - gameTime) < 5);
+                    t.stationIndex === ka[4][0] && Math.abs(t.scheduledTime - gameTime) < 2);
                 
                 if (!exists) {
-                    const stIdx = ka[4][0];
-                    const destIdx = ka[4][1];
+                    const stIdx = ka[4][0], destIdx = ka[4][1];
+                    const arriveTime = gameTime;
+                    const departTime = gameTime + 5 + Math.floor(Math.random() * 5);
+                    
                     trains.push({
                         id: trainIdCounter++,
                         name: ka[0] + '-' + String(Math.floor(Math.random()*900)+100),
@@ -597,26 +612,30 @@
                         isCommuter: false,
                         scheduledTime: gameTime,
                         destination: destIdx,
+                        arriveTime: arriveTime,
+                        departTime: departTime,
                         delay: 0
                     });
-                    addLog(`🚆 ${ka[0]} tiba di ${stasiunData[stIdx].name} (GAPEKA 2026)`, 'ka');
+                    addLog(`🚆 ${ka[0]} tiba di ${stasiunData[stIdx].name} (GAPEKA 2026 REAL-TIME)`, 'ka');
                 }
             }
         });
 
-        // Spawn Commuter
+        // Commuter
         gapeka2026.commuter.forEach(com => {
             const startTime = com[2] * 60;
             const interval = com[3];
-            const elapsed = (currentTotal - startTime + 1440) % 1440;
+            const elapsed = (currentMinute - startTime + 1440) % 1440;
             
-            if (elapsed % interval < 2 && elapsed < 1440) {
+            if (elapsed % interval === 0 || elapsed % interval === 1) {
                 const exists = trains.some(t => t.name.startsWith(com[0]) && 
-                    t.stationIndex === com[4][0] &&
-                    Math.abs(t.scheduledTime - gameTime) < 5);
+                    t.stationIndex === com[4][0] && Math.abs(t.scheduledTime - gameTime) < 2);
                 
                 if (!exists) {
                     const stIdx = com[4][0];
+                    const arriveTime = gameTime;
+                    const departTime = gameTime + 3 + Math.floor(Math.random() * 3);
+                    
                     trains.push({
                         id: trainIdCounter++,
                         name: com[0] + '-' + String(Math.floor(Math.random()*90)+10),
@@ -626,9 +645,11 @@
                         commuterRoute: com[4],
                         scheduledTime: gameTime,
                         routeIndex: 0,
+                        arriveTime: arriveTime,
+                        departTime: departTime,
                         delay: 0
                     });
-                    addLog(`🚃 ${com[0]} tiba di ${stasiunData[stIdx].name} (GAPEKA 2026)`, 'commuter');
+                    addLog(`🚃 ${com[0]} tiba di ${stasiunData[stIdx].name} (GAPEKA 2026 REAL-TIME)`, 'commuter');
                 }
             }
         });
@@ -639,15 +660,19 @@
     // ========== GERAKKAN KERETA ==========
     function gerakkanKereta() {
         if (trains.length === 0) return;
-
-        let moved = 0;
-        let commuterMoved = 0;
+        
+        const gameTime = getGameTime();
+        let moved = 0, commuterMoved = 0;
 
         trains.forEach(t => {
-            // Hanya gerakkan kereta yang sudah di stasiun minimal 2 menit
-            let moveChance = t.isCommuter ? 0.5 : 0.3;
-            
-            if (Math.random() < moveChance && t.status !== 'depart') {
+            // Update status berdasarkan waktu
+            if (t.status === 'arrive' && t.departTime !== undefined && gameTime >= t.departTime) {
+                t.status = 'depart';
+                addLog(`🚂 ${t.name} berangkat dari ${stasiunData[t.stationIndex].name}`, 'ka');
+            }
+
+            // Kereta yang sudah depart dan waktunya pindah
+            if (t.status === 'depart' && t.departTime !== undefined && gameTime >= t.departTime + 2) {
                 let newIdx;
                 if (t.isCommuter && t.commuterRoute) {
                     let currentStation = stasiunData[t.stationIndex].name;
@@ -664,7 +689,6 @@
                         else newIdx = 0;
                     }
                 } else if (t.destination !== undefined) {
-                    // KA jarak jauh: menuju destination
                     if (t.stationIndex < t.destination) newIdx = t.stationIndex + 1;
                     else if (t.stationIndex > t.destination) newIdx = t.stationIndex - 1;
                     else newIdx = (t.stationIndex + 1) % stasiunData.length;
@@ -673,26 +697,27 @@
                 }
 
                 t.stationIndex = newIdx;
-                t.status = Math.random() > 0.5 ? 'arrive' : 'standby';
+                t.status = 'arrive';
+                t.arriveTime = gameTime;
+                t.departTime = gameTime + 3 + Math.floor(Math.random() * 5);
                 moved++;
                 if (t.isCommuter) commuterMoved++;
-            } else if (Math.random() < 0.2) {
-                // Ubah status random
-                const statuses = ['arrive','standby','depart'];
-                t.status = statuses[Math.floor(Math.random() * statuses.length)];
+                
+                addLog(`🚂 ${t.name} tiba di ${stasiunData[newIdx].name}`, 'ka');
             }
         });
 
         if (moved > 0) {
             let msg = `${moved} kereta berpindah`;
             if (commuterMoved > 0) msg += ` (${commuterMoved} commuter)`;
-            addLog(`🚂 ${msg}`, 'ka');
+            addLog(`🔄 ${msg}`, 'ka');
         }
         updateStatus();
     }
 
     // ========== KONTROL PPKA ==========
     function ubahStatusAll() {
+        const gameTime = getGameTime();
         const trainsHere = trains.filter(t => t.stationIndex === selectedStation);
         if (trainsHere.length === 0) {
             addLog('⚠️ Tidak ada kereta di stasiun ini', 'warning');
@@ -701,6 +726,8 @@
         trainsHere.forEach(t => {
             const statuses = ['arrive','depart','standby'];
             t.status = statuses[Math.floor(Math.random() * statuses.length)];
+            if (t.status === 'arrive') t.arriveTime = gameTime;
+            if (t.status === 'depart') t.departTime = gameTime + 5;
         });
         addLog(`🔄 Status ${trainsHere.length} kereta di ${stasiunData[selectedStation].name} diubah`, 'ka');
         updateStatus();
@@ -719,6 +746,7 @@
     }
 
     function spawnManual() {
+        const gameTime = getGameTime();
         const isCommuter = Math.random() > 0.5;
         if (isCommuter) {
             const com = gapeka2026.commuter[Math.floor(Math.random() * gapeka2026.commuter.length)];
@@ -731,6 +759,8 @@
                 commuterRoute: com[4],
                 scheduledTime: gameTime,
                 routeIndex: 0,
+                arriveTime: gameTime,
+                departTime: gameTime + 3,
                 delay: 0
             });
             addLog(`🚃 ${com[0]} (manual) tiba di ${stasiunData[selectedStation].name}`, 'commuter');
@@ -744,6 +774,8 @@
                 isCommuter: false,
                 scheduledTime: gameTime,
                 destination: ka[4][1],
+                arriveTime: gameTime,
+                departTime: gameTime + 5,
                 delay: 0
             });
             addLog(`🚆 ${ka[0]} (manual) tiba di ${stasiunData[selectedStation].name}`, 'ka');
@@ -751,65 +783,61 @@
         updateStatus();
     }
 
-    function cepatkanWaktu() {
-        gameTime += 30;
-        if (gameTime >= 1440) gameTime -= 1440;
-        addLog(`⏩ Waktu dipercepat 30 menit -> ${formatTime(gameTime)}`, 'warning');
-        spawnDariGapeka();
-        gerakkanKereta();
-        updateStatus();
-    }
-
     function toggleAutoSpawn() {
         autoSpawnEnabled = !autoSpawnEnabled;
         const btn = document.querySelector('.btn-commuter');
         btn.textContent = autoSpawnEnabled ? '⏸️ AUTO SPAWN' : '▶️ AUTO SPAWN OFF';
-        btn.style.borderColor = autoSpawnEnabled ? '#00ccff' : '#ff3333';
-        btn.style.color = autoSpawnEnabled ? '#00ccff' : '#ff3333';
+        btn.style.borderColor = autoSpawnEnabled ? '#17a2b8' : '#dc3545';
+        btn.style.color = autoSpawnEnabled ? '#17a2b8' : '#dc3545';
         addLog(autoSpawnEnabled ? '🔄 Auto spawn diaktifkan' : '⏹️ Auto spawn dimatikan', 'warning');
     }
 
     function resetSimulasi() {
         trains = [];
-        gameTime = 360;
         trainIdCounter = 0;
-        logEntries = ['<div class="log-entry"><span class="log-time">[06:00]</span> Sistem PPKA DAOP 8 siap. GAPEKA 2026 loaded.</div>'];
+        const real = getRealTime();
+        logEntries = [`<div class="log-entry"><span class="log-time">[${real.string}]</span> Sistem PPKA DAOP 8 real-time siap.</div>`];
         addLog('💥 Simulasi di-reset!', 'danger');
         updateStatus();
         document.getElementById('stName').innerText = stasiunData[selectedStation].name;
-        document.getElementById('stDetail').innerText = `${stasiunData[selectedStation].daop} | PPKA Aktif`;
+        document.getElementById('stDetail').innerText = `${stasiunData[selectedStation].daop} | PPKA Aktif | Real-Time`;
     }
 
     // ========== INIT ==========
     function init() {
-        // Set default station
         selectStation(0);
+        syncTime();
         
-        // Spawn awal
-        setTimeout(() => {
-            spawnDariGapeka();
-        }, 500);
-
-        // Timer auto spawn setiap 2 detik
+        // Timer per detik untuk update jam
         setInterval(() => {
-            spawnDariGapeka();
-        }, 2000);
-
-        // Timer gerakan kereta setiap 5 detik
-        setInterval(() => {
-            gerakkanKereta();
-        }, 5000);
-
-        // Timer update map & status
-        setInterval(() => {
-            updateStatus();
+            const real = getRealTime();
+            document.getElementById('realTime').textContent = real.string;
+            document.getElementById('gameTime').innerHTML = formatTime(getGameTime());
         }, 1000);
 
-        // Resize canvas
+        // Spawn setiap menit (cek jadwal)
+        setInterval(() => {
+            spawnDariGapeka();
+        }, 10000);
+
+        // Gerakkan kereta setiap 15 detik
+        setInterval(() => {
+            gerakkanKereta();
+        }, 15000);
+
+        // Update UI setiap 5 detik
+        setInterval(() => {
+            updateStatus();
+        }, 5000);
+
         window.addEventListener('resize', () => drawMap());
+        
+        // Initial spawn
+        setTimeout(() => spawnDariGapeka(), 2000);
+        
+        addLog('🕐 Sistem real-time aktif. Waktu disinkronkan dengan jam sistem.', 'info');
     }
 
-    // Jalankan
     init();
 </script>
 </body>
