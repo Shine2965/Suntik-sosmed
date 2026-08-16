@@ -143,6 +143,16 @@
         .buzzer-promo strong {
             color: #ffaa00;
         }
+        .user-id-display {
+            text-align: center;
+            font-size: 10px;
+            color: #444;
+            margin-top: 6px;
+            font-family: monospace;
+        }
+        .user-id-display span {
+            color: #666;
+        }
     </style>
 </head>
 <body>
@@ -173,6 +183,9 @@
         
         <div class="info-text">🔒 Data aman & hanya bisa diakses oleh pemilik akun</div>
         <div class="env-status" id="envStatus">🔌 Mengambil data dari server...</div>
+        <div class="user-id-display">
+            🆔 User ID: <span id="userIdDisplay">-</span>
+        </div>
         <div class="security-badge">📁 Data dari Shine Shop</div>
     </div>
 
@@ -187,23 +200,50 @@
         const loginBtn = document.getElementById('loginBtn');
         const errorEl = document.getElementById('loginError');
         const envStatus = document.getElementById('envStatus');
+        const userIdDisplay = document.getElementById('userIdDisplay');
 
         let accountsData = [];
-// ---------- USER ID (IMMUTABLE) ----------
-function generateUserID() {
-  return 'user-' + Math.random().toString(36).substring(2, 10) + '-' + Date.now().toString(36);
-}
 
-function getOrCreateUserID() {
-  let id = localStorage.getItem('user_id');
-  if (!id) {
-    id = generateUserID();
-    localStorage.setItem('user_id', id);
-  }
-  return id;
-}
+        // ===================== USER ID (PERSISTEN - TIDAK BUAT ULANG) =====================
+        function generateUserID() {
+            return 'user-' + Math.random().toString(36).substring(2, 10) + '-' + Date.now().toString(36);
+        }
 
-const userID = getOrCreateUserID();
+        function getOrCreateUserID() {
+            // CEK APAKAH SUDAH ADA DI LOCAL STORAGE
+            let id = localStorage.getItem('user_id');
+            
+            // JIKA SUDAH ADA, LANGSUNG KEMBALIKAN (TIDAK BUAT BARU)
+            if (id) {
+                console.log('✅ User ID sudah ada (persisten):', id);
+                return id;
+            }
+            
+            // JIKA BELUM ADA, BUAT BARU
+            id = generateUserID();
+            localStorage.setItem('user_id', id);
+            console.log('🆕 User ID baru dibuat:', id);
+            return id;
+        }
+
+        // ===================== GET USER ID (TANPA MEMBUAT BARU) =====================
+        function getUserID() {
+            // HANYA MENGAMBIL, TIDAK MEMBUAT BARU
+            return localStorage.getItem('user_id') || null;
+        }
+
+        // ===================== TAMPILKAN USER ID =====================
+        function displayUserID() {
+            const id = getUserID();
+            if (id) {
+                userIdDisplay.textContent = id;
+                userIdDisplay.style.color = '#00ffaa';
+            } else {
+                userIdDisplay.textContent = 'Belum ada (akan dibuat saat login)';
+                userIdDisplay.style.color = '#666';
+            }
+        }
+
         // ===================== GENERATE SESSION TOKEN =====================
         function generateSessionToken() {
             const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
@@ -284,6 +324,17 @@ const userID = getOrCreateUserID();
                     return;
                 }
 
+                // ✅ DAPATKAN USER ID (TANPA MEMBUAT BARU)
+                let userId = getUserID();
+                
+                // JIKA BELUM ADA USER ID, BUAT SEKARANG
+                if (!userId) {
+                    userId = getOrCreateUserID();
+                    console.log('🆕 User ID dibuat saat login:', userId);
+                } else {
+                    console.log('✅ User ID existing digunakan:', userId);
+                }
+
                 // ✅ Generate session token
                 const sessionToken = generateSessionToken();
                 
@@ -328,10 +379,18 @@ const userID = getOrCreateUserID();
                 return;
             }
 
-            // Hapus session lama jika ada
+            // Hapus session lama jika ada (tapi PERTAHANKAN user_id)
             if (loggedIn === 'true' && !sessionToken) {
+                const userId = localStorage.getItem('user_id'); // Simpan dulu
                 localStorage.clear();
+                if (userId) {
+                    localStorage.setItem('user_id', userId); // Restore user_id
+                    console.log('🔄 User ID dipertahankan:', userId);
+                }
             }
+
+            // Tampilkan User ID yang sudah ada (jika ada)
+            displayUserID();
 
             // Ambil data akun dari accounts.json
             await fetchAccounts();
@@ -339,6 +398,14 @@ const userID = getOrCreateUserID();
             console.log('🔐 Halaman Login siap!');
             console.log('📊 Total akun:', accountsData.length);
             console.log('📁 Sumber data: /info/accounts.json');
+            
+            // Log status User ID
+            const existingId = getUserID();
+            if (existingId) {
+                console.log('🆔 User ID existing:', existingId);
+            } else {
+                console.log('🆔 Belum ada User ID (akan dibuat saat login)');
+            }
         }
 
         init();
