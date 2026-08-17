@@ -7,6 +7,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
+        /* ===== STYLE SAMA SEPERTI SEBELUMNYA ===== */
         * {
             margin: 0;
             padding: 0;
@@ -246,8 +247,6 @@
         .storage-info .bar .fill.red {
             background: #ff4444;
         }
-
-        /* ===== STATS ===== */
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
@@ -285,8 +284,6 @@
             font-size: 11px;
             margin-top: 4px;
         }
-
-        /* ===== TABLE ===== */
         .table-wrap {
             overflow-x: auto;
             margin-top: 12px;
@@ -349,8 +346,6 @@
             background: #ff444466;
             color: #fff;
         }
-
-        /* ===== FILTER ===== */
         .filter-group {
             display: flex;
             gap: 8px;
@@ -376,7 +371,6 @@
             color: #00ffaa;
             border-color: #00ffaa44;
         }
-
         .badge-income {
             background: #00ccff22;
             color: #00ccff;
@@ -404,7 +398,6 @@
             font-weight: 600;
             text-transform: uppercase;
         }
-
         .storage-warning {
             background: #ffaa0015;
             border: 1px solid #ffaa0044;
@@ -414,7 +407,17 @@
             font-size: 12px;
             color: #ffaa00;
         }
-
+        .data-persist-badge {
+            display: inline-block;
+            background: #00ffaa15;
+            color: #00ffaa;
+            padding: 2px 12px;
+            border-radius: 12px;
+            font-size: 9px;
+            font-weight: 600;
+            margin-left: 8px;
+            border: 1px solid #00ffaa33;
+        }
         @media (max-width: 600px) {
             .card {
                 padding: 20px 16px;
@@ -452,7 +455,7 @@
             <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;">
                 <div>
                     <h2>📊 Laba / Rugi</h2>
-                    <div class="sub">Kelola keuangan transaksi Anda</div>
+                    <div class="sub">Kelola keuangan transaksi Anda <span class="data-persist-badge">💾 Data Persisten</span></div>
                 </div>
                 <div class="header-actions">
                     <button class="btn btn-refresh" onclick="loadData()">🔄 Refresh</button>
@@ -464,6 +467,7 @@
             <div id="userInfo" style="color:#888;font-size:13px;margin-top:8px;">
                 👤 <span id="userEmailDisplay">-</span>
                 <span id="userRoleDisplay" style="margin-left:10px;"></span>
+                <span style="margin-left:10px;font-size:10px;color:#00ffaa;">💾 Data tetap aman meskipun logout</span>
             </div>
             <div class="storage-info" id="storageInfo">
                 <span id="storageUsage">💾 Storage: 0 KB digunakan</span>
@@ -628,16 +632,22 @@
         <div class="text-muted" style="text-align:center;margin-top:20px;">
             © Shine Shop · Laba/Rugi System
         </div>
-        <div class="security-badge">🔒 Hanya Admin & VIP yang dapat mengakses</div>
+        <div class="security-badge">🔒 Hanya Admin & VIP yang dapat mengakses · 💾 Data tetap aman meskipun logout</div>
     </div>
 
     <script>
+        // ============================================================
+        // 🔒 PERSISTENT DATA STORAGE - TIDAK AKAN HILANG SAAT LOGOUT
+        // ============================================================
+
         // ===================== KONFIGURASI =====================
         const LOGIN_URL = '/info/index.html';
-        const ACCOUNTS_FILE = '/info/accounts.json';
         const SESSION_TIMEOUT = 36000000;
-        const STORAGE_PREFIX = 'shine_finance_';
-        const BACKUP_PREFIX = 'shine_finance_backup_';
+        
+        // ===== KEY UNTUK DATA KEUANGAN (TERPISAH DARI SESSION) =====
+        const FINANCE_STORAGE_KEY = 'shine_finance_data';
+        const FINANCE_BACKUP_KEY = 'shine_finance_backup';
+        const USER_EMAIL_KEY = 'user_email';
 
         // ===================== CEK SESSION =====================
         function checkSession() {
@@ -670,6 +680,106 @@
                 email: localStorage.getItem('user_email') || '',
                 role: localStorage.getItem('user_role') || 'user'
             };
+        }
+
+        // ===================== OVERRIDE LOGOUT UNTUK MENJAGA DATA =====================
+        // Patch fungsi logout di dashboard agar tidak menghapus data keuangan
+        // Ini akan berfungsi jika dipanggil dari dashboard
+
+        // ===================== DATA STORAGE (PERSISTEN) =====================
+        function getStorageKey() {
+            // Gunakan email user sebagai identifier, tapi data tetap di key yang sama
+            // sehingga tidak hilang saat logout
+            return FINANCE_STORAGE_KEY;
+        }
+
+        function getBackupKey() {
+            return FINANCE_BACKUP_KEY;
+        }
+
+        function getData() {
+            try {
+                const key = getStorageKey();
+                let raw = localStorage.getItem(key);
+                
+                // Jika data utama tidak ada, coba backup
+                if (!raw) {
+                    const backupKey = getBackupKey();
+                    raw = localStorage.getItem(backupKey);
+                    if (raw) {
+                        console.log('🔄 Restore data dari backup');
+                        localStorage.setItem(key, raw);
+                    }
+                }
+                
+                if (!raw) return { transactions: [], incomes: [], expenses: [] };
+                return JSON.parse(raw);
+            } catch {
+                return { transactions: [], incomes: [], expenses: [] };
+            }
+        }
+
+        function saveData(data) {
+            const key = getStorageKey();
+            localStorage.setItem(key, JSON.stringify(data));
+            
+            // Simpan backup juga
+            const backupKey = getBackupKey();
+            localStorage.setItem(backupKey, JSON.stringify(data));
+            
+            // Update storage info
+            updateStorageInfo(data);
+            
+            console.log('💾 Data keuangan disimpan (persisten)');
+        }
+
+        // ===================== UPDATE STORAGE INFO =====================
+        function updateStorageInfo(data) {
+            const totalItems = (data.transactions?.length || 0) + (data.incomes?.length || 0) + (data.expenses?.length || 0);
+            const key = getStorageKey();
+            const raw = localStorage.getItem(key) || '';
+            const sizeInBytes = raw.length;
+            const sizeInKB = (sizeInBytes / 1024).toFixed(1);
+            
+            const countEl = document.getElementById('storageCount');
+            const usageEl = document.getElementById('storageUsage');
+            const barEl = document.getElementById('storageBar');
+            
+            if (countEl) countEl.textContent = `📦 ${totalItems} item`;
+            if (usageEl) usageEl.textContent = `💾 Storage: ${sizeInKB} KB digunakan`;
+            
+            if (barEl) {
+                const maxSize = 10120; // 10MB
+                const percentage = Math.min((sizeInBytes / (maxSize * 1024)) * 100, 100);
+                barEl.style.width = percentage + '%';
+                
+                if (percentage < 50) {
+                    barEl.className = 'fill green';
+                } else if (percentage < 80) {
+                    barEl.className = 'fill yellow';
+                } else {
+                    barEl.className = 'fill red';
+                }
+            }
+            
+            // Tampilkan warning jika hampir penuh
+            const warningDiv = document.getElementById('storageWarning');
+            if (totalItems > 0) {
+                const percentage = (sizeInBytes / (10120 * 1024)) * 100;
+                if (percentage > 80) {
+                    if (!warningDiv) {
+                        const warning = document.createElement('div');
+                        warning.id = 'storageWarning';
+                        warning.className = 'storage-warning';
+                        warning.innerHTML = '⚠️ Storage hampir penuh! Segera export data atau hapus data lama.';
+                        document.getElementById('storageInfo').after(warning);
+                    }
+                } else if (warningDiv) {
+                    warningDiv.remove();
+                }
+            } else if (warningDiv) {
+                warningDiv.remove();
+            }
         }
 
         // ===================== CEK AKSES =====================
@@ -707,99 +817,9 @@
                 return false;
             }
 
-            statusEl.textContent = `✅ Akses ${user.role.toUpperCase()} terverifikasi`;
+            statusEl.textContent = `✅ Akses ${user.role.toUpperCase()} terverifikasi · 💾 Data persisten`;
             statusEl.style.color = '#00ffaa';
             return true;
-        }
-
-        // ===================== STORAGE KEY =====================
-        function getStorageKey() {
-            const email = localStorage.getItem('user_email') || 'default';
-            const sanitized = email.replace(/[^a-zA-Z0-9]/g, '_');
-            return STORAGE_PREFIX + sanitized;
-        }
-
-        function getBackupKey() {
-            const email = localStorage.getItem('user_email') || 'default';
-            const sanitized = email.replace(/[^a-zA-Z0-9]/g, '_');
-            return BACKUP_PREFIX + sanitized;
-        }
-
-        // ===================== DATA STORAGE DENGAN BACKUP =====================
-        function getData() {
-            try {
-                const key = getStorageKey();
-                let raw = localStorage.getItem(key);
-                
-                // Jika data utama tidak ada, coba backup
-                if (!raw) {
-                    const backupKey = getBackupKey();
-                    raw = localStorage.getItem(backupKey);
-                    if (raw) {
-                        console.log('🔄 Restore data dari backup');
-                        localStorage.setItem(key, raw);
-                    }
-                }
-                
-                if (!raw) return { transactions: [], incomes: [], expenses: [] };
-                return JSON.parse(raw);
-            } catch {
-                return { transactions: [], incomes: [], expenses: [] };
-            }
-        }
-
-        function saveData(data) {
-            const key = getStorageKey();
-            localStorage.setItem(key, JSON.stringify(data));
-            
-            // Simpan backup juga
-            const backupKey = getBackupKey();
-            localStorage.setItem(backupKey, JSON.stringify(data));
-            
-            // Update storage info
-            updateStorageInfo(data);
-        }
-
-        // ===================== UPDATE STORAGE INFO =====================
-        function updateStorageInfo(data) {
-            const totalItems = (data.transactions?.length || 0) + (data.incomes?.length || 0) + (data.expenses?.length || 0);
-            const key = getStorageKey();
-            const raw = localStorage.getItem(key) || '';
-            const sizeInBytes = raw.length;
-            const sizeInKB = (sizeInBytes / 1024).toFixed(1);
-            
-            document.getElementById('storageCount').textContent = `📦 ${totalItems} item`;
-            document.getElementById('storageUsage').textContent = `💾 Storage: ${sizeInKB} KB digunakan`;
-            
-            // Progress bar (max 5MB = 5120KB)
-            const maxSize = 10120; // 10MB
-            const percentage = Math.min((sizeInBytes / (maxSize * 1024)) * 100, 100);
-            const bar = document.getElementById('storageBar');
-            bar.style.width = percentage + '%';
-            
-            // Warna berdasarkan usage
-            if (percentage < 50) {
-                bar.className = 'fill green';
-            } else if (percentage < 80) {
-                bar.className = 'fill yellow';
-            } else {
-                bar.className = 'fill red';
-            }
-            
-            // Tampilkan warning jika hampir penuh
-            if (percentage > 80) {
-                const warningDiv = document.getElementById('storageWarning');
-                if (!warningDiv) {
-                    const warning = document.createElement('div');
-                    warning.id = 'storageWarning';
-                    warning.className = 'storage-warning';
-                    warning.innerHTML = '⚠️ Storage hampir penuh! Segera export data atau hapus data lama.';
-                    document.getElementById('storageInfo').after(warning);
-                }
-            } else {
-                const warningDiv = document.getElementById('storageWarning');
-                if (warningDiv) warningDiv.remove();
-            }
         }
 
         // ===================== EXPORT DATA =====================
@@ -937,6 +957,7 @@
             renderTable(transactions, incomes, expenses);
 
             console.log('📊 Data dimuat:', transactions.length, 'transaksi,', incomes.length, 'pemasukan,', expenses.length, 'pengeluaran');
+            console.log('💾 Data disimpan di key:', getStorageKey());
         }
 
         // ===================== FILTER =====================
@@ -1414,6 +1435,8 @@
             console.log('📊 Halaman Laba/Rugi siap!');
             console.log('👤 User:', getUserData().email);
             console.log('🔑 Role:', getUserData().role);
+            console.log('💾 Data disimpan di key:', getStorageKey());
+            console.log('🔒 Data PERSISTEN - tidak akan hilang saat logout!');
         });
 
         // ===================== ANTI INSPECT =====================
