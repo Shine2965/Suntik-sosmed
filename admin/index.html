@@ -273,6 +273,11 @@
         table .price-new.decreased {
             color: #00ffaa;
         }
+        table .price-per-k {
+            color: #ffaa00;
+            font-weight: 600;
+            font-size: 12px;
+        }
         .no-data {
             color: #666;
             text-align: center;
@@ -403,7 +408,7 @@
             <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;">
                 <div>
                     <h2>💰 Harga Editor</h2>
-                    <div class="sub">Edit harga layanan secara massal (fixed atau persentase) <span style="color:#ff4444;font-size:11px;">🔒 Admin Only</span></div>
+                    <div class="sub">Edit harga layanan secara massal (fixed atau persentase) <span style="color:#ffaa00;font-size:11px;">🔑 Admin & VIP</span></div>
                 </div>
                 <div class="header-actions">
                     <button class="btn btn-back" onclick="location.href='/info/dashboard/index.html'">⬅️ Kembali</button>
@@ -510,12 +515,12 @@
         <div class="text-muted" style="text-align:center;margin-top:20px;">
             © Shine Shop · Harga Editor
         </div>
-        <div class="security-badge">🔒 Hanya Admin yang dapat mengakses</div>
+        <div class="security-badge">🔒 Hanya Admin & VIP yang dapat mengakses</div>
     </div>
 
     <script>
         // ============================================================
-        // 🔒 KONFIGURASI - ADMIN ONLY
+        // 🔒 KONFIGURASI - ADMIN & VIP
         // ============================================================
         const LOGIN_URL = '/info/index.html';
         const DASHBOARD_URL = '/info/dashboard/index.html';
@@ -566,9 +571,9 @@
         }
 
         // ============================================================
-        // 🔒 CEK AKSES - HANYA ADMIN
+        // 🔒 CEK AKSES - ADMIN ATAU VIP
         // ============================================================
-        async function checkAdminAccess() {
+        async function checkAccess() {
             const statusEl = document.getElementById('envStatus');
             const user = getUserData();
 
@@ -584,15 +589,15 @@
             }
             document.getElementById('userRoleDisplay').innerHTML = roleHtml;
 
-            // ===== HANYA ADMIN YANG BISA AKSES =====
-            if (user.role !== 'admin', 'vip') {
-                // Tampilkan halaman access denied
+            // ===== ADMIN ATAU VIP YANG BISA AKSES =====
+            const allowedRoles = ['admin', 'vip'];
+            if (!allowedRoles.includes(user.role)) {
                 const container = document.querySelector('.container');
                 container.innerHTML = `
                     <div class="card access-denied">
                         <div class="icon">⛔</div>
                         <h1>Akses Ditolak</h1>
-                        <p>Halaman ini hanya dapat diakses oleh <strong style="color:#ff4444;">Admin</strong>.</p>
+                        <p>Halaman ini hanya dapat diakses oleh <strong style="color:#ffaa00;">Admin</strong> atau <strong style="color:#ffaa00;">VIP</strong>.</p>
                         <p style="font-size:13px;color:#666;">Role Anda: ${user.role || 'Tidak diketahui'}</p>
                         <br>
                         <button class="btn btn-back" onclick="location.href='${DASHBOARD_URL}'" style="width:auto;">
@@ -604,26 +609,62 @@
                     </div>
                 `;
                 
-                // Sembunyikan elemen yang tidak perlu
                 document.getElementById('toolsCard').style.display = 'none';
                 document.getElementById('summaryCard').style.display = 'none';
                 document.getElementById('tableCard').style.display = 'none';
                 
-                statusEl.textContent = '❌ Akses ditolak! Hanya Admin yang bisa mengakses halaman ini.';
+                statusEl.textContent = '❌ Akses ditolak! Hanya Admin & VIP yang bisa mengakses halaman ini.';
                 statusEl.style.color = '#ff6666';
                 
                 Swal.fire({
                     title: '⛔ Akses Ditolak',
-                    text: 'Halaman ini hanya untuk Admin. Role Anda: ' + (user.role || 'Tidak diketahui'),
+                    text: 'Halaman ini hanya untuk Admin & VIP. Role Anda: ' + (user.role || 'Tidak diketahui'),
                     icon: 'error',
                     confirmButtonColor: '#ff4444'
                 });
                 return false;
             }
 
-            statusEl.textContent = `✅ Akses Admin terverifikasi`;
+            statusEl.textContent = `✅ Akses ${user.role.toUpperCase()} terverifikasi`;
             statusEl.style.color = '#00ffaa';
             return true;
+        }
+
+        // ============================================================
+        // 🔒 AUTO UPDATE HARGA PER K (1000 UNIT)
+        // ============================================================
+        function updatePricePerK() {
+            // Loop melalui semua kategori dan layanan
+            Object.keys(currentData).forEach(category => {
+                const services = currentData[category] || [];
+                services.forEach(service => {
+                    // Jika ada field pricePerFollower, update harga per K
+                    if (service.pricePerFollower !== undefined && service.pricePerFollower !== null) {
+                        // Harga per K = pricePerFollower * 1000
+                        const pricePerK = service.pricePerFollower * 1000;
+                        
+                        // Update field yang berhubungan dengan harga per K
+                        // Jika ada field name yang mengandung "/K", update juga
+                        if (service.name) {
+                            // Cari pola harga di nama (contoh: Rp 50.000/K)
+                            const nameWithPrice = service.name.replace(
+                                /Rp\s*[\d.,]+(\s*\/\s*K)?/gi,
+                                (match) => {
+                                    // Jika match mengandung "/K", update dengan harga baru
+                                    if (match.includes('/K') || match.includes('/ k')) {
+                                        return `Rp ${pricePerK.toLocaleString('id-ID')}/K`;
+                                    }
+                                    return match;
+                                }
+                            );
+                            service.name = nameWithPrice;
+                        }
+                        
+                        // Simpan harga per K sebagai properti terpisah (opsional)
+                        service.pricePerK = pricePerK;
+                    }
+                });
+            });
         }
 
         // ============================================================
@@ -644,6 +685,9 @@
                 currentData = JSON.parse(JSON.stringify(originalData));
                 changedItems = {};
 
+                // Update harga per K
+                updatePricePerK();
+
                 // Update kategori filter
                 const categoryFilter = document.getElementById('categoryFilter');
                 const currentCat = categoryFilter.value;
@@ -662,10 +706,11 @@
                 renderTable();
                 updateItemCount();
 
-                statusEl.textContent = `✅ ${Object.keys(currentData).length} kategori dimuat`;
+                statusEl.textContent = `✅ ${Object.keys(currentData).length} kategori dimuat (Harga/K otomatis)`;
                 statusEl.style.color = '#00ffaa';
 
                 console.log('📊 Data dimuat:', Object.keys(currentData).length, 'kategori');
+                console.log('💰 Harga per K otomatis diupdate');
 
             } catch (err) {
                 console.error('Error load data:', err);
@@ -727,6 +772,7 @@
                             <th>Kategori</th>
                             <th>Harga Lama</th>
                             <th>Harga Baru</th>
+                            <th>Harga /K</th>
                             <th>Perubahan</th>
                         </tr>
                     </thead>
@@ -736,6 +782,7 @@
             allItems.forEach(({ category, service, original, isChanged }) => {
                 const priceOld = original ? original.pricePerFollower : service.pricePerFollower;
                 const priceNew = service.pricePerFollower;
+                const pricePerK = service.pricePerK || (priceNew * 1000);
                 const diff = priceNew - priceOld;
                 const diffPercent = priceOld > 0 ? ((diff / priceOld) * 100) : 0;
 
@@ -757,10 +804,11 @@
                 html += `
                     <tr>
                         <td><code style="color:#ffaa00;">${service.id}</code></td>
-                        <td style="max-width:300px;word-break:break-word;">${service.name || '-'}</td>
+                        <td style="max-width:250px;word-break:break-word;font-size:12px;">${service.name || '-'}</td>
                         <td><span style="color:#00ccff;font-size:11px;">${category}</span></td>
                         <td class="price-old">Rp ${priceOld.toLocaleString('id-ID')}</td>
                         <td class="price-new ${priceNewClass}">Rp ${priceNew.toLocaleString('id-ID')}</td>
+                        <td class="price-per-k">Rp ${pricePerK.toLocaleString('id-ID')}/K</td>
                         <td>${changeBadge}</td>
                     </tr>
                 `;
@@ -864,12 +912,17 @@
 
                     if (newPrice !== oldPrice) {
                         service.pricePerFollower = newPrice;
+                        // Update harga per K otomatis
+                        service.pricePerK = newPrice * 1000;
                         changedCount++;
                         const key = cat + '_' + service.id;
                         changedItems[key] = true;
                     }
                 });
             });
+
+            // Update harga per K di semua layanan (untuk yang tidak berubah juga)
+            updatePricePerK();
 
             if (changedCount === 0) {
                 Swal.fire({
@@ -891,6 +944,8 @@
                         Nilai: ${value}${mode === 'fixed' ? '' : '%'} | 
                         Kategori: ${categoryFilter === 'all' ? 'Semua' : categoryFilter}
                         ${idFilter ? ` | ID: ${idFilter}` : ''}
+                        <br>
+                        🔄 Harga per K otomatis diupdate
                     </span>
                 </div>
             `;
@@ -901,7 +956,7 @@
 
             Swal.fire({
                 title: '✅ Berhasil!',
-                text: `${changedCount} layanan berhasil diubah.`,
+                text: `${changedCount} layanan berhasil diubah. Harga per K otomatis diupdate.`,
                 icon: 'success',
                 timer: 2000,
                 showConfirmButton: false
@@ -925,6 +980,8 @@
                 if (result.isConfirmed) {
                     currentData = JSON.parse(JSON.stringify(originalData));
                     changedItems = {};
+                    // Update harga per K untuk data original
+                    updatePricePerK();
                     document.getElementById('editResult').style.display = 'none';
                     updateSummary();
                     renderTable();
@@ -964,9 +1021,12 @@
         }
 
         // ============================================================
-        // 🔒 DOWNLOAD JSON
+        // 🔒 DOWNLOAD JSON (dengan harga per K)
         // ============================================================
         function downloadJSON() {
+            // Pastikan harga per K update sebelum export
+            updatePricePerK();
+            
             const dataToExport = JSON.parse(JSON.stringify(currentData));
             const json = JSON.stringify(dataToExport, null, 2);
             const blob = new Blob([json], { type: 'application/json' });
@@ -979,7 +1039,7 @@
 
             Swal.fire({
                 title: '✅ Download Berhasil!',
-                text: 'File JSON berhasil diunduh.',
+                text: 'File JSON berhasil diunduh. Harga per K sudah termasuk.',
                 icon: 'success',
                 timer: 2000,
                 showConfirmButton: false
@@ -1002,14 +1062,15 @@
         // 🔒 INIT
         // ============================================================
         document.addEventListener('DOMContentLoaded', async function() {
-            const isAdmin = await checkAdminAccess();
-            if (!isAdmin) return;
+            const hasAccess = await checkAccess();
+            if (!hasAccess) return;
 
             await loadData();
 
             console.log('💰 Harga Editor siap!');
-            console.log('👤 Admin:', getUserData().email);
-            console.log('🔑 Role: Admin');
+            console.log('👤 User:', getUserData().email);
+            console.log('🔑 Role:', getUserData().role);
+            console.log('🔄 Harga per K otomatis diupdate');
         });
     </script>
 </body>
