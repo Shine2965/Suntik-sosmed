@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Deposit Saldo - Shine Shop</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: #0a0a0a;
+            min-height: 100vh;
+            padding: 30px 20px;
+            background: radial-gradient(circle at 20% 30%, #00ffaa10, transparent 50%),
+                        radial-gradient(circle at 80% 70%, #00c6ff10, transparent 50%),
+                        #0a0a0a;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        .card {
+            background: #1a1a1a;
+            border-radius: 24px;
+            padding: 30px 28px;
+            border: 1px solid #00ffaa33;
+            box-shadow: 0 0 40px rgba(0,255,170,0.05);
+            margin-bottom: 20px;
+        }
+        .card h2 {
+            color: #00ffaa;
+            font-size: 22px;
+            margin-bottom: 6px;
+        }
+        .card .sub {
+            color: #888;
+            font-size: 14px;
+            margin-bottom: 20px;
+        }
+        .form-group {
+            margin-bottom: 16px;
+        }
+        .form-group label {
+            color: #ccc;
+            font-size: 13px;
+            font-weight: 600;
+            display: block;
+            margin-bottom: 6px;
+        }
+        .form-group label .required {
+            color: #ff6666;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 12px 16px;
+            border-radius: 12px;
+            border: 1px solid #00ffaa33;
+            background: #0d0d0d;
+            color: #fff;
+            font-size: 14px;
+            outline: none;
+            transition: 0.3s;
+            font-family: 'Poppins', sans-serif;
+        }
+        .form-group input:focus {
+            border-color: #00ffaa;
+            box-shadow: 0 0 20px rgba(0,255,170,0.1);
+        }
+        .form-group input::placeholder {
+            color: #555;
+        }
+        .form-group input:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .btn {
+            padding: 12px 24px;
+            border-radius: 30px;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.3s;
+            font-size: 13px;
+            font-family: 'Poppins', sans-serif;
+        }
+        .btn-primary {
+            background: #00ffaa;
+            color: #0a0a0a;
+            width: 100%;
+            padding: 14px;
+            font-size: 15px;
+        }
+        .btn-primary:hover {
+            background: #00dd99;
+            transform: scale(0.97);
+        }
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .btn-back {
+            background: #444;
+            color: #fff;
+        }
+        .btn-back:hover {
+            background: #555;
+        }
+        .btn-upload {
+            background: #ffaa0044;
+            color: #ffaa00;
+            border: 1px solid #ffaa0055;
+        }
+        .btn-upload:hover {
+            background: #ffaa0066;
+        }
+        .header-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 10px;
+        }
+        .text-muted {
+            color: #666;
+            font-size: 12px;
+        }
+        .text-success {
+            color: #00ffaa;
+        }
+        .text-warning {
+            color: #ffaa00;
+        }
+        .text-danger {
+            color: #ff4444;
+        }
+        .security-badge {
+            text-align: center;
+            font-size: 10px;
+            color: #444;
+            margin-top: 12px;
+            border-top: 1px solid #00ffaa15;
+            padding-top: 12px;
+        }
+        .env-status {
+            text-align: center;
+            font-size: 11px;
+            color: #555;
+            margin-top: 8px;
+        }
+        .role-badge {
+            display: inline-block;
+            padding: 2px 12px;
+            border-radius: 12px;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+        .role-badge.admin {
+            background: #ff444422;
+            color: #ff6666;
+        }
+        .role-badge.vip {
+            background: #ffaa0044;
+            color: #ffaa00;
+        }
+        .role-badge.user {
+            background: #444;
+            color: #888;
+        }
+
+        /* QRIS */
+        .qris-wrapper {
+            background: #ffffff;
+            border-radius: 16px;
+            padding: 20px;
+            margin: 16px 0;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .qris-wrapper canvas {
+            max-width: 220px;
+            height: auto;
+            border-radius: 8px;
+        }
+        .qris-wrapper .qris-label {
+            color: #888;
+            font-size: 12px;
+            margin-top: 8px;
+        }
+
+        /* Detail Transaksi */
+        .detail-box {
+            background: #0d0d0d;
+            border-radius: 12px;
+            padding: 16px 20px;
+            margin: 12px 0;
+            border: 1px solid #00ffaa15;
+        }
+        .detail-box .row {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            border-bottom: 1px solid #00ffaa08;
+        }
+        .detail-box .row:last-child {
+            border-bottom: none;
+        }
+        .detail-box .row .label {
+            color: #888;
+            font-size: 13px;
+        }
+        .detail-box .row .value {
+            color: #fff;
+            font-size: 13px;
+            font-weight: 600;
+        }
+        .detail-box .row .value.green {
+            color: #00ffaa;
+        }
+        .detail-box .row .value.yellow {
+            color: #ffaa00;
+        }
+
+        /* File Upload */
+        .file-upload-area {
+            border: 2px dashed #00ffaa33;
+            border-radius: 12px;
+            padding: 24px;
+            text-align: center;
+            cursor: pointer;
+            transition: 0.3s;
+            margin-top: 8px;
+        }
+        .file-upload-area:hover {
+            border-color: #00ffaa66;
+            background: rgba(0,255,170,0.03);
+        }
+        .file-upload-area .icon {
+            font-size: 36px;
+            display: block;
+            margin-bottom: 8px;
+        }
+        .file-upload-area .text {
+            color: #888;
+            font-size: 13px;
+        }
+        .file-upload-area .text strong {
+            color: #00ffaa;
+        }
+        .file-upload-area .file-name {
+            color: #00ffaa;
+            font-size: 13px;
+            margin-top: 6px;
+            display: none;
+        }
+        .file-upload-area.has-file {
+            border-color: #00ffaa66;
+            background: rgba(0,255,170,0.05);
+        }
+        .file-upload-area.has-file .file-name {
+            display: block;
+        }
+        #fileInput {
+            display: none;
+        }
+
+        .preview-image {
+            max-width: 100%;
+            max-height: 150px;
+            border-radius: 8px;
+            margin-top: 8px;
+            display: none;
+            border: 1px solid #00ffaa33;
+        }
+
+        @media (max-width: 600px) {
+            .card {
+                padding: 20px 16px;
+            }
+            .header-actions {
+                flex-direction: column;
+            }
+            .header-actions .btn {
+                width: 100%;
+                text-align: center;
+            }
+            .qris-wrapper canvas {
+                max-width: 180px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- ===== HEADER ===== -->
+        <div class="card">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;">
+                <div>
+                    <h2>💰 Deposit Saldo</h2>
+                    <div class="sub">Isi saldo akun Anda dengan mudah</div>
+                </div>
+                <div class="header-actions">
+                    <button class="btn btn-back" onclick="location.href='/info/dashboard/index.html'">⬅️ Kembali</button>
+                </div>
+            </div>
+            <div id="userInfo" style="color:#888;font-size:13px;margin-top:8px;">
+                👤 <span id="userEmailDisplay">-</span>
+                <span id="userRoleDisplay" style="margin-left:10px;"></span>
+            </div>
+            <div class="env-status" id="envStatus">🔌 Memuat data user...</div>
+        </div>
+
+        <!-- ===== FORM DEPOSIT ===== -->
+        <div class="card" id="depositCard">
+            <h2>📝 Form Deposit</h2>
+            <div class="sub">Minimal deposit <span style="color:#ffaa00;">Rp 1.000</span> (biaya admin 1%)</div>
+
+            <div class="form-group">
+                <label>💰 Jumlah Deposit <span class="required">*</span></label>
+                <input type="number" id="depositAmount" placeholder="Masukkan nominal deposit (min 1.000)" min="1000" oninput="calculateTotal()">
+            </div>
+
+            <div class="detail-box">
+                <div class="row">
+                    <span class="label">Jumlah Deposit</span>
+                    <span class="value" id="displayAmount">Rp 0</span>
+                </div>
+                <div class="row">
+                    <span class="label">Biaya Admin (1%)</span>
+                    <span class="value yellow" id="displayFee">Rp 0</span>
+                </div>
+                <div class="row">
+                    <span class="label">Total Bayar</span>
+                    <span class="value green" id="displayTotal">Rp 0</span>
+                </div>
+            </div>
+
+            <!-- QRIS -->
+            <div class="qris-wrapper">
+                <canvas id="qrisCanvas" width="220" height="220"></canvas>
+                <div class="qris-label">📱 Scan QRIS untuk membayar</div>
+            </div>
+
+            <!-- Upload Bukti -->
+            <div class="form-group">
+                <label>📎 Upload Bukti Transfer <span class="required">*</span></label>
+                <div class="file-upload-area" id="uploadArea" onclick="document.getElementById('fileInput').click()">
+                    <span class="icon">📤</span>
+                    <div class="text">Klik atau seret file untuk upload<br><strong>Format: JPG, PNG, PDF</strong></div>
+                    <div class="file-name" id="fileName">📄 file.jpg</div>
+                    <img class="preview-image" id="previewImage" alt="Preview Bukti">
+                </div>
+                <input type="file" id="fileInput" accept="image/*,application/pdf" onchange="handleFileSelect(event)">
+            </div>
+
+            <button class="btn btn-primary" id="submitBtn" onclick="submitDeposit()">
+                ✅ Kirim Deposit
+            </button>
+        </div>
+
+        <div class="text-muted" style="text-align:center;margin-top:20px;">
+            © Shine Shop · Deposit System
+        </div>
+        <div class="security-badge">🔒 Data aman & terenkripsi</div>
+    </div>
+
+    <script>
+        // ============================================================
+        // 🔒 KONFIGURASI
+        // ============================================================
+        const LOGIN_URL = '/info/index.html';
+        const DASHBOARD_URL = '/info/dashboard/index.html';
+        const DISCORD_WEBHOOK = 'https://discord.com/api/webhooks/1482244989021851748/oq__kcKXWHJILOG96lbfFxfZKoKCLEqkLJrlSS_rTQ6YEhgSTnFL_Guu8ZulERNEmCZV';
+        const QRIS_STRING = '00020101021226670016COM.NOBUBANK.WWW01189360050300000879140214526036770909650303UMI51440014ID.CO.QRIS.WWW0215ID20243611417480303UMI5204541153033605802ID5920SHINE SHOP OK19967206008SURABAYA61056011162070703A0163041008';
+        const ADMIN_FEE = 0.01; // 1%
+        const MIN_DEPOSIT = 1000;
+        const SESSION_TIMEOUT = 36000000;
+
+        let selectedFile = null;
+        let currentTotal = 0;
+
+        // ============================================================
+        // 🔒 CEK SESSION
+        // ============================================================
+        function checkSession() {
+            const loggedIn = localStorage.getItem('logged_in');
+            const sessionToken = localStorage.getItem('session_token');
+            const sessionCreated = parseInt(localStorage.getItem('session_created') || '0');
+            const now = Date.now();
+
+            if (loggedIn !== 'true' || !sessionToken) {
+                window.location.href = LOGIN_URL;
+                return false;
+            }
+
+            if (now - sessionCreated > SESSION_TIMEOUT) {
+                console.log('⏰ Session expired');
+                window.location.href = LOGIN_URL;
+                return false;
+            }
+
+            return true;
+        }
+
+        if (!checkSession()) {
+            throw new Error('Redirect ke login');
+        }
+
+        // ============================================================
+        // 🔒 GET USER DATA
+        // ============================================================
+        function getUserData() {
+            return {
+                email: localStorage.getItem('user_email') || '',
+                role: localStorage.getItem('user_role') || 'user',
+                saldo: localStorage.getItem('user_saldo') || '0'
+            };
+        }
+
+        // ============================================================
+        // 🔒 TAMPILKAN USER
+        // ============================================================
+        function displayUser() {
+            const user = getUserData();
+            document.getElementById('userEmailDisplay').textContent = user.email || 'Belum login';
+
+            let roleHtml = '';
+            if (user.role === 'admin') {
+                roleHtml = `<span class="role-badge admin">🔑 Admin</span>`;
+            } else if (user.role === 'vip') {
+                roleHtml = `<span class="role-badge vip">⭐ VIP</span>`;
+            } else {
+                roleHtml = `<span class="role-badge user">👤 User</span>`;
+            }
+            document.getElementById('userRoleDisplay').innerHTML = roleHtml;
+
+            document.getElementById('envStatus').textContent = `✅ User terverifikasi`;
+            document.getElementById('envStatus').style.color = '#00ffaa';
+        }
+
+        // ============================================================
+        // 🔒 GENERATE QRIS
+        // ============================================================
+        function generateQRIS() {
+            const canvas = document.getElementById('qrisCanvas');
+            QRCode.toCanvas(canvas, QRIS_STRING, {
+                width: 220,
+                margin: 2,
+                color: {
+                    dark: '#000000',
+                    light: '#ffffff'
+                }
+            }, function(error) {
+                if (error) {
+                    console.error('QRIS Error:', error);
+                    canvas.parentElement.innerHTML = `
+                        <span style="color:#ff6666;">❌ Gagal generate QRIS</span>
+                        <div class="qris-label">QRIS string: ${QRIS_STRING.substring(0, 50)}...</div>
+                    `;
+                } else {
+                    console.log('✅ QRIS berhasil digenerate');
+                }
+            });
+        }
+
+        // ============================================================
+        // 🔒 HITUNG TOTAL
+        // ============================================================
+        function calculateTotal() {
+            const amount = parseInt(document.getElementById('depositAmount').value) || 0;
+            
+            if (amount < MIN_DEPOSIT && amount > 0) {
+                document.getElementById('depositAmount').style.borderColor = '#ff4444';
+                document.getElementById('displayAmount').textContent = `Rp ${amount.toLocaleString('id-ID')}`;
+                document.getElementById('displayFee').textContent = `Rp 0`;
+                document.getElementById('displayTotal').textContent = `⚠️ Minimal Rp ${MIN_DEPOSIT.toLocaleString('id-ID')}`;
+                document.getElementById('displayTotal').style.color = '#ff4444';
+                currentTotal = 0;
+                return;
+            }
+
+            document.getElementById('depositAmount').style.borderColor = '';
+            
+            const fee = Math.round(amount * ADMIN_FEE);
+            const total = amount + fee;
+
+            document.getElementById('displayAmount').textContent = `Rp ${amount.toLocaleString('id-ID')}`;
+            document.getElementById('displayFee').textContent = `Rp ${fee.toLocaleString('id-ID')}`;
+            document.getElementById('displayTotal').textContent = `Rp ${total.toLocaleString('id-ID')}`;
+            document.getElementById('displayTotal').style.color = '#00ffaa';
+            
+            currentTotal = total;
+        }
+
+        // ============================================================
+        // 🔒 HANDLE FILE SELECT
+        // ============================================================
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            // Validasi ukuran file (max 5MB)
+            if (file.size > 5 * 1024 * 1024) {
+                Swal.fire({
+                    title: '❌ File Terlalu Besar',
+                    text: 'Maksimal ukuran file adalah 5MB.',
+                    icon: 'error',
+                    confirmButtonColor: '#ff4444'
+                });
+                event.target.value = '';
+                return;
+            }
+
+            selectedFile = file;
+
+            const uploadArea = document.getElementById('uploadArea');
+            const fileName = document.getElementById('fileName');
+            const previewImage = document.getElementById('previewImage');
+
+            uploadArea.classList.add('has-file');
+            fileName.textContent = `📄 ${file.name}`;
+            fileName.style.display = 'block';
+
+            // Preview gambar
+            if (file.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    previewImage.src = e.target.result;
+                    previewImage.style.display = 'block';
+                };
+                reader.readAsDataURL(file);
+            } else {
+                previewImage.style.display = 'none';
+            }
+
+            console.log('📎 File selected:', file.name);
+        }
+
+        // ============================================================
+        // 🔒 SUBMIT DEPOSIT
+        // ============================================================
+        async function submitDeposit() {
+            const submitBtn = document.getElementById('submitBtn');
+            const user = getUserData();
+            const amount = parseInt(document.getElementById('depositAmount').value) || 0;
+
+            // Validasi
+            if (amount < MIN_DEPOSIT) {
+                Swal.fire({
+                    title: '⚠️ Minimal Deposit',
+                    text: `Minimal deposit adalah Rp ${MIN_DEPOSIT.toLocaleString('id-ID')}`,
+                    icon: 'warning',
+                    confirmButtonColor: '#ffaa00'
+                });
+                document.getElementById('depositAmount').focus();
+                return;
+            }
+
+            if (!selectedFile) {
+                Swal.fire({
+                    title: '⚠️ Upload Bukti',
+                    text: 'Silakan upload bukti transfer terlebih dahulu.',
+                    icon: 'warning',
+                    confirmButtonColor: '#ffaa00'
+                });
+                return;
+            }
+
+            // Konfirmasi
+            const confirmResult = await Swal.fire({
+                title: '📤 Konfirmasi Deposit',
+                html: `
+                    <div style="text-align:left;color:#ccc;font-size:14px;">
+                        <b>👤 User:</b> ${user.email}<br>
+                        <b>💰 Deposit:</b> Rp ${amount.toLocaleString('id-ID')}<br>
+                        <b>📊 Biaya Admin:</b> Rp ${Math.round(amount * ADMIN_FEE).toLocaleString('id-ID')}<br>
+                        <b>💵 Total Bayar:</b> <span style="color:#00ffaa;">Rp ${currentTotal.toLocaleString('id-ID')}</span><br>
+                        <b>📎 Bukti:</b> ${selectedFile.name}
+                    </div>
+                `,
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonText: '✅ Ya, Kirim!',
+                cancelButtonText: '❌ Batal',
+                confirmButtonColor: '#00ffaa',
+                cancelButtonColor: '#666'
+            });
+
+            if (!confirmResult.isConfirmed) return;
+
+            submitBtn.disabled = true;
+            submitBtn.textContent = '⏳ Mengirim...';
+
+            try {
+                // Generate transaction ID
+                const trxID = 'DEP-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).substring(2, 6).toUpperCase();
+
+                // Kirim ke Discord
+                const textMessage = `
+📢 **DEPOSIT SALDO BARU**
+━━━━━━━━━━━━━━━━━━━━━
+🆔 **ID Transaksi:** ${trxID}
+👤 **User:** ${user.email}
+🔑 **Role:** ${user.role}
+💰 **Deposit:** Rp ${amount.toLocaleString('id-ID')}
+📊 **Biaya Admin (1%):** Rp ${Math.round(amount * ADMIN_FEE).toLocaleString('id-ID')}
+💵 **Total Bayar:** Rp ${currentTotal.toLocaleString('id-ID')}
+📅 **Tanggal:** ${new Date().toLocaleString('id-ID')}
+━━━━━━━━━━━━━━━━━━━━━
+📎 **Bukti transfer terlampir di bawah**
+                `;
+
+                // Kirim teks ke Discord
+                const textRes = await fetch(DISCORD_WEBHOOK, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        content: textMessage
+                    })
+                });
+
+                if (!textRes.ok) {
+                    throw new Error('Gagal kirim pesan ke Discord');
+                }
+
+                // Kirim file ke Discord
+                const formData = new FormData();
+                formData.append('file', selectedFile);
+                formData.append('payload_json', JSON.stringify({
+                    content: `📸 Bukti deposit untuk ${user.email} - ${trxID}`
+                }));
+
+                const fileRes = await fetch(DISCORD_WEBHOOK, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!fileRes.ok) {
+                    throw new Error('Gagal upload bukti ke Discord');
+                }
+
+                // Simpan ke localStorage
+                const historyKey = 'deposit_history';
+                let history = JSON.parse(localStorage.getItem(historyKey) || '[]');
+                history.push({
+                    id: trxID,
+                    user: user.email,
+                    amount: amount,
+                    total: currentTotal,
+                    fee: Math.round(amount * ADMIN_FEE),
+                    status: 'pending',
+                    date: new Date().toISOString(),
+                    fileName: selectedFile.name
+                });
+                localStorage.setItem(historyKey, JSON.stringify(history));
+
+                Swal.fire({
+                    title: '✅ Deposit Berhasil Dikirim!',
+                    html: `
+                        Deposit Anda sedang diproses.<br>
+                        <span style="font-size:13px;color:#888;">ID Transaksi: ${trxID}</span><br>
+                        <span style="font-size:13px;color:#ffaa00;">Saldo akan ditambahkan setelah admin memverifikasi.</span>
+                    `,
+                    icon: 'success',
+                    confirmButtonColor: '#00ffaa'
+                });
+
+                // Reset form
+                document.getElementById('depositAmount').value = '';
+                document.getElementById('displayAmount').textContent = 'Rp 0';
+                document.getElementById('displayFee').textContent = 'Rp 0';
+                document.getElementById('displayTotal').textContent = 'Rp 0';
+                selectedFile = null;
+                document.getElementById('fileInput').value = '';
+                document.getElementById('uploadArea').classList.remove('has-file');
+                document.getElementById('fileName').style.display = 'none';
+                document.getElementById('previewImage').style.display = 'none';
+                document.getElementById('previewImage').src = '';
+                calculateTotal();
+
+            } catch (err) {
+                console.error('Error:', err);
+                Swal.fire({
+                    title: '❌ Gagal',
+                    text: err.message || 'Terjadi error saat mengirim deposit.',
+                    icon: 'error',
+                    confirmButtonColor: '#ff4444'
+                });
+            }
+
+            submitBtn.disabled = false;
+            submitBtn.textContent = '✅ Kirim Deposit';
+        }
+
+        // ============================================================
+        // 🔒 ANTI INSPECT
+        // ============================================================
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'F12' ||
+                (e.ctrlKey && e.shiftKey && ['I', 'C', 'J'].includes(e.key)) ||
+                (e.ctrlKey && e.key === 'u')) {
+                e.preventDefault();
+                return false;
+            }
+        });
+
+        // ============================================================
+        // 🔒 INIT
+        // ============================================================
+        document.addEventListener('DOMContentLoaded', function() {
+            displayUser();
+            generateQRIS();
+
+            console.log('💰 Halaman Deposit siap!');
+            console.log('👤 User:', getUserData().email);
+            console.log('💳 QRIS:', QRIS_STRING.substring(0, 30) + '...');
+        });
+    </script>
+</body>
+</html>
