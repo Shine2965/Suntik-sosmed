@@ -113,14 +113,6 @@
         .btn-back:hover {
             background: #555;
         }
-        .btn-upload {
-            background: #ffaa0044;
-            color: #ffaa00;
-            border: 1px solid #ffaa0055;
-        }
-        .btn-upload:hover {
-            background: #ffaa0066;
-        }
         .header-actions {
             display: flex;
             gap: 10px;
@@ -196,13 +188,14 @@
             max-height: 500px;
             padding: 20px;
         }
-        .qris-wrapper canvas {
+        .qris-wrapper #qrisCanvas {
             max-width: 220px;
             height: auto;
             border-radius: 8px;
+            background: #fff;
         }
         .qris-wrapper .qris-label {
-            color: #888;
+            color: #666;
             font-size: 12px;
             margin-top: 8px;
         }
@@ -211,6 +204,9 @@
             font-size: 18px;
             font-weight: 700;
             margin-top: 4px;
+            background: #00ffaa15;
+            padding: 4px 16px;
+            border-radius: 8px;
         }
 
         /* Detail Transaksi */
@@ -329,7 +325,7 @@
                 width: 100%;
                 text-align: center;
             }
-            .qris-wrapper canvas {
+            .qris-wrapper #qrisCanvas {
                 max-width: 180px;
             }
         }
@@ -390,7 +386,7 @@
 
                 <!-- QRIS Wrapper (muncul setelah input valid) -->
                 <div class="qris-wrapper" id="qrisWrapper">
-                    <canvas id="qrisCanvas" width="220" height="220"></canvas>
+                    <div id="qrisCanvasContainer"></div>
                     <div class="qris-label">📱 Scan QRIS untuk membayar</div>
                     <div class="qris-amount" id="qrisAmount">Rp 0</div>
                 </div>
@@ -434,6 +430,7 @@
         let selectedFile = null;
         let currentTotal = 0;
         let qrisGenerated = false;
+        let qrisCanvas = null;
 
         // ============================================================
         // 🔒 CEK SESSION
@@ -495,10 +492,24 @@
         }
 
         // ============================================================
-        // 🔒 GENERATE QRIS
+        // 🔒 GENERATE QRIS (menggunakan DOM canvas)
         // ============================================================
         function generateQRIS() {
-            const canvas = document.getElementById('qrisCanvas');
+            const container = document.getElementById('qrisCanvasContainer');
+            
+            // Hapus canvas lama jika ada
+            container.innerHTML = '';
+            
+            // Buat canvas baru
+            const canvas = document.createElement('canvas');
+            canvas.id = 'qrisCanvas';
+            canvas.width = 220;
+            canvas.height = 220;
+            canvas.style.maxWidth = '220px';
+            canvas.style.height = 'auto';
+            container.appendChild(canvas);
+
+            // Generate QR Code
             QRCode.toCanvas(canvas, QRIS_STRING, {
                 width: 220,
                 margin: 2,
@@ -509,13 +520,15 @@
             }, function(error) {
                 if (error) {
                     console.error('QRIS Error:', error);
-                    canvas.parentElement.innerHTML = `
-                        <span style="color:#ff6666;">❌ Gagal generate QRIS</span>
-                        <div class="qris-label">QRIS string: ${QRIS_STRING.substring(0, 50)}...</div>
+                    container.innerHTML = `
+                        <span style="color:#ff6666;font-size:13px;">❌ Gagal generate QRIS</span>
+                        <div style="font-size:10px;color:#888;word-break:break-all;margin-top:4px;">${QRIS_STRING.substring(0, 60)}...</div>
                     `;
+                    qrisGenerated = false;
                 } else {
                     console.log('✅ QRIS berhasil digenerate');
                     qrisGenerated = true;
+                    qrisCanvas = canvas;
                 }
             });
         }
@@ -579,7 +592,11 @@
             currentTotal = total;
 
             // Tampilkan QRIS jika nominal valid
-            showQRIS(total);
+            if (amount >= MIN_DEPOSIT) {
+                showQRIS(total);
+            } else {
+                showQRIS(0);
+            }
         }
 
         // ============================================================
@@ -810,6 +827,7 @@
             console.log('💰 Halaman Deposit siap!');
             console.log('👤 User:', getUserData().email);
             console.log('📱 QRIS akan muncul setelah input nominal valid');
+            console.log('📌 QRIS String length:', QRIS_STRING.length);
         });
     </script>
 </body>
