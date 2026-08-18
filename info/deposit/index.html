@@ -185,6 +185,16 @@
             display: flex;
             flex-direction: column;
             align-items: center;
+            transition: all 0.4s ease;
+            opacity: 0;
+            max-height: 0;
+            overflow: hidden;
+            padding: 0 20px;
+        }
+        .qris-wrapper.show {
+            opacity: 1;
+            max-height: 500px;
+            padding: 20px;
         }
         .qris-wrapper canvas {
             max-width: 220px;
@@ -195,6 +205,12 @@
             color: #888;
             font-size: 12px;
             margin-top: 8px;
+        }
+        .qris-wrapper .qris-amount {
+            color: #00ffaa;
+            font-size: 18px;
+            font-weight: 700;
+            margin-top: 4px;
         }
 
         /* Detail Transaksi */
@@ -282,6 +298,26 @@
             border: 1px solid #00ffaa33;
         }
 
+        .qris-placeholder {
+            text-align: center;
+            padding: 30px 20px;
+            color: #666;
+            font-size: 14px;
+            border: 1px dashed #00ffaa22;
+            border-radius: 12px;
+            margin: 16px 0;
+            display: block;
+        }
+        .qris-placeholder .icon {
+            font-size: 40px;
+            display: block;
+            margin-bottom: 10px;
+        }
+        .qris-placeholder .highlight {
+            color: #ffaa00;
+            font-weight: 600;
+        }
+
         @media (max-width: 600px) {
             .card {
                 padding: 20px 16px;
@@ -305,7 +341,7 @@
         <div class="card">
             <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;">
                 <div>
-                    <h2>💰 Deposit Saldo Buzzer</h2>
+                    <h2>💰 Deposit Saldo</h2>
                     <div class="sub">Isi saldo akun Anda dengan mudah</div>
                 </div>
                 <div class="header-actions">
@@ -344,10 +380,20 @@
                 </div>
             </div>
 
-            <!-- QRIS -->
-            <div class="qris-wrapper">
-                <canvas id="qrisCanvas" width="220" height="220"></canvas>
-                <div class="qris-label">📱 Scan QRIS untuk membayar</div>
+            <!-- ===== QRIS ===== -->
+            <div id="qrisContainer">
+                <!-- QRIS Placeholder (muncul sebelum input) -->
+                <div class="qris-placeholder" id="qrisPlaceholder">
+                    <span class="icon">📱</span>
+                    <span>Masukkan nominal deposit terlebih dahulu<br>untuk menampilkan QRIS</span>
+                </div>
+
+                <!-- QRIS Wrapper (muncul setelah input valid) -->
+                <div class="qris-wrapper" id="qrisWrapper">
+                    <canvas id="qrisCanvas" width="220" height="220"></canvas>
+                    <div class="qris-label">📱 Scan QRIS untuk membayar</div>
+                    <div class="qris-amount" id="qrisAmount">Rp 0</div>
+                </div>
             </div>
 
             <!-- Upload Bukti -->
@@ -387,6 +433,7 @@
 
         let selectedFile = null;
         let currentTotal = 0;
+        let qrisGenerated = false;
 
         // ============================================================
         // 🔒 CEK SESSION
@@ -468,8 +515,36 @@
                     `;
                 } else {
                     console.log('✅ QRIS berhasil digenerate');
+                    qrisGenerated = true;
                 }
             });
+        }
+
+        // ============================================================
+        // 🔒 TAMPILKAN QRIS (jika nominal valid)
+        // ============================================================
+        function showQRIS(amount) {
+            const placeholder = document.getElementById('qrisPlaceholder');
+            const wrapper = document.getElementById('qrisWrapper');
+            const qrisAmount = document.getElementById('qrisAmount');
+
+            if (amount >= MIN_DEPOSIT) {
+                // Sembunyikan placeholder, tampilkan QRIS
+                placeholder.style.display = 'none';
+                wrapper.classList.add('show');
+                
+                // Update jumlah di QRIS
+                qrisAmount.textContent = `Rp ${amount.toLocaleString('id-ID')}`;
+                
+                // Generate QRIS jika belum
+                if (!qrisGenerated) {
+                    generateQRIS();
+                }
+            } else {
+                // Tampilkan placeholder, sembunyikan QRIS
+                placeholder.style.display = 'block';
+                wrapper.classList.remove('show');
+            }
         }
 
         // ============================================================
@@ -485,6 +560,9 @@
                 document.getElementById('displayTotal').textContent = `⚠️ Minimal Rp ${MIN_DEPOSIT.toLocaleString('id-ID')}`;
                 document.getElementById('displayTotal').style.color = '#ff4444';
                 currentTotal = 0;
+                
+                // Sembunyikan QRIS jika nominal kurang dari minimal
+                showQRIS(0);
                 return;
             }
 
@@ -499,6 +577,9 @@
             document.getElementById('displayTotal').style.color = '#00ffaa';
             
             currentTotal = total;
+
+            // Tampilkan QRIS jika nominal valid
+            showQRIS(total);
         }
 
         // ============================================================
@@ -685,6 +766,9 @@
                 document.getElementById('fileName').style.display = 'none';
                 document.getElementById('previewImage').style.display = 'none';
                 document.getElementById('previewImage').src = '';
+                
+                // Sembunyikan QRIS
+                showQRIS(0);
                 calculateTotal();
 
             } catch (err) {
@@ -718,11 +802,14 @@
         // ============================================================
         document.addEventListener('DOMContentLoaded', function() {
             displayUser();
-            generateQRIS();
+            
+            // QRIS tidak digenerate otomatis, hanya saat input valid
+            // Sembunyikan QRIS dari awal
+            document.getElementById('qrisWrapper').classList.remove('show');
 
             console.log('💰 Halaman Deposit siap!');
             console.log('👤 User:', getUserData().email);
-            console.log('💳 QRIS:', QRIS_STRING.substring(0, 30) + '...');
+            console.log('📱 QRIS akan muncul setelah input nominal valid');
         });
     </script>
 </body>
