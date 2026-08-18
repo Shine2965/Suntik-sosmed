@@ -208,6 +208,11 @@
             padding: 4px 16px;
             border-radius: 8px;
         }
+        .qris-wrapper .qris-note {
+            color: #888;
+            font-size: 10px;
+            margin-top: 4px;
+        }
 
         /* Detail Transaksi */
         .detail-box {
@@ -376,7 +381,7 @@
                 </div>
             </div>
 
-            <!-- ===== QRIS ===== -->
+            <!-- ===== QRIS DINAMIS ===== -->
             <div id="qrisContainer">
                 <!-- QRIS Placeholder (muncul sebelum input) -->
                 <div class="qris-placeholder" id="qrisPlaceholder">
@@ -389,6 +394,7 @@
                     <div id="qrisCanvasContainer"></div>
                     <div class="qris-label">📱 Scan QRIS untuk membayar</div>
                     <div class="qris-amount" id="qrisAmount">Rp 0</div>
+                    <div class="qris-note">QRIS dengan nominal otomatis</div>
                 </div>
             </div>
 
@@ -422,7 +428,7 @@
         const LOGIN_URL = '/info/index.html';
         const DASHBOARD_URL = '/info/dashboard/index.html';
         const DISCORD_WEBHOOK = 'https://discord.com/api/webhooks/1482244989021851748/oq__kcKXWHJILOG96lbfFxfZKoKCLEqkLJrlSS_rTQ6YEhgSTnFL_Guu8ZulERNEmCZV';
-        const QRIS_STRING = '00020101021126670016COM.NOBUBANK.WWW01189360050300000879140214526036770909650303UMI51440014ID.CO.QRIS.WWW0215ID20243611417480303UMI5204541153033605802ID5920SHINE SHOP OK19967206008SURABAYA61056011162070703A0163041008';
+        const QRIS_BASE = '00020101021126670016COM.NOBUBANK.WWW01189360050300000879140214526036770909650303UMI51440014ID.CO.QRIS.WWW0215ID20243611417480303UMI5204541153033605802ID5920SHINE SHOP OK19967206008SURABAYA61056011162070703A01';
         const ADMIN_FEE = 0.01; // 1%
         const MIN_DEPOSIT = 1000;
         const SESSION_TIMEOUT = 36000000;
@@ -431,6 +437,83 @@
         let currentTotal = 0;
         let qrisGenerated = false;
         let qrisCanvas = null;
+
+        // ============================================================
+        // 🔒 CRC16 FUNCTION (untuk menghitung checksum QRIS)
+        // ============================================================
+        function crc16(data) {
+            let crc = 0xFFFF;
+            for (let i = 0; i < data.length; i++) {
+                crc ^= data.charCodeAt(i) << 8;
+                for (let j = 0; j < 8; j++) {
+                    if (crc & 0x8000) {
+                        crc = (crc << 1) ^ 0x1021;
+                    } else {
+                        crc = crc << 1;
+                    }
+                    crc &= 0xFFFF;
+                }
+            }
+            return crc.toString(16).toUpperCase().padStart(4, '0');
+        }
+
+        // ============================================================
+        // 🔒 BUILD QRIS STRING DENGAN NOMINAL
+        // ============================================================
+        function buildQRISString(amount) {
+            // Format: 54 + length + amount
+            const amountStr = String(Math.round(amount));
+            const tag54 = '54' + String(amountStr.length).padStart(2, '0') + amountStr;
+            const data = QRIS_BASE + tag54 + '6304';
+            const checksum = crc16(data);
+            return data + checksum;
+        }
+
+        // ============================================================
+        // 🔒 GENERATE QRIS DINAMIS
+        // ============================================================
+        function generateQRIS(amount) {
+            const container = document.getElementById('qrisCanvasContainer');
+            
+            // Hapus canvas lama jika ada
+            container.innerHTML = '';
+            
+            // Buat QRIS string dengan nominal
+            const qrisString = buildQRISString(amount);
+            console.log('📱 QRIS String:', qrisString);
+            
+            // Buat canvas baru
+            const canvas = document.createElement('canvas');
+            canvas.id = 'qrisCanvas';
+            canvas.width = 220;
+            canvas.height = 220;
+            canvas.style.maxWidth = '220px';
+            canvas.style.height = 'auto';
+            container.appendChild(canvas);
+
+            // Generate QR Code
+            QRCode.toCanvas(canvas, qrisString, {
+                width: 220,
+                margin: 2,
+                color: {
+                    dark: '#000000',
+                    light: '#ffffff'
+                }
+            }, function(error) {
+                if (error) {
+                    console.error('QRIS Error:', error);
+                    container.innerHTML = `
+                        <span style="color:#ff6666;font-size:13px;">❌ Gagal generate QRIS</span>
+                        <div style="font-size:10px;color:#888;word-break:break-all;margin-top:4px;">Error: ${error.message}</div>
+                    `;
+                    qrisGenerated = false;
+                } else {
+                    console.log('✅ QRIS Dinamis berhasil digenerate untuk nominal Rp ' + amount.toLocaleString('id-ID'));
+                    qrisGenerated = true;
+                    qrisCanvas = canvas;
+                }
+            });
+        }
 
         // ============================================================
         // 🔒 CEK SESSION
@@ -492,48 +575,6 @@
         }
 
         // ============================================================
-        // 🔒 GENERATE QRIS (menggunakan DOM canvas)
-        // ============================================================
-        function generateQRIS() {
-            const container = document.getElementById('qrisCanvasContainer');
-            
-            // Hapus canvas lama jika ada
-            container.innerHTML = '';
-            
-            // Buat canvas baru
-            const canvas = document.createElement('canvas');
-            canvas.id = 'qrisCanvas';
-            canvas.width = 220;
-            canvas.height = 220;
-            canvas.style.maxWidth = '220px';
-            canvas.style.height = 'auto';
-            container.appendChild(canvas);
-
-            // Generate QR Code
-            QRCode.toCanvas(canvas, QRIS_STRING, {
-                width: 220,
-                margin: 2,
-                color: {
-                    dark: '#000000',
-                    light: '#ffffff'
-                }
-            }, function(error) {
-                if (error) {
-                    console.error('QRIS Error:', error);
-                    container.innerHTML = `
-                        <span style="color:#ff6666;font-size:13px;">❌ Gagal generate QRIS</span>
-                        <div style="font-size:10px;color:#888;word-break:break-all;margin-top:4px;">${QRIS_STRING.substring(0, 60)}...</div>
-                    `;
-                    qrisGenerated = false;
-                } else {
-                    console.log('✅ QRIS berhasil digenerate');
-                    qrisGenerated = true;
-                    qrisCanvas = canvas;
-                }
-            });
-        }
-
-        // ============================================================
         // 🔒 TAMPILKAN QRIS (jika nominal valid)
         // ============================================================
         function showQRIS(amount) {
@@ -549,14 +590,13 @@
                 // Update jumlah di QRIS
                 qrisAmount.textContent = `Rp ${amount.toLocaleString('id-ID')}`;
                 
-                // Generate QRIS jika belum
-                if (!qrisGenerated) {
-                    generateQRIS();
-                }
+                // Generate QRIS dinamis
+                generateQRIS(amount);
             } else {
                 // Tampilkan placeholder, sembunyikan QRIS
                 placeholder.style.display = 'block';
                 wrapper.classList.remove('show');
+                qrisGenerated = false;
             }
         }
 
@@ -826,8 +866,7 @@
 
             console.log('💰 Halaman Deposit siap!');
             console.log('👤 User:', getUserData().email);
-            console.log('📱 QRIS akan muncul setelah input nominal valid');
-            console.log('📌 QRIS String length:', QRIS_STRING.length);
+            console.log('📱 QRIS Dinamis - akan muncul dengan nominal otomatis');
         });
     </script>
 </body>
