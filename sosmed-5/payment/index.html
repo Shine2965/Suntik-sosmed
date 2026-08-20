@@ -244,6 +244,46 @@ p{
   margin-top:4px;
   font-family:'Courier New',monospace;
 }
+.loading-state{
+  text-align:center;
+  padding:20px;
+  color:#888;
+  display:none;
+}
+.loading-state .spinner{
+  display:inline-block;
+  width:30px;
+  height:30px;
+  border:3px solid #00ffaa22;
+  border-top-color:#00ffaa;
+  border-radius:50%;
+  animation:spin 0.8s linear infinite;
+  margin-bottom:10px;
+}
+@keyframes spin{
+  to{transform:rotate(360deg)}
+}
+.error-state{
+  text-align:center;
+  padding:20px;
+  color:#ff6666;
+}
+.error-state .retry-btn{
+  background:#444;
+  color:#fff;
+  border:none;
+  padding:8px 24px;
+  border-radius:20px;
+  cursor:pointer;
+  margin-top:10px;
+  font-family:'Poppins',sans-serif;
+  width:auto;
+  box-shadow:none;
+}
+.error-state .retry-btn:hover{
+  background:#555;
+  transform:none;
+}
 @media(max-width:480px){
   .card{padding:20px 16px;border-radius:20px}
   h2{font-size:20px}
@@ -264,26 +304,41 @@ p{
   <h2>💳 Pembayaran QRIS</h2>
   <div class="subtitle">✦ Shine Shop - Sosmed 2 ✦</div>
   
-  <div class="qr-wrapper">
+  <!-- Loading State -->
+  <div class="loading-state" id="loadingState">
+    <div class="spinner"></div>
+    <div>⏳ Memuat data transaksi...</div>
+  </div>
+  
+  <div class="qr-wrapper" id="qrWrapper" style="display:none;">
     <canvas id="qrisCanvas" width="240" height="240"></canvas>
   </div>
   
-  <div class="unique-code">🔑 Kode Unik: <span id="uniqueCode">-</span></div>
-  
-  <div class="details" id="orderDetails"></div>
-  
-  <!-- Loading State -->
-  <div id="loadingState" style="display:none;text-align:center;padding:20px;color:#888;">
-    <span>⏳ Memuat data transaksi...</span>
+  <div class="unique-code" id="uniqueCodeWrapper" style="display:none;">
+    🔑 Kode Unik: <span id="uniqueCode">-</span>
   </div>
   
-  <input type="text" id="namaInput" placeholder="Nama Lengkap">
-  <input type="email" id="gmailInput" placeholder="Gmail Aktif">
-  <input type="text" id="voucherInput" placeholder="Kode Voucher (opsional)">
-  <button id="applyVoucher" class="btn">🎫 Gunakan Voucher</button>
-  <div class="voucher-status" id="voucherStatus"></div>
+  <div class="details" id="orderDetails">
+    <span style="color:#888;">⏳ Memuat data transaksi...</span>
+  </div>
   
-  <button id="confirmBtn" class="btn">✅ Cek Status Pembayaran</button>
+  <div id="errorState" style="display:none;">
+    <div class="error-state">
+      <div style="font-size:40px;margin-bottom:10px;">❌</div>
+      <div id="errorMessage">Gagal memuat data transaksi</div>
+      <button class="retry-btn" onclick="loadTransactionData()">🔄 Coba Lagi</button>
+    </div>
+  </div>
+  
+  <div id="formWrapper" style="display:none;">
+    <input type="text" id="namaInput" placeholder="Nama Lengkap">
+    <input type="email" id="gmailInput" placeholder="Gmail Aktif">
+    <input type="text" id="voucherInput" placeholder="Kode Voucher (opsional)">
+    <button id="applyVoucher" class="btn">🎫 Gunakan Voucher</button>
+    <div class="voucher-status" id="voucherStatus"></div>
+    
+    <button id="confirmBtn" class="btn">✅ Cek Status Pembayaran</button>
+  </div>
   
   <div class="muted">⏳ Admin memproses maksimal 72 jam</div>
   
@@ -294,124 +349,32 @@ p{
 
 <script>
 // ===================== KONFIGURASI =====================
-const discordWebhook = "https://discord.com/api/webhooks/1482244989021851748/oq__kcKXWHJILOG96lbfFxfZKoKCLEqkLJrlSS_rTQ6YEhgSTnFL_Guu8ZulERNEmCZV";
-const p = new URLSearchParams(location.search);
-const trx = p.get("trx") || "-";
-const layanan = p.get("layanan") || "-";
-const total = Number(p.get("total") || 0);
-const target = p.get("target") || "-";
-const kategori = p.get("kategori") || "-";
-const id = p.get("id") || "-";
-const jumlah = Number(p.get("jumlah") || 0);
+const DISCORD_WEBHOOK = "https://discord.com/api/webhooks/1482244989021851748/oq__kcKXWHJILOG96lbfFxfZKoKCLEqkLJrlSS_rTQ6YEhgSTnFL_Guu8ZulERNEmCZV";
 
-const maintenance = false;
+// Ambil TRX ID dari URL (HANYA ID, TIDAK ADA DATA LAIN)
+const urlParams = new URLSearchParams(window.location.search);
+const trx = urlParams.get("trx") || "-";
 
-if (maintenance === true) {
-  window.location.replace("/maintenance/");
-}
+// ===================== VARIABEL =====================
+let originalTotal = 0;
+let finalTotal = 0;
+let appliedVoucher = null;
+let appliedDiscount = 0;
+let uniqueCode = 0;
+let transactionData = null;
+let dataLoaded = false;
 
+// ===================== TAMPILKAN ID TRANSAKSI =====================
+document.getElementById('transactionIdDisplay').textContent = `🆔 ID Transaksi: ${trx}`;
+
+// ===================== MASK ID =====================
 function maskID(id) {
   id = String(id || "-");
   if (id.length <= 4) return id;
   return id.slice(0, 2) + "**" + id.slice(-2);
 }
-const maskedTrx = maskID(trx);
 
-let originalTotal = total;
-let finalTotal = total;
-let appliedVoucher = null;
-let appliedDiscount = 0;
-let uniqueCode = 0;
-let transactionLocked = false;
-let transactionData = null;
-let dataLoaded = false;
-
-// ================= TAMPILKAN ID TRANSAKSI =================
-document.getElementById('transactionIdDisplay').textContent = `🆔 ID Transaksi: ${trx}`;
-
-// ================= AMBIL DATA TRANSAKSI DARI API =================
-async function loadTransactionData() {
-  const loadingState = document.getElementById('loadingState');
-  const orderDetails = document.getElementById('orderDetails');
-  
-  try {
-    loadingState.style.display = 'block';
-    orderDetails.innerHTML = '<span style="color:#888;">⏳ Memuat data transaksi...</span>';
-    
-    const res = await fetch('/api/get-transaction?trx=' + encodeURIComponent(trx) + '&t=' + Date.now());
-    
-    if (!res.ok) {
-      // Jika API gagal, gunakan data dari URL parameter
-      console.warn('API gagal, gunakan data dari URL');
-      transactionData = {
-        trx: trx,
-        layanan: layanan,
-        total: total,
-        target: target,
-        kategori: kategori,
-        id: id,
-        jumlah: jumlah
-      };
-      dataLoaded = true;
-      loadingState.style.display = 'none';
-      updateDisplay();
-      return;
-    }
-    
-    const result = await res.json();
-    
-    if (result.success && result.data) {
-      transactionData = result.data;
-      // Update nilai dari API
-      originalTotal = Number(transactionData.total) || total;
-      finalTotal = originalTotal;
-      
-      // Update display
-      document.getElementById('orderDetails').innerHTML = `
-        <strong>ID Transaksi:</strong> ${trx}<br>
-        <strong>Layanan:</strong> ${transactionData.layanan || layanan}<br>
-        <strong>Target:</strong> ${transactionData.target || target}<br>
-        <strong>Jumlah:</strong> ${transactionData.jumlah || jumlah}<br>
-        <strong>Total:</strong> Rp ${(transactionData.total || total).toLocaleString("id-ID")}
-      `;
-      
-      console.log('📦 Data transaksi dari API:', transactionData);
-    } else {
-      // Fallback ke URL parameter
-      transactionData = {
-        trx: trx,
-        layanan: layanan,
-        total: total,
-        target: target,
-        kategori: kategori,
-        id: id,
-        jumlah: jumlah
-      };
-    }
-    
-    dataLoaded = true;
-    loadingState.style.display = 'none';
-    updateDisplay();
-    
-  } catch (err) {
-    console.error('Error load transaction:', err);
-    // Fallback ke URL parameter
-    transactionData = {
-      trx: trx,
-      layanan: layanan,
-      total: total,
-      target: target,
-      kategori: kategori,
-      id: id,
-      jumlah: jumlah
-    };
-    dataLoaded = true;
-    loadingState.style.display = 'none';
-    updateDisplay();
-  }
-}
-
-// ================= USER ID =================
+// ===================== USER ID =====================
 function generateUserID(){
   return 'user-' + Math.random().toString(36).substring(2,10) + '-' + Date.now().toString(36);
 }
@@ -421,7 +384,7 @@ async function getUserID(){
   return id;
 }
 
-// ================= USER BAN =================
+// ===================== USER BAN =====================
 async function checkUserBan(){
   try{
     const userID = await getUserID();
@@ -448,7 +411,7 @@ async function checkUserBan(){
 }
 checkUserBan();
 
-// ================= LOCK LOCAL STORAGE =================
+// ===================== LOCK LOCAL STORAGE =====================
 function checkTransactionLockLocal() {
   try {
     const confirmed = JSON.parse(localStorage.getItem('confirmed_transactions') || '[]');
@@ -466,7 +429,7 @@ function saveTransactionLockLocal() {
   } catch(e) { console.error("Gagal simpan lock:", e); }
 }
 
-// ================= VOUCHER SYSTEM =================
+// ===================== VOUCHER SYSTEM =====================
 function getUsedVouchers() {
   try { return JSON.parse(localStorage.getItem('used_vouchers_' + trx) || '[]'); } 
   catch { return []; }
@@ -486,13 +449,14 @@ function isVoucherUsed(code) {
   return getUsedVouchers().includes(code);
 }
 
-// ================= QRIS =================
+// ===================== QRIS =====================
 function generateUniqueCode() {
   if (!uniqueCode) {
     uniqueCode = Math.floor(Math.random() * 200) + 1;
   }
   return uniqueCode;
 }
+
 function crc16(s){
   let c=0xFFFF;
   for(let i=0;i<s.length;i++){
@@ -511,21 +475,114 @@ function buildQR(a){
   return base+tag+"6304"+crc16(base+tag+"6304");
 }
 
-// ================= UPDATE DISPLAY =================
+// ===================== AMBIL DATA TRANSAKSI DARI API =====================
+async function loadTransactionData() {
+    const loadingState = document.getElementById('loadingState');
+    const orderDetails = document.getElementById('orderDetails');
+    const errorState = document.getElementById('errorState');
+    const formWrapper = document.getElementById('formWrapper');
+    const qrWrapper = document.getElementById('qrWrapper');
+    const uniqueCodeWrapper = document.getElementById('uniqueCodeWrapper');
+    
+    // Reset tampilan
+    loadingState.style.display = 'block';
+    errorState.style.display = 'none';
+    formWrapper.style.display = 'none';
+    qrWrapper.style.display = 'none';
+    uniqueCodeWrapper.style.display = 'none';
+    orderDetails.innerHTML = '<span style="color:#888;">⏳ Memuat data transaksi...</span>';
+    
+    try {
+        if (!trx || trx === '-') {
+            throw new Error('ID Transaksi tidak ditemukan');
+        }
+        
+        console.log('📡 Mengambil data transaksi:', trx);
+        
+        const res = await fetch('/api/get-transaction?trx=' + encodeURIComponent(trx) + '&t=' + Date.now());
+        
+        if (!res.ok) {
+            if (res.status === 404) {
+                throw new Error('Transaksi tidak ditemukan');
+            }
+            throw new Error('Gagal mengambil data transaksi: ' + res.status);
+        }
+        
+        const result = await res.json();
+        
+        if (result.success && result.data) {
+            transactionData = result.data;
+            
+            // Update semua data dari API
+            originalTotal = Number(transactionData.total) || 0;
+            finalTotal = originalTotal;
+            
+            // Tampilkan data
+            orderDetails.innerHTML = `
+                <strong>ID Transaksi:</strong> ${trx}<br>
+                <strong>Layanan:</strong> ${transactionData.layanan || '-'}<br>
+                <strong>Target:</strong> ${transactionData.target || '-'}<br>
+                <strong>Jumlah:</strong> ${transactionData.jumlah || 0}<br>
+                <strong>Total:</strong> Rp ${(transactionData.total || 0).toLocaleString("id-ID")}
+            `;
+            
+            console.log('📦 Data transaksi dari API:', transactionData);
+            
+            // Tampilkan semua elemen
+            loadingState.style.display = 'none';
+            formWrapper.style.display = 'block';
+            qrWrapper.style.display = 'block';
+            uniqueCodeWrapper.style.display = 'block';
+            
+            dataLoaded = true;
+            
+            // Update display QRIS
+            updateDisplay();
+            
+            // Cek lock
+            if (checkTransactionLockLocal()) {
+                const btn = document.getElementById('confirmBtn');
+                btn.disabled = true;
+                btn.style.opacity = '0.5';
+                btn.textContent = '✅ Transaksi Sudah Dikonfirmasi';
+            }
+            
+            // Cek voucher used
+            const usedVouchers = getUsedVouchers();
+            if (usedVouchers.length > 0) {
+                const lastUsed = usedVouchers[usedVouchers.length - 1];
+                document.getElementById('voucherStatus').innerHTML = `<span class="used">⚠️ Voucher ${lastUsed} sudah digunakan untuk transaksi ini (1×)</span>`;
+                document.getElementById('voucherInput').disabled = true;
+                document.getElementById('voucherInput').style.opacity = '0.4';
+                document.getElementById('applyVoucher').disabled = true;
+                document.getElementById('applyVoucher').style.opacity = '0.4';
+            }
+            
+        } else {
+            throw new Error(result.message || 'Data tidak valid');
+        }
+        
+    } catch (err) {
+        console.error('Error load transaction:', err);
+        loadingState.style.display = 'none';
+        errorState.style.display = 'block';
+        document.getElementById('errorMessage').textContent = err.message || 'Gagal memuat data transaksi';
+    }
+}
+
+// ===================== UPDATE DISPLAY =====================
 function updateDisplay(){
   uniqueCode = generateUniqueCode();
   document.getElementById('uniqueCode').textContent = uniqueCode;
   
   const totalDenganUnik = finalTotal + uniqueCode;
   
-  const displayTotal = transactionData ? transactionData.total : total;
-  
   let detailHtml = `
   <strong>ID Transaksi:</strong> ${trx}<br>
-  <strong>Layanan:</strong> ${transactionData ? transactionData.layanan : layanan}<br>
-  <strong>Target:</strong> ${transactionData ? transactionData.target : target}<br>
-  <strong>Jumlah:</strong> ${transactionData ? transactionData.jumlah : jumlah}<br>
-  <strong>Total:</strong> <s>Rp ${(transactionData ? transactionData.total : total).toLocaleString("id-ID")}</s><br>
+  <strong>Layanan:</strong> ${transactionData ? transactionData.layanan : '-'}<br>
+  <strong>Target:</strong> ${transactionData ? transactionData.target : '-'}<br>
+  <strong>Jumlah:</strong> ${transactionData ? transactionData.jumlah : 0}<br>
+  <strong>Total:</strong> <s>Rp ${(transactionData ? transactionData.total : 0).toLocaleString("id-ID")}</s><br>
   `;
   
   if (appliedVoucher) {
@@ -552,7 +609,7 @@ function updateDisplay(){
   });
 }
 
-// ================= LOAD VOUCHER =================
+// ===================== LOAD VOUCHER =====================
 async function loadVoucher(){
   try{
     const r = await fetch("/sosmed-1/payment/voucher.json",{cache:"no-store"});
@@ -562,7 +619,7 @@ async function loadVoucher(){
   }catch{return []}
 }
 
-// ================= APPLY VOUCHER =================
+// ===================== APPLY VOUCHER =====================
 document.getElementById('applyVoucher').onclick = async function() {
   const code = document.getElementById('voucherInput').value.trim().toUpperCase();
   if(!code) return Swal.fire("Isi kode voucher","","warning");
@@ -633,7 +690,7 @@ document.getElementById('applyVoucher').onclick = async function() {
   });
 };
 
-// ================= CONFIRM =================
+// ===================== CONFIRM =====================
 document.getElementById('confirmBtn').onclick = async function() {
   if (checkTransactionLockLocal()) {
     return Swal.fire("Gagal", "Transaksi ini sudah dikonfirmasi sebelumnya!", "error");
@@ -660,9 +717,9 @@ document.getElementById('confirmBtn').onclick = async function() {
       chat_id:"-1002112920606",
       text:`
 🆕 Transaksi Baru Sosmed 2
-ID TRANSAKSI: ${maskedTrx}
-Layanan: ${transactionData ? transactionData.layanan : layanan}
-Harga asli: Rp${(transactionData ? transactionData.total : originalTotal).toLocaleString("id-ID")}
+ID TRANSAKSI: ${maskedUserID}
+Layanan: ${transactionData ? transactionData.layanan : '-'}
+Harga asli: Rp${(transactionData ? transactionData.total : 0).toLocaleString("id-ID")}
 Total Bayar: Rp ${totalDenganUnik.toLocaleString("id-ID")}
 User ID: ${maskedUserID}
 Referal Code: ${refCode}
@@ -671,11 +728,11 @@ Order sekarang di shinedomain.my.id`
     })
   });
   
-  await fetch(discordWebhook,{
+  await fetch(DISCORD_WEBHOOK,{
     method:"POST",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify({
-      content:`💰 Pembayaran Baru SOSMED 2\nID: ${trx}\nLayanan: ${transactionData ? transactionData.layanan : layanan}\nHarga Asli: Rp${(transactionData ? transactionData.total : originalTotal).toLocaleString("id-ID")}\nTotal Bayar: Rp ${totalDenganUnik.toLocaleString("id-ID")}\nKode Unik: ${uniqueCode}\nTarget: ${transactionData ? transactionData.target : target}\nVoucher: ${appliedVoucher || "-"}\nDiskon: ${appliedVoucher ? `Rp ${appliedDiscount.toLocaleString("id-ID")}` : "-"}\nNama: ${nama}\nGmail: ${gmail}\nUser ID: ${userID}\nReferral: ${refCode}`
+      content:`💰 Pembayaran Baru SOSMED 2\nID: ${trx}\nLayanan: ${transactionData ? transactionData.layanan : '-'}\nHarga Asli: Rp${(transactionData ? transactionData.total : 0).toLocaleString("id-ID")}\nTotal Bayar: Rp ${totalDenganUnik.toLocaleString("id-ID")}\nKode Unik: ${uniqueCode}\nTarget: ${transactionData ? transactionData.target : '-'}\nVoucher: ${appliedVoucher || "-"}\nDiskon: ${appliedVoucher ? `Rp ${appliedDiscount.toLocaleString("id-ID")}` : "-"}\nNama: ${nama}\nGmail: ${gmail}\nUser ID: ${userID}\nReferral: ${refCode}`
     })
   });
 
@@ -688,49 +745,13 @@ Order sekarang di shinedomain.my.id`
   this.textContent = '✅ Transaksi Sudah Dikonfirmasi';
 };
 
-// ================= INIT =================
-(async function() {
-  // Load data dari API dulu
-  await loadTransactionData();
-  
-  if (checkTransactionLockLocal()) {
-    transactionLocked = true;
-    const btn = document.getElementById('confirmBtn');
-    btn.disabled = true;
-    btn.style.opacity = '0.5';
-    btn.textContent = '✅ Transaksi Sudah Dikonfirmasi';
-  }
-  
-  const usedVouchers = getUsedVouchers();
-  if (usedVouchers.length > 0) {
-    const lastUsed = usedVouchers[usedVouchers.length - 1];
-    document.getElementById('voucherStatus').innerHTML = `<span class="used">⚠️ Voucher ${lastUsed} sudah digunakan untuk transaksi ini (1×)</span>`;
-    document.getElementById('voucherInput').disabled = true;
-    document.getElementById('voucherInput').style.opacity = '0.4';
-    document.getElementById('applyVoucher').disabled = true;
-    document.getElementById('applyVoucher').style.opacity = '0.4';
-  }
-  
-  // Update display dengan data dari API
-  updateDisplay();
-})();
+// ===================== INIT =====================
+document.addEventListener('DOMContentLoaded', function() {
+  // Load data dari API
+  loadTransactionData();
+});
 
-// ================= REFERRAL =================
-function ambilReferral() {
-  const savedRef = localStorage.getItem('referral_code');
-  const statusElement = document.getElementById('status-ref');
-  if (statusElement) {
-    if (savedRef) {
-      statusElement.innerHTML = `Terdeteksi! Kode referral Anda adalah: <strong>${savedRef}</strong>`;
-    } else {
-      statusElement.innerHTML = `Tidak ada kode referral yang tersimpan.`;
-    }
-  }
-  return savedRef;
-}
-ambilReferral();
-
-// ================= ANTI DEVTOOLS =================
+// ===================== ANTI DEVTOOLS =====================
 document.addEventListener("keydown", function(e){
   if(e.key === "F12") e.preventDefault();
   if(e.ctrlKey && e.shiftKey && ["I","J"].includes(e.key)) e.preventDefault();
