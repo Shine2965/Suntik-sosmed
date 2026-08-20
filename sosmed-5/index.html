@@ -494,7 +494,7 @@ input:focus, select:focus {
 =================================*/  
 .terms-container {
   margin-top: 24px;
-  padding: 16px 20px;
+  padding: 18px 20px;
   background: var(--glass);
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
@@ -508,28 +508,64 @@ input:focus, select:focus {
 .terms-container .terms-header {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
   cursor: pointer;
   user-select: none;
+  padding: 4px 0;
 }
 
 .terms-container .terms-header input[type="checkbox"] {
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
+  min-width: 22px;
+  min-height: 22px;
   accent-color: var(--accent2);
   cursor: pointer;
   flex-shrink: 0;
   margin: 0;
+  border-radius: 4px;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  background: rgba(15, 23, 42, 0.6);
+  transition: all 0.3s ease;
+  -webkit-appearance: none;
+  appearance: none;
+  position: relative;
+}
+
+.terms-container .terms-header input[type="checkbox"]:checked {
+  background: var(--accent2);
+  border-color: var(--accent2);
+}
+
+.terms-container .terms-header input[type="checkbox"]:checked::after {
+  content: '✓';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.terms-container .terms-header input[type="checkbox"]:focus {
+  box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.25);
+}
+
+.terms-container .terms-header input[type="checkbox"]:hover {
+  border-color: var(--accent2);
 }
 
 .terms-container .terms-header label {
   margin: 0;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 500;
   color: var(--text);
   text-transform: none;
   letter-spacing: 0;
   cursor: pointer;
+  line-height: 1.5;
+  flex: 1;
 }
 
 .terms-container .terms-header label .terms-link {
@@ -551,11 +587,11 @@ input:focus, select:focus {
 }
 
 .terms-container .terms-content.open {
-  max-height: 400px;
+  max-height: 450px;
 }
 
 .terms-container .terms-content-inner {
-  margin-top: 12px;
+  margin-top: 14px;
   padding: 14px 16px;
   background: rgba(15, 23, 42, 0.5);
   border-radius: var(--radius-sm);
@@ -588,6 +624,7 @@ input:focus, select:focus {
   transition: color 0.3s ease;
   width: auto;
   box-shadow: none;
+  font-family: 'Poppins', sans-serif;
 }
 
 .terms-container .terms-toggle:hover {
@@ -603,8 +640,12 @@ input:focus, select:focus {
 .terms-error {
   color: var(--danger);
   font-size: 12px;
-  margin-top: 8px;
+  margin-top: 10px;
   display: none;
+  padding: 8px 14px;
+  background: rgba(248, 113, 113, 0.08);
+  border-radius: 8px;
+  border-left: 3px solid var(--danger);
 }
 
 .terms-error.show {
@@ -743,7 +784,22 @@ p.info {
   }
 
   .terms-container {
-    padding: 12px 14px;
+    padding: 14px 14px;
+  }
+  
+  .terms-container .terms-header {
+    gap: 12px;
+  }
+  
+  .terms-container .terms-header input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    min-width: 20px;
+    min-height: 20px;
+  }
+  
+  .terms-container .terms-header label {
+    font-size: 13px;
   }
   
   .desc, .aver {
@@ -769,6 +825,21 @@ p.info {
   input, select {
     padding: 12px 14px;
     font-size: 14px;
+  }
+  
+  .terms-container .terms-header {
+    gap: 10px;
+  }
+  
+  .terms-container .terms-header input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    min-width: 18px;
+    min-height: 18px;
+  }
+  
+  .terms-container .terms-header label {
+    font-size: 12px;
   }
 }
 
@@ -912,7 +983,7 @@ overlay.onclick=closeMenu;
 
 <!-- ===== SYARAT & KETENTUAN ===== -->
 <div class="terms-container" id="termsContainer">
-  <div class="terms-header">
+  <div class="terms-header" onclick="toggleCheckbox(event)">
     <input type="checkbox" id="termsCheckbox">
     <label for="termsCheckbox">
       Saya menyetujui 
@@ -951,16 +1022,13 @@ setTimeout(() => {
 }, 1000);  
 
 // ============================================================
-// 🔒 USER ID - HANYA AMBIL DARI LOCALSTORAGE (TIDAK BUAT ULANG)
+// 🔒 USER ID - HANYA AMBIL DARI LOCALSTORAGE
 // ============================================================
 
-// ===== FUNGSI AMBIL USER ID (TANPA MEMBUAT BARU) =====
 function getUserID() {
-  // HANYA MENGAMBIL, TIDAK MEMBUAT BARU
   return localStorage.getItem('user_id') || null;
 }
 
-// ===== FUNGSI TAMPILKAN USER ID =====
 function displayUserID() {
   const id = getUserID();
   const displayEl = document.getElementById('userIdDisplay');
@@ -976,20 +1044,25 @@ function displayUserID() {
   return id;
 }
 
-// ===== FUNGSI GET USER ID UNTUK API (AMAN - TIDAK BUAT BARU) =====
 function getCurrentUserID() {
   return localStorage.getItem('user_id') || null;
 }
 
 // ============================================================
-// 🔒 CEK APAKAH USER ID ADA (UNTUK VALIDASI)
+// 🔒 TOGGLE CHECKBOX
 // ============================================================
-function hasUserID() {
-  return localStorage.getItem('user_id') !== null;
+function toggleCheckbox(e) {
+  if (e.target.classList.contains('terms-link')) return;
+  const checkbox = document.getElementById('termsCheckbox');
+  if (checkbox) {
+    checkbox.checked = !checkbox.checked;
+    const event = new Event('change', { bubbles: true });
+    checkbox.dispatchEvent(event);
+  }
 }
 
 // ============================================================
-// 📦 SAVE TRANSACTION KE API (dengan User ID jika ada)
+// 📦 SAVE TRANSACTION KE API (HANYA KIRIM TRX ID KE URL)
 // ============================================================
 async function saveTransactionToAPI(trxID, kategori, layanan, id, jumlah, total, target) {
     try {
@@ -1006,7 +1079,7 @@ async function saveTransactionToAPI(trxID, kategori, layanan, id, jumlah, total,
             user_id: userID || 'unknown'
         };
 
-        console.log('📦 Menyimpan transaksi dengan User ID:', userID || 'Tidak ada');
+        console.log('📦 Menyimpan transaksi:', data);
 
         const res = await fetch('/api/save-transaction', {
             method: 'POST',
@@ -1017,7 +1090,7 @@ async function saveTransactionToAPI(trxID, kategori, layanan, id, jumlah, total,
         });
 
         if (!res.ok) {
-            console.warn('Gagal menyimpan transaksi ke API, lanjut ke payment');
+            console.warn('Gagal menyimpan transaksi ke API');
         }
 
         const result = await res.json();
@@ -1031,7 +1104,7 @@ async function saveTransactionToAPI(trxID, kategori, layanan, id, jumlah, total,
 }
 
 // ============================================================
-// 🔢 FUNGSI FORMAT HARGA DENGAN PEMBULATAN
+// 🔢 FUNGSI FORMAT HARGA
 // ============================================================
 
 function formatPrice(price) {
@@ -1047,31 +1120,9 @@ function formatPrice(price) {
     roundedPrice = Math.floor(price);
   }
   
-  const formatted = roundedPrice.toLocaleString('id-ID');
-  return formatted;
+  return roundedPrice.toLocaleString('id-ID');
 }
 
-function formatPriceWithDecimal(price) {
-  if (price === undefined || price === null || isNaN(price)) {
-    return '0';
-  }
-  
-  const fixed = price.toFixed(2);
-  const parts = fixed.split('.');
-  const integerPart = parseInt(parts[0]).toLocaleString('id-ID');
-  const decimalPart = parts[1];
-  
-  if (parseInt(decimalPart) >= 50) {
-    const newInteger = Math.ceil(price);
-    return newInteger.toLocaleString('id-ID');
-  } else {
-    return integerPart + ',' + decimalPart;
-  }
-}
-
-// ============================================================
-// 🔢 FUNGSI FORMAT HARGA PER K
-// ============================================================
 function getPricePerK(service) {
   if (!service) return '-';
   const price = service.pricePerFollower || 0;
@@ -1112,7 +1163,7 @@ async function loadData() {
 }
 
 // ============================================================
-// 🚀 INIT - Tampilkan User ID saat halaman dimuat
+// 🚀 INIT
 // ============================================================
 window.addEventListener("load", function() {
   displayUserID();
@@ -1197,6 +1248,7 @@ function validateTerms() {
   if (!termsCheckbox.checked) {
     termsError.classList.add('show');
     termsCheckbox.style.borderColor = 'var(--danger)';
+    document.getElementById('termsContainer').scrollIntoView({ behavior: 'smooth', block: 'center' });
     setTimeout(() => {
       termsError.classList.remove('show');
     }, 3000);
@@ -1216,12 +1268,6 @@ termsCheckbox.addEventListener('change', function() {
       termsContent.classList.add('open');
       termsToggleBtn.textContent = '📖 Sembunyikan';
     }
-  }
-});
-
-document.addEventListener('click', function(e) {
-  if (e.target.tagName === 'A' && e.target.href) {
-    // Biarkan link berjalan normal
   }
 });
 
@@ -1325,17 +1371,11 @@ function searchLayanan(){
 }  
 
 // ============================================================
-// 🚀 LANJUT KE PEMBAYARAN
+// 🚀 LANJUT KE PEMBAYARAN - HANYA KIRIM TRX ID
 // ============================================================
 function lanjutPembayaran(){  
   // Validasi syarat & ketentuan
-  if (!termsCheckbox.checked) {
-    termsError.classList.add('show');
-    termsCheckbox.style.borderColor = 'var(--danger)';
-    document.getElementById('termsContainer').scrollIntoView({ behavior: 'smooth', block: 'center' });
-    setTimeout(() => {
-      termsError.classList.remove('show');
-    }, 3000);
+  if (!validateTerms()) {
     return;
   }
   
@@ -1358,19 +1398,15 @@ function lanjutPembayaran(){
   const totalRaw = jumlah * hargaAktif;
   const totalFormatted = formatPrice(totalRaw);
   
-  // Cek apakah ada User ID
-  const userID = getCurrentUserID();
-  if (!userID) {
-    console.warn('⚠️ Tidak ada User ID, transaksi tetap dilanjutkan');
-  }
-  
-  // ===== SIMPAN KE API DENGAN USER ID (JIKA ADA) =====
+  // ===== SIMPAN KE API (SEMUA DATA DISIMPAN DI SERVER) =====
   saveTransactionToAPI(trxID, kategori, selectedService.name, selectedService.id, jumlah, totalRaw, target)
     .then(() => {
-      window.location.href=`payment/?trx=${trxID}&kategori=${kategori}&layanan=${selectedService.name}&id=${selectedService.id}&jumlah=${jumlah}&total=${totalFormatted}&target=${encodeURIComponent(target)}`;
+      // HANYA KIRIM TRX ID KE URL, TIDAK ADA DATA LAIN
+      window.location.href = `payment/?trx=${trxID}`;
     })
     .catch(() => {
-      window.location.href=`payment/?trx=${trxID}&kategori=${kategori}&layanan=${selectedService.name}&id=${selectedService.id}&jumlah=${jumlah}&total=${totalFormatted}&target=${encodeURIComponent(target)}`;
+      // FALLBACK: tetap redirect dengan TRX ID saja
+      window.location.href = `payment/?trx=${trxID}`;
     });
 }  
    
