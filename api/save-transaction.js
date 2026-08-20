@@ -29,9 +29,7 @@ export default async function handler(req, res) {
             });
         }
 
-        // Simpan ke memory (atau bisa ke database/JSON)
-        // Untuk production, gunakan database seperti Vercel KV, Supabase, atau file JSON
-        // Di sini kita simpan ke file JSON sebagai contoh
+        // Simpan ke file JSON (atau database)
         const fs = require('fs');
         const path = require('path');
         const filePath = path.join(process.cwd(), 'public', 'info', 'transactions.json');
