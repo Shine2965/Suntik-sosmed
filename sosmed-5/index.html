@@ -470,6 +470,7 @@ input:focus, select:focus {
   border-radius: 12px;
   padding: 8px 16px;
   margin-top: 10px;
+  margin-bottom: 16px;
   font-size: 12px;
   color: #94a3b8;
   font-family: 'Courier New', monospace;
@@ -950,67 +951,45 @@ setTimeout(() => {
 }, 1000);  
 
 // ============================================================
-// 🔒 USER ID (PERSISTEN - TIDAK BUAT ULANG)
+// 🔒 USER ID - HANYA AMBIL DARI LOCALSTORAGE (TIDAK BUAT ULANG)
 // ============================================================
-function generateUserID() {
-  return 'user-' + Math.random().toString(36).substring(2, 10) + '-' + Date.now().toString(36);
+
+// ===== FUNGSI AMBIL USER ID (TANPA MEMBUAT BARU) =====
+function getUserID() {
+  // HANYA MENGAMBIL, TIDAK MEMBUAT BARU
+  return localStorage.getItem('user_id') || null;
 }
 
-function getOrCreateUserID() {
-  let id = localStorage.getItem('user_id');
-  if (!id) {
-    id = generateUserID();
-    localStorage.setItem('user_id', id);
-    console.log('🆕 User ID baru dibuat:', id);
-  } else {
-    console.log('✅ User ID existing:', id);
-  }
-  return id;
-}
-
-// Tampilkan User ID di halaman
+// ===== FUNGSI TAMPILKAN USER ID =====
 function displayUserID() {
-  const id = getOrCreateUserID();
+  const id = getUserID();
   const displayEl = document.getElementById('userIdDisplay');
   if (displayEl) {
-    displayEl.textContent = id;
+    if (id) {
+      displayEl.textContent = id;
+      displayEl.style.color = '#00ffaa';
+    } else {
+      displayEl.textContent = 'Belum ada User ID (login dulu)';
+      displayEl.style.color = '#666';
+    }
   }
   return id;
 }
 
-// ============================================================
-// 🔒 LOCK: Cegah manipulasi user_id dari console
-// ============================================================
-(function lockUserID() {
-  const originalSetItem = Storage.prototype.setItem;
-  const originalRemoveItem = Storage.prototype.removeItem;
-  
-  Storage.prototype.setItem = function(key, value) {
-    if (key === 'user_id' && localStorage.getItem('user_id') !== null) {
-      console.warn('🔒 User ID sudah diset, tidak bisa diubah!');
-      return;
-    }
-    originalSetItem.call(this, key, value);
-  };
-  
-  Storage.prototype.removeItem = function(key) {
-    if (key === 'user_id') {
-      console.warn('🔒 Tidak bisa hapus User ID!');
-      return;
-    }
-    originalRemoveItem.call(this, key);
-  };
-})();
-
-// ============================================================
-// 🔒 FUNGSI GET USER ID UNTUK API
-// ============================================================
+// ===== FUNGSI GET USER ID UNTUK API (AMAN - TIDAK BUAT BARU) =====
 function getCurrentUserID() {
-  return localStorage.getItem('user_id') || generateUserID();
+  return localStorage.getItem('user_id') || null;
 }
 
 // ============================================================
-// 📦 SAVE TRANSACTION KE API (dengan User ID)
+// 🔒 CEK APAKAH USER ID ADA (UNTUK VALIDASI)
+// ============================================================
+function hasUserID() {
+  return localStorage.getItem('user_id') !== null;
+}
+
+// ============================================================
+// 📦 SAVE TRANSACTION KE API (dengan User ID jika ada)
 // ============================================================
 async function saveTransactionToAPI(trxID, kategori, layanan, id, jumlah, total, target) {
     try {
@@ -1024,10 +1003,10 @@ async function saveTransactionToAPI(trxID, kategori, layanan, id, jumlah, total,
             total: total,
             target: target,
             status: 'pending',
-            user_id: userID  // 👈 Ganti email dengan user_id
+            user_id: userID || 'unknown'
         };
 
-        console.log('📦 Menyimpan transaksi dengan User ID:', userID);
+        console.log('📦 Menyimpan transaksi dengan User ID:', userID || 'Tidak ada');
 
         const res = await fetch('/api/save-transaction', {
             method: 'POST',
@@ -1139,7 +1118,13 @@ window.addEventListener("load", function() {
   displayUserID();
   loadData();
   loadTerms();
-  console.log('👤 User ID aktif:', getCurrentUserID());
+  
+  const id = getCurrentUserID();
+  if (id) {
+    console.log('👤 User ID aktif:', id);
+  } else {
+    console.log('⚠️ Belum ada User ID di localStorage');
+  }
 });
 
 // ============================================================
@@ -1373,7 +1358,13 @@ function lanjutPembayaran(){
   const totalRaw = jumlah * hargaAktif;
   const totalFormatted = formatPrice(totalRaw);
   
-  // ===== SIMPAN KE API DENGAN USER ID =====
+  // Cek apakah ada User ID
+  const userID = getCurrentUserID();
+  if (!userID) {
+    console.warn('⚠️ Tidak ada User ID, transaksi tetap dilanjutkan');
+  }
+  
+  // ===== SIMPAN KE API DENGAN USER ID (JIKA ADA) =====
   saveTransactionToAPI(trxID, kategori, selectedService.name, selectedService.id, jumlah, totalRaw, target)
     .then(() => {
       window.location.href=`payment/?trx=${trxID}&kategori=${kategori}&layanan=${selectedService.name}&id=${selectedService.id}&jumlah=${jumlah}&total=${totalFormatted}&target=${encodeURIComponent(target)}`;
