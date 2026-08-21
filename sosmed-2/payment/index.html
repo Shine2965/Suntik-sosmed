@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="id">
 <head>
@@ -156,6 +155,33 @@ h2{
 .details strong{color:#f8fafc;font-weight:600}
 .details .discount-text{color:#22c55e;font-weight:600}
 .details .voucher-text{color:#facc15;font-weight:600}
+.gmail-display{
+  background:rgba(255,255,255,0.04);
+  padding:10px 16px;
+  border-radius:12px;
+  margin:8px 0 4px 0;
+  border:1px solid rgba(0,198,255,0.12);
+  display:flex;
+  align-items:center;
+  gap:10px;
+  flex-wrap:wrap;
+}
+.gmail-display .label{
+  color:#94a3b8;
+  font-size:12px;
+  font-weight:500;
+}
+.gmail-display .value{
+  color:#00ffaa;
+  font-size:14px;
+  font-weight:600;
+  word-break:break-all;
+}
+.gmail-display .value.not-set{
+  color:#ff6666;
+  font-style:italic;
+  font-weight:400;
+}
 input{
   width:100%;
   padding:14px 16px;
@@ -238,6 +264,77 @@ p{
 .voucher-status .active{color:#22c55e}
 .voucher-status .used{color:#ef4444}
 .voucher-status .info{color:#94a3b8}
+
+/* ===== BANNED PAGE ===== */
+.banned-page{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  min-height:100vh;
+  padding:20px;
+  background:linear-gradient(135deg,#0f2027,#203a43,#2c5364);
+  color:white;
+  text-align:center;
+}
+.banned-card{
+  max-width:460px;
+  background:rgba(255,255,255,0.06);
+  backdrop-filter:blur(20px);
+  padding:40px 30px;
+  border-radius:24px;
+  border:1px solid rgba(255,68,68,0.3);
+  box-shadow:0 0 60px rgba(255,68,68,0.1);
+}
+.banned-card .icon{font-size:64px;display:block;margin-bottom:16px}
+.banned-card h1{color:#ff4444;font-size:28px;margin-bottom:8px}
+.banned-card .banned-gmail{color:#00ffaa;font-size:16px;font-weight:600;word-break:break-all;margin:8px 0}
+.banned-card .banned-reason{
+  color:#f1f5f9;
+  font-size:14px;
+  line-height:1.8;
+  background:rgba(255,68,68,0.08);
+  padding:14px 18px;
+  border-radius:12px;
+  border-left:3px solid #ff4444;
+  text-align:left;
+  margin:12px 0;
+}
+.banned-card .banned-until{
+  color:#ffaa00;
+  font-size:13px;
+  font-weight:600;
+  margin:8px 0;
+}
+.banned-card .banned-current-time{
+  color:#94a3b8;
+  font-size:12px;
+  margin:4px 0 16px 0;
+}
+.banned-card .btn-appeal{
+  display:inline-block;
+  background:#ffaa0044;
+  color:#ffaa00;
+  border:1px solid #ffaa0055;
+  padding:12px 30px;
+  border-radius:30px;
+  text-decoration:none;
+  font-weight:600;
+  font-size:14px;
+  transition:0.3s;
+  font-family:'Poppins',sans-serif;
+  margin-top:8px;
+}
+.banned-card .btn-appeal:hover{
+  background:#ffaa0066;
+  transform:scale(1.02);
+}
+.banned-card .banned-id{
+  color:#666;
+  font-size:11px;
+  margin-top:12px;
+  word-break:break-all;
+}
+
 @media(max-width:480px){
   .card{padding:20px 16px;border-radius:20px}
   h2{font-size:20px}
@@ -246,6 +343,8 @@ p{
   .unique-code{font-size:17px;padding:10px 12px}
   .btn{font-size:14px;padding:14px}
   input{font-size:13px;padding:12px 14px}
+  .banned-card{padding:28px 20px}
+  .banned-card h1{font-size:22px}
 }
 </style>
 </head>
@@ -254,9 +353,35 @@ p{
 <div class="orb orb-2"></div>
 <div class="orb orb-3"></div>
 
-<div class="card">
+<!-- ===== BANNED CONTAINER (hidden by default) ===== -->
+<div id="bannedContainer" style="display:none;" class="banned-page">
+  <div class="banned-card">
+    <span class="icon">🚫</span>
+    <h1>Akses Diblokir</h1>
+    <p style="color:#94a3b8;font-size:14px;border:none;background:none;padding:0;margin:0;">Akun Anda telah diblokir</p>
+    <div class="banned-gmail" id="bannedGmail">-</div>
+    <div class="banned-reason" id="bannedReason">-</div>
+    <div class="banned-until" id="bannedUntil">-</div>
+    <div class="banned-current-time" id="bannedCurrentTime">-</div>
+    <a href="https://wa.me/6289518103883?text=Halo%20Admin%2C%20saya%20ingin%20mengajukan%20banding%20atas%20ban%20akun%20saya.%20Gmail%3A%20" 
+       target="_blank" 
+       class="btn-appeal">
+       📱 Ajukan Banding
+    </a>
+    <div class="banned-id" id="bannedUserId">-</div>
+  </div>
+</div>
+
+<!-- ===== QRIS CARD ===== -->
+<div id="qrisCard" class="card">
   <h2>💳 Pembayaran QRIS</h2>
   <div class="subtitle">✦ Shine Shop - Sosmed 2 ✦</div>
+  
+  <!-- ===== GMAIL DISPLAY (dari localStorage) ===== -->
+  <div class="gmail-display">
+    <span class="label">📧 Gmail:</span>
+    <span class="value" id="gmailDisplay">Belum diatur</span>
+  </div>
   
   <div class="qr-wrapper">
     <canvas id="qrisCanvas" width="240" height="240"></canvas>
@@ -266,8 +391,6 @@ p{
   
   <div class="details" id="orderDetails"></div>
   
-  <input type="text" id="namaInput" placeholder="Nama Lengkap">
-  <input type="email" id="gmailInput" placeholder="Gmail Aktif">
   <input type="text" id="voucherInput" placeholder="Kode Voucher (opsional)">
   <button id="applyVoucher" class="btn">🎫 Gunakan Voucher</button>
   <div class="voucher-status" id="voucherStatus"></div>
@@ -282,16 +405,19 @@ p{
 <script>
 // ===================== KONFIGURASI =====================
 const discordWebhook = "https://discord.com/api/webhooks/1482244989021851748/oq__kcKXWHJILOG96lbfFxfZKoKCLEqkLJrlSS_rTQ6YEhgSTnFL_Guu8ZulERNEmCZV";
+const GMAIL_BAN_URL = "/sosmed-2/payment/gmail.json";
+const WHATSAPP_NUMBER = "6289518103883";
+
 const p = new URLSearchParams(location.search);
 const trx = p.get("trx") || "-";
 const layanan = p.get("layanan") || "-";
 const total = Number(p.get("total") || 0);
 const target = p.get("target") || "-";
-   const maintenance = false;
 
-  if (maintenance === true) {
-    window.location.replace("/maintenance/");
-  }
+const maintenance = false;
+if (maintenance === true) {
+  window.location.replace("/maintenance/");
+}
 
 function maskID(id) {
   id = String(id || "-");
@@ -317,32 +443,148 @@ async function getUserID(){
   return id;
 }
 
-// ================= USER BAN =================
-async function checkUserBan(){
-  try{
-    const userID = await getUserID();
-    const res = await fetch("/sosmed-2/payment/user.json",{cache:"no-store"});
-    if(!res.ok) return;
+// ================= GMAIL (dari localStorage) =================
+function getStoredGmail() {
+  return localStorage.getItem('user_gmail') || null;
+}
+
+function validateEmail(email) {
+  return email && email.includes('@') && email.includes('.') && email.length > 5;
+}
+
+// ================= GET WAKTU GMT+7 =================
+function getGMT7Time() {
+  const now = new Date();
+  // Konversi ke GMT+7 (WIB)
+  const gmt7Time = new Date(now.getTime() + (7 * 60 * 60 * 1000));
+  return gmt7Time;
+}
+
+function formatGMT7(date) {
+  const options = {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    timeZone: 'Asia/Jakarta'
+  };
+  return date.toLocaleString('id-ID', options);
+}
+
+// ================= CEK BANNED GMAIL =================
+async function checkGmailBanned(gmail) {
+  if (!gmail || !validateEmail(gmail)) return null;
+  
+  try {
+    const res = await fetch(GMAIL_BAN_URL + '?t=' + Date.now(), { cache: "no-store" });
+    if (!res.ok) return null;
+    
     const list = await res.json();
-    const banned = list.find(x => x.user === userID);
-    if(banned){
-      const reason = banned.reason || "Tidak ada keterangan";
-      document.body.innerHTML = `
-      <div style="display:flex;align-items:center;justify-content:center;height:100vh;background:linear-gradient(135deg,#0f2027,#203a43,#2c5364);color:white;text-align:center;">
-      <div style="max-width:420px;background:rgba(255,255,255,.12);padding:30px;border-radius:22px;">
-      <h1>🚫 Akses Diblokir</h1>
-      <p>Akun kamu diblokir</p>
-      <div>${reason}</div>
-      <br>
-      <small>User ID: ${userID}</small>
-      </div></div>`;
-      throw new Error("USER_BANNED");
+    if (!Array.isArray(list)) return null;
+    
+    // Cari Gmail yang cocok (case insensitive)
+    const banned = list.find(item => 
+      item.Gmail && item.Gmail.toLowerCase() === gmail.toLowerCase()
+    );
+    
+    if (!banned) return null;
+    
+    // Cek apakah masa ban sudah berakhir
+    if (banned["Dibanned sampai"]) {
+      const untilDate = new Date(banned["Dibanned sampai"]);
+      const now = getGMT7Time();
+      
+      // Jika sudah lewat masa ban, tidak dianggap banned
+      if (now > untilDate) {
+        return null;
+      }
     }
-  }catch(e){
-    if(e.message === "USER_BANNED") throw e;
+    
+    return banned;
+    
+  } catch (err) {
+    console.error('Error check banned:', err);
+    return null;
   }
 }
-checkUserBan();
+
+// ================= SHOW BANNED PAGE =================
+function showBannedPage(bannedData, userID, gmail) {
+  const bannedContainer = document.getElementById('bannedContainer');
+  const qrisCard = document.getElementById('qrisCard');
+  
+  // Sembunyikan QRIS card
+  qrisCard.style.display = 'none';
+  
+  // Tampilkan banned container
+  bannedContainer.style.display = 'flex';
+  
+  // Isi data
+  document.getElementById('bannedGmail').textContent = gmail || '-';
+  document.getElementById('bannedReason').textContent = bannedData.Alasan || 'Tidak ada keterangan';
+  document.getElementById('bannedUserId').textContent = '🆔 User ID: ' + (userID || '-');
+  
+  // Format tanggal banned sampai
+  let untilText = '-';
+  if (bannedData["Dibanned sampai"]) {
+    const untilDate = new Date(bannedData["Dibanned sampai"]);
+    untilText = formatGMT7(untilDate);
+  }
+  document.getElementById('bannedUntil').textContent = '⏳ Dibanned sampai: ' + untilText;
+  
+  // Update waktu real-time
+  updateBannedTime();
+  
+  // Update link WhatsApp dengan Gmail
+  const appealLink = document.querySelector('.btn-appeal');
+  if (appealLink && gmail) {
+    appealLink.href = `https://wa.me/${WHATSAPP_NUMBER}?text=Halo%20Admin%2C%20saya%20ingin%20mengajukan%20banding%20atas%20ban%20akun%20saya.%20Gmail%3A%20${encodeURIComponent(gmail)}%0AUser%20ID%3A%20${encodeURIComponent(userID || '-')}`;
+  }
+}
+
+// ================= UPDATE BANNED TIME REAL-TIME =================
+function updateBannedTime() {
+  const now = getGMT7Time();
+  const timeEl = document.getElementById('bannedCurrentTime');
+  if (timeEl) {
+    timeEl.textContent = '🕐 Waktu saat ini (GMT+7): ' + formatGMT7(now);
+  }
+}
+
+// ================= CEK BAN SEBELUM LOAD =================
+async function checkAndHandleBan() {
+  const gmail = getStoredGmail();
+  const userID = await getUserID();
+  
+  // Update display Gmail
+  const gmailDisplay = document.getElementById('gmailDisplay');
+  if (gmailDisplay) {
+    if (gmail && validateEmail(gmail)) {
+      gmailDisplay.textContent = gmail;
+      gmailDisplay.className = 'value';
+    } else {
+      gmailDisplay.textContent = '⚠️ Belum diatur!';
+      gmailDisplay.className = 'value not-set';
+    }
+  }
+  
+  // Jika belum ada Gmail, tetap lanjutkan (tapi tampilkan warning)
+  if (!gmail || !validateEmail(gmail)) {
+    console.warn('⚠️ Gmail belum diatur di localStorage');
+    return false;
+  }
+  
+  // Cek apakah Gmail terban
+  const bannedData = await checkGmailBanned(gmail);
+  if (bannedData) {
+    showBannedPage(bannedData, userID, gmail);
+    return true; // Terban
+  }
+  
+  return false; // Tidak terban
+}
 
 // ================= LOCK LOCAL STORAGE =================
 function checkTransactionLockLocal() {
@@ -389,6 +631,7 @@ function generateUniqueCode() {
   }
   return uniqueCode;
 }
+
 function crc16(s){
   let c=0xFFFF;
   for(let i=0;i<s.length;i++){
@@ -407,7 +650,7 @@ function buildQR(a){
   return base+tag+"6304"+crc16(base+tag+"6304");
 }
 
-// ================= UPDATE DISPLAY (REFLEK DISKON) =================
+// ================= UPDATE DISPLAY =================
 function updateDisplay(){
   uniqueCode = generateUniqueCode();
   document.getElementById('uniqueCode').textContent = uniqueCode;
@@ -489,7 +732,6 @@ document.getElementById('applyVoucher').onclick = async function() {
   
   let discount = 0;
   if (v.type === "percent") {
-    // SUPPORT DESIMAL: value bisa 0.7 (berarti 0.7%)
     discount = originalTotal * (v.value / 100);
     if (v.max_discount) discount = Math.min(discount, v.max_discount);
   } else if (v.type === "fixed") {
@@ -517,7 +759,6 @@ document.getElementById('applyVoucher').onclick = async function() {
   this.disabled = true;
   this.style.opacity = '0.4';
   
-  // UPDATE DISPLAY LANGSUNG
   updateDisplay();
   
   Swal.fire({
@@ -534,20 +775,31 @@ document.getElementById('confirmBtn').onclick = async function() {
     return Swal.fire("Gagal", "Transaksi ini sudah dikonfirmasi sebelumnya!", "error");
   }
   
-  const nama = document.getElementById('namaInput').value;
-  const gmail = document.getElementById('gmailInput').value;
+  const gmail = getStoredGmail();
   const userID = await getUserID();
   const maskedUserID = maskID(userID);
   const refCode = localStorage.getItem('referral_code') || "-";
 
-  if(!nama || !gmail) {
-    return Swal.fire("Lengkapi data nama dan email","","warning");
+  if(!gmail || !validateEmail(gmail)) {
+    return Swal.fire("Lengkapi data", "Gmail belum diatur di profil Anda. Hubungi admin.", "warning");
+  }
+
+  // Cek apakah Gmail terban (validasi ulang)
+  const bannedData = await checkGmailBanned(gmail);
+  if (bannedData) {
+    return Swal.fire({
+      title: "🚫 Akses Diblokir",
+      text: "Gmail Anda terdaftar dalam daftar banned. Silakan ajukan banding.",
+      icon: "error",
+      confirmButtonColor: "#ff4444"
+    });
   }
 
   Swal.fire({title:"Mengirim...", didOpen:()=>Swal.showLoading()});
   
   const totalDenganUnik = finalTotal + uniqueCode;
   
+  // Kirim ke Telegram
   await fetch("/api/send-telegram",{
     method:"POST",
     headers:{"Content-Type":"application/json"},
@@ -560,17 +812,19 @@ Layanan: ${layanan}
 Harga asli: Rp${originalTotal.toLocaleString("id-ID")}
 Total Bayar: Rp ${totalDenganUnik.toLocaleString("id-ID")}
 User ID: ${maskedUserID}
+Gmail: ${gmail}
 Referal Code: ${refCode}
 Voucher: ${appliedVoucher || "Tidak ada"} ${appliedVoucher ? `(Diskon Rp ${appliedDiscount.toLocaleString("id-ID")})` : ''}
 Order sekarang di shinedomain.my.id`
     })
   });
   
+  // Kirim ke Discord dengan Gmail
   await fetch(discordWebhook,{
     method:"POST",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify({
-      content:`💰 Pembayaran Baru SOSMED 2\nID: ${trx}\nLayanan: ${layanan}\nHarga Asli: Rp${originalTotal.toLocaleString("id-ID")}\nTotal Bayar: Rp ${totalDenganUnik.toLocaleString("id-ID")}\nKode Unik: ${uniqueCode}\nTarget: ${target}\nVoucher: ${appliedVoucher || "-"}\nDiskon: ${appliedVoucher ? `Rp ${appliedDiscount.toLocaleString("id-ID")}` : "-"}\nNama: ${nama}\nGmail: ${gmail}\nUser ID: ${userID}\nReferral: ${refCode}`
+      content:`💰 Pembayaran Baru SOSMED 2\nID: ${trx}\nLayanan: ${layanan}\nHarga Asli: Rp${originalTotal.toLocaleString("id-ID")}\nTotal Bayar: Rp ${totalDenganUnik.toLocaleString("id-ID")}\nKode Unik: ${uniqueCode}\nTarget: ${target}\nVoucher: ${appliedVoucher || "-"}\nDiskon: ${appliedVoucher ? `Rp ${appliedDiscount.toLocaleString("id-ID")}` : "-"}\n📧 Gmail: ${gmail}\nUser ID: ${userID}\nReferral: ${refCode}`
     })
   });
 
@@ -585,6 +839,15 @@ Order sekarang di shinedomain.my.id`
 
 // ================= INIT =================
 (async function() {
+  // 1. CEK BAN GMAIL
+  const isBanned = await checkAndHandleBan();
+  if (isBanned) {
+    // Update waktu real-time setiap detik
+    setInterval(updateBannedTime, 1000);
+    return; // Stop eksekusi jika terban
+  }
+  
+  // 2. CEK LOCK TRANSAKSI
   if (checkTransactionLockLocal()) {
     transactionLocked = true;
     const btn = document.getElementById('confirmBtn');
@@ -593,6 +856,7 @@ Order sekarang di shinedomain.my.id`
     btn.textContent = '✅ Transaksi Sudah Dikonfirmasi';
   }
   
+  // 3. CEK VOUCHER TERPAKAI
   const usedVouchers = getUsedVouchers();
   if (usedVouchers.length > 0) {
     const lastUsed = usedVouchers[usedVouchers.length - 1];
@@ -602,10 +866,10 @@ Order sekarang di shinedomain.my.id`
     document.getElementById('applyVoucher').disabled = true;
     document.getElementById('applyVoucher').style.opacity = '0.4';
   }
+  
+  // 4. UPDATE DISPLAY
+  updateDisplay();
 })();
-
-// ================= UPDATE DISPLAY AWAL =================
-updateDisplay();
 
 // ================= REFERRAL =================
 function ambilReferral() {
@@ -622,7 +886,6 @@ function ambilReferral() {
 }
 ambilReferral();
 
- 
 // ================= ANTI DEVTOOLS =================
 document.addEventListener("keydown", function(e){
   if(e.key === "F12") e.preventDefault();
@@ -640,7 +903,8 @@ setInterval(() => {
 }, 2000);
 
 console.log('💳 QRIS Payment - Sosmed 2 siap!');
-console.log('🎫 Voucher otomatis mengurangi total bayar');
+console.log('📧 Gmail diambil dari localStorage');
+console.log('🚫 Cek banned berdasarkan Gmail');
 </script>
 </body>
 </html>
