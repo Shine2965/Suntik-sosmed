@@ -481,66 +481,106 @@ function validateEmail(email) {
 let wibInterval = null;
 let bannedInterval = null;
 
+/**
+ * Mengambil waktu saat ini.
+ * Jangan tambahkan +7 jam secara manual.
+ * Konversi WIB dilakukan oleh Intl.DateTimeFormat.
+ */
 function getWIBTime() {
-  const now = new Date();
-  // Konversi ke WIB (GMT+7)
-  const wibTime = new Date(now.getTime() + (7 * 60 * 60 * 1000));
-  return wibTime;
+  return new Date();
 }
 
+/**
+ * Format tanggal + waktu WIB
+ */
 function formatWIB(date) {
-  const options = {
+  return new Intl.DateTimeFormat('id-ID', {
+    timeZone: 'Asia/Jakarta',
     day: '2-digit',
     month: 'long',
     year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
     second: '2-digit',
-    timeZone: 'Asia/Jakarta'
-  };
-  return date.toLocaleString('id-ID', options);
+    hour12: false
+  }).format(date);
 }
 
+/**
+ * Format jam WIB saja
+ */
 function formatWIBTime(date) {
-  const options = {
+  return new Intl.DateTimeFormat('id-ID', {
+    timeZone: 'Asia/Jakarta',
     hour: '2-digit',
     minute: '2-digit',
     second: '2-digit',
-    hour12: false,
-    timeZone: 'Asia/Jakarta'
-  };
-  return date.toLocaleString('id-ID', options);
+    hour12: false
+  }).format(date);
 }
 
+/**
+ * Update jam WIB untuk display utama
+ */
 function updateWIBDisplay() {
-  const now = getWIBTime();
   const displayEl = document.getElementById('wibTimeDisplay');
-  if (displayEl) {
-    displayEl.textContent = formatWIBTime(now);
-  }
-}
 
-function updateBannedWIBDisplay() {
+  if (!displayEl) return;
+
   const now = getWIBTime();
-  const timeEl = document.getElementById('bannedCurrentTime');
-  if (timeEl && document.getElementById('bannedContainer').style.display !== 'none') {
-    timeEl.textContent = '🕐 WIB (GMT+7): ' + formatWIB(now);
-  }
+  displayEl.textContent = formatWIBTime(now);
 }
 
+/**
+ * Update waktu pada container BANNED
+ */
+function updateBannedWIBDisplay() {
+  const timeEl = document.getElementById('bannedCurrentTime');
+  const containerEl = document.getElementById('bannedContainer');
+
+  if (!timeEl || !containerEl) return;
+
+  // Jangan update jika container sedang disembunyikan
+  if (containerEl.style.display === 'none') return;
+
+  const now = getWIBTime();
+
+  timeEl.textContent =
+    '🕐 WIB (GMT+7): ' + formatWIB(now);
+}
+
+/**
+ * Memulai semua clock
+ */
 function startWIBClock() {
-  // Update pertama
+  // Hentikan interval lama jika ada
+  if (wibInterval) {
+    clearInterval(wibInterval);
+    wibInterval = null;
+  }
+
+  if (bannedInterval) {
+    clearInterval(bannedInterval);
+    bannedInterval = null;
+  }
+
+  // Update langsung tanpa menunggu 1 detik
   updateWIBDisplay();
-  
-  // Update setiap detik untuk QRIS
-  if (wibInterval) clearInterval(wibInterval);
+  updateBannedWIBDisplay();
+
+  // Update setiap 1 detik
   wibInterval = setInterval(updateWIBDisplay, 1000);
-  
-  // Update setiap detik untuk BANNED (selalu jalan, cek statusnya di dalam fungsi)
-  if (bannedInterval) clearInterval(bannedInterval);
   bannedInterval = setInterval(updateBannedWIBDisplay, 1000);
 }
 
+/**
+ * Jalankan setelah DOM selesai dimuat
+ */
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', startWIBClock);
+} else {
+  startWIBClock();
+}
 // ================= CEK BANNED GMAIL =================
 async function checkGmailBanned(gmail) {
   if (!gmail || !validateEmail(gmail)) return null;
