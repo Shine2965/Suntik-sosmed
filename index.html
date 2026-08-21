@@ -72,7 +72,7 @@ body {
   background: linear-gradient(135deg, #1a0e2e 0%, #2d1b4e 30%, #4a2a6a 60%, #1a0e2e 100%);
 }
 
-/* ========== ANIMATED BACKGROUND (BINTANG & AURORA) ========== */
+/* ========== ANIMATED BACKGROUND ========== */
 body::before {
   content: '';
   position: fixed;
@@ -96,7 +96,7 @@ body::before {
   100% { transform: translate(1%, -1%) rotate(1deg); }
 }
 
-/* ========== BINTANG JATUH ========== */
+/* ========== BINTANG ========== */
 .stars {
   position: fixed;
   top: 0;
@@ -158,7 +158,7 @@ body::before {
   100% { opacity: 0; }
 }
 
-/* ========== ANIME DECORATIONS ========== */
+/* ========== ANIME ORBS ========== */
 .anime-orb {
   position: fixed;
   border-radius: 50%;
@@ -238,7 +238,7 @@ body::before {
   opacity: 0.8;
 }
 
-/* ========== LOGO WRAPPER (ANIME STYLE) ========== */
+/* ========== LOGO WRAPPER ========== */
 .logo-wrapper {
   width: 90px;
   height: 90px;
@@ -281,7 +281,7 @@ body::before {
   display: block;
 }
 
-/* ========== TYPOGRAPHY (KAWAII) ========== */
+/* ========== TYPOGRAPHY ========== */
 h1 {
   font-size: 28px;
   font-weight: 900;
@@ -333,7 +333,7 @@ h1 {
   font-weight: 600;
 }
 
-/* ========== GMAIL DISPLAY (KAWAII) ========== */
+/* ========== GMAIL DISPLAY ========== */
 .gmail-display {
   background: rgba(255, 107, 157, 0.08);
   border: 1px solid rgba(255, 107, 157, 0.2);
@@ -411,7 +411,7 @@ h1 {
   font-weight: 700;
 }
 
-/* ========== BUTTONS (ANIME STYLE) ========== */
+/* ========== BUTTONS ========== */
 .nav-btn {
   width: 100%;
   padding: 14px 20px;
@@ -457,7 +457,7 @@ h1 {
   flex-shrink: 0;
 }
 
-/* ========== BUTTON VARIANTS (KAWAII) ========== */
+/* ========== BUTTON VARIANTS ========== */
 .nav-btn.primary {
   background: linear-gradient(135deg, rgba(255, 107, 157, 0.15), rgba(255, 64, 128, 0.15));
   border-color: rgba(255, 107, 157, 0.15);
@@ -498,7 +498,7 @@ h1 {
   border-color: rgba(255, 215, 0, 0.20);
 }
 
-/* ========== DIVIDER (KAWAII) ========== */
+/* ========== DIVIDER ========== */
 .divider {
   width: 60px;
   height: 3px;
@@ -523,7 +523,7 @@ h1 {
   font-weight: 700;
 }
 
-/* ========== USER BUBBLE (KAWAII) ========== */
+/* ========== USER BUBBLE ========== */
 .user-bubble {
   position: fixed;
   bottom: 24px;
@@ -841,6 +841,8 @@ async function ensureGmail() {
     confirmButtonColor: '#ff6b9d',
     allowOutsideClick: false,
     allowEscapeKey: false,
+    background: '#1a0e2e',
+    color: '#fff',
     preConfirm: (email) => {
       if (!validateEmail(email)) {
         Swal.showValidationMessage('⚠️ Format Gmail tidak valid!');
@@ -945,8 +947,15 @@ async function changeGmailWithPassword() {
   });
 
   if (newGmail) {
+    // ===== UPDATE LOCAL STORAGE =====
     setGmail(newGmail);
     updateGmailDisplay();
+    
+    // ===== KIRIM EVENT KE SEMUA TAB =====
+    try {
+      localStorage.setItem('gmail_updated', Date.now().toString());
+    } catch(e) {}
+    
     Swal.fire({
       title: '✅ Gmail Diubah!',
       text: `Gmail berhasil diubah menjadi: ${newGmail}`,
@@ -955,6 +964,25 @@ async function changeGmailWithPassword() {
       background: '#1a0e2e',
       color: '#fff'
     });
+    
+    // ===== UPDATE USER BUBBLE =====
+    updateUserBubble();
+  }
+}
+
+// ---------- UPDATE USER BUBBLE ----------
+function updateUserBubble() {
+  const gmail = getStoredGmail() || 'Belum diatur';
+  const bubble = document.getElementById('userBubble');
+  if (bubble) {
+    const bubbleContent = bubble.querySelector('#bubbleContent');
+    if (bubbleContent) {
+      bubbleContent.innerHTML = `
+        <b>🌸 Selamat Datang</b>
+        <span class="user-id">${userID}</span>
+        <span class="gmail-mini">📧 ${gmail}</span>
+      `;
+    }
   }
 }
 
@@ -1065,6 +1093,15 @@ async function cekPesan() {
   }
 }
 
+// ===== LISTENER UNTUK UPDATE GMAIL DARI TAB LAIN =====
+window.addEventListener('storage', function(e) {
+  if (e.key === 'gmail_updated' || e.key === GMAIL_KEY) {
+    console.log('🔄 Gmail diupdate dari tab lain, refresh display...');
+    updateGmailDisplay();
+    updateUserBubble();
+  }
+});
+
 // ---------- INIT ----------
 window.addEventListener('load', function() {
   updateGmailDisplay();
@@ -1089,7 +1126,7 @@ setInterval(() => {
 }, 2000);
 
 console.log('🌸 Anime Shine Shop Active! ✨');
-console.log('📧 Gmail wajib diisi dan tidak bisa diubah tanpa password');
+console.log('📧 Gmail wajib diisi dan otomatis update di localStorage');
 </script>
 </body>
 </html>
