@@ -479,6 +479,7 @@ function validateEmail(email) {
 
 // ================= WIB REAL-TIME (GMT+7) =================
 let wibInterval = null;
+let bannedInterval = null;
 
 function getWIBTime() {
   const now = new Date();
@@ -517,11 +518,13 @@ function updateWIBDisplay() {
   if (displayEl) {
     displayEl.textContent = formatWIBTime(now);
   }
-  
-  // Update banned time juga jika ada
-  const bannedTimeEl = document.getElementById('bannedCurrentTime');
-  if (bannedTimeEl && document.getElementById('bannedContainer').style.display !== 'none') {
-    bannedTimeEl.textContent = '🕐 WIB (GMT+7): ' + formatWIB(now);
+}
+
+function updateBannedWIBDisplay() {
+  const now = getWIBTime();
+  const timeEl = document.getElementById('bannedCurrentTime');
+  if (timeEl && document.getElementById('bannedContainer').style.display !== 'none') {
+    timeEl.textContent = '🕐 WIB (GMT+7): ' + formatWIB(now);
   }
 }
 
@@ -529,9 +532,13 @@ function startWIBClock() {
   // Update pertama
   updateWIBDisplay();
   
-  // Update setiap detik
+  // Update setiap detik untuk QRIS
   if (wibInterval) clearInterval(wibInterval);
   wibInterval = setInterval(updateWIBDisplay, 1000);
+  
+  // Update setiap detik untuk BANNED (selalu jalan, cek statusnya di dalam fungsi)
+  if (bannedInterval) clearInterval(bannedInterval);
+  bannedInterval = setInterval(updateBannedWIBDisplay, 1000);
 }
 
 // ================= CEK BANNED GMAIL =================
@@ -587,21 +594,12 @@ function showBannedPage(bannedData, userID, gmail) {
   }
   document.getElementById('bannedUntil').textContent = '⏳ Dibanned sampai: ' + untilText;
   
-  // Update waktu real-time
-  updateWIBDisplay();
+  // Update waktu WIB di halaman banned
+  updateBannedWIBDisplay();
   
   const appealLink = document.querySelector('.btn-appeal');
   if (appealLink && gmail) {
     appealLink.href = `https://wa.me/${WHATSAPP_NUMBER}?text=Halo%20Admin%2C%20saya%20ingin%20mengajukan%20banding%20atas%20ban%20akun%20saya.%20Gmail%3A%20${encodeURIComponent(gmail)}%0AUser%20ID%3A%20${encodeURIComponent(userID || '-')}`;
-  }
-}
-
-// ================= UPDATE BANNED TIME =================
-function updateBannedTimeDisplay() {
-  const now = getWIBTime();
-  const timeEl = document.getElementById('bannedCurrentTime');
-  if (timeEl && document.getElementById('bannedContainer').style.display !== 'none') {
-    timeEl.textContent = '🕐 WIB (GMT+7): ' + formatWIB(now);
   }
 }
 
@@ -888,12 +886,11 @@ Order sekarang di shinedomain.my.id`
   // 1. CEK BAN GMAIL
   const isBanned = await checkAndHandleBan();
   
-  // 2. START WIB CLOCK (selalu jalan)
+  // 2. START WIB CLOCK (selalu jalan, untuk QRIS dan BANNED)
   startWIBClock();
   
   if (isBanned) {
-    // Update banned time setiap detik
-    setInterval(updateBannedTimeDisplay, 1000);
+    // Update banned time setiap detik (interval sudah jalan dari startWIBClock)
     return;
   }
   
@@ -955,7 +952,7 @@ setInterval(() => {
 console.log('💳 QRIS Payment - Sosmed 2 siap!');
 console.log('📧 Gmail diambil dari localStorage');
 console.log('🚫 Cek banned berdasarkan Gmail');
-console.log('🕐 WIB real-time aktif (GMT+7)');
+console.log('🕐 WIB (GMT+7) real-time aktif untuk QRIS & BANNED');
 </script>
 </body>
 </html>
