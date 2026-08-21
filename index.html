@@ -738,17 +738,54 @@ function getOrCreateUserID() {
 
 const userID = getOrCreateUserID();
 
-// ---------- GMAIL (WAJIB & TIDAK BISA DIUBAH TANPA PASSWORD) ----------
+// ---------- GMAIL KEY ----------
 const GMAIL_KEY = 'user_gmail';
 
+// ============================================================
+// 🔥 FUNGSI UTAMA: UPDATE GMAIL LANGSUNG KE LOCAL STORAGE
+// ============================================================
+function updateGmailAndStorage(newGmail) {
+  if (!newGmail || !validateEmail(newGmail)) {
+    console.error('❌ Gmail tidak valid:', newGmail);
+    return false;
+  }
+  
+  // 1. SIMPAN KE LOCAL STORAGE
+  localStorage.setItem(GMAIL_KEY, newGmail);
+  console.log('✅ Gmail tersimpan di localStorage:', newGmail);
+  
+  // 2. VERIFIKASI
+  const saved = localStorage.getItem(GMAIL_KEY);
+  if (saved === newGmail) {
+    console.log('✅ Verifikasi berhasil: Gmail tersimpan dengan benar');
+  } else {
+    console.error('❌ Verifikasi gagal! Gmail tidak tersimpan dengan benar');
+    return false;
+  }
+  
+  // 3. UPDATE DISPLAY
+  updateGmailDisplay();
+  
+  // 4. UPDATE BUBBLE
+  updateUserBubble();
+  
+  // 5. KIRIM EVENT KE TAB LAIN
+  try {
+    localStorage.setItem('gmail_updated', Date.now().toString());
+    console.log('📡 Event dikirim ke tab lain');
+  } catch(e) {}
+  
+  return true;
+}
+
+// ---------- GET STORED GMAIL ----------
 function getStoredGmail() {
   return localStorage.getItem(GMAIL_KEY) || null;
 }
 
+// ---------- SET GMAIL (alias untuk updateGmailAndStorage) ----------
 function setGmail(email) {
-  if (!email) return false;
-  localStorage.setItem(GMAIL_KEY, email);
-  return true;
+  return updateGmailAndStorage(email);
 }
 
 // ---------- VALIDASI GMAIL ----------
@@ -756,7 +793,7 @@ function validateEmail(email) {
   return email && email.includes('@') && email.includes('.') && email.length > 5;
 }
 
-// ---------- TAMPILKAN GMAIL (FORCED REFRESH) ----------
+// ---------- TAMPILKAN GMAIL ----------
 function updateGmailDisplay() {
   const gmail = getStoredGmail();
   const displayEl = document.getElementById('gmailDisplay');
@@ -774,7 +811,6 @@ function updateGmailDisplay() {
     displayEl.style.color = '#ff6666';
   }
   
-  // Update user bubble juga
   updateUserBubble();
 }
 
@@ -783,13 +819,10 @@ function updateUserBubble() {
   const gmail = getStoredGmail() || 'Belum diatur';
   const bubble = document.getElementById('userBubble');
   if (bubble) {
-    // Update langsung konten bubble
-    const userId = userID || 'unknown';
-    const gmailDisplay = gmail || 'Belum diatur';
     bubble.innerHTML = `
       <b>🌸 Selamat Datang</b>
-      <span class="user-id">${userId}</span>
-      <span class="gmail-mini">📧 ${gmailDisplay}</span>
+      <span class="user-id">${userID}</span>
+      <span class="gmail-mini">📧 ${gmail}</span>
     `;
   }
 }
@@ -829,20 +862,21 @@ async function ensureGmail() {
 
   if (result.isConfirmed && result.value) {
     const newGmail = result.value.trim();
-    setGmail(newGmail);
-    updateGmailDisplay();
-    updateUserBubble();
+    // ===== SIMPAN LANGSUNG KE LOCAL STORAGE =====
+    const saved = updateGmailAndStorage(newGmail);
     
-    Swal.fire({
-      title: '✅ Gmail Tersimpan!',
-      text: `Gmail ${newGmail} berhasil disimpan.`,
-      icon: 'success',
-      confirmButtonColor: '#ff6b9d',
-      background: '#1a0e2e',
-      color: '#fff',
-      timer: 2000,
-      timerProgressBar: true
-    });
+    if (saved) {
+      Swal.fire({
+        title: '✅ Gmail Tersimpan!',
+        text: `Gmail ${newGmail} berhasil disimpan di localStorage.`,
+        icon: 'success',
+        confirmButtonColor: '#ff6b9d',
+        background: '#1a0e2e',
+        color: '#fff',
+        timer: 2000,
+        timerProgressBar: true
+      });
+    }
     return true;
   }
 
@@ -927,29 +961,30 @@ async function changeGmailWithPassword() {
   });
 
   if (newGmail) {
-    // ===== SIMPAN KE LOCAL STORAGE =====
-    setGmail(newGmail);
-    console.log('✅ Gmail baru disimpan:', newGmail);
+    // ===== SIMPAN LANGSUNG KE LOCAL STORAGE =====
+    const saved = updateGmailAndStorage(newGmail);
     
-    // ===== UPDATE DISPLAY LANGSUNG =====
-    updateGmailDisplay();
-    updateUserBubble();
-    
-    // ===== KIRIM EVENT KE TAB LAIN =====
-    try {
-      localStorage.setItem('gmail_updated', Date.now().toString());
-    } catch(e) {}
-    
-    Swal.fire({
-      title: '✅ Gmail Diubah!',
-      text: `Gmail berhasil diubah menjadi: ${newGmail}`,
-      icon: 'success',
-      confirmButtonColor: '#ff6b9d',
-      background: '#1a0e2e',
-      color: '#fff',
-      timer: 2000,
-      timerProgressBar: true
-    });
+    if (saved) {
+      Swal.fire({
+        title: '✅ Gmail Diubah!',
+        text: `Gmail berhasil diubah menjadi: ${newGmail} dan tersimpan di localStorage.`,
+        icon: 'success',
+        confirmButtonColor: '#ff6b9d',
+        background: '#1a0e2e',
+        color: '#fff',
+        timer: 2000,
+        timerProgressBar: true
+      });
+    } else {
+      Swal.fire({
+        title: '❌ Gagal Menyimpan',
+        text: 'Terjadi error saat menyimpan Gmail ke localStorage.',
+        icon: 'error',
+        confirmButtonColor: '#ff4444',
+        background: '#1a0e2e',
+        color: '#fff'
+      });
+    }
   }
 }
 
@@ -1044,10 +1079,9 @@ if (storedRef) {
 document.getElementById('changeGmailBtn').addEventListener('click', changeGmailWithPassword);
 
 // ---------- USER BUBBLE ----------
-const bubble = document.getElementById('userBubble');
-
 function showUserBubble() {
   const gmail = getStoredGmail() || 'Belum diatur';
+  const bubble = document.getElementById('userBubble');
   bubble.innerHTML = `
     <b>🌸 Selamat Datang</b>
     <span class="user-id">${userID}</span>
@@ -1114,7 +1148,6 @@ async function cekPesan() {
 window.addEventListener('storage', function(e) {
   if (e.key === 'gmail_updated' || e.key === GMAIL_KEY) {
     console.log('🔄 Storage event detected, updating Gmail display...');
-    // Force update dari localStorage
     updateGmailDisplay();
     updateUserBubble();
   }
@@ -1122,7 +1155,6 @@ window.addEventListener('storage', function(e) {
 
 // ===== FORCE UPDATE SETIAP 5 DETIK (FALLBACK) =====
 setInterval(() => {
-  // Cek apakah Gmail di localStorage berbeda dengan yang ditampilkan
   const currentGmail = getStoredGmail();
   const displayEl = document.getElementById('gmailDisplay');
   if (displayEl && currentGmail && validateEmail(currentGmail)) {
@@ -1136,7 +1168,6 @@ setInterval(() => {
 
 // ---------- INIT ----------
 window.addEventListener('load', function() {
-  // Pastikan display selalu update
   setTimeout(() => {
     updateGmailDisplay();
     showUserBubble();
@@ -1162,7 +1193,7 @@ setInterval(() => {
 
 console.log('🌸 Anime Shine Shop Active! ✨');
 console.log('📧 Gmail auto-sync dari localStorage');
-console.log('🔁 Display akan update otomatis setiap 5 detik');
+console.log('🔥 updateGmailAndStorage() akan langsung simpan ke localStorage');
 </script>
 </body>
 </html>
