@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="id">
 <head>
@@ -155,7 +156,6 @@ h2{
 .details strong{color:#f8fafc;font-weight:600}
 .details .discount-text{color:#22c55e;font-weight:600}
 .details .voucher-text{color:#facc15;font-weight:600}
-.details .price-per-k{color:#00ccff;font-size:12px}
 input{
   width:100%;
   padding:14px 16px;
@@ -287,28 +287,12 @@ const trx = p.get("trx") || "-";
 const layanan = p.get("layanan") || "-";
 const total = Number(p.get("total") || 0);
 const target = p.get("target") || "-";
-const serviceId = p.get("id") || "-";
-const kategori = p.get("kategori") || "-";
-const maintenance = false;
+   const maintenance = false;
 
-if (maintenance === true) {
-  window.location.replace("/maintenance/");
-}
-
-// ================= FORMAT HARGA =================
-function formatPrice(price) {
-  if (price === undefined || price === null || isNaN(price)) return '0';
-  const decimalPart = price % 1;
-  let roundedPrice;
-  if (decimalPart >= 0.5) {
-    roundedPrice = Math.ceil(price);
-  } else {
-    roundedPrice = Math.floor(price);
+  if (maintenance === true) {
+    window.location.replace("/maintenance/");
   }
-  return roundedPrice.toLocaleString('id-ID');
-}
 
-// ================= MASK ID =================
 function maskID(id) {
   id = String(id || "-");
   if (id.length <= 4) return id;
@@ -322,7 +306,6 @@ let appliedVoucher = null;
 let appliedDiscount = 0;
 let uniqueCode = 0;
 let transactionLocked = false;
-let serviceData = null;
 
 // ================= USER ID =================
 function generateUserID(){
@@ -406,7 +389,6 @@ function generateUniqueCode() {
   }
   return uniqueCode;
 }
-
 function crc16(s){
   let c=0xFFFF;
   for(let i=0;i<s.length;i++){
@@ -418,7 +400,6 @@ function crc16(s){
   return (c&0xFFFF).toString(16).toUpperCase().padStart(4,'0');
 }
 
-// ================= BUILD QRIS DINAMIS =================
 function buildQR(a){
   const str=String(parseInt(a));
   const tag="54"+String(str.length).padStart(2,"0")+str;
@@ -426,42 +407,7 @@ function buildQR(a){
   return base+tag+"6304"+crc16(base+tag+"6304");
 }
 
-// ================= AMBIL DATA LAYANAN DARI LIST.JSON =================
-async function fetchServiceData() {
-  try {
-    const res = await fetch("/sosmed-2/list.json?t=" + Date.now());
-    if (!res.ok) throw new Error("Gagal fetch list.json");
-    const data = await res.json();
-    
-    // Cari layanan berdasarkan kategori dan ID
-    if (kategori && data[kategori]) {
-      const found = data[kategori].find(s => String(s.id) === String(serviceId));
-      if (found) {
-        serviceData = found;
-        console.log("✅ Service data ditemukan:", serviceData.name);
-        return serviceData;
-      }
-    }
-    
-    // Fallback: cari di semua kategori
-    for (const cat in data) {
-      const found = data[cat].find(s => String(s.id) === String(serviceId));
-      if (found) {
-        serviceData = found;
-        console.log("✅ Service data ditemukan di kategori:", cat);
-        return serviceData;
-      }
-    }
-    
-    console.log("⚠️ Service data tidak ditemukan untuk ID:", serviceId);
-    return null;
-  } catch (err) {
-    console.error("Error fetch service data:", err);
-    return null;
-  }
-}
-
-// ================= UPDATE DISPLAY =================
+// ================= UPDATE DISPLAY (REFLEK DISKON) =================
 function updateDisplay(){
   uniqueCode = generateUniqueCode();
   document.getElementById('uniqueCode').textContent = uniqueCode;
@@ -469,32 +415,20 @@ function updateDisplay(){
   const totalDenganUnik = finalTotal + uniqueCode;
   
   let detailHtml = `
-  <strong>🆔 ID Transaksi:</strong> ${trx}<br>
-  <strong>📋 Layanan:</strong> ${layanan}<br>
-  <strong>🎯 Target:</strong> ${target}<br>
+  <strong>ID Transaksi:</strong> ${trx}<br>
+  <strong>Layanan:</strong> ${layanan}<br>
+  <strong>Target:</strong> ${target}<br>
+  <strong>Total:</strong> <s>Rp ${originalTotal.toLocaleString("id-ID")}</s><br>
   `;
   
-  // Tampilkan harga per K jika ada data layanan
-  if (serviceData && serviceData.pricePerFollower) {
-    const pricePerK = serviceData.pricePerFollower * 1000;
-    detailHtml += `<strong>💰 Harga /K:</strong> <span class="price-per-k">Rp ${formatPrice(pricePerK)}/K</span><br>`;
-  }
-  
-  detailHtml += `<strong>💵 Total:</strong> <s>Rp ${formatPrice(originalTotal)}</s><br>`;
-  
   if (appliedVoucher) {
-    detailHtml += `<strong>🎫 Voucher:</strong> <span class="voucher-text">${appliedVoucher}</span> <span class="discount-text">(Diskon Rp ${formatPrice(appliedDiscount)})</span><br>`;
+    detailHtml += `<strong>🎫 Voucher:</strong> <span class="voucher-text">${appliedVoucher}</span> <span class="discount-text">(Diskon Rp ${appliedDiscount.toLocaleString("id-ID")})</span><br>`;
   }
   
-  detailHtml += `<strong>💳 Total Bayar:</strong> Rp ${formatPrice(totalDenganUnik)}`;
-  
-  if (serviceData && serviceData.desc) {
-    detailHtml += `<br><br><span style="font-size:12px;color:#94a3b8;">📄 ${serviceData.desc}</span>`;
-  }
+  detailHtml += `<strong>Total Bayar:</strong> Rp ${totalDenganUnik.toLocaleString("id-ID")}`;
   
   document.getElementById('orderDetails').innerHTML = detailHtml;
   
-  // Generate QRIS
   QRCode.toCanvas(document.getElementById('qrisCanvas'), buildQR(totalDenganUnik), { width:240 }, function(err){
     if(err) return console.error(err);
     const ctx = document.getElementById('qrisCanvas').getContext("2d");
@@ -547,7 +481,7 @@ document.getElementById('applyVoucher').onclick = async function() {
   if (originalTotal < minPurchase) {
     return Swal.fire({
       title: "❌ Minimal Pembelian",
-      text: `Minimal pembelian untuk voucher ini adalah Rp ${formatPrice(minPurchase)}`,
+      text: `Minimal pembelian untuk voucher ini adalah Rp ${minPurchase.toLocaleString("id-ID")}`,
       icon: "warning",
       confirmButtonColor: "#22c55e"
     });
@@ -555,6 +489,7 @@ document.getElementById('applyVoucher').onclick = async function() {
   
   let discount = 0;
   if (v.type === "percent") {
+    // SUPPORT DESIMAL: value bisa 0.7 (berarti 0.7%)
     discount = originalTotal * (v.value / 100);
     if (v.max_discount) discount = Math.min(discount, v.max_discount);
   } else if (v.type === "fixed") {
@@ -570,7 +505,7 @@ document.getElementById('applyVoucher').onclick = async function() {
   
   markVoucherUsed(v.code);
   
-  let discountText = `Rp ${formatPrice(discount)}`;
+  let discountText = `Rp ${discount.toLocaleString("id-ID")}`;
   if (v.type === "percent") {
     discountText += ` (${v.value}% dari total)`;
   }
@@ -582,6 +517,7 @@ document.getElementById('applyVoucher').onclick = async function() {
   this.disabled = true;
   this.style.opacity = '0.4';
   
+  // UPDATE DISPLAY LANGSUNG
   updateDisplay();
   
   Swal.fire({
@@ -612,7 +548,6 @@ document.getElementById('confirmBtn').onclick = async function() {
   
   const totalDenganUnik = finalTotal + uniqueCode;
   
-  // Kirim ke Telegram
   await fetch("/api/send-telegram",{
     method:"POST",
     headers:{"Content-Type":"application/json"},
@@ -620,27 +555,22 @@ document.getElementById('confirmBtn').onclick = async function() {
       chat_id:"-1002112920606",
       text:`
 🆕 Transaksi Baru Sosmed 2
-━━━━━━━━━━━━━━━━━━━━━
-🆔 ID TRANSAKSI: ${maskedTrx}
-📋 Layanan: ${layanan}
-🎯 Target: ${target}
-💰 Harga asli: Rp${formatPrice(originalTotal)}
-💳 Total Bayar: Rp ${formatPrice(totalDenganUnik)}
-🔑 Kode Unik: ${uniqueCode}
-👤 User ID: ${maskedUserID}
-📎 Referal Code: ${refCode}
-🎫 Voucher: ${appliedVoucher || "Tidak ada"} ${appliedVoucher ? `(Diskon Rp ${formatPrice(appliedDiscount)})` : ''}
-━━━━━━━━━━━━━━━━━━━━━
-📌 Order sekarang di shinedomain.my.id`
+ID TRANSAKSI: ${maskedTrx}
+Layanan: ${layanan}
+Harga asli: Rp${originalTotal.toLocaleString("id-ID")}
+Total Bayar: Rp ${totalDenganUnik.toLocaleString("id-ID")}
+User ID: ${maskedUserID}
+Referal Code: ${refCode}
+Voucher: ${appliedVoucher || "Tidak ada"} ${appliedVoucher ? `(Diskon Rp ${appliedDiscount.toLocaleString("id-ID")})` : ''}
+Order sekarang di shinedomain.my.id`
     })
   });
   
-  // Kirim ke Discord
   await fetch(discordWebhook,{
     method:"POST",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify({
-      content:`💰 Pembayaran Baru SOSMED 2\n━━━━━━━━━━━━━━━━━━━━━\n🆔 ID: ${trx}\n📋 Layanan: ${layanan}\n🎯 Target: ${target}\n💰 Harga Asli: Rp${formatPrice(originalTotal)}\n💳 Total Bayar: Rp ${formatPrice(totalDenganUnik)}\n🔑 Kode Unik: ${uniqueCode}\n🎫 Voucher: ${appliedVoucher || "-"}\n📊 Diskon: ${appliedVoucher ? `Rp ${formatPrice(appliedDiscount)}` : "-"}\n👤 Nama: ${nama}\n📧 Gmail: ${gmail}\n🆔 User ID: ${userID}\n📎 Referral: ${refCode}`
+      content:`💰 Pembayaran Baru SOSMED 2\nID: ${trx}\nLayanan: ${layanan}\nHarga Asli: Rp${originalTotal.toLocaleString("id-ID")}\nTotal Bayar: Rp ${totalDenganUnik.toLocaleString("id-ID")}\nKode Unik: ${uniqueCode}\nTarget: ${target}\nVoucher: ${appliedVoucher || "-"}\nDiskon: ${appliedVoucher ? `Rp ${appliedDiscount.toLocaleString("id-ID")}` : "-"}\nNama: ${nama}\nGmail: ${gmail}\nUser ID: ${userID}\nReferral: ${refCode}`
     })
   });
 
@@ -655,9 +585,6 @@ document.getElementById('confirmBtn').onclick = async function() {
 
 // ================= INIT =================
 (async function() {
-  // Ambil data layanan dari list.json
-  await fetchServiceData();
-  
   if (checkTransactionLockLocal()) {
     transactionLocked = true;
     const btn = document.getElementById('confirmBtn');
@@ -695,6 +622,7 @@ function ambilReferral() {
 }
 ambilReferral();
 
+ 
 // ================= ANTI DEVTOOLS =================
 document.addEventListener("keydown", function(e){
   if(e.key === "F12") e.preventDefault();
@@ -712,8 +640,6 @@ setInterval(() => {
 }, 2000);
 
 console.log('💳 QRIS Payment - Sosmed 2 siap!');
-console.log('📋 Layanan:', layanan);
-console.log('🆔 ID:', serviceId);
 console.log('🎫 Voucher otomatis mengurangi total bayar');
 </script>
 </body>
