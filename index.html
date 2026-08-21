@@ -654,7 +654,7 @@ h1 {
   <div class="divider"></div>
 
   <!-- ===== GMAIL DISPLAY ===== -->
-  <div class="gmail-display">
+  <div class="gmail-display" id="gmailDisplayContainer">
     <span class="gmail-label">📧 Gmail:</span>
     <span class="gmail-value" id="gmailDisplay">Belum diatur</span>
     <button class="btn-change-gmail" id="changeGmailBtn">✏️ Ubah</button>
@@ -751,71 +751,46 @@ function setGmail(email) {
   return true;
 }
 
-// ---------- REFERRAL CODE (IMMUTABLE ONCE SET) ----------
-function getReferralFromURL() {
-  const params = new URLSearchParams(window.location.search);
-  return params.get('ref') || null;
-}
-
-function getStoredReferral() {
-  return localStorage.getItem('referral_code') || null;
-}
-
-function setReferralIfNotExists(code) {
-  if (!code) return false;
-  const existing = getStoredReferral();
-  if (!existing) {
-    localStorage.setItem('referral_code', code);
-    return true;
-  }
-  return false;
-}
-
-// ---------- LOCK: Prevent localStorage manipulation ----------
-(function lockLocalStorage() {
-  const originalSetItem = Storage.prototype.setItem;
-  const originalRemoveItem = Storage.prototype.removeItem;
-  
-  Storage.prototype.setItem = function(key, value) {
-    if (key === 'referral_code' && localStorage.getItem('referral_code') !== null) {
-      console.warn('🔒 Shine Lock: Referral code sudah diset, tidak bisa diubah!');
-      return;
-    }
-    if (key === 'user_id' && localStorage.getItem('user_id') !== null) {
-      console.warn('🔒 Shine Lock: User ID sudah diset, tidak bisa diubah!');
-      return;
-    }
-    if (key === GMAIL_KEY && localStorage.getItem(GMAIL_KEY) !== null) {
-      console.warn('🔒 Shine Lock: Gmail sudah diset, tidak bisa diubah manual!');
-      return;
-    }
-    originalSetItem.call(this, key, value);
-  };
-  
-  Storage.prototype.removeItem = function(key) {
-    if (key === 'referral_code' || key === 'user_id' || key === GMAIL_KEY) {
-      console.warn('🔒 Dragon Lock: Gak bisa hapus ' + key + '!');
-      return;
-    }
-    originalRemoveItem.call(this, key);
-  };
-})();
-
 // ---------- VALIDASI GMAIL ----------
 function validateEmail(email) {
   return email && email.includes('@') && email.includes('.') && email.length > 5;
 }
 
-// ---------- TAMPILKAN GMAIL ----------
+// ---------- TAMPILKAN GMAIL (FORCED REFRESH) ----------
 function updateGmailDisplay() {
   const gmail = getStoredGmail();
   const displayEl = document.getElementById('gmailDisplay');
+  if (!displayEl) return;
+  
+  console.log('🔄 Update Gmail Display, current:', gmail);
+  
   if (gmail && validateEmail(gmail)) {
     displayEl.textContent = gmail;
     displayEl.className = 'gmail-value';
+    displayEl.style.color = '#ff6b9d';
   } else {
     displayEl.textContent = '⚠️ Wajib diatur!';
     displayEl.className = 'gmail-value not-set';
+    displayEl.style.color = '#ff6666';
+  }
+  
+  // Update user bubble juga
+  updateUserBubble();
+}
+
+// ---------- UPDATE USER BUBBLE ----------
+function updateUserBubble() {
+  const gmail = getStoredGmail() || 'Belum diatur';
+  const bubble = document.getElementById('userBubble');
+  if (bubble) {
+    // Update langsung konten bubble
+    const userId = userID || 'unknown';
+    const gmailDisplay = gmail || 'Belum diatur';
+    bubble.innerHTML = `
+      <b>🌸 Selamat Datang</b>
+      <span class="user-id">${userId}</span>
+      <span class="gmail-mini">📧 ${gmailDisplay}</span>
+    `;
   }
 }
 
@@ -853,15 +828,20 @@ async function ensureGmail() {
   });
 
   if (result.isConfirmed && result.value) {
-    setGmail(result.value.trim());
+    const newGmail = result.value.trim();
+    setGmail(newGmail);
     updateGmailDisplay();
+    updateUserBubble();
+    
     Swal.fire({
       title: '✅ Gmail Tersimpan!',
-      text: 'Gmail Anda telah disimpan dan jika ingin mengubahnya silahkan hubungi admin pada WhatsApp +6289518103883.',
+      text: `Gmail ${newGmail} berhasil disimpan.`,
       icon: 'success',
       confirmButtonColor: '#ff6b9d',
       background: '#1a0e2e',
-      color: '#fff'
+      color: '#fff',
+      timer: 2000,
+      timerProgressBar: true
     });
     return true;
   }
@@ -947,11 +927,15 @@ async function changeGmailWithPassword() {
   });
 
   if (newGmail) {
-    // ===== UPDATE LOCAL STORAGE =====
+    // ===== SIMPAN KE LOCAL STORAGE =====
     setGmail(newGmail);
-    updateGmailDisplay();
+    console.log('✅ Gmail baru disimpan:', newGmail);
     
-    // ===== KIRIM EVENT KE SEMUA TAB =====
+    // ===== UPDATE DISPLAY LANGSUNG =====
+    updateGmailDisplay();
+    updateUserBubble();
+    
+    // ===== KIRIM EVENT KE TAB LAIN =====
     try {
       localStorage.setItem('gmail_updated', Date.now().toString());
     } catch(e) {}
@@ -962,29 +946,62 @@ async function changeGmailWithPassword() {
       icon: 'success',
       confirmButtonColor: '#ff6b9d',
       background: '#1a0e2e',
-      color: '#fff'
+      color: '#fff',
+      timer: 2000,
+      timerProgressBar: true
     });
-    
-    // ===== UPDATE USER BUBBLE =====
-    updateUserBubble();
   }
 }
 
-// ---------- UPDATE USER BUBBLE ----------
-function updateUserBubble() {
-  const gmail = getStoredGmail() || 'Belum diatur';
-  const bubble = document.getElementById('userBubble');
-  if (bubble) {
-    const bubbleContent = bubble.querySelector('#bubbleContent');
-    if (bubbleContent) {
-      bubbleContent.innerHTML = `
-        <b>🌸 Selamat Datang</b>
-        <span class="user-id">${userID}</span>
-        <span class="gmail-mini">📧 ${gmail}</span>
-      `;
-    }
-  }
+// ---------- REFERRAL CODE ----------
+function getReferralFromURL() {
+  const params = new URLSearchParams(window.location.search);
+  return params.get('ref') || null;
 }
+
+function getStoredReferral() {
+  return localStorage.getItem('referral_code') || null;
+}
+
+function setReferralIfNotExists(code) {
+  if (!code) return false;
+  const existing = getStoredReferral();
+  if (!existing) {
+    localStorage.setItem('referral_code', code);
+    return true;
+  }
+  return false;
+}
+
+// ---------- LOCK: Prevent localStorage manipulation ----------
+(function lockLocalStorage() {
+  const originalSetItem = Storage.prototype.setItem;
+  const originalRemoveItem = Storage.prototype.removeItem;
+  
+  Storage.prototype.setItem = function(key, value) {
+    if (key === 'referral_code' && localStorage.getItem('referral_code') !== null) {
+      console.warn('🔒 Shine Lock: Referral code sudah diset, tidak bisa diubah!');
+      return;
+    }
+    if (key === 'user_id' && localStorage.getItem('user_id') !== null) {
+      console.warn('🔒 Shine Lock: User ID sudah diset, tidak bisa diubah!');
+      return;
+    }
+    if (key === GMAIL_KEY && localStorage.getItem(GMAIL_KEY) !== null) {
+      console.warn('🔒 Shine Lock: Gmail sudah diset, tidak bisa diubah manual!');
+      return;
+    }
+    originalSetItem.call(this, key, value);
+  };
+  
+  Storage.prototype.removeItem = function(key) {
+    if (key === 'referral_code' || key === 'user_id' || key === GMAIL_KEY) {
+      console.warn('🔒 Dragon Lock: Gak bisa hapus ' + key + '!');
+      return;
+    }
+    originalRemoveItem.call(this, key);
+  };
+})();
 
 // ---------- AUDIO PLAY ----------
 function playAudio() {
@@ -1096,17 +1113,35 @@ async function cekPesan() {
 // ===== LISTENER UNTUK UPDATE GMAIL DARI TAB LAIN =====
 window.addEventListener('storage', function(e) {
   if (e.key === 'gmail_updated' || e.key === GMAIL_KEY) {
-    console.log('🔄 Gmail diupdate dari tab lain, refresh display...');
+    console.log('🔄 Storage event detected, updating Gmail display...');
+    // Force update dari localStorage
     updateGmailDisplay();
     updateUserBubble();
   }
 });
 
+// ===== FORCE UPDATE SETIAP 5 DETIK (FALLBACK) =====
+setInterval(() => {
+  // Cek apakah Gmail di localStorage berbeda dengan yang ditampilkan
+  const currentGmail = getStoredGmail();
+  const displayEl = document.getElementById('gmailDisplay');
+  if (displayEl && currentGmail && validateEmail(currentGmail)) {
+    const displayed = displayEl.textContent;
+    if (displayed !== currentGmail && displayed !== '⚠️ Wajib diatur!') {
+      console.log('🔄 Force update Gmail display:', currentGmail);
+      updateGmailDisplay();
+    }
+  }
+}, 5000);
+
 // ---------- INIT ----------
 window.addEventListener('load', function() {
-  updateGmailDisplay();
-  showUserBubble();
-  playAudio();
+  // Pastikan display selalu update
+  setTimeout(() => {
+    updateGmailDisplay();
+    showUserBubble();
+    playAudio();
+  }, 100);
 });
 
 // ---------- ANTI DEVTOOLS ----------
@@ -1126,7 +1161,8 @@ setInterval(() => {
 }, 2000);
 
 console.log('🌸 Anime Shine Shop Active! ✨');
-console.log('📧 Gmail wajib diisi dan otomatis update di localStorage');
+console.log('📧 Gmail auto-sync dari localStorage');
+console.log('🔁 Display akan update otomatis setiap 5 detik');
 </script>
 </body>
 </html>
