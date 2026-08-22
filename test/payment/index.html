@@ -386,6 +386,34 @@ p{
 @keyframes spin{
   to{transform:rotate(360deg)}
 }
+.status-result{
+  margin-top:12px;
+  padding:12px 16px;
+  border-radius:12px;
+  text-align:center;
+  font-size:13px;
+  min-height:24px;
+}
+.status-result.success{
+  background:#00ffaa15;
+  border:1px solid #00ffaa33;
+  color:#00ffaa;
+}
+.status-result.failed{
+  background:#ff444415;
+  border:1px solid #ff444433;
+  color:#ff6666;
+}
+.status-result.pending{
+  background:#ffaa0015;
+  border:1px solid #ffaa0033;
+  color:#ffaa00;
+}
+.status-result.info{
+  background:#00ccff15;
+  border:1px solid #00ccff33;
+  color:#00ccff;
+}
 @media(max-width:480px){
   .card{padding:20px 16px;border-radius:20px}
   h2{font-size:20px}
@@ -453,7 +481,7 @@ p{
   
   <!-- ===== CEK STATUS PEMBAYARAN (CALLBACK QRIS) ===== -->
   <button id="checkStatusBtn" class="btn btn-check-status">🔄 Cek Status Pembayaran</button>
-  <div id="statusResult" style="margin-top:10px;text-align:center;font-size:13px;min-height:24px;"></div>
+  <div id="statusResult" class="status-result" style="display:none;"></div>
   
   <div class="muted">⏳ Admin memproses maksimal 72 jam</div>
   
@@ -475,7 +503,6 @@ const MERCHANT_CODE = "QP052692";
 const API_KEY = "d1370635be9857299bde44b946c938655534efdff7ef5246685b67ef91decb1c";
 const SECRET_KEY = "d1370635be9857299bde44b946c938655534efdff7ef5246685b67ef91decb1c";
 const CALLBACK_URL = `https://shinedomain.my.id/api/callback/accept/${SECRET_KEY}`;
-const MUTASI_URL = `https://qiospay.id/api/mutasi/qris/${MERCHANT_CODE}/${API_KEY}`;
 
 const p = new URLSearchParams(location.search);
 const trx = p.get("trx") || "-";
@@ -697,7 +724,7 @@ function isVoucherUsed(code) {
 // ================= QRIS =================
 function generateUniqueCode() {
   if (!uniqueCode) {
-    uniqueCode = Math.floor(Math.random() * 2) + 1;
+    uniqueCode = Math.floor(Math.random() * 50) + 1;
   }
   return uniqueCode;
 }
@@ -821,7 +848,7 @@ document.getElementById('applyVoucher').onclick = async function() {
   });
 };
 
-// ================= CEK STATUS PEMBAYARAN (CALLBACK QRIS) =================
+// ================= CEK STATUS PEMBAYARAN (FIXED) =================
 document.getElementById('checkStatusBtn').onclick = async function() {
   const btn = this;
   const resultEl = document.getElementById('statusResult');
@@ -834,14 +861,18 @@ document.getElementById('checkStatusBtn').onclick = async function() {
   const userID = await getUserID();
   
   if(!gmail || !validateEmail(gmail)) {
-    resultEl.innerHTML = '<span style="color:#ff6666;">⚠️ Gmail belum diatur. Hubungi admin.</span>';
+    resultEl.style.display = 'block';
+    resultEl.className = 'status-result failed';
+    resultEl.innerHTML = '⚠️ Gmail belum diatur. Hubungi admin.';
     return;
   }
   
   // Cek banned
   const bannedData = await checkGmailBanned(gmail);
   if (bannedData) {
-    resultEl.innerHTML = '<span style="color:#ff6666;">🚫 Gmail terdaftar dalam daftar banned.</span>';
+    resultEl.style.display = 'block';
+    resultEl.className = 'status-result failed';
+    resultEl.innerHTML = '🚫 Gmail terdaftar dalam daftar banned.';
     return;
   }
   
@@ -849,15 +880,16 @@ document.getElementById('checkStatusBtn').onclick = async function() {
   isCheckingStatus = true;
   btn.disabled = true;
   btn.innerHTML = '<span class="status-loading"></span> Mengecek...';
-  resultEl.innerHTML = '<span style="color:#ffaa00;">⏳ Menghubungi server Qiospay...</span>';
+  resultEl.style.display = 'block';
+  resultEl.className = 'status-result pending';
+  resultEl.innerHTML = '⏳ Menghubungi server untuk verifikasi...';
   
   try {
-    // ===== KIRIM CALLBACK KE QIOSPAY =====
-    // Simulasi callback dengan mengirim request ke Qiospay
+    // ===== KIRIM CALLBACK KE API KITA =====
     const callbackData = {
       order_id: trx,
       amount: finalTotal + uniqueCode,
-      status: 'pending',
+      status: 'check',
       merchant_code: MERCHANT_CODE,
       payment_method: 'QRIS',
       customer_email: gmail,
@@ -866,7 +898,7 @@ document.getElementById('checkStatusBtn').onclick = async function() {
       payment_time: new Date().toISOString()
     };
     
-    // Kirim callback ke endpoint kita (untuk verifikasi internal)
+    // Kirim callback ke endpoint kita
     const callbackRes = await fetch(CALLBACK_URL, {
       method: 'POST',
       headers: {
@@ -876,20 +908,20 @@ document.getElementById('checkStatusBtn').onclick = async function() {
       body: JSON.stringify(callbackData)
     });
     
-    if (!callbackRes.ok) {
-      throw new Error('Callback gagal: ' + callbackRes.status);
-    }
-    
     const callbackResult = await callbackRes.json();
+    console.log('✅ Callback response:', callbackResult);
     
     // ===== CEK MUTASI DARI QIOSPAY =====
-    const mutasiRes = await fetch(MUTASI_URL + '?t=' + Date.now());
+    const mutasiUrl = `https://qiospay.id/api/mutasi/qris/${MERCHANT_CODE}/${API_KEY}`;
+    
+    const mutasiRes = await fetch(mutasiUrl + '?t=' + Date.now());
     
     if (!mutasiRes.ok) {
       throw new Error('Gagal mengambil data mutasi: ' + mutasiRes.status);
     }
     
     const mutasiData = await mutasiRes.json();
+    console.log('📊 Mutasi data:', mutasiData);
     
     // Cari transaksi yang cocok
     const transactions = mutasiData.data || [];
@@ -928,31 +960,39 @@ document.getElementById('checkStatusBtn').onclick = async function() {
       });
       
       // Kirim ke Telegram
-      await fetch("/api/send-telegram", {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({
-          chat_id: "-1002112920606",
-          text: discordMessage
-        })
-      });
+      try {
+        await fetch("/api/send-telegram", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({
+            chat_id: "-1002112920606",
+            text: discordMessage
+          })
+        });
+      } catch(e) { console.warn('Telegram error:', e); }
       
       // Simpan lock
       saveTransactionLockLocal();
       
+      resultEl.style.display = 'block';
+      resultEl.className = 'status-result success';
       resultEl.innerHTML = `
-        <div style="background:#00ffaa15;padding:12px;border-radius:12px;border:1px solid #00ffaa33;">
-          <span style="color:#00ffaa;font-weight:700;">✅ PEMBAYARAN TERVERIFIKASI!</span><br>
-          <span style="color:#888;font-size:12px;">Transaksi ${trx} telah dibayar dan diverifikasi otomatis.</span>
-          <br><br>
-          <span style="color:#ffaa00;font-size:12px;">📩 Notifikasi telah dikirim ke admin.</span>
-        </div>
+        ✅ <strong>PEMBAYARAN TERVERIFIKASI!</strong><br>
+        <span style="font-size:12px;color:#888;">Transaksi ${trx} telah dibayar dan diverifikasi otomatis.</span>
+        <br>
+        <span style="font-size:11px;color:#ffaa00;">📩 Notifikasi telah dikirim ke admin.</span>
       `;
       
       // Nonaktifkan tombol
       btn.disabled = true;
       btn.textContent = '✅ Sudah Diverifikasi';
       btn.style.opacity = '0.5';
+      
+      // Nonaktifkan tombol confirm juga
+      const confirmBtn = document.getElementById('confirmBtn');
+      confirmBtn.disabled = true;
+      confirmBtn.style.opacity = '0.5';
+      confirmBtn.textContent = '✅ Transaksi Sudah Dikonfirmasi';
       
       Swal.fire({
         title: '✅ Pembayaran Terverifikasi!',
@@ -966,48 +1006,52 @@ document.getElementById('checkStatusBtn').onclick = async function() {
       const status = foundTx.status || 'unknown';
       let statusText = status;
       let statusColor = '#ffaa00';
+      let statusClass = 'pending';
       
       if (status === 'pending') {
         statusText = '⏳ Menunggu Pembayaran';
         statusColor = '#ffaa00';
+        statusClass = 'pending';
       } else if (status === 'process' || status === 'processing') {
         statusText = '🔄 Sedang Diproses';
         statusColor = '#00ccff';
+        statusClass = 'info';
       } else if (status === 'failed' || status === 'expired') {
         statusText = '❌ Gagal/Kadaluarsa';
         statusColor = '#ff4444';
+        statusClass = 'failed';
       }
       
+      resultEl.style.display = 'block';
+      resultEl.className = 'status-result ' + statusClass;
       resultEl.innerHTML = `
-        <div style="background:#ffaa0015;padding:12px;border-radius:12px;border:1px solid #ffaa0033;">
-          <span style="color:${statusColor};font-weight:700;">${statusText}</span><br>
-          <span style="color:#888;font-size:12px;">Status saat ini: ${status}</span>
-          <br>
-          <span style="color:#888;font-size:11px;">⏳ Silakan tunggu atau hubungi admin jika sudah transfer.</span>
-        </div>
+        <strong style="color:${statusColor};">${statusText}</strong><br>
+        <span style="font-size:12px;color:#888;">Status saat ini: ${status}</span>
+        <br>
+        <span style="font-size:11px;color:#888;">⏳ Silakan tunggu atau hubungi admin jika sudah transfer.</span>
       `;
       
     } else {
       // Transaksi tidak ditemukan
+      resultEl.style.display = 'block';
+      resultEl.className = 'status-result info';
       resultEl.innerHTML = `
-        <div style="background:#ff444415;padding:12px;border-radius:12px;border:1px solid #ff444433;">
-          <span style="color:#ff6666;font-weight:700;">❌ Transaksi Tidak Ditemukan</span><br>
-          <span style="color:#888;font-size:12px;">ID: ${trx}</span>
-          <br>
-          <span style="color:#888;font-size:11px;">⏳ Jika sudah transfer, hubungi admin untuk verifikasi manual.</span>
-        </div>
+        <strong>ℹ️ Transaksi Tidak Ditemukan</strong><br>
+        <span style="font-size:12px;color:#888;">ID: ${trx}</span>
+        <br>
+        <span style="font-size:11px;color:#888;">⏳ Jika sudah transfer, hubungi admin untuk verifikasi manual.</span>
       `;
     }
     
   } catch (err) {
     console.error('Error cek status:', err);
+    resultEl.style.display = 'block';
+    resultEl.className = 'status-result failed';
     resultEl.innerHTML = `
-      <div style="background:#ff444415;padding:12px;border-radius:12px;border:1px solid #ff444433;">
-        <span style="color:#ff6666;font-weight:700;">❌ Gagal Mengecek Status</span><br>
-        <span style="color:#888;font-size:12px;">${err.message}</span>
-        <br>
-        <span style="color:#888;font-size:11px;">⏳ Coba lagi nanti atau hubungi admin.</span>
-      </div>
+      ❌ Gagal Mengecek Status<br>
+      <span style="font-size:12px;color:#888;">${err.message}</span>
+      <br>
+      <span style="font-size:11px;color:#888;">⏳ Coba lagi nanti atau hubungi admin.</span>
     `;
   }
   
@@ -1149,7 +1193,7 @@ setInterval(() => {
 console.log('💳 QRIS Payment - Sosmed 2 siap!');
 console.log('📧 Gmail diambil dari localStorage');
 console.log('🚫 Cek banned berdasarkan Gmail');
-console.log('🕐 WIB (GMT+7) real-time aktif untuk QRIS & BANNED');
+console.log('🕐 WIB (GMT+7) real-time aktif');
 console.log('⚡ Auto-Verifikasi QRIS aktif!');
 console.log('🔄 Tombol "Cek Status" akan mengirim callback QRIS');
 </script>
