@@ -120,6 +120,9 @@ h2{
 #qrisCanvas{
   display:block;
   border-radius:12px;
+  background:#fff;
+  width:240px;
+  height:240px;
 }
 .unique-code{
   background:rgba(30,41,59,0.6);
@@ -239,15 +242,6 @@ p{
 }
 .btn:active:not(:disabled){transform:scale(0.97)}
 .btn:disabled{opacity:0.4;cursor:not-allowed;transform:none!important;box-shadow:none!important}
-.btn-check-status{
-  background:linear-gradient(135deg,#f59e0b,#d97706);
-  box-shadow:0 8px 24px rgba(245,158,11,0.3);
-}
-.btn-check-status:hover:not(:disabled){
-  background:linear-gradient(135deg,#fbbf24,#f59e0b);
-  box-shadow:0 12px 32px rgba(245,158,11,0.4);
-}
-.btn-check-status:disabled{opacity:0.4;cursor:not-allowed;transform:none!important;box-shadow:none!important}
 #applyVoucher{
   background:linear-gradient(135deg,#22c55e,#16a34a);
   box-shadow:0 8px 24px rgba(34,197,94,0.25);
@@ -374,45 +368,31 @@ p{
   font-weight:500;
   font-variant-numeric:tabular-nums;
 }
-.status-loading{
-  display:inline-block;
-  width:16px;
-  height:16px;
-  border:2px solid rgba(255,255,255,0.2);
-  border-top-color:#00ffaa;
-  border-radius:50%;
-  animation:spin 0.8s linear infinite;
-}
-@keyframes spin{
-  to{transform:rotate(360deg)}
-}
-.status-result{
+.payment-status{
   margin-top:12px;
   padding:12px 16px;
   border-radius:12px;
   text-align:center;
   font-size:13px;
-  min-height:24px;
+  display:none;
 }
-.status-result.success{
+.payment-status.success{
+  display:block;
   background:#00ffaa15;
   border:1px solid #00ffaa33;
   color:#00ffaa;
 }
-.status-result.failed{
+.payment-status.failed{
+  display:block;
   background:#ff444415;
   border:1px solid #ff444433;
-  color:#ff6666;
+  color:#ff4444;
 }
-.status-result.pending{
+.payment-status.checking{
+  display:block;
   background:#ffaa0015;
   border:1px solid #ffaa0033;
   color:#ffaa00;
-}
-.status-result.info{
-  background:#00ccff15;
-  border:1px solid #00ccff33;
-  color:#00ccff;
 }
 @media(max-width:480px){
   .card{padding:20px 16px;border-radius:20px}
@@ -479,9 +459,10 @@ p{
   <button id="applyVoucher" class="btn">🎫 Gunakan Voucher</button>
   <div class="voucher-status" id="voucherStatus"></div>
   
-  <!-- ===== CEK STATUS PEMBAYARAN (CALLBACK QRIS) ===== -->
-  <button id="checkStatusBtn" class="btn btn-check-status">🔄 Cek Status Pembayaran</button>
-  <div id="statusResult" class="status-result" style="display:none;"></div>
+  <!-- ===== PAYMENT STATUS ===== -->
+  <div id="paymentStatus" class="payment-status"></div>
+  
+  <button id="confirmBtn" class="btn">✅ Cek Status Pembayaran</button>
   
   <div class="muted">⏳ Admin memproses maksimal 72 jam</div>
   
@@ -499,10 +480,9 @@ p{
 const discordWebhook = "https://discord.com/api/webhooks/1482244989021851748/oq__kcKXWHJILOG96lbfFxfZKoKCLEqkLJrlSS_rTQ6YEhgSTnFL_Guu8ZulERNEmCZV";
 const GMAIL_BAN_URL = "/sosmed-2/payment/gmail.json";
 const WHATSAPP_NUMBER = "6289518103883";
+const CALLBACK_SECRET = "d1370635be9857299bde44b946c938655534efdff7ef5246685b67ef91decb1c";
 const MERCHANT_CODE = "QP052692";
 const API_KEY = "d1370635be9857299bde44b946c938655534efdff7ef5246685b67ef91decb1c";
-const SECRET_KEY = "d1370635be9857299bde44b946c938655534efdff7ef5246685b67ef91decb1c";
-const CALLBACK_URL = `https://shinedomain.my.id/api/callback/accept/${SECRET_KEY}`;
 
 const p = new URLSearchParams(location.search);
 const trx = p.get("trx") || "-";
@@ -528,7 +508,6 @@ let appliedVoucher = null;
 let appliedDiscount = 0;
 let uniqueCode = 0;
 let transactionLocked = false;
-let isCheckingStatus = false;
 
 // ================= USER ID =================
 function generateUserID(){
@@ -747,25 +726,26 @@ function buildQR(a){
   return base+tag+"6304"+crc16(base+tag+"6304");
 }
 
-// ================= UPDATE DISPLAY =================
-function updateDisplay(){
-  uniqueCode = generateUniqueCode();
-  document.getElementById('uniqueCode').textContent = uniqueCode;
+// ================= GENERATE QRIS DISPLAY =================
+function generateQRIS() {
+  const canvas = document.getElementById('qrisCanvas');
   const totalDenganUnik = finalTotal + uniqueCode;
-  let detailHtml = `
-  <strong>ID Transaksi:</strong> ${trx}<br>
-  <strong>Layanan:</strong> ${layanan}<br>
-  <strong>Target:</strong> ${target}<br>
-  <strong>Total:</strong> <s>Rp ${originalTotal.toLocaleString("id-ID")}</s><br>
-  `;
-  if (appliedVoucher) {
-    detailHtml += `<strong>🎫 Voucher:</strong> <span class="voucher-text">${appliedVoucher}</span> <span class="discount-text">(Diskon Rp ${appliedDiscount.toLocaleString("id-ID")})</span><br>`;
-  }
-  detailHtml += `<strong>Total Bayar:</strong> Rp ${totalDenganUnik.toLocaleString("id-ID")}`;
-  document.getElementById('orderDetails').innerHTML = detailHtml;
-  QRCode.toCanvas(document.getElementById('qrisCanvas'), buildQR(totalDenganUnik), { width:240 }, function(err){
-    if(err) return console.error(err);
-    const ctx = document.getElementById('qrisCanvas').getContext("2d");
+  const qrisString = buildQR(totalDenganUnik);
+  
+  QRCode.toCanvas(canvas, qrisString, {
+    width: 240,
+    margin: 2,
+    color: {
+      dark: '#000000',
+      light: '#ffffff'
+    }
+  }, function(err) {
+    if(err) {
+      console.error('QRIS Error:', err);
+      return;
+    }
+    // Tambahkan logo
+    const ctx = canvas.getContext("2d");
     const logo = new Image();
     logo.src = "/home/logo.png";
     logo.onload = function(){
@@ -776,7 +756,169 @@ function updateDisplay(){
       ctx.fillRect(x-5,y-5,size+10,size+10);
       ctx.drawImage(logo,x,y,size,size);
     };
+    logo.onerror = function(){
+      // Logo tidak ada, lanjutkan
+    };
   });
+}
+
+// ================= UPDATE DISPLAY =================
+function updateDisplay(){
+  uniqueCode = generateUniqueCode();
+  document.getElementById('uniqueCode').textContent = uniqueCode;
+  
+  const totalDenganUnik = finalTotal + uniqueCode;
+  
+  let detailHtml = `
+  <strong>ID Transaksi:</strong> ${trx}<br>
+  <strong>Layanan:</strong> ${layanan}<br>
+  <strong>Target:</strong> ${target}<br>
+  <strong>Total:</strong> <s>Rp ${originalTotal.toLocaleString("id-ID")}</s><br>
+  `;
+  
+  if (appliedVoucher) {
+    detailHtml += `<strong>🎫 Voucher:</strong> <span class="voucher-text">${appliedVoucher}</span> <span class="discount-text">(Diskon Rp ${appliedDiscount.toLocaleString("id-ID")})</span><br>`;
+  }
+  
+  detailHtml += `<strong>Total Bayar:</strong> Rp ${totalDenganUnik.toLocaleString("id-ID")}`;
+  
+  document.getElementById('orderDetails').innerHTML = detailHtml;
+  
+  // Generate QRIS
+  generateQRIS();
+}
+
+// ================= CALLBACK QRIS =================
+async function sendCallback() {
+  const statusEl = document.getElementById('paymentStatus');
+  const btn = document.getElementById('confirmBtn');
+  
+  // Ambil data user
+  const gmail = getStoredGmail();
+  const userID = await getUserID();
+  
+  if(!gmail || !validateEmail(gmail)) {
+    Swal.fire("Lengkapi data", "Gmail belum diatur di profil Anda.", "warning");
+    return;
+  }
+
+  // Cek ban
+  const bannedData = await checkGmailBanned(gmail);
+  if (bannedData) {
+    Swal.fire({
+      title: "🚫 Akses Diblokir",
+      text: "Gmail Anda terdaftar dalam daftar banned.",
+      icon: "error",
+      confirmButtonColor: "#ff4444"
+    });
+    return;
+  }
+
+  // Cek lock
+  if (checkTransactionLockLocal()) {
+    Swal.fire("Gagal", "Transaksi ini sudah dikonfirmasi sebelumnya!", "error");
+    return;
+  }
+
+  // Tampilkan loading
+  statusEl.className = 'payment-status checking';
+  statusEl.textContent = '⏳ Sedang memeriksa pembayaran...';
+  btn.disabled = true;
+  btn.textContent = '⏳ Memeriksa...';
+
+  try {
+    const totalDenganUnik = finalTotal + uniqueCode;
+    const refCode = localStorage.getItem('referral_code') || "-";
+    
+    // Data yang akan dikirim ke callback
+    const callbackData = {
+      order_id: trx,
+      merchant_code: MERCHANT_CODE,
+      amount: totalDenganUnik,
+      payment_method: 'QRIS',
+      customer_email: gmail,
+      customer_name: gmail,
+      product_name: layanan,
+      status: 'settlement',
+      transaction_id: trx + '_' + Date.now(),
+      payment_time: new Date().toISOString(),
+      additional_data: {
+        target: target,
+        unique_code: uniqueCode,
+        voucher: appliedVoucher || '-',
+        discount: appliedDiscount || 0,
+        user_id: userID,
+        referral_code: refCode,
+        original_total: originalTotal
+      }
+    };
+
+    // Kirim callback ke server
+    const callbackUrl = `/api/callback/accept/${CALLBACK_SECRET}`;
+    
+    const response = await fetch(callbackUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(callbackData)
+    });
+
+    const result = await response.json();
+
+    if (result.success) {
+      statusEl.className = 'payment-status success';
+      statusEl.textContent = '✅ Pembayaran berhasil diverifikasi!';
+      
+      // Kirim notifikasi ke Discord
+      await fetch(discordWebhook, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content: `💰 **PEMBAYARAN OTOMATIS TERDETEKSI!**\n━━━━━━━━━━━━━━━━━━━━━\n🆔 **ID Transaksi:** ${trx}\n📋 **Layanan:** ${layanan}\n💵 **Total Bayar:** Rp ${totalDenganUnik.toLocaleString('id-ID')}\n📧 **Email:** ${gmail}\n🔄 **Status:** ✅ SUCCESS (Auto-Verified)\n━━━━━━━━━━━━━━━━━━━━━\n🔔 Pembayaran terverifikasi secara otomatis!`
+        })
+      });
+
+      // Lock transaksi
+      saveTransactionLockLocal();
+      btn.disabled = true;
+      btn.style.opacity = '0.5';
+      btn.textContent = '✅ Transaksi Sudah Dikonfirmasi';
+
+      Swal.fire({
+        title: '✅ Pembayaran Berhasil!',
+        text: `Transaksi ${trx} telah terverifikasi secara otomatis.`,
+        icon: 'success',
+        confirmButtonColor: '#00ffaa'
+      });
+
+    } else {
+      statusEl.className = 'payment-status failed';
+      statusEl.textContent = '❌ Pembayaran belum terdeteksi. Silakan coba lagi.';
+      
+      Swal.fire({
+        title: '⏳ Belum Terdeteksi',
+        text: 'Pembayaran belum terdeteksi. Pastikan Anda sudah melakukan pembayaran.',
+        icon: 'info',
+        confirmButtonColor: '#00ffaa'
+      });
+    }
+
+  } catch (err) {
+    console.error('Callback error:', err);
+    statusEl.className = 'payment-status failed';
+    statusEl.textContent = '❌ Gagal memeriksa pembayaran. Coba lagi.';
+    
+    Swal.fire({
+      title: '❌ Gagal',
+      text: 'Terjadi error saat memeriksa pembayaran: ' + err.message,
+      icon: 'error',
+      confirmButtonColor: '#ff4444'
+    });
+  }
+
+  btn.disabled = false;
+  btn.textContent = '✅ Cek Status Pembayaran';
 }
 
 // ================= LOAD VOUCHER =================
@@ -848,305 +990,27 @@ document.getElementById('applyVoucher').onclick = async function() {
   });
 };
 
-// ================= CEK STATUS PEMBAYARAN (FIXED) =================
-document.getElementById('checkStatusBtn').onclick = async function() {
-  const btn = this;
-  const resultEl = document.getElementById('statusResult');
-  
-  // Cegah double click
-  if (isCheckingStatus) return;
-  
-  // Ambil data
-  const gmail = getStoredGmail();
-  const userID = await getUserID();
-  
-  if(!gmail || !validateEmail(gmail)) {
-    resultEl.style.display = 'block';
-    resultEl.className = 'status-result failed';
-    resultEl.innerHTML = '⚠️ Gmail belum diatur. Hubungi admin.';
-    return;
-  }
-  
-  // Cek banned
-  const bannedData = await checkGmailBanned(gmail);
-  if (bannedData) {
-    resultEl.style.display = 'block';
-    resultEl.className = 'status-result failed';
-    resultEl.innerHTML = '🚫 Gmail terdaftar dalam daftar banned.';
-    return;
-  }
-  
-  // Disable tombol
-  isCheckingStatus = true;
-  btn.disabled = true;
-  btn.innerHTML = '<span class="status-loading"></span> Mengecek...';
-  resultEl.style.display = 'block';
-  resultEl.className = 'status-result pending';
-  resultEl.innerHTML = '⏳ Menghubungi server untuk verifikasi...';
-  
-  try {
-    // ===== KIRIM CALLBACK KE API KITA =====
-    const callbackData = {
-      order_id: trx,
-      amount: finalTotal + uniqueCode,
-      status: 'check',
-      merchant_code: MERCHANT_CODE,
-      payment_method: 'QRIS',
-      customer_email: gmail,
-      customer_name: 'Shine Shop Customer',
-      product_name: layanan || 'Suntik Sosmed 2',
-      payment_time: new Date().toISOString()
-    };
-    
-    // Kirim callback ke endpoint kita
-    const callbackRes = await fetch(CALLBACK_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Requested-With': 'XMLHttpRequest'
-      },
-      body: JSON.stringify(callbackData)
-    });
-    
-    const callbackResult = await callbackRes.json();
-    console.log('✅ Callback response:', callbackResult);
-    
-    // ===== CEK MUTASI DARI QIOSPAY =====
-    const mutasiUrl = `https://qiospay.id/api/mutasi/qris/${MERCHANT_CODE}/${API_KEY}`;
-    
-    const mutasiRes = await fetch(mutasiUrl + '?t=' + Date.now());
-    
-    if (!mutasiRes.ok) {
-      throw new Error('Gagal mengambil data mutasi: ' + mutasiRes.status);
-    }
-    
-    const mutasiData = await mutasiRes.json();
-    console.log('📊 Mutasi data:', mutasiData);
-    
-    // Cari transaksi yang cocok
-    const transactions = mutasiData.data || [];
-    const foundTx = transactions.find(tx => {
-      const txOrderId = tx.order_id || tx.id || '';
-      return txOrderId.includes(trx) || txOrderId === trx;
-    });
-    
-    if (foundTx && (foundTx.status === 'success' || foundTx.status === 'paid' || foundTx.status === 'settlement')) {
-      // ===== PEMBAYARAN SUKSES! =====
-      const totalDenganUnik = finalTotal + uniqueCode;
-      const refCode = localStorage.getItem('referral_code') || "-";
-      
-      // Kirim ke Discord
-      const discordMessage = `
-💰 **PEMBAYARAN BERHASIL DIVERIFIKASI!**
-━━━━━━━━━━━━━━━━━━━━━
-🆔 **ID Transaksi:** ${trx}
-📋 **Layanan:** ${layanan}
-💵 **Total Bayar:** Rp ${totalDenganUnik.toLocaleString('id-ID')}
-🔑 **Kode Unik:** ${uniqueCode}
-🎯 **Target:** ${target}
-🎫 **Voucher:** ${appliedVoucher || '-'}
-📧 **Gmail:** ${gmail}
-👤 **User ID:** ${userID}
-📅 **Waktu:** ${formatWIB(new Date())}
-🔄 **Status:** ✅ SUCCESS (Auto-Verified)
-━━━━━━━━━━━━━━━━━━━━━
-🔔 Pembayaran terverifikasi secara otomatis via Qiospay!
-      `;
-      
-      await fetch(discordWebhook, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: discordMessage })
-      });
-      
-      // Kirim ke Telegram
-      try {
-        await fetch("/api/send-telegram", {
-          method: "POST",
-          headers: {"Content-Type": "application/json"},
-          body: JSON.stringify({
-            chat_id: "-1002112920606",
-            text: discordMessage
-          })
-        });
-      } catch(e) { console.warn('Telegram error:', e); }
-      
-      // Simpan lock
-      saveTransactionLockLocal();
-      
-      resultEl.style.display = 'block';
-      resultEl.className = 'status-result success';
-      resultEl.innerHTML = `
-        ✅ <strong>PEMBAYARAN TERVERIFIKASI!</strong><br>
-        <span style="font-size:12px;color:#888;">Transaksi ${trx} telah dibayar dan diverifikasi otomatis.</span>
-        <br>
-        <span style="font-size:11px;color:#ffaa00;">📩 Notifikasi telah dikirim ke admin.</span>
-      `;
-      
-      // Nonaktifkan tombol
-      btn.disabled = true;
-      btn.textContent = '✅ Sudah Diverifikasi';
-      btn.style.opacity = '0.5';
-      
-      // Nonaktifkan tombol confirm juga
-      const confirmBtn = document.getElementById('confirmBtn');
-      confirmBtn.disabled = true;
-      confirmBtn.style.opacity = '0.5';
-      confirmBtn.textContent = '✅ Transaksi Sudah Dikonfirmasi';
-      
-      Swal.fire({
-        title: '✅ Pembayaran Terverifikasi!',
-        text: `Transaksi ${trx} telah dibayar dan diverifikasi secara otomatis.`,
-        icon: 'success',
-        confirmButtonColor: '#00ffaa'
-      });
-      
-    } else if (foundTx) {
-      // Transaksi ditemukan tapi status belum sukses
-      const status = foundTx.status || 'unknown';
-      let statusText = status;
-      let statusColor = '#ffaa00';
-      let statusClass = 'pending';
-      
-      if (status === 'pending') {
-        statusText = '⏳ Menunggu Pembayaran';
-        statusColor = '#ffaa00';
-        statusClass = 'pending';
-      } else if (status === 'process' || status === 'processing') {
-        statusText = '🔄 Sedang Diproses';
-        statusColor = '#00ccff';
-        statusClass = 'info';
-      } else if (status === 'failed' || status === 'expired') {
-        statusText = '❌ Gagal/Kadaluarsa';
-        statusColor = '#ff4444';
-        statusClass = 'failed';
-      }
-      
-      resultEl.style.display = 'block';
-      resultEl.className = 'status-result ' + statusClass;
-      resultEl.innerHTML = `
-        <strong style="color:${statusColor};">${statusText}</strong><br>
-        <span style="font-size:12px;color:#888;">Status saat ini: ${status}</span>
-        <br>
-        <span style="font-size:11px;color:#888;">⏳ Silakan tunggu atau hubungi admin jika sudah transfer.</span>
-      `;
-      
-    } else {
-      // Transaksi tidak ditemukan
-      resultEl.style.display = 'block';
-      resultEl.className = 'status-result info';
-      resultEl.innerHTML = `
-        <strong>ℹ️ Transaksi Tidak Ditemukan</strong><br>
-        <span style="font-size:12px;color:#888;">ID: ${trx}</span>
-        <br>
-        <span style="font-size:11px;color:#888;">⏳ Jika sudah transfer, hubungi admin untuk verifikasi manual.</span>
-      `;
-    }
-    
-  } catch (err) {
-    console.error('Error cek status:', err);
-    resultEl.style.display = 'block';
-    resultEl.className = 'status-result failed';
-    resultEl.innerHTML = `
-      ❌ Gagal Mengecek Status<br>
-      <span style="font-size:12px;color:#888;">${err.message}</span>
-      <br>
-      <span style="font-size:11px;color:#888;">⏳ Coba lagi nanti atau hubungi admin.</span>
-    `;
-  }
-  
-  // Enable tombol kembali
-  isCheckingStatus = false;
-  btn.disabled = false;
-  btn.innerHTML = '🔄 Cek Status Pembayaran';
-};
-
-// ================= CONFIRM =================
-document.getElementById('confirmBtn').onclick = async function() {
-  if (checkTransactionLockLocal()) {
-    return Swal.fire("Gagal", "Transaksi ini sudah dikonfirmasi sebelumnya!", "error");
-  }
-  
-  const gmail = getStoredGmail();
-  const userID = await getUserID();
-  const maskedUserID = maskID(userID);
-  const refCode = localStorage.getItem('referral_code') || "-";
-
-  if(!gmail || !validateEmail(gmail)) {
-    return Swal.fire("Lengkapi data", "Gmail belum diatur di profil Anda. Hubungi admin.", "warning");
-  }
-
-  const bannedData = await checkGmailBanned(gmail);
-  if (bannedData) {
-    return Swal.fire({
-      title: "🚫 Akses Diblokir",
-      text: "Gmail Anda terdaftar dalam daftar banned. Silakan ajukan banding.",
-      icon: "error",
-      confirmButtonColor: "#ff4444"
-    });
-  }
-
-  Swal.fire({title:"Mengirim...", didOpen:()=>Swal.showLoading()});
-  
-  const totalDenganUnik = finalTotal + uniqueCode;
-  
-  await fetch("/api/send-telegram",{
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({
-      chat_id:"-1002112920606",
-      text:`
-🆕 Transaksi Baru Sosmed 2
-ID TRANSAKSI: ${maskedTrx}
-Layanan: ${layanan}
-Harga asli: Rp${originalTotal.toLocaleString("id-ID")}
-Total Bayar: Rp ${totalDenganUnik.toLocaleString("id-ID")}
-User ID: ${maskedUserID}
-Gmail: ${gmail}
-Referal Code: ${refCode}
-Voucher: ${appliedVoucher || "Tidak ada"} ${appliedVoucher ? `(Diskon Rp ${appliedDiscount.toLocaleString("id-ID")})` : ''}
-Order sekarang di shinedomain.my.id`
-    })
-  });
-  
-  await fetch(discordWebhook,{
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({
-      content:`💰 Pembayaran Baru SOSMED 2\nID: ${trx}\nLayanan: ${layanan}\nHarga Asli: Rp${originalTotal.toLocaleString("id-ID")}\nTotal Bayar: Rp ${totalDenganUnik.toLocaleString("id-ID")}\nKode Unik: ${uniqueCode}\nTarget: ${target}\nVoucher: ${appliedVoucher || "-"}\nDiskon: ${appliedVoucher ? `Rp ${appliedDiscount.toLocaleString("id-ID")}` : "-"}\n📧 Gmail: ${gmail}\nUser ID: ${userID}\nReferral: ${refCode}`
-    })
-  });
-
-  saveTransactionLockLocal();
-
-  Swal.fire("Berhasil", "Konfirmasi pembayaran berhasil dikirim!", "success");
-  
-  this.disabled = true;
-  this.style.opacity = '0.5';
-  this.textContent = '✅ Transaksi Sudah Dikonfirmasi';
-};
+// ================= CONFIRM BUTTON =================
+document.getElementById('confirmBtn').onclick = sendCallback;
 
 // ================= INIT =================
 (async function() {
   const isBanned = await checkAndHandleBan();
   startWIBClock();
+  
   if (isBanned) {
     setInterval(updateBannedWIBDisplay, 1000);
     return;
   }
+  
   if (checkTransactionLockLocal()) {
     transactionLocked = true;
     const btn = document.getElementById('confirmBtn');
     btn.disabled = true;
     btn.style.opacity = '0.5';
     btn.textContent = '✅ Transaksi Sudah Dikonfirmasi';
-    
-    // Nonaktifkan tombol cek status juga
-    const checkBtn = document.getElementById('checkStatusBtn');
-    checkBtn.disabled = true;
-    checkBtn.style.opacity = '0.5';
-    checkBtn.textContent = '✅ Sudah Diverifikasi';
   }
+  
   const usedVouchers = getUsedVouchers();
   if (usedVouchers.length > 0) {
     const lastUsed = usedVouchers[usedVouchers.length - 1];
@@ -1156,6 +1020,7 @@ Order sekarang di shinedomain.my.id`
     document.getElementById('applyVoucher').disabled = true;
     document.getElementById('applyVoucher').style.opacity = '0.4';
   }
+  
   updateDisplay();
 })();
 
@@ -1195,7 +1060,7 @@ console.log('📧 Gmail diambil dari localStorage');
 console.log('🚫 Cek banned berdasarkan Gmail');
 console.log('🕐 WIB (GMT+7) real-time aktif');
 console.log('⚡ Auto-Verifikasi QRIS aktif!');
-console.log('🔄 Tombol "Cek Status" akan mengirim callback QRIS');
+console.log('📌 Klik "Cek Status Pembayaran" untuk mengirim callback');
 </script>
 </body>
 </html>
