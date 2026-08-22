@@ -783,26 +783,13 @@ overlay.onclick=closeMenu;
 <!-- FORM -->    
 <div class="container">    
 <h2>Suntik Sosmed 2 - Shine Shop</h2>    
-
 <label>Cari Layanan:</label>
 <input type="text" id="search" placeholder="Contoh: Instagram / 14444" onkeyup="searchLayanan()">
 
-<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;">
-  <div style="flex:2;">
-    <label for="kategori">Kategori:</label>
-    <select id="kategori" onchange="loadLayanan()">
-      <option value="">-- Pilih Kategori --</option>    
-    </select>
-  </div>
-  <div style="flex:1;">
-    <label for="sortHarga">Urutkan Harga:</label>
-    <select id="sortHarga" onchange="loadLayanan()">
-      <option value="default">📋 Default</option>
-      <option value="asc">⬆️ Termurah → Termahal</option>
-      <option value="desc">⬇️ Termahal → Termurah</option>
-    </select>
-  </div>
-</div>
+<label for="kategori">Kategori:</label>
+<select id="kategori" onchange="loadLayanan()">
+  <option value="">-- Pilih Kategori --</option>    
+</select>    
 
 <label for="layanan">Layanan:</label>
 <select id="layanan" onchange="showInfo()">
@@ -965,7 +952,6 @@ document.addEventListener('click', function(e) {
 // ===================== DATA LAYANAN (AUTO-REFRESH TANPA RESET) =====================  
 let layananData = {};  
 let selectedService = null;  
-let currentSort = 'default';
 
 // Simpan state form sebelum refresh
 let savedFormState = {
@@ -974,17 +960,8 @@ let savedFormState = {
   jumlah: '',
   target: '',
   total: '',
-  search: '',
-  sort: 'default'
+  search: ''
 };
-
-// Fungsi untuk mendapatkan harga efektif (diskon jika ada)
-function getEffectivePrice(service) {
-  if (service.diskon && service.diskon < service.pricePerFollower) {
-    return service.diskon;
-  }
-  return service.pricePerFollower;
-}
 
 // Fungsi untuk menyimpan state form
 function saveFormState() {
@@ -994,7 +971,6 @@ function saveFormState() {
   savedFormState.target = document.getElementById('target').value;
   savedFormState.total = document.getElementById('total').value;
   savedFormState.search = document.getElementById('search').value;
-  savedFormState.sort = document.getElementById('sortHarga').value;
 }
 
 // Fungsi untuk restore state form
@@ -1016,9 +992,6 @@ function restoreFormState() {
   }
   if (savedFormState.search) {
     document.getElementById('search').value = savedFormState.search;
-  }
-  if (savedFormState.sort) {
-    document.getElementById('sortHarga').value = savedFormState.sort;
   }
 }
 
@@ -1056,9 +1029,6 @@ async function refreshDataSilent() {
     // Restore form state (termasuk layanan yang dipilih)
     restoreFormState();
     
-    // Load ulang layanan dengan sorting yang sama
-    loadLayanan();
-    
     // Jika layanan masih ada di data baru, update info
     if (selectedService) {
       const kategoriVal = document.getElementById('kategori').value;
@@ -1073,6 +1043,12 @@ async function refreshDataSilent() {
       }
     }
     
+    // Auto-refresh search jika ada
+    const searchVal = document.getElementById('search').value;
+    if (searchVal) {
+      searchLayanan();
+    }
+    
     console.log('🔄 Data refreshed silently without resetting form');
     
   } catch (err) {
@@ -1080,7 +1056,7 @@ async function refreshDataSilent() {
   }
 }
 
-// Fungsi load data awal
+// Fungsi load data awal (sama seperti refresh tapi tanpa interval)
 async function loadData() {
   try {
     const res = await fetch("/sosmed-2/list.json?ts=" + Date.now());
@@ -1106,45 +1082,41 @@ async function loadData() {
   }
 }
 
-// Fungsi load layanan dengan sorting
-function loadLayanan(){    
-  const kategori = document.getElementById("kategori").value;    
-  const layanan = document.getElementById("layanan");    
-  const sortMode = document.getElementById("sortHarga").value;
+// Jalankan saat halaman selesai dimuat
+window.addEventListener("load", function() {
+  loadData();
   
-  layanan.innerHTML = "<option value=''>-- Pilih Layanan --</option>";    
+  // Auto refresh setiap 5 detik tanpa reset form
+  setInterval(refreshDataSilent, 5000);
+  
+  // Load syarat & ketentuan di background
+  loadTerms();
+});
+
+// Simpan state sebelum halaman di-refresh (manual)
+window.addEventListener('beforeunload', function() {
+  saveFormState();
+});
+
+function loadLayanan(){    
+  const kategori=document.getElementById("kategori").value;    
+  const layanan=document.getElementById("layanan");    
+  layanan.innerHTML="<option value=''>-- Pilih Layanan --</option>";    
     
   if(kategori && layananData[kategori]){    
-    // Buat salinan array untuk di-sort
-    let services = [...layananData[kategori]];
-    
-    // Sort berdasarkan harga efektif
-    if (sortMode === 'asc') {
-      services.sort((a, b) => getEffectivePrice(a) - getEffectivePrice(b));
-    } else if (sortMode === 'desc') {
-      services.sort((a, b) => getEffectivePrice(b) - getEffectivePrice(a));
-    }
-    // default: urutan asli dari JSON
-    
-    services.forEach(l => {    
-      let opt = document.createElement("option");    
-      opt.value = l.id;    
+    layananData[kategori].forEach(l=>{    
+      let opt=document.createElement("option");    
+      opt.value=l.id;    
       let label = l.name + " (ID: "+l.id+")";  
       if(l.diskon && l.diskon < l.pricePerFollower) {  
         label += " 🔥 DISKON";  
       }  
-      // Tambahkan info harga di label jika di-sort
-      if (sortMode !== 'default') {
-        const price = getEffectivePrice(l);
-        label += ` [Rp${price}]`;
-      }
       opt.textContent = label;  
       layanan.appendChild(opt);    
     });    
   }    
-  document.getElementById("infoLayanan").innerHTML = "";    
-  document.getElementById("average").innerHTML = "";
-  selectedService = null;    
+  document.getElementById("infoLayanan").innerHTML="";    
+  selectedService=null;    
   // Save state setelah load layanan
   saveFormState();
 }    
