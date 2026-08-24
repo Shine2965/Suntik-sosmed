@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cek Status Pesanan - Shine Shop</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: #0a0a0a;
+            min-height: 100vh;
+            padding: 30px 20px;
+            background: radial-gradient(circle at 20% 30%, #00ffaa10, transparent 50%),
+                        radial-gradient(circle at 80% 70%, #00c6ff10, transparent 50%),
+                        #0a0a0a;
+        }
+        .container {
+            max-width: 700px;
+            margin: 0 auto;
+        }
+        .card {
+            background: #1a1a1a;
+            border-radius: 24px;
+            padding: 30px 28px;
+            border: 1px solid #00ffaa33;
+            box-shadow: 0 0 40px rgba(0,255,170,0.05);
+            margin-bottom: 20px;
+        }
+        .card h2 {
+            color: #00ffaa;
+            font-size: 22px;
+            margin-bottom: 6px;
+        }
+        .card .sub {
+            color: #888;
+            font-size: 14px;
+            margin-bottom: 20px;
+        }
+        .form-group {
+            margin-bottom: 16px;
+        }
+        .form-group label {
+            color: #ccc;
+            font-size: 13px;
+            font-weight: 600;
+            display: block;
+            margin-bottom: 6px;
+        }
+        .form-group label .required {
+            color: #ff6666;
+        }
+        .form-group input,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px 16px;
+            border-radius: 12px;
+            border: 1px solid #00ffaa33;
+            background: #0d0d0d;
+            color: #fff;
+            font-size: 14px;
+            outline: none;
+            transition: 0.3s;
+            font-family: 'Poppins', sans-serif;
+        }
+        .form-group input:focus,
+        .form-group textarea:focus {
+            border-color: #00ffaa;
+            box-shadow: 0 0 20px rgba(0,255,170,0.1);
+        }
+        .form-group input::placeholder,
+        .form-group textarea::placeholder {
+            color: #555;
+        }
+        .form-group textarea {
+            min-height: 80px;
+            resize: vertical;
+        }
+        .form-group .hint {
+            color: #666;
+            font-size: 11px;
+            margin-top: 4px;
+        }
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+        .btn {
+            padding: 12px 24px;
+            border-radius: 30px;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.3s;
+            font-size: 13px;
+            font-family: 'Poppins', sans-serif;
+        }
+        .btn-back {
+            background: #444;
+            color: #fff;
+        }
+        .btn-back:hover {
+            background: #555;
+        }
+        .btn-primary {
+            background: #00ffaa;
+            color: #0a0a0a;
+        }
+        .btn-primary:hover {
+            background: #00dd99;
+            transform: scale(0.97);
+        }
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .btn-refresh {
+            background: #00ffaa22;
+            color: #00ffaa;
+            border: 1px solid #00ffaa44;
+        }
+        .btn-refresh:hover {
+            background: #00ffaa44;
+        }
+        .btn-copy {
+            background: #ffaa0044;
+            color: #ffaa00;
+            border: 1px solid #ffaa0055;
+            padding: 4px 14px;
+            border-radius: 20px;
+            font-size: 11px;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        .btn-copy:hover {
+            background: #ffaa0066;
+        }
+        .header-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 10px;
+        }
+        .text-muted {
+            color: #666;
+            font-size: 12px;
+        }
+        .text-success {
+            color: #00ffaa;
+        }
+        .text-danger {
+            color: #ff4444;
+        }
+        .text-warning {
+            color: #ffaa00;
+        }
+        .text-info {
+            color: #00ccff;
+        }
+        .security-badge {
+            text-align: center;
+            font-size: 10px;
+            color: #444;
+            margin-top: 12px;
+            border-top: 1px solid #00ffaa15;
+            padding-top: 12px;
+        }
+        .env-status {
+            text-align: center;
+            font-size: 11px;
+            color: #555;
+            margin-top: 8px;
+        }
+
+        /* ===== RESULT ===== */
+        .result-card {
+            background: #0d0d0d;
+            border-radius: 16px;
+            padding: 20px;
+            border: 1px solid #00ffaa15;
+            margin-top: 12px;
+            display: none;
+            animation: fadeUp 0.4s ease both;
+        }
+        .result-card.show {
+            display: block;
+        }
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(15px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .result-card .status-badge {
+            display: inline-block;
+            padding: 4px 16px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+        .result-card .status-badge.pending {
+            background: #ffaa0022;
+            color: #ffaa00;
+            border: 1px solid #ffaa0044;
+        }
+        .result-card .status-badge.processing {
+            background: #00ccff22;
+            color: #00ccff;
+            border: 1px solid #00ccff44;
+        }
+        .result-card .status-badge.completed {
+            background: #00ffaa22;
+            color: #00ffaa;
+            border: 1px solid #00ffaa44;
+        }
+        .result-card .status-badge.canceled {
+            background: #ff444422;
+            color: #ff4444;
+            border: 1px solid #ff444444;
+        }
+        .result-card .status-badge.partial {
+            background: #ffaa0044;
+            color: #ffaa00;
+            border: 1px solid #ffaa0066;
+        }
+        .result-card .status-badge.not-found {
+            background: #444;
+            color: #888;
+            border: 1px solid #555;
+        }
+        .result-card .detail-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #00ffaa08;
+        }
+        .result-card .detail-row:last-child {
+            border-bottom: none;
+        }
+        .result-card .detail-row .label {
+            color: #888;
+            font-size: 13px;
+        }
+        .result-card .detail-row .value {
+            color: #fff;
+            font-size: 13px;
+            font-weight: 600;
+        }
+        .result-card .detail-row .value.green {
+            color: #00ffaa;
+        }
+        .result-card .detail-row .value.yellow {
+            color: #ffaa00;
+        }
+        .result-card .detail-row .value.red {
+            color: #ff4444;
+        }
+        .result-card .detail-row .value.blue {
+            color: #00ccff;
+        }
+
+        /* ===== MASSAL ===== */
+        .massal-item {
+            background: #0d0d0d;
+            border-radius: 12px;
+            padding: 14px 16px;
+            margin-bottom: 8px;
+            border: 1px solid #00ffaa10;
+        }
+        .massal-item .order-id {
+            color: #ffaa00;
+            font-weight: 700;
+            font-size: 14px;
+        }
+        .massal-item .order-status {
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .massal-item .order-detail {
+            font-size: 12px;
+            color: #888;
+            margin-top: 4px;
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #00ffaa33;
+            border-top-color: #00ffaa;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 600px) {
+            .card {
+                padding: 20px 16px;
+            }
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+            .header-actions {
+                flex-direction: column;
+            }
+            .header-actions .btn {
+                width: 100%;
+                text-align: center;
+            }
+            .result-card .detail-row {
+                flex-wrap: wrap;
+                gap: 4px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- ===== HEADER ===== -->
+        <div class="card">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;">
+                <div>
+                    <h2>📦 Cek Status Pesanan</h2>
+                    <div class="sub">Cek status pesanan dari Fayupedia</div>
+                </div>
+                <div class="header-actions">
+                    <button class="btn btn-back" onclick="location.href='/'">🏠 Home</button>
+                </div>
+            </div>
+            <div class="env-status" id="envStatus">🔌 Memuat konfigurasi...</div>
+        </div>
+
+        <!-- ===== FORM ===== -->
+        <div class="card" id="formCard">
+            <h2>🔍 Cek Status</h2>
+            <div class="sub">Masukkan ID pesanan untuk cek status</div>
+
+            <div class="form-group">
+                <label>🆔 ID Pesanan <span class="required">*</span></label>
+                <input type="text" id="orderIdInput" placeholder="Contoh: 1107 atau 1107,1108,1109" oninput="toggleMassalMode()">
+                <div class="hint">💡 Pisahkan dengan koma (,) untuk cek massal (maks 50 ID)</div>
+            </div>
+
+            <div id="massalInfo" style="display:none;background:#00ccff08;border:1px solid #00ccff33;border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:#00ccff;">
+                📋 Mode <strong>Massal</strong> terdeteksi. Akan mengecek semua ID yang dimasukkan.
+            </div>
+
+            <button class="btn btn-primary" id="checkBtn" onclick="checkStatus()">
+                ✅ Cek Status
+            </button>
+        </div>
+
+        <!-- ===== HASIL ===== -->
+        <div class="card" id="resultCard" style="display:none;">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+                <h2>📊 Hasil Pengecekan</h2>
+                <button class="btn btn-refresh" onclick="resetForm()" style="padding:6px 16px;font-size:11px;">🔄 Cek Lagi</button>
+            </div>
+            <div id="resultContainer"></div>
+        </div>
+
+        <div class="text-muted" style="text-align:center;margin-top:20px;">
+            © Shine Shop · Cek Status Pesanan
+        </div>
+        <div class="security-badge">🔒 Data dari Fayupedia API</div>
+    </div>
+
+    <script>
+        // ===================== KONFIGURASI =====================
+        const FAYUPEDIA_URL = 'https://fayupedia.id/api/status';
+        const CONFIG_API = '/api/qris-config';
+
+        let FAYUPEDIA_API_ID = 5522;
+        let FAYUPEDIA_API_KEY = '';
+        let configLoaded = false;
+
+        // ===================== AMBIL KONFIGURASI DARI ENV =====================
+        async function fetchConfig() {
+            const statusEl = document.getElementById('envStatus');
+            try {
+                statusEl.textContent = '⏳ Mengambil konfigurasi...';
+                statusEl.style.color = '#888';
+
+                const res = await fetch(CONFIG_API + '?t=' + Date.now());
+                if (!res.ok) throw new Error('Gagal mengambil konfigurasi');
+
+                const data = await res.json();
+                if (!data.success) throw new Error(data.message || 'Format data tidak valid');
+
+                if (data.fayupedia_api_key) {
+                    FAYUPEDIA_API_KEY = data.fayupedia_api_key;
+                }
+                if (data.fayupedia_api_id) {
+                    FAYUPEDIA_API_ID = data.fayupedia_api_id;
+                }
+
+                // Fallback jika tidak ada dari ENV
+                if (!FAYUPEDIA_API_KEY) {
+                    FAYUPEDIA_API_KEY = '6mnjom-ing8mx-a4csgp-6bwv4c-4zdv1l';
+                    console.warn('⚠️ FAYUPEDIA_API_KEY tidak ditemukan di ENV, menggunakan default');
+                }
+
+                configLoaded = true;
+                statusEl.textContent = '✅ Konfigurasi berhasil dimuat';
+                statusEl.style.color = '#00ffaa';
+                console.log('✅ Fayupedia Config loaded');
+                console.log('📌 API ID:', FAYUPEDIA_API_ID);
+                console.log('📌 API Key:', FAYUPEDIA_API_KEY.substring(0, 10) + '...');
+
+                return true;
+
+            } catch (err) {
+                console.error('Error fetch config:', err);
+                statusEl.textContent = '❌ ' + err.message;
+                statusEl.style.color = '#ff6666';
+                return false;
+            }
+        }
+
+        // ===================== TOGGLE MASSAL MODE =====================
+        function toggleMassalMode() {
+            const input = document.getElementById('orderIdInput');
+            const massalInfo = document.getElementById('massalInfo');
+            const value = input.value.trim();
+
+            if (value.includes(',')) {
+                massalInfo.style.display = 'block';
+            } else {
+                massalInfo.style.display = 'none';
+            }
+        }
+
+        // ===================== FORMAT STATUS =====================
+        function getStatusBadge(status) {
+            const statusMap = {
+                'pending': { class: 'pending', label: '⏳ Pending' },
+                'processing': { class: 'processing', label: '🔄 Processing' },
+                'completed': { class: 'completed', label: '✅ Completed' },
+                'canceled': { class: 'canceled', label: '❌ Canceled' },
+                'partial': { class: 'partial', label: '⚠️ Partial' },
+                'not-found': { class: 'not-found', label: '❓ Tidak Ditemukan' }
+            };
+            const s = statusMap[status] || statusMap['not-found'];
+            return `<span class="status-badge ${s.class}">${s.label}</span>`;
+        }
+
+        function getStatusIcon(status) {
+            const icons = {
+                'pending': '⏳',
+                'processing': '🔄',
+                'completed': '✅',
+                'canceled': '❌',
+                'partial': '⚠️'
+            };
+            return icons[status] || '❓';
+        }
+
+        // ===================== CEK STATUS =====================
+        async function checkStatus() {
+            const input = document.getElementById('orderIdInput');
+            const checkBtn = document.getElementById('checkBtn');
+            const resultCard = document.getElementById('resultCard');
+            const resultContainer = document.getElementById('resultContainer');
+
+            const orderIds = input.value.trim();
+
+            if (!orderIds) {
+                Swal.fire({
+                    title: '⚠️ Masukkan ID Pesanan',
+                    text: 'Silakan masukkan ID pesanan yang ingin dicek.',
+                    icon: 'warning',
+                    confirmButtonColor: '#ffaa00'
+                });
+                input.focus();
+                return;
+            }
+
+            // Cek apakah config sudah dimuat
+            if (!configLoaded) {
+                const loaded = await fetchConfig();
+                if (!loaded) {
+                    Swal.fire({
+                        title: '❌ Gagal Memuat Konfigurasi',
+                        text: 'Tidak dapat mengambil konfigurasi API. Hubungi admin.',
+                        icon: 'error',
+                        confirmButtonColor: '#ff4444'
+                    });
+                    return;
+                }
+            }
+
+            // Disable button
+            checkBtn.disabled = true;
+            checkBtn.innerHTML = '<span class="loading-spinner"></span> Mengecek...';
+
+            // Sembunyikan hasil sebelumnya
+            resultCard.style.display = 'none';
+            resultContainer.innerHTML = '';
+
+            try {
+                // Cek apakah massal atau single
+                const ids = orderIds.split(',').map(id => id.trim()).filter(id => id !== '');
+                const isMassal = ids.length > 1;
+
+                // Validasi ID
+                const validIds = ids.filter(id => /^\d+$/.test(id));
+                if (validIds.length === 0) {
+                    throw new Error('ID pesanan harus berupa angka.');
+                }
+
+                // Batasi 50 ID
+                if (validIds.length > 50) {
+                    throw new Error('Maksimal 50 ID pesanan dalam satu permintaan.');
+                }
+
+                const idParam = validIds.join(',');
+
+                // Kirim request ke Fayupedia
+                const payload = {
+                    api_id: FAYUPEDIA_API_ID,
+                    api_key: FAYUPEDIA_API_KEY,
+                    id: idParam
+                };
+
+                console.log('📡 Sending request to Fayupedia:', payload);
+
+                const response = await fetch(FAYUPEDIA_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await response.json();
+                console.log('📦 Fayupedia Response:', data);
+
+                // Tampilkan hasil
+                resultCard.style.display = 'block';
+
+                if (data.status === true) {
+                    if (isMassal) {
+                        // ===== RESPON MASSAL =====
+                        renderMassalResult(data, validIds);
+                    } else {
+                        // ===== RESPON SINGLE =====
+                        renderSingleResult(data, validIds[0]);
+                    }
+                } else {
+                    // ===== RESPON GAGAL =====
+                    renderErrorResult(data, validIds);
+                }
+
+            } catch (err) {
+                console.error('Error:', err);
+                resultCard.style.display = 'block';
+                resultContainer.innerHTML = `
+                    <div style="background:#ff444415;border:1px solid #ff444455;border-radius:12px;padding:20px;text-align:center;color:#ff6666;">
+                        <div style="font-size:36px;margin-bottom:8px;">❌</div>
+                        <div style="font-size:15px;font-weight:600;">Terjadi Error</div>
+                        <div style="font-size:13px;color:#888;margin-top:4px;">${err.message}</div>
+                        <button class="btn btn-refresh" onclick="checkStatus()" style="margin-top:12px;">🔄 Coba Lagi</button>
+                    </div>
+                `;
+            }
+
+            // Enable button
+            checkBtn.disabled = false;
+            checkBtn.innerHTML = '✅ Cek Status';
+        }
+
+        // ===================== RENDER SINGLE RESULT =====================
+        function renderSingleResult(data, orderId) {
+            const container = document.getElementById('resultContainer');
+
+            const status = data.order_status || 'not-found';
+            const isFound = status !== 'not-found';
+
+            let statusBadge = getStatusBadge(status);
+
+            let detailsHtml = '';
+            if (isFound) {
+                detailsHtml = `
+                    <div class="detail-row">
+                        <span class="label">🆔 Order ID</span>
+                        <span class="value" style="color:#ffaa00;">${data.order_id || orderId}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="label">📊 Status</span>
+                        <span class="value">${statusBadge}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="label">💰 Charge</span>
+                        <span class="value green">Rp ${(data.charge || 0).toLocaleString('id-ID')}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="label">📊 Start Count</span>
+                        <span class="value blue">${data.start_count || 0}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="label">📉 Remains</span>
+                        <span class="value ${(data.remains || 0) > 0 ? 'yellow' : 'green'}">${data.remains || 0}</span>
+                    </div>
+                `;
+            } else {
+                detailsHtml = `
+                    <div class="detail-row">
+                        <span class="label">🆔 Order ID</span>
+                        <span class="value" style="color:#ff4444;">${orderId}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="label">📊 Status</span>
+                        <span class="value">${statusBadge}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="label">📝 Pesan</span>
+                        <span class="value" style="color:#888;font-weight:400;">${data.msg || 'Pesanan tidak ditemukan'}</span>
+                    </div>
+                `;
+            }
+
+            container.innerHTML = `
+                <div class="result-card show">
+                    ${isFound ? `
+                        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
+                            <div style="font-size:16px;font-weight:700;color:#fff;">
+                                ${getStatusIcon(status)} Status: ${status.toUpperCase()}
+                            </div>
+                            <button class="btn-copy" onclick="copyResult('${data.order_id || orderId}')">📋 Salin ID</button>
+                        </div>
+                    ` : `
+                        <div style="text-align:center;padding:8px 0;color:#ff6666;font-size:15px;font-weight:600;">
+                            ${getStatusIcon('not-found')} Pesanan Tidak Ditemukan
+                        </div>
+                    `}
+                    <div style="margin-top:12px;">
+                        ${detailsHtml}
+                    </div>
+                    ${isFound ? `
+                        <div style="margin-top:12px;padding:10px;background:#00ffaa08;border-radius:10px;border:1px solid #00ffaa15;text-align:center;font-size:12px;color:#888;">
+                            📅 Terakhir diperbarui: ${new Date().toLocaleString('id-ID')}
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        }
+
+        // ===================== RENDER MASSAL RESULT =====================
+        function renderMassalResult(data, orderIds) {
+            const container = document.getElementById('resultContainer');
+
+            const orders = data.orders || {};
+            const totalFound = Object.keys(orders).length;
+
+            let html = `
+                <div style="margin-bottom:12px;color:#888;font-size:13px;">
+                    📊 Menampilkan ${totalFound} dari ${orderIds.length} ID pesanan
+                </div>
+                <div style="max-height:400px;overflow-y:auto;">
+            `;
+
+            orderIds.forEach(id => {
+                const orderData = orders[id] || null;
+                const isFound = orderData !== null && orderData.order_status !== undefined;
+
+                let statusBadge = '';
+                let details = '';
+
+                if (isFound) {
+                    const status = orderData.order_status || 'pending';
+                    statusBadge = getStatusBadge(status);
+                    details = `
+                        <div style="font-size:12px;color:#888;margin-top:4px;">
+                            💰 ${(orderData.charge || 0).toLocaleString('id-ID')} | 
+                            📊 ${orderData.start_count || 0} | 
+                            📉 ${orderData.remains || 0}
+                        </div>
+                    `;
+                } else {
+                    statusBadge = getStatusBadge('not-found');
+                    details = `
+                        <div style="font-size:12px;color:#888;margin-top:4px;">
+                            ${orderData?.msg || 'Pesanan tidak ditemukan'}
+                        </div>
+                    `;
+                }
+
+                html += `
+                    <div class="massal-item">
+                        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">
+                            <span class="order-id">🆔 ${id}</span>
+                            <span class="order-status">${statusBadge}</span>
+                        </div>
+                        ${details}
+                    </div>
+                `;
+            });
+
+            html += `
+                </div>
+                <div style="margin-top:12px;padding:10px;background:#00ffaa08;border-radius:10px;border:1px solid #00ffaa15;text-align:center;font-size:12px;color:#888;">
+                    📅 Terakhir diperbarui: ${new Date().toLocaleString('id-ID')}
+                    <br>
+                    <button class="btn-copy" onclick="copyMassalResult('${orderIds.join(',')}')" style="margin-top:6px;">📋 Salin Semua ID</button>
+                </div>
+            `;
+
+            container.innerHTML = html;
+        }
+
+        // ===================== RENDER ERROR RESULT =====================
+        function renderErrorResult(data, orderIds) {
+            const container = document.getElementById('resultContainer');
+
+            const msg = data.msg || 'Pesanan tidak ditemukan.';
+
+            let html = `
+                <div style="background:#ff444415;border:1px solid #ff444455;border-radius:12px;padding:20px;text-align:center;color:#ff6666;">
+                    <div style="font-size:36px;margin-bottom:8px;">❌</div>
+                    <div style="font-size:15px;font-weight:600;">${msg}</div>
+                    <div style="font-size:13px;color:#888;margin-top:4px;">ID: ${orderIds.join(', ')}</div>
+                    <button class="btn btn-refresh" onclick="checkStatus()" style="margin-top:12px;">🔄 Coba Lagi</button>
+                </div>
+            `;
+
+            container.innerHTML = html;
+        }
+
+        // ===================== COPY FUNCTIONS =====================
+        function copyResult(text) {
+            navigator.clipboard.writeText(String(text)).then(() => {
+                Swal.fire({
+                    title: '✅ Berhasil Disalin!',
+                    text: `ID ${text} telah disalin ke clipboard.`,
+                    icon: 'success',
+                    timer: 1500,
+                    showConfirmButton: false,
+                    toast: true,
+                    position: 'top-end'
+                });
+            }).catch(() => {
+                const textarea = document.createElement('textarea');
+                textarea.value = text;
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                Swal.fire({
+                    title: '✅ Berhasil Disalin!',
+                    icon: 'success',
+                    timer: 1500,
+                    showConfirmButton: false,
+                    toast: true,
+                    position: 'top-end'
+                });
+            });
+        }
+
+        function copyMassalResult(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                Swal.fire({
+                    title: '✅ Berhasil Disalin!',
+                    text: 'Semua ID pesanan telah disalin.',
+                    icon: 'success',
+                    timer: 1500,
+                    showConfirmButton: false,
+                    toast: true,
+                    position: 'top-end'
+                });
+            }).catch(() => {
+                const textarea = document.createElement('textarea');
+                textarea.value = text;
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                Swal.fire({
+                    title: '✅ Berhasil Disalin!',
+                    icon: 'success',
+                    timer: 1500,
+                    showConfirmButton: false,
+                    toast: true,
+                    position: 'top-end'
+                });
+            });
+        }
+
+        // ===================== RESET FORM =====================
+        function resetForm() {
+            document.getElementById('orderIdInput').value = '';
+            document.getElementById('resultCard').style.display = 'none';
+            document.getElementById('resultContainer').innerHTML = '';
+            document.getElementById('massalInfo').style.display = 'none';
+            document.getElementById('orderIdInput').focus();
+        }
+
+        // ===================== ENTER KEY =====================
+        document.getElementById('orderIdInput').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                checkStatus();
+            }
+        });
+
+        // ===================== INIT =====================
+        document.addEventListener('DOMContentLoaded', async function() {
+            await fetchConfig();
+
+            console.log('📦 Cek Status Pesanan siap!');
+            console.log('📌 API ID:', FAYUPEDIA_API_ID);
+            console.log('📌 API Key:', FAYUPEDIA_API_KEY ? '✅ Terdeteksi' : '❌ Tidak ada');
+        });
+
+        // ===================== ANTI INSPECT =====================
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'F12' ||
+                (e.ctrlKey && e.shiftKey && ['I', 'C', 'J'].includes(e.key)) ||
+                (e.ctrlKey && e.key === 'u')) {
+                e.preventDefault();
+                return false;
+            }
+        });
+
+        // Deteksi DevTools
+        setInterval(() => {
+            const threshold = 160;
+            if (window.devtoolsOpen) return;
+            const widthThreshold = window.outerWidth - window.innerWidth > threshold;
+            if (widthThreshold && !/Android|iPhone|iPad/i.test(navigator.userAgent)) {
+                document.body.innerHTML = "<h1 style='color:gold;text-align:center;margin-top:40vh;'>🚫 Developer Tools Terdeteksi</h1>";
+            }
+        }, 2000);
+    </script>
+</body>
+</html>
