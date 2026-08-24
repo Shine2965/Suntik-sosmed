@@ -20,12 +20,17 @@ export default function handler(req, res) {
 
     try {
         // ===== QIOSPAY CONFIG =====
-        const qiospayApiKey = process.env.QIOSPAY_API_KEY || 'd1370635be9857299bde44b946c938655534efdff7ef5246685b67ef91decb1c';
+        const qiospayApiKey = process.env.QIOSPAY_API_KEY || '';
         const merchantCode = process.env.QIOSPAY_MERCHANT_CODE || 'QP052692';
 
         // ===== FAYUPEDIA CONFIG =====
         const fayupediaApiKey = process.env.FAYUPEDIA_API_KEY || '';
         const fayupediaApiId = parseInt(process.env.FAYUPEDIA_API_ID) || 5522;
+
+        // ===== ORDERSOSMED CONFIG (TAMBAHAN BARU) =====
+        const ordersosmedApiKey = process.env.ORDERSOSMED_API_KEY || '';
+        const ordersosmedApiId = parseInt(process.env.ORDERSOSMED_API_ID) || 11313;
+        const ordersosmedSecretKey = process.env.ORDERSOSMED_SECRET_KEY || 'Alvino11';
 
         // ===== RESPONSE =====
         return res.status(200).json({
@@ -34,9 +39,13 @@ export default function handler(req, res) {
             merchant_code: merchantCode,
             fayupedia_api_key: fayupediaApiKey,
             fayupedia_api_id: fayupediaApiId,
+            ordersosmed_api_key: ordersosmedApiKey,
+            ordersosmed_api_id: ordersosmedApiId,
+            ordersosmed_secret_key: ordersosmedSecretKey,
             from_env: {
                 qiospay: !!process.env.QIOSPAY_API_KEY,
-                fayupedia: !!process.env.FAYUPEDIA_API_KEY
+                fayupedia: !!process.env.FAYUPEDIA_API_KEY,
+                ordersosmed: !!process.env.ORDERSOSMED_API_KEY
             }
         });
 
