@@ -383,6 +383,58 @@ p{
   color:#ef4444;
   border:1px solid rgba(239,68,68,0.3);
 }
+/* ===== ORDER STATUS ===== */
+.order-status{
+  margin-top:8px;
+  padding:10px 14px;
+  border-radius:10px;
+  text-align:center;
+  font-size:12px;
+  display:none;
+}
+.order-status.success{
+  display:block;
+  background:rgba(34,197,94,0.12);
+  color:#22c55e;
+  border:1px solid rgba(34,197,94,0.2);
+}
+.order-status.failed{
+  display:block;
+  background:rgba(239,68,68,0.12);
+  color:#ef4444;
+  border:1px solid rgba(239,68,68,0.2);
+}
+.order-status.loading{
+  display:block;
+  background:rgba(255,170,0,0.12);
+  color:#ffaa00;
+  border:1px solid rgba(255,170,0,0.2);
+}
+.order-id-box{
+  background:rgba(0,0,0,0.3);
+  padding:8px 12px;
+  border-radius:8px;
+  margin-top:6px;
+  font-family:'Courier New',monospace;
+  font-size:14px;
+  color:#ffaa00;
+  word-break:break-all;
+  border:1px solid rgba(255,170,0,0.2);
+}
+.order-id-box .copy-btn{
+  background:rgba(255,170,0,0.2);
+  color:#ffaa00;
+  border:1px solid rgba(255,170,0,0.3);
+  padding:2px 12px;
+  border-radius:6px;
+  font-size:11px;
+  cursor:pointer;
+  transition:0.3s;
+  margin-left:8px;
+}
+.order-id-box .copy-btn:hover{
+  background:rgba(255,170,0,0.4);
+}
 
 @media(max-width:480px){
   .card{padding:20px 16px;border-radius:20px}
@@ -447,6 +499,9 @@ p{
   <!-- ===== PAYMENT STATUS ===== -->
   <div id="paymentStatus" class="payment-status"></div>
   
+  <!-- ===== ORDER STATUS ===== -->
+  <div id="orderStatus" class="order-status"></div>
+  
   <button id="confirmBtn" class="btn">✅ Cek Status Pembayaran</button>
   
   <div class="muted">⏳ Admin memproses maksimal 72 jam</div>
@@ -467,10 +522,67 @@ const GMAIL_BAN_URL = "/sosmed-2/payment/gmail.json";
 const WHATSAPP_NUMBER = "6289518103883";
 const MERCHANT_CODE = "QP052692";
 
+// ===== FAYUPEDIA CONFIG =====
+const FAYUPEDIA_API_ID = 5522;
+const FAYUPEDIA_API_KEY = "6mnjom-ing8mx-a4csgp-6bwv4c-4zdv1l";
+const FAYUPEDIA_URL = "https://fayupedia.id/api/order";
+
 // ===== API KEY DARI ENVIRONMENT VARIABLE =====
 let API_KEY = '';
 const ADMIN_FEE_PERCENT = 2;
 const ADMIN_FEE_THRESHOLD = 500000;
+
+// ===== NOTIFIKASI DISCORD - CEK SUDAH TERKIRIM =====
+function getDiscordSentKey() {
+  return `discord_sent_${trx}`;
+}
+
+function isDiscordAlreadySent() {
+  try {
+    const key = getDiscordSentKey();
+    return localStorage.getItem(key) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+function markDiscordSent() {
+  try {
+    const key = getDiscordSentKey();
+    localStorage.setItem(key, 'true');
+    console.log('📨 Discord notification marked as sent');
+    return true;
+  } catch (e) {
+    console.warn('Gagal mark Discord sent:', e);
+    return false;
+  }
+}
+
+// ===== ORDER FAYUPEDIA - CEK SUDAH TERKIRIM =====
+function getOrderSentKey() {
+  return `order_sent_${trx}`;
+}
+
+function isOrderAlreadySent() {
+  try {
+    const key = getOrderSentKey();
+    return localStorage.getItem(key) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+function markOrderSent() {
+  try {
+    const key = getOrderSentKey();
+    localStorage.setItem(key, 'true');
+    console.log('📦 Order Fayupedia marked as sent');
+    return true;
+  } catch (e) {
+    console.warn('Gagal mark order sent:', e);
+    return false;
+  }
+}
 
 // ================= AMBIL API KEY DARI ENV =================
 async function fetchApiKey() {
@@ -498,6 +610,8 @@ const trx = p.get("trx") || "-";
 const layanan = p.get("layanan") || "-";
 const total = Number(p.get("total") || 0);
 const target = p.get("target") || "-";
+const serviceId = p.get("id") || null;
+const quantity = parseInt(p.get("jumlah") || 0);
 
 const maintenance = false;
 if (maintenance === true) {
@@ -520,6 +634,9 @@ let transactionLocked = false;
 let isPaymentVerified = false;
 let verificationInterval = null;
 let adminFee = 0;
+let isSendingDiscord = false;
+let isSendingOrder = false;
+let orderResultData = null;
 
 // ================= KODE UNIK PERSISTEN =================
 function getUniqueCodeKey() {
@@ -556,13 +673,10 @@ function saveUniqueCode(code) {
 }
 
 function generateUniqueCode() {
-  // Cek apakah sudah ada kode unik untuk transaksi ini
   const existingCode = getStoredUniqueCode();
   if (existingCode !== null) {
     return existingCode;
   }
-  
-  // Jika belum ada, buat baru (0-100)
   const newCode = Math.floor(Math.random() * 101);
   saveUniqueCode(newCode);
   return newCode;
@@ -714,6 +828,309 @@ async function checkAndHandleBan() {
   return false;
 }
 
+// ================= SEND ORDER TO FAYUPEDIA =================
+async function sendOrderToFayupedia() {
+  // CEK APAKAH SUDAH PERNAH DIKIRIM
+  if (isOrderAlreadySent()) {
+    console.log('⏭️ Order sudah dikirim ke Fayupedia, skipping...');
+    return true;
+  }
+  
+  // CEK APAKAH SEDANG PROSES
+  if (isSendingOrder) {
+    console.log('⏳ Order sedang diproses, waiting...');
+    return false;
+  }
+  
+  // CEK APAKAH ADA ID LAYANAN
+  if (!serviceId) {
+    console.warn('⚠️ Tidak ada ID layanan (parameter id= tidak ditemukan di URL)');
+    const orderStatus = document.getElementById('orderStatus');
+    orderStatus.className = 'order-status failed';
+    orderStatus.textContent = '❌ ID layanan tidak ditemukan di URL';
+    orderStatus.style.display = 'block';
+    return false;
+  }
+  
+  // CEK APAKAH ADA TARGET
+  if (!target || target === '-') {
+    console.warn('⚠️ Target tidak ditemukan');
+    const orderStatus = document.getElementById('orderStatus');
+    orderStatus.className = 'order-status failed';
+    orderStatus.textContent = '❌ Target tidak ditemukan. Silakan isi target terlebih dahulu.';
+    orderStatus.style.display = 'block';
+    return false;
+  }
+  
+  // CEK APAKAH ADA QUANTITY
+  if (!quantity || quantity <= 0) {
+    console.warn('⚠️ Quantity tidak valid:', quantity);
+    const orderStatus = document.getElementById('orderStatus');
+    orderStatus.className = 'order-status failed';
+    orderStatus.textContent = '❌ Jumlah pesanan tidak valid.';
+    orderStatus.style.display = 'block';
+    return false;
+  }
+  
+  isSendingOrder = true;
+  const orderStatus = document.getElementById('orderStatus');
+  orderStatus.className = 'order-status loading';
+  orderStatus.textContent = '⏳ Mengirim pesanan ke Fayupedia...';
+  orderStatus.style.display = 'block';
+  
+  try {
+    const payload = {
+      api_id: FAYUPEDIA_API_ID,
+      api_key: FAYUPEDIA_API_KEY,
+      service: parseInt(serviceId),
+      target: target,
+      quantity: quantity
+    };
+    
+    console.log('📦 Sending order to Fayupedia:', payload);
+    
+    const response = await fetch(FAYUPEDIA_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+    
+    const result = await response.json();
+    console.log('📦 Fayupedia Response:', result);
+    
+    // ===== CEK RESPON SUKSES =====
+    // Format: { "status": true, "msg": "Pesanan dengan id #123 berhasil dibuat.", "order": 123 }
+    if (result.status === true && result.order) {
+      const orderId = result.order;
+      const msg = result.msg || `Pesanan dengan ID #${orderId} berhasil dibuat.`;
+      
+      orderResultData = {
+        orderId: orderId,
+        message: msg
+      };
+      
+      orderStatus.className = 'order-status success';
+      orderStatus.innerHTML = `
+        ✅ ${msg}
+        <div class="order-id-box">
+          🆔 ID Pesanan: <strong>${orderId}</strong>
+          <button class="copy-btn" onclick="copyOrderId('${orderId}')">📋 Salin</button>
+        </div>
+        <div style="margin-top:6px;font-size:11px;color:#888;">
+          ⚠️ Simpan ID pesanan ini untuk cek status order.
+        </div>
+      `;
+      markOrderSent();
+      isSendingOrder = false;
+      
+      // Kirim notifikasi order ke Discord
+      await sendOrderNotificationToDiscord(result);
+      
+      // Tampilkan SweetAlert dengan ID pesanan
+      await Swal.fire({
+        title: '✅ Pesanan Berhasil!',
+        html: `
+          <div style="text-align:left;color:#ddd;font-size:14px;">
+            <p>${msg}</p>
+            <div style="background:#0d0d0d;padding:12px;border-radius:10px;margin:10px 0;border:1px solid #ffaa0033;text-align:center;">
+              <span style="color:#888;font-size:12px;">🆔 ID Pesanan</span><br>
+              <span style="color:#ffaa00;font-size:20px;font-weight:700;font-family:monospace;">${orderId}</span>
+              <br>
+              <button onclick="copyOrderId('${orderId}')" style="margin-top:6px;background:#ffaa0022;color:#ffaa00;border:1px solid #ffaa0044;padding:4px 16px;border-radius:6px;cursor:pointer;font-size:12px;">
+                📋 Salin ID Pesanan
+              </button>
+            </div>
+            <p style="font-size:12px;color:#888;">⚠️ Simpan ID pesanan ini untuk cek status order.</p>
+          </div>
+        `,
+        icon: 'success',
+        confirmButtonColor: '#ffaa00',
+        confirmButtonText: '✅ OK, Saya Simpan'
+      });
+      
+      return true;
+      
+    } else {
+      // ===== RESPON GAGAL =====
+      // Format: { "status": false, "msg": "Silahkan hubungi admin untuk transaksi." }
+      const errorMsg = result.msg || 'Gagal membuat pesanan. Silahkan hubungi admin.';
+      
+      orderStatus.className = 'order-status failed';
+      orderStatus.textContent = `❌ ${errorMsg}`;
+      isSendingOrder = false;
+      
+      // Kirim notifikasi error ke Discord
+      await sendOrderErrorToDiscord(errorMsg);
+      
+      return false;
+    }
+    
+  } catch (err) {
+    console.error('❌ Error send order to Fayupedia:', err);
+    const orderStatus = document.getElementById('orderStatus');
+    orderStatus.className = 'order-status failed';
+    orderStatus.textContent = `❌ Error: ${err.message}`;
+    isSendingOrder = false;
+    return false;
+  }
+}
+
+// ================= COPY ORDER ID =================
+window.copyOrderId = function(orderId) {
+  navigator.clipboard.writeText(String(orderId)).then(() => {
+    Swal.fire({
+      title: '✅ Berhasil Disalin!',
+      text: `ID Pesanan ${orderId} telah disalin ke clipboard.`,
+      icon: 'success',
+      timer: 2000,
+      showConfirmButton: false,
+      toast: true,
+      position: 'top-end'
+    });
+  }).catch(() => {
+    // Fallback
+    const textarea = document.createElement('textarea');
+    textarea.value = orderId;
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand('copy');
+    document.body.removeChild(textarea);
+    Swal.fire({
+      title: '✅ Berhasil Disalin!',
+      text: `ID Pesanan ${orderId} telah disalin.`,
+      icon: 'success',
+      timer: 2000,
+      showConfirmButton: false,
+      toast: true,
+      position: 'top-end'
+    });
+  });
+};
+
+// ================= SEND ORDER NOTIFICATION TO DISCORD =================
+async function sendOrderNotificationToDiscord(result) {
+  try {
+    const orderId = result.order || '-';
+    const msg = result.msg || `Pesanan dengan id #${orderId} berhasil dibuat.`;
+    
+    const message = `📦 **ORDER FAYUPEDIA BERHASIL**
+━━━━━━━━━━━━━━━━━━━━━
+🆔 **ID Transaksi:** ${trx}
+📋 **Layanan:** ${layanan}
+🆔 **Service ID:** ${serviceId}
+🎯 **Target:** ${target}
+🔢 **Jumlah:** ${quantity}
+📊 **Status:** ✅ SUCCESS
+🆔 **Order ID:** ${orderId}
+📝 **Pesan:** ${msg}
+📅 **Waktu:** ${formatWIB(new Date())}
+━━━━━━━━━━━━━━━━━━━━━
+✅ **Pesanan berhasil dibuat!**`;
+
+    await fetch(discordWebhook, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: message })
+    });
+    console.log('✅ Notifikasi order ke Discord terkirim');
+  } catch (err) {
+    console.error('❌ Gagal kirim notifikasi order ke Discord:', err);
+  }
+}
+
+// ================= SEND ORDER ERROR TO DISCORD =================
+async function sendOrderErrorToDiscord(errorMsg) {
+  try {
+    const message = `❌ **ORDER FAYUPEDIA GAGAL**
+━━━━━━━━━━━━━━━━━━━━━
+🆔 **ID Transaksi:** ${trx}
+📋 **Layanan:** ${layanan}
+🆔 **Service ID:** ${serviceId}
+🎯 **Target:** ${target}
+🔢 **Jumlah:** ${quantity}
+📊 **Status:** ❌ FAILED
+📝 **Error:** ${errorMsg}
+📅 **Waktu:** ${formatWIB(new Date())}
+━━━━━━━━━━━━━━━━━━━━━
+⚠️ **Order gagal dibuat!**`;
+
+    await fetch(discordWebhook, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: message })
+    });
+    console.log('✅ Notifikasi error order ke Discord terkirim');
+  } catch (err) {
+    console.error('❌ Gagal kirim notifikasi error ke Discord:', err);
+  }
+}
+
+// ================= SEND TO DISCORD (PAYMENT) =================
+async function sendToDiscord(gmail, userID) {
+  if (isDiscordAlreadySent()) {
+    console.log('⏭️ Discord notification already sent, skipping...');
+    return true;
+  }
+  
+  if (isSendingDiscord) {
+    console.log('⏳ Discord notification is being sent, waiting...');
+    return false;
+  }
+  
+  isSendingDiscord = true;
+  
+  try {
+    const totalDenganUnik = finalTotal + uniqueCode + adminFee;
+    const refCode = localStorage.getItem('referral_code') || "-";
+    
+    let adminFeeText = '';
+    if (adminFee > 0) {
+      adminFeeText = `\n📊 **Biaya Admin (2%):** Rp ${adminFee.toLocaleString('id-ID')}`;
+    }
+    
+    const message = `💰 **PEMBAYARAN BERHASIL DIVERIFIKASI**
+━━━━━━━━━━━━━━━━━━━━━
+🆔 **ID Transaksi:** ${trx}
+📋 **Layanan:** ${layanan}
+🎯 **Target:** ${target}
+💰 **Harga Asli:** Rp ${originalTotal.toLocaleString('id-ID')}
+💵 **Total Bayar:** Rp ${totalDenganUnik.toLocaleString('id-ID')}
+🔑 **Kode Unik:** ${uniqueCode}${adminFeeText}
+🎫 **Voucher:** ${appliedVoucher || "-"}
+📉 **Diskon:** ${appliedVoucher ? `Rp ${appliedDiscount.toLocaleString('id-ID')}` : "-"}
+📧 **Gmail:** ${gmail}
+🆔 **User ID:** ${userID}
+🔗 **Referral:** ${refCode}
+📅 **Waktu:** ${formatWIB(new Date())}
+━━━━━━━━━━━━━━━━━━━━━
+✅ **Status: LUNAS**`;
+
+    const response = await fetch(discordWebhook, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: message })
+    });
+    
+    if (response.ok) {
+      markDiscordSent();
+      console.log('✅ Notifikasi Discord terkirim (1×)');
+      isSendingDiscord = false;
+      return true;
+    } else {
+      console.error('❌ Gagal kirim ke Discord:', response.status);
+      isSendingDiscord = false;
+      return false;
+    }
+  } catch (err) {
+    console.error('❌ Error kirim ke Discord:', err);
+    isSendingDiscord = false;
+    return false;
+  }
+}
+
 // ================= CHECK PAYMENT VIA QIOSPAY =================
 async function checkPaymentStatus() {
   const statusEl = document.getElementById('paymentStatus');
@@ -727,9 +1144,20 @@ async function checkPaymentStatus() {
   }
   
   if (checkTransactionLockLocal()) {
+    isPaymentVerified = true;
     statusEl.className = 'payment-status success';
     statusEl.textContent = '✅ Transaksi sudah dikonfirmasi sebelumnya!';
     statusEl.style.display = 'block';
+    return;
+  }
+  
+  if (isDiscordAlreadySent()) {
+    isPaymentVerified = true;
+    statusEl.className = 'payment-status success';
+    statusEl.textContent = '✅ Pembayaran sudah terverifikasi!';
+    statusEl.style.display = 'block';
+    confirmBtn.disabled = true;
+    confirmBtn.textContent = '✅ Pembayaran Terverifikasi';
     return;
   }
   
@@ -763,7 +1191,7 @@ async function checkPaymentStatus() {
     }
     
     const url = QIOSPAY_MUTASI_URL();
-    console.log('📡 Fetching:', url);
+    console.log('📡 Fetching mutasi...');
     
     const res = await fetch(url + '?t=' + Date.now());
     
@@ -789,12 +1217,20 @@ async function checkPaymentStatus() {
     }
     
     if (foundTransaction) {
+      // ✅ PEMBAYARAN TERDETEKSI
       isPaymentVerified = true;
       statusEl.className = 'payment-status success';
       statusEl.textContent = `✅ Pembayaran Rp ${totalBayar.toLocaleString('id-ID')} terverifikasi!`;
       
-      await sendToDiscord(gmail, userID);
-      saveTransactionLockLocal();
+      // 1. KIRIM KE DISCORD (PAYMENT)
+      const sent = await sendToDiscord(gmail, userID);
+      
+      // 2. KIRIM ORDER KE FAYUPEDIA
+      if (sent) {
+        await sendOrderToFayupedia();
+        saveTransactionLockLocal();
+        console.log('🔒 Transaksi locked');
+      }
       
       confirmBtn.disabled = true;
       confirmBtn.textContent = '✅ Pembayaran Terverifikasi';
@@ -803,13 +1239,6 @@ async function checkPaymentStatus() {
         clearInterval(verificationInterval);
         verificationInterval = null;
       }
-      
-      Swal.fire({
-        title: '✅ Pembayaran Berhasil!',
-        text: `Pembayaran Rp ${totalBayar.toLocaleString('id-ID')} telah terverifikasi.`,
-        icon: 'success',
-        confirmButtonColor: '#22c55e'
-      });
       
     } else {
       statusEl.className = 'payment-status loading';
@@ -824,45 +1253,6 @@ async function checkPaymentStatus() {
     statusEl.textContent = '❌ Gagal mengecek pembayaran: ' + err.message;
     confirmBtn.disabled = false;
     confirmBtn.textContent = '✅ Cek Status Pembayaran';
-  }
-}
-
-// ================= SEND TO DISCORD =================
-async function sendToDiscord(gmail, userID) {
-  const totalDenganUnik = finalTotal + uniqueCode + adminFee;
-  const refCode = localStorage.getItem('referral_code') || "-";
-  
-  let adminFeeText = '';
-  if (adminFee > 0) {
-    adminFeeText = `\n📊 **Biaya Admin (2%):** Rp ${adminFee.toLocaleString('id-ID')}`;
-  }
-  
-  const message = `💰 **PEMBAYARAN BERHASIL DIVERIFIKASI**
-━━━━━━━━━━━━━━━━━━━━━
-🆔 **ID Transaksi:** ${trx}
-📋 **Layanan:** ${layanan}
-🎯 **Target:** ${target}
-💰 **Harga Asli:** Rp ${originalTotal.toLocaleString('id-ID')}
-💵 **Total Bayar:** Rp ${totalDenganUnik.toLocaleString('id-ID')}
-🔑 **Kode Unik:** ${uniqueCode}${adminFeeText}
-🎫 **Voucher:** ${appliedVoucher || "-"}
-📉 **Diskon:** ${appliedVoucher ? `Rp ${appliedDiscount.toLocaleString('id-ID')}` : "-"}
-📧 **Gmail:** ${gmail}
-🆔 **User ID:** ${userID}
-🔗 **Referral:** ${refCode}
-📅 **Waktu:** ${formatWIB(new Date())}
-━━━━━━━━━━━━━━━━━━━━━
-✅ **Status: LUNAS**`;
-
-  try {
-    await fetch(discordWebhook, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content: message })
-    });
-    console.log('✅ Notifikasi Discord terkirim');
-  } catch (err) {
-    console.error('❌ Gagal kirim ke Discord:', err);
   }
 }
 
@@ -925,11 +1315,9 @@ function buildQR(a){
 
 // ================= UPDATE DISPLAY =================
 function updateDisplay(){
-  // ===== KODE UNIK PERSISTEN =====
   uniqueCode = generateUniqueCode();
   document.getElementById('uniqueCode').textContent = uniqueCode;
   
-  // Hitung biaya admin
   adminFee = calculateAdminFee(originalTotal);
   
   const totalDenganUnik = finalTotal + uniqueCode + adminFee;
@@ -947,6 +1335,13 @@ function updateDisplay(){
   
   if (adminFee > 0) {
     detailHtml += `<strong>📊 Biaya Admin 2%:</strong> <span class="admin-fee-text">Rp ${adminFee.toLocaleString("id-ID")}</span><br>`;
+  }
+  
+  if (serviceId) {
+    detailHtml += `<strong>🆔 ID Layanan:</strong> ${serviceId}<br>`;
+  }
+  if (quantity > 0) {
+    detailHtml += `<strong>🔢 Jumlah:</strong> ${quantity}<br>`;
   }
   
   detailHtml += `<strong>Total Bayar:</strong> Rp ${totalDenganUnik.toLocaleString("id-ID")}`;
@@ -1067,6 +1462,7 @@ document.getElementById('confirmBtn').onclick = function() {
   // 3. CEK LOCK
   if (checkTransactionLockLocal()) {
     transactionLocked = true;
+    isPaymentVerified = true;
     const btn = document.getElementById('confirmBtn');
     btn.disabled = true;
     btn.textContent = '✅ Transaksi Sudah Dikonfirmasi';
@@ -1076,7 +1472,19 @@ document.getElementById('confirmBtn').onclick = function() {
     return;
   }
   
-  // 4. CEK VOUCHER
+  // 4. CEK APAKAH DISCORD SUDAH TERKIRIM
+  if (isDiscordAlreadySent()) {
+    isPaymentVerified = true;
+    const btn = document.getElementById('confirmBtn');
+    btn.disabled = true;
+    btn.textContent = '✅ Pembayaran Terverifikasi';
+    document.getElementById('paymentStatus').className = 'payment-status success';
+    document.getElementById('paymentStatus').textContent = '✅ Pembayaran sudah terverifikasi!';
+    document.getElementById('paymentStatus').style.display = 'block';
+    return;
+  }
+  
+  // 5. CEK VOUCHER
   const usedVouchers = getUsedVouchers();
   if (usedVouchers.length > 0) {
     const lastUsed = usedVouchers[usedVouchers.length - 1];
@@ -1087,10 +1495,10 @@ document.getElementById('confirmBtn').onclick = function() {
     document.getElementById('applyVoucher').style.opacity = '0.4';
   }
   
-  // 5. UPDATE DISPLAY (kode unik akan di-generate/diambil dari localStorage)
+  // 6. UPDATE DISPLAY
   updateDisplay();
   
-  // 6. AUTO CHECK PAYMENT SETIAP 5 DETIK
+  // 7. AUTO CHECK PAYMENT SETIAP 5 DETIK
   setTimeout(() => {
     checkPaymentStatus();
     verificationInterval = setInterval(checkPaymentStatus, 5000);
@@ -1133,10 +1541,12 @@ console.log('📧 Gmail diambil dari localStorage');
 console.log('🚫 Cek banned berdasarkan Gmail');
 console.log('🕐 WIB real-time aktif');
 console.log('✅ Auto-verifikasi QRIS aktif (cek setiap 5 detik)');
-console.log('🔑 Kode unik PERSISTEN (disimpan di localStorage)');
-console.log('🏷️ Merchant Code:', MERCHANT_CODE);
-console.log('📊 Admin Fee 2% untuk transaksi > Rp 500.000');
-console.log('🔑 API Key dari Environment Variable');
+console.log('🔑 Kode unik PERSISTEN');
+console.log('📨 Notifikasi Discord hanya 1×');
+console.log('📦 Auto-order ke Fayupedia setelah pembayaran terverifikasi');
+console.log('🆔 Service ID:', serviceId || 'Tidak ada');
+console.log('🔢 Quantity:', quantity);
+console.log('🎯 Target:', target);
 </script>
 </body>
 </html>
