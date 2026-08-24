@@ -521,12 +521,12 @@ const discordWebhook = "https://discord.com/api/webhooks/1482244989021851748/oq_
 const GMAIL_BAN_URL = "/sosmed-2/payment/gmail.json";
 const WHATSAPP_NUMBER = "6289518103883";
 const MERCHANT_CODE = "QP052692";
+const LOLLIPOP_URL = "https://lollipop-smm.com/api/v2";
 
-// ===== LOLLIPOP CONFIG (diambil dari ENV) =====
+// ===== LOLLIPOP CONFIG (dari ENV) =====
 let LOLLIPOP_API_KEY = '';
-let LOLLIPOP_API_URL = 'https://lollipop-smm.com/api/v2';
 
-// ===== API KEY QIOSPAY =====
+// ===== API KEY QIOSPAY DARI ENVIRONMENT VARIABLE =====
 let QIOSPAY_API_KEY = '';
 const ADMIN_FEE_PERCENT = 2;
 const ADMIN_FEE_THRESHOLD = 500000;
@@ -590,20 +590,16 @@ async function fetchConfigFromEnv() {
     if (res.ok) {
       const data = await res.json();
       
-      // QIOSPAY
+      // QIOSPAY API Key
       if (data.qiospay_api_key) {
         QIOSPAY_API_KEY = data.qiospay_api_key;
         console.log('✅ QIOSPAY API Key dari ENV');
       }
       
-      // LOLLIPOP
+      // LOLLIPOP Config
       if (data.lollipop_api_key) {
         LOLLIPOP_API_KEY = data.lollipop_api_key;
         console.log('✅ LOLLIPOP API Key dari ENV');
-      }
-      if (data.lollipop_api_url) {
-        LOLLIPOP_API_URL = data.lollipop_api_url;
-        console.log('✅ LOLLIPOP API URL dari ENV');
       }
       
       return true;
@@ -911,25 +907,25 @@ async function sendOrderToLollipop() {
   orderStatus.style.display = 'block';
   
   try {
-    // ===== BUILD PAYLOAD UNTUK LOLLIPOP =====
-    const payload = new URLSearchParams();
-    payload.append('key', LOLLIPOP_API_KEY);
-    payload.append('action', 'add');
-    payload.append('service', parseInt(serviceId));
-    payload.append('link', target);
-    payload.append('quantity', quantity);
+    // ===== PAYLOAD UNTUK LOLLIPOP (JSON) =====
+    const payload = {
+      key: LOLLIPOP_API_KEY,
+      action: 'add',
+      service: parseInt(serviceId),
+      link: target,
+      quantity: quantity
+    };
     
     console.log('📦 Sending order to Lollipop SMM');
-    console.log('📦 Payload:', payload.toString());
-    console.log('📦 URL:', LOLLIPOP_API_URL);
+    console.log('📦 Payload:', payload);
     
-    const response = await fetch(LOLLIPOP_API_URL, {
+    const response = await fetch(LOLLIPOP_URL, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
+        'Content-Type': 'application/json',
         'Accept': 'application/json'
       },
-      body: payload.toString()
+      body: JSON.stringify(payload)
     });
     
     const result = await response.json();
@@ -1577,7 +1573,6 @@ console.log('🆔 Service ID:', serviceId || 'Tidak ada');
 console.log('🔢 Quantity:', quantity);
 console.log('🎯 Target:', target);
 console.log('🔑 LOLLIPOP API Key dari ENV:', LOLLIPOP_API_KEY ? '✅ Terdeteksi' : '❌ Tidak ada');
-console.log('🔗 LOLLIPOP API URL:', LOLLIPOP_API_URL);
 </script>
 </body>
 </html>
