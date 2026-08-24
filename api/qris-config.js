@@ -1,5 +1,5 @@
 // /api/qris-config.js
-// Vercel Serverless Function - Mengambil API Key dari Environment Variable
+// Vercel Serverless Function - Mengambil semua konfigurasi dari Environment Variable
 
 export default function handler(req, res) {
     // CORS
@@ -12,29 +12,32 @@ export default function handler(req, res) {
     }
 
     if (req.method !== 'GET') {
-        return res.status(405).json({ success: false, message: 'Method not allowed' });
+        return res.status(405).json({ 
+            success: false, 
+            message: 'Method not allowed' 
+        });
     }
 
     try {
-        // Ambil dari environment variable
-        const apiKey = process.env.QIOSPAY_API_KEY;
+        // ===== QIOSPAY CONFIG =====
+        const qiospayApiKey = process.env.QIOSPAY_API_KEY || 'd1370635be9857299bde44b946c938655534efdff7ef5246685b67ef91decb1c';
         const merchantCode = process.env.QIOSPAY_MERCHANT_CODE || 'QP052692';
 
-        if (!apiKey) {
-            console.warn('⚠️ QIOSPAY_API_KEY tidak ditemukan di environment');
-            return res.status(200).json({
-                success: true,
-                api_key: '-',
-                merchant_code: merchantCode,
-                from_env: false
-            });
-        }
+        // ===== FAYUPEDIA CONFIG =====
+        const fayupediaApiKey = process.env.FAYUPEDIA_API_KEY || '';
+        const fayupediaApiId = parseInt(process.env.FAYUPEDIA_API_ID) || 5522;
 
+        // ===== RESPONSE =====
         return res.status(200).json({
             success: true,
-            api_key: apiKey,
+            qiospay_api_key: qiospayApiKey,
             merchant_code: merchantCode,
-            from_env: true
+            fayupedia_api_key: fayupediaApiKey,
+            fayupedia_api_id: fayupediaApiId,
+            from_env: {
+                qiospay: !!process.env.QIOSPAY_API_KEY,
+                fayupedia: !!process.env.FAYUPEDIA_API_KEY
+            }
         });
 
     } catch (error) {
