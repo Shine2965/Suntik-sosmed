@@ -28,7 +28,7 @@ export default function handler(req, res) {
         const fayupediaApiId = parseInt(process.env.FAYUPEDIA_API_ID) || 5522;
 
         // ===== ORDERSOSMED CONFIG (TAMBAHAN BARU) =====
-        const ordersosmedApiKey = process.env.ORDERSOSMED_API_KEY || '';
+        const ordersosmedApiKey = process.env.ORDERSOSMED_API_KEY || '23941803d5391da4e45a1bf4ebca52064fa17a53574d1c3655a0173dd7530fb1';
         const ordersosmedApiId = parseInt(process.env.ORDERSOSMED_API_ID) || 11313;
         const ordersosmedSecretKey = process.env.ORDERSOSMED_SECRET_KEY || 'Alvino11';
 
