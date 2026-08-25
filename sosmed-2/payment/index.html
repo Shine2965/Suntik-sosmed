@@ -1162,7 +1162,7 @@ async function sendToDiscord(gmail, userID) {
   }
 }
 
-// ================= CHECK PAYMENT VIA QIOSPAY =================
+// ================= CHECK PAYMENT VIA QIOSPAY (FIXED) =================
 async function checkPaymentStatus() {
   const statusEl = document.getElementById('paymentStatus');
   const confirmBtn = document.getElementById('confirmBtn');
@@ -1233,18 +1233,37 @@ async function checkPaymentStatus() {
     const data = await res.json();
     console.log('📊 Data Mutasi:', data);
     
+    // HITUNG ULANG NOMINAL YANG SAMA DENGAN QRIS
     const totalBayar = finalTotal + uniqueCode + adminFee;
-    const totalStr = String(totalBayar);
+    console.log('💰 Nominal yang dicek:', totalBayar);
     
     let foundTransaction = null;
     
     if (data.status === 'success' && data.data) {
       const transactions = Array.isArray(data.data) ? data.data : [data.data];
       
-      foundTransaction = transactions.find(t => {
-        const amount = String(t.amount || '');
-        return amount === totalStr || amount === String(Math.round(totalBayar));
-      });
+      // LOOP SEMUA TRANSAKSI
+      for (const t of transactions) {
+        // AMBIL AMOUNT DALAM ANGKA (BERSIHIN DARI RP, TITIK, KOMA, DLL)
+        let rawAmount = String(t.amount || '');
+        // HAPUS RP, SPASI, TITIK, KOMA
+        let cleanAmount = rawAmount.replace(/[^0-9]/g, '');
+        let amountNumber = parseInt(cleanAmount) || 0;
+        
+        // CEK APAKAH SAMA DENGAN NOMINAL YANG DIHARAPKAN
+        if (amountNumber === totalBayar) {
+          foundTransaction = t;
+          console.log('✅ Transaksi ditemukan:', t);
+          break;
+        }
+        
+        // CEK JUGA KALO FORMATNYA BEDA (MISAL ADA DESIMAL)
+        if (Math.round(amountNumber) === totalBayar) {
+          foundTransaction = t;
+          console.log('✅ Transaksi ditemukan (round):', t);
+          break;
+        }
+      }
     }
     
     if (foundTransaction) {
@@ -1344,7 +1363,7 @@ function buildQR(a){
   return base+tag+"6304"+crc16(base+tag+"6304");
 }
 
-// ================= UPDATE DISPLAY =================
+// ================= UPDATE DISPLAY (FIXED) =================
 function updateDisplay(){
   uniqueCode = generateUniqueCode();
   document.getElementById('uniqueCode').textContent = uniqueCode;
@@ -1353,6 +1372,7 @@ function updateDisplay(){
   
   const totalDenganUnik = finalTotal + uniqueCode + adminFee;
   
+  // UPDATE DISPLAY
   let detailHtml = `
   <strong>ID Transaksi:</strong> ${trx}<br>
   <strong>Layanan:</strong> ${layanan}<br>
@@ -1379,6 +1399,7 @@ function updateDisplay(){
   
   document.getElementById('orderDetails').innerHTML = detailHtml;
   
+  // BUILD QRIS PAKAI NOMINAL YANG SAMA
   QRCode.toCanvas(document.getElementById('qrisCanvas'), buildQR(totalDenganUnik), { width:240 }, function(err){
     if(err) return console.error(err);
     const ctx = document.getElementById('qrisCanvas').getContext("2d");
@@ -1391,6 +1412,9 @@ function updateDisplay(){
       ctx.fillStyle = "#fff";
       ctx.fillRect(x-5,y-5,size+10,size+10);
       ctx.drawImage(logo,x,y,size,size);
+    };
+    logo.onerror = function(){
+      console.warn('Logo tidak ditemukan, melanjutkan tanpa logo');
     };
   });
 }
