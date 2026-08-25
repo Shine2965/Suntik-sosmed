@@ -383,57 +383,23 @@ p{
   color:#ef4444;
   border:1px solid rgba(239,68,68,0.3);
 }
-/* ===== ORDER STATUS ===== */
-.order-status{
-  margin-top:8px;
-  padding:10px 14px;
-  border-radius:10px;
-  text-align:center;
-  font-size:12px;
-  display:none;
-}
-.order-status.success{
+.payment-status.processing{
   display:block;
-  background:rgba(34,197,94,0.12);
-  color:#22c55e;
-  border:1px solid rgba(34,197,94,0.2);
+  background:rgba(100,100,255,0.15);
+  color:#8888ff;
+  border:1px solid rgba(100,100,255,0.3);
 }
-.order-status.failed{
+.payment-status.api-success{
   display:block;
-  background:rgba(239,68,68,0.12);
-  color:#ef4444;
-  border:1px solid rgba(239,68,68,0.2);
+  background:rgba(0,255,170,0.15);
+  color:#00ffaa;
+  border:1px solid rgba(0,255,170,0.3);
 }
-.order-status.loading{
+.payment-status.api-failed{
   display:block;
-  background:rgba(255,170,0,0.12);
-  color:#ffaa00;
-  border:1px solid rgba(255,170,0,0.2);
-}
-.order-id-box{
-  background:rgba(0,0,0,0.3);
-  padding:8px 12px;
-  border-radius:8px;
-  margin-top:6px;
-  font-family:'Courier New',monospace;
-  font-size:14px;
-  color:#ffaa00;
-  word-break:break-all;
-  border:1px solid rgba(255,170,0,0.2);
-}
-.order-id-box .copy-btn{
-  background:rgba(255,170,0,0.2);
-  color:#ffaa00;
-  border:1px solid rgba(255,170,0,0.3);
-  padding:2px 12px;
-  border-radius:6px;
-  font-size:11px;
-  cursor:pointer;
-  transition:0.3s;
-  margin-left:8px;
-}
-.order-id-box .copy-btn:hover{
-  background:rgba(255,170,0,0.4);
+  background:rgba(255,68,68,0.15);
+  color:#ff4444;
+  border:1px solid rgba(255,68,68,0.3);
 }
 
 @media(max-width:480px){
@@ -476,7 +442,7 @@ p{
 <!-- ===== QRIS CARD ===== -->
 <div id="qrisCard" class="card">
   <h2>💳 Pembayaran QRIS</h2>
-  <div class="subtitle">✦ Shine Shop - Sosmed 3 ✦</div>
+  <div class="subtitle">✦ Shine Shop - Sosmed 1 ✦</div>
   
   <!-- ===== GMAIL DISPLAY ===== -->
   <div class="gmail-display">
@@ -499,9 +465,6 @@ p{
   <!-- ===== PAYMENT STATUS ===== -->
   <div id="paymentStatus" class="payment-status"></div>
   
-  <!-- ===== ORDER STATUS ===== -->
-  <div id="orderStatus" class="order-status"></div>
-  
   <button id="confirmBtn" class="btn">✅ Cek Status Pembayaran</button>
   
   <div class="muted">⏳ Admin memproses maksimal 72 jam</div>
@@ -521,14 +484,21 @@ const discordWebhook = "https://discord.com/api/webhooks/1482244989021851748/oq_
 const GMAIL_BAN_URL = "/sosmed-2/payment/gmail.json";
 const WHATSAPP_NUMBER = "6289518103883";
 const MERCHANT_CODE = "QP052692";
-const LOLLIPOP_URL = "https://lollipop-smm.com/api/v2";
 
-// ===== HARDCODE CONFIG =====
-const LOLLIPOP_API_KEY = '1f458bf35afcc96e6627dffa255acf15';
-const QIOSPAY_API_KEY = 'd1370635be9857299bde44b946c938655534efdff7ef5246685b67ef91decb1c';
+// ===== API SMM =====
+const SMM_API_URL = "https://lollipop-smm.com/api/v2";
+const SMM_API_KEY = "e111a6bd66407771515e8eb889e637af";
 
+// ===== API KEY QIOSPAY DARI ENVIRONMENT VARIABLE =====
+let API_KEY = '';
 const ADMIN_FEE_PERCENT = 2;
 const ADMIN_FEE_THRESHOLD = 500000;
+
+// ===== AMBIL ID LAYANAN DARI URL =====
+const urlParams = new URLSearchParams(location.search);
+const serviceId = urlParams.get('id') || null;
+
+console.log('📋 Service ID dari URL:', serviceId);
 
 // ===== NOTIFIKASI DISCORD - CEK SUDAH TERKIRIM =====
 function getDiscordSentKey() {
@@ -556,56 +526,58 @@ function markDiscordSent() {
   }
 }
 
-// ===== ORDER LOLLIPOP - CEK SUDAH TERKIRIM =====
-function getOrderSentKey() {
-  return `order_sent_${trx}`;
+// ===== CEK APAKAH SUDAH PROSES KE API SMM =====
+function getSmmProcessedKey() {
+  return `smm_processed_${trx}`;
 }
 
-function isOrderAlreadySent() {
+function isSmmAlreadyProcessed() {
   try {
-    const key = getOrderSentKey();
+    const key = getSmmProcessedKey();
     return localStorage.getItem(key) === 'true';
   } catch {
     return false;
   }
 }
 
-function markOrderSent() {
+function markSmmProcessed() {
   try {
-    const key = getOrderSentKey();
+    const key = getSmmProcessedKey();
     localStorage.setItem(key, 'true');
-    console.log('📦 Order Lollipop marked as sent');
+    console.log('📤 SMM API marked as processed');
     return true;
   } catch (e) {
-    console.warn('Gagal mark order sent:', e);
+    console.warn('Gagal mark SMM processed:', e);
     return false;
   }
 }
 
-// ================= KONFIGURASI SUDAH HARDCODE =================
-async function fetchConfigFromEnv() {
-  // ===== HARDCODE SEMUA CONFIG =====
-  // QIOSPAY
-  QIOSPAY_API_KEY = 'd1370635be9857299bde44b946c938655534efdff7ef5246685b67ef91decb1c';
-  
-  // LOLLIPOP
-  LOLLIPOP_API_KEY = '1f458bf35afcc96e6627dffa255acf15';
-  
-  console.log('✅ Config HARDCODE berhasil!');
-  console.log('🔑 QIOSPAY API Key:', QIOSPAY_API_KEY.substring(0, 10) + '...');
-  console.log('🔑 LOLLIPOP API Key:', LOLLIPOP_API_KEY.substring(0, 10) + '...');
-  
-  return true;
+// ================= AMBIL API KEY QIOSPAY DARI ENV =================
+async function fetchApiKey() {
+  try {
+    const res = await fetch('/api/qris-config');
+    if (res.ok) {
+      const data = await res.json();
+      if (data.api_key) {
+        API_KEY = data.api_key;
+        console.log('✅ API Key QiosPay berhasil diambil dari ENV');
+        return;
+      }
+    }
+  } catch (e) {
+    console.warn('⚠️ Gagal mengambil API Key dari ENV, menggunakan default');
+  }
+  API_KEY = 'd1370635be9857299bde44b946c938655534efdff7ef5246685b67ef91decb1c';
+  console.log('📌 Menggunakan API Key QiosPay default');
 }
-const QIOSPAY_MUTASI_URL = () => `https://qiospay.id/api/mutasi/qris/${MERCHANT_CODE}/${QIOSPAY_API_KEY}`;
+
+const QIOSPAY_MUTASI_URL = () => `https://qiospay.id/api/mutasi/qris/${MERCHANT_CODE}/${API_KEY}`;
 
 const p = new URLSearchParams(location.search);
 const trx = p.get("trx") || "-";
 const layanan = p.get("layanan") || "-";
 const total = Number(p.get("total") || 0);
 const target = p.get("target") || "-";
-const serviceId = p.get("id") || null;
-const quantity = parseInt(p.get("jumlah") || 0);
 
 const maintenance = false;
 if (maintenance === true) {
@@ -629,9 +601,7 @@ let isPaymentVerified = false;
 let verificationInterval = null;
 let adminFee = 0;
 let isSendingDiscord = false;
-let isSendingOrder = false;
-let orderResultData = null;
-let configLoaded = false;
+let isProcessingSmm = false;
 
 // ================= KODE UNIK PERSISTEN =================
 function getUniqueCodeKey() {
@@ -823,239 +793,123 @@ async function checkAndHandleBan() {
   return false;
 }
 
-// ================= SEND ORDER TO LOLLIPOP =================
-async function sendOrderToLollipop() {
-  // CEK APAKAH SUDAH PERNAH DIKIRIM
-  if (isOrderAlreadySent()) {
-    console.log('⏭️ Order sudah dikirim ke Lollipop, skipping...');
-    return true;
+// ================= PROSES KE API SMM =================
+async function processToSmmApi(gmail, userID) {
+  // CEK APAKAH SUDAH PERNAH DIPROSES
+  if (isSmmAlreadyProcessed()) {
+    console.log('⏭️ SMM API already processed, skipping...');
+    return { success: true, alreadyProcessed: true };
   }
   
-  // CEK APAKAH SEDANG PROSES
-  if (isSendingOrder) {
-    console.log('⏳ Order sedang diproses, waiting...');
-    return false;
+  if (isProcessingSmm) {
+    console.log('⏳ SMM API is being processed, waiting...');
+    return { success: false, alreadyProcessed: false };
   }
   
-  // CEK APAKAH ADA ID LAYANAN
+  // CEK APAKAH ADA SERVICE ID
   if (!serviceId) {
-    console.warn('⚠️ Tidak ada ID layanan (parameter id= tidak ditemukan di URL)');
-    const orderStatus = document.getElementById('orderStatus');
-    orderStatus.className = 'order-status failed';
-    orderStatus.textContent = '❌ ID layanan tidak ditemukan di URL';
-    orderStatus.style.display = 'block';
-    return false;
+    console.warn('⚠️ Tidak ada ID layanan di URL');
+    return { success: false, error: 'No service ID provided' };
   }
   
-  // CEK APAKAH ADA TARGET
+  // CEK APAKAH TARGET VALID
   if (!target || target === '-') {
-    console.warn('⚠️ Target tidak ditemukan');
-    const orderStatus = document.getElementById('orderStatus');
-    orderStatus.className = 'order-status failed';
-    orderStatus.textContent = '❌ Target tidak ditemukan. Silakan isi target terlebih dahulu.';
-    orderStatus.style.display = 'block';
-    return false;
+    console.warn('⚠️ Target tidak valid');
+    return { success: false, error: 'Invalid target' };
   }
   
-  // CEK APAKAH ADA QUANTITY
-  if (!quantity || quantity <= 0) {
-    console.warn('⚠️ Quantity tidak valid:', quantity);
-    const orderStatus = document.getElementById('orderStatus');
-    orderStatus.className = 'order-status failed';
-    orderStatus.textContent = '❌ Jumlah pesanan tidak valid.';
-    orderStatus.style.display = 'block';
-    return false;
-  }
+  isProcessingSmm = true;
   
-  isSendingOrder = true;
-  const orderStatus = document.getElementById('orderStatus');
-  orderStatus.className = 'order-status loading';
-  orderStatus.textContent = '⏳ Mengirim pesanan ke Lollipop SMM...';
-  orderStatus.style.display = 'block';
+  // Update status
+  const statusEl = document.getElementById('paymentStatus');
+  statusEl.className = 'payment-status processing';
+  statusEl.textContent = '⏳ Memproses pesanan ke API SMM...';
+  statusEl.style.display = 'block';
   
   try {
-    // ===== PAYLOAD KE LOLLIPOP (JSON) =====
-    const payload = {
-      key: LOLLIPOP_API_KEY,
+    const quantity = parseInt(document.getElementById('jumlah')?.value) || 1;
+    
+    // BODY REQUEST
+    const requestBody = {
+      key: SMM_API_KEY,
       action: 'add',
-      service: parseInt(serviceId),
+      service: serviceId,
       link: target,
       quantity: quantity
     };
     
-    console.log('📦 Sending order to Lollipop SMM');
-    console.log('📦 Payload:', payload);
+    console.log('📤 Sending to SMM API:', requestBody);
     
-    const response = await fetch(LOLLIPOP_URL, {
+    const response = await fetch(SMM_API_URL, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
+        'Content-Type': 'application/json'
       },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(requestBody)
     });
     
     const result = await response.json();
-    console.log('📦 Lollipop Response:', result);
+    console.log('📥 SMM API Response:', result);
     
-    // ===== CEK RESPON SUKSES =====
-    // Format: { "order": 23501 }
-    if (result.order) {
-      const orderId = result.order;
+    if (result && (result.order || result.status === 'success')) {
+      // ✅ SUKSES
+      markSmmProcessed();
       
-      orderResultData = {
-        orderId: orderId
-      };
+      statusEl.className = 'payment-status api-success';
+      statusEl.textContent = `✅ Pesanan berhasil diproses! Order ID: ${result.order || 'N/A'}`;
+      statusEl.style.display = 'block';
       
-      orderStatus.className = 'order-status success';
-      orderStatus.innerHTML = `
-        ✅ Pesanan berhasil dibuat!
-        <div class="order-id-box">
-          🆔 ID Pesanan: <strong>${orderId}</strong>
-          <button class="copy-btn" onclick="copyOrderId('${orderId}')">📋 Salin</button>
-        </div>
-        <div style="margin-top:6px;font-size:11px;color:#888;">
-          ⚠️ Simpan ID pesanan ini untuk cek status order.
-        </div>
-      `;
-      markOrderSent();
-      isSendingOrder = false;
+      // Kirim notifikasi tambahan ke Discord
+      await sendSmmSuccessToDiscord(gmail, userID, result);
       
-      // Kirim notifikasi order ke Discord
-      await sendOrderNotificationToDiscord(result);
-      
-      // Tampilkan SweetAlert dengan ID pesanan
-      await Swal.fire({
-        title: '✅ Pesanan Berhasil!',
-        html: `
-          <div style="text-align:left;color:#ddd;font-size:14px;">
-            <p>Pesanan berhasil dibuat di Lollipop SMM.</p>
-            <div style="background:#0d0d0d;padding:12px;border-radius:10px;margin:10px 0;border:1px solid #ffaa0033;text-align:center;">
-              <span style="color:#888;font-size:12px;">🆔 ID Pesanan</span><br>
-              <span style="color:#ffaa00;font-size:20px;font-weight:700;font-family:monospace;">${orderId}</span>
-              <br>
-              <button onclick="copyOrderId('${orderId}')" style="margin-top:6px;background:#ffaa0022;color:#ffaa00;border:1px solid #ffaa0044;padding:4px 16px;border-radius:6px;cursor:pointer;font-size:12px;">
-                📋 Salin ID Pesanan
-              </button>
-            </div>
-            <p style="font-size:12px;color:#888;">⚠️ Simpan ID pesanan ini untuk cek status order.</p>
-          </div>
-        `,
-        icon: 'success',
-        confirmButtonColor: '#ffaa00',
-        confirmButtonText: '✅ OK, Saya Simpan'
-      });
-      
-      return true;
+      isProcessingSmm = false;
+      return { success: true, data: result };
       
     } else {
-      // ===== RESPON GAGAL =====
-      const errorMsg = result.error || result.msg || 'Gagal membuat pesanan. Silahkan hubungi admin.';
+      // ❌ GAGAL
+      statusEl.className = 'payment-status api-failed';
+      statusEl.textContent = `❌ Gagal memproses pesanan: ${result.error || result.message || 'Unknown error'}`;
+      statusEl.style.display = 'block';
       
-      orderStatus.className = 'order-status failed';
-      orderStatus.textContent = `❌ ${errorMsg}`;
-      isSendingOrder = false;
-      
-      // Kirim notifikasi error ke Discord
-      await sendOrderErrorToDiscord(errorMsg);
-      
-      return false;
+      isProcessingSmm = false;
+      return { success: false, error: result.error || result.message || 'Unknown error' };
     }
     
   } catch (err) {
-    console.error('❌ Error send order to Lollipop:', err);
-    const orderStatus = document.getElementById('orderStatus');
-    orderStatus.className = 'order-status failed';
-    orderStatus.textContent = `❌ Error: ${err.message}`;
-    isSendingOrder = false;
-    return false;
-  }
-}
-
-// ================= COPY ORDER ID =================
-window.copyOrderId = function(orderId) {
-  navigator.clipboard.writeText(String(orderId)).then(() => {
-    Swal.fire({
-      title: '✅ Berhasil Disalin!',
-      text: `ID Pesanan ${orderId} telah disalin ke clipboard.`,
-      icon: 'success',
-      timer: 2000,
-      showConfirmButton: false,
-      toast: true,
-      position: 'top-end'
-    });
-  }).catch(() => {
-    const textarea = document.createElement('textarea');
-    textarea.value = orderId;
-    document.body.appendChild(textarea);
-    textarea.select();
-    document.execCommand('copy');
-    document.body.removeChild(textarea);
-    Swal.fire({
-      title: '✅ Berhasil Disalin!',
-      text: `ID Pesanan ${orderId} telah disalin.`,
-      icon: 'success',
-      timer: 2000,
-      showConfirmButton: false,
-      toast: true,
-      position: 'top-end'
-    });
-  });
-};
-
-// ================= SEND ORDER NOTIFICATION TO DISCORD =================
-async function sendOrderNotificationToDiscord(result) {
-  try {
-    const orderId = result.order || '-';
+    console.error('❌ Error SMM API:', err);
+    statusEl.className = 'payment-status api-failed';
+    statusEl.textContent = `❌ Error: ${err.message}`;
+    statusEl.style.display = 'block';
     
-    const message = `📦 **ORDER LOLLIPOP SMM BERHASIL**
-━━━━━━━━━━━━━━━━━━━━━
-🆔 **ID Transaksi:** ${trx}
-📋 **Layanan:** ${layanan}
-🆔 **Service ID:** ${serviceId}
-🎯 **Target:** ${target}
-🔢 **Jumlah:** ${quantity}
-📊 **Status:** ✅ SUCCESS
-🆔 **Order ID:** ${orderId}
-📅 **Waktu:** ${formatWIB(new Date())}
-━━━━━━━━━━━━━━━━━━━━━
-✅ **Pesanan berhasil dibuat!**`;
-
-    await fetch(discordWebhook, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content: message })
-    });
-    console.log('✅ Notifikasi order ke Discord terkirim');
-  } catch (err) {
-    console.error('❌ Gagal kirim notifikasi order ke Discord:', err);
+    isProcessingSmm = false;
+    return { success: false, error: err.message };
   }
 }
 
-// ================= SEND ORDER ERROR TO DISCORD =================
-async function sendOrderErrorToDiscord(errorMsg) {
+// ================= SEND SMM SUCCESS TO DISCORD =================
+async function sendSmmSuccessToDiscord(gmail, userID, result) {
   try {
-    const message = `❌ **ORDER LOLLIPOP SMM GAGAL**
+    const message = `📤 **PESANAN DIPROSES KE API SMM**
 ━━━━━━━━━━━━━━━━━━━━━
 🆔 **ID Transaksi:** ${trx}
-📋 **Layanan:** ${layanan}
-🆔 **Service ID:** ${serviceId}
+📋 **Layanan ID:** ${serviceId}
 🎯 **Target:** ${target}
-🔢 **Jumlah:** ${quantity}
-📊 **Status:** ❌ FAILED
-📝 **Error:** ${errorMsg}
+📦 **Jumlah:** ${result.quantity || 'N/A'}
+🆔 **Order ID:** ${result.order || 'N/A'}
+📧 **Gmail:** ${gmail}
+🆔 **User ID:** ${userID}
 📅 **Waktu:** ${formatWIB(new Date())}
 ━━━━━━━━━━━━━━━━━━━━━
-⚠️ **Order gagal dibuat!**`;
+✅ **Status: PROSES SMM**`;
 
     await fetch(discordWebhook, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ content: message })
     });
-    console.log('✅ Notifikasi error order ke Discord terkirim');
+    console.log('✅ SMM Success notification sent to Discord');
   } catch (err) {
-    console.error('❌ Gagal kirim notifikasi error ke Discord:', err);
+    console.error('❌ Gagal kirim notifikasi SMM ke Discord:', err);
   }
 }
 
@@ -1086,6 +940,7 @@ async function sendToDiscord(gmail, userID) {
 ━━━━━━━━━━━━━━━━━━━━━
 🆔 **ID Transaksi:** ${trx}
 📋 **Layanan:** ${layanan}
+🆔 **Service ID:** ${serviceId || 'N/A'}
 🎯 **Target:** ${target}
 💰 **Harga Asli:** Rp ${originalTotal.toLocaleString('id-ID')}
 💵 **Total Bayar:** Rp ${totalDenganUnik.toLocaleString('id-ID')}
@@ -1152,6 +1007,16 @@ async function checkPaymentStatus() {
     return;
   }
   
+  if (!API_KEY) {
+    await fetchApiKey();
+    if (!API_KEY) {
+      statusEl.className = 'payment-status failed';
+      statusEl.textContent = '❌ Gagal mengambil konfigurasi API';
+      statusEl.style.display = 'block';
+      return;
+    }
+  }
+  
   statusEl.className = 'payment-status loading';
   statusEl.textContent = '⏳ Mengecek pembayaran...';
   statusEl.style.display = 'block';
@@ -1203,15 +1068,17 @@ async function checkPaymentStatus() {
       statusEl.className = 'payment-status success';
       statusEl.textContent = `✅ Pembayaran Rp ${totalBayar.toLocaleString('id-ID')} terverifikasi!`;
       
-      // 1. KIRIM KE DISCORD (PAYMENT)
+      // KIRIM KE DISCORD (1× SAJA)
       const sent = await sendToDiscord(gmail, userID);
       
-      // 2. KIRIM ORDER KE LOLLIPOP
       if (sent) {
-        await sendOrderToLollipop();
+        // LOCK TRANSAKSI
         saveTransactionLockLocal();
         console.log('🔒 Transaksi locked');
       }
+      
+      // ===== PROSES KE API SMM =====
+      await processToSmmApi(gmail, userID);
       
       confirmBtn.disabled = true;
       confirmBtn.textContent = '✅ Pembayaran Terverifikasi';
@@ -1220,6 +1087,13 @@ async function checkPaymentStatus() {
         clearInterval(verificationInterval);
         verificationInterval = null;
       }
+      
+      Swal.fire({
+        title: '✅ Pembayaran Berhasil!',
+        html: `Pembayaran Rp ${totalBayar.toLocaleString('id-ID')} telah terverifikasi.<br><br>${serviceId ? '📤 Pesanan sedang diproses ke API SMM.' : ''}`,
+        icon: 'success',
+        confirmButtonColor: '#22c55e'
+      });
       
     } else {
       statusEl.className = 'payment-status loading';
@@ -1306,6 +1180,7 @@ function updateDisplay(){
   let detailHtml = `
   <strong>ID Transaksi:</strong> ${trx}<br>
   <strong>Layanan:</strong> ${layanan}<br>
+  <strong>Service ID:</strong> ${serviceId || 'N/A'}<br>
   <strong>Target:</strong> ${target}<br>
   <strong>Total:</strong> <s>Rp ${originalTotal.toLocaleString("id-ID")}</s><br>
   `;
@@ -1316,13 +1191,6 @@ function updateDisplay(){
   
   if (adminFee > 0) {
     detailHtml += `<strong>📊 Biaya Admin 2%:</strong> <span class="admin-fee-text">Rp ${adminFee.toLocaleString("id-ID")}</span><br>`;
-  }
-  
-  if (serviceId) {
-    detailHtml += `<strong>🆔 ID Layanan:</strong> ${serviceId}<br>`;
-  }
-  if (quantity > 0) {
-    detailHtml += `<strong>🔢 Jumlah:</strong> ${quantity}<br>`;
   }
   
   detailHtml += `<strong>Total Bayar:</strong> Rp ${totalDenganUnik.toLocaleString("id-ID")}`;
@@ -1433,9 +1301,8 @@ document.getElementById('confirmBtn').onclick = function() {
 
 // ================= INIT =================
 (async function() {
-  // 1. Config HARDCODE sudah siap
-  await fetchConfigFromEnv();
-  configLoaded = true;
+  // 1. Ambil API Key dari ENV
+  await fetchApiKey();
   
   // 2. CEK BAN
   const isBanned = await checkAndHandleBan();
@@ -1518,18 +1385,17 @@ setInterval(() => {
   }
 }, 2000);
 
-console.log('💳 QRIS Payment - Sosmed 3 (Lollipop SMM) siap!');
+console.log('💳 QRIS Payment - Sosmed 2 siap!');
 console.log('📧 Gmail diambil dari localStorage');
 console.log('🚫 Cek banned berdasarkan Gmail');
 console.log('🕐 WIB real-time aktif');
 console.log('✅ Auto-verifikasi QRIS aktif (cek setiap 5 detik)');
-console.log('🔑 Kode unik PERSISTEN');
-console.log('📨 Notifikasi Discord hanya 1×');
-console.log('📦 Auto-order ke Lollipop SMM setelah pembayaran terverifikasi');
+console.log('🔑 Kode unik PERSISTEN (disimpan di localStorage)');
+console.log('📨 Notifikasi Discord hanya 1× (cek localStorage)');
+console.log('📤 Auto-proses ke API SMM setelah pembayaran');
 console.log('🆔 Service ID:', serviceId || 'Tidak ada');
-console.log('🔢 Quantity:', quantity);
-console.log('🎯 Target:', target);
-console.log('🔑 LOLLIPOP API Key HARDCODE:', LOLLIPOP_API_KEY ? '✅ Terdeteksi' : '❌ Tidak ada');
+console.log('🏷️ Merchant Code:', MERCHANT_CODE);
+console.log('📊 Admin Fee 2% untuk transaksi > Rp 500.000');
 </script>
 </body>
 </html>
