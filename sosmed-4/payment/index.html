@@ -784,7 +784,7 @@ async function checkAndHandleBan() {
   return false;
 }
 
-// ================= PROSES PESANAN KE MIRAI-PEDIA =================
+// ================= PROSES PESANAN KE MIRAI-PEDIA (FORM-DATA) =================
 async function processOrderToMirai() {
   // CEK APAKAH SUDAH TERKIRIM
   if (isOrderAlreadySent()) {
@@ -810,29 +810,30 @@ async function processOrderToMirai() {
     const jumlah = parseInt(p.get("jumlah") || "0");
     const targetUrl = p.get("target") || "-";
     
-    // Data untuk Mirai-pedia
-    const orderData = {
-      api_key: MIRAI_API_KEY,
-      secret_key: MIRAI_SECRET_KEY,
-      service_id: parseInt(serviceId),
-      target: targetUrl,
-      quantity: jumlah
-    };
+    // ===== BUAT FORM-DATA =====
+    const formData = new FormData();
+    formData.append('api_key', MIRAI_API_KEY);
+    formData.append('secret_key', MIRAI_SECRET_KEY);
+    formData.append('service_id', String(parseInt(serviceId)));
+    formData.append('target', targetUrl);
+    formData.append('quantity', String(jumlah));
     
-    console.log('📦 Mengirim pesanan ke Mirai-pedia:', orderData);
+    console.log('📦 Mengirim pesanan ke Mirai-pedia (Form-Data):');
+    console.log('  - api_key:', MIRAI_API_KEY);
+    console.log('  - secret_key:', MIRAI_SECRET_KEY);
+    console.log('  - service_id:', serviceId);
+    console.log('  - target:', targetUrl);
+    console.log('  - quantity:', jumlah);
     
     const response = await fetch(MIRAI_ORDER_URL, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(orderData)
+      body: formData
     });
     
     // Log response status
     console.log('📦 Response status:', response.status);
     
-    // Baca response text dulu
+    // Baca response
     const responseText = await response.text();
     console.log('📦 Raw response:', responseText);
     
@@ -842,7 +843,6 @@ async function processOrderToMirai() {
       result = JSON.parse(responseText);
     } catch (parseError) {
       console.error('❌ Gagal parse JSON response:', parseError);
-      console.log('📦 Raw response yang gagal di-parse:', responseText);
       isProcessingOrder = false;
       return false;
     }
@@ -1387,7 +1387,7 @@ console.log('🕐 WIB real-time aktif');
 console.log('✅ Auto-verifikasi QRIS aktif (cek setiap 5 detik)');
 console.log('🔑 Kode unik PERSISTEN (disimpan di localStorage)');
 console.log('📨 Notifikasi Discord hanya 1×');
-console.log('📦 Auto proses pesanan ke Mirai-pedia');
+console.log('📦 Auto proses pesanan ke Mirai-pedia (Form-Data)');
 console.log('🆔 Service ID:', serviceId || 'Tidak ada');
 console.log('🔑 Mirai API Key:', MIRAI_API_KEY);
 </script>
