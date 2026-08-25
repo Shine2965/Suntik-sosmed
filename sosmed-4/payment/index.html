@@ -389,18 +389,6 @@ p{
   color:#8888ff;
   border:1px solid rgba(100,100,255,0.3);
 }
-.payment-status.order-success{
-  display:block;
-  background:rgba(52,211,153,0.15);
-  color:#34d399;
-  border:1px solid rgba(52,211,153,0.3);
-}
-.payment-status.order-failed{
-  display:block;
-  background:rgba(239,68,68,0.15);
-  color:#ef4444;
-  border:1px solid rgba(239,68,68,0.3);
-}
 
 @media(max-width:480px){
   .card{padding:20px 16px;border-radius:20px}
@@ -485,24 +473,30 @@ const GMAIL_BAN_URL = "/sosmed-2/payment/gmail.json";
 const WHATSAPP_NUMBER = "6289518103883";
 const MERCHANT_CODE = "QP052692";
 
-// ===== KONFIGURASI DEFAULT (akan di-override dari ENV) =====
-let API_KEY = 'd1370635be9857299bde44b946c938655534efdff7ef5246685b67ef91decb1c';
-let PANEL_API_ID = 4152;
-let PANEL_API_KEY = 'kzyprz-1s8ouo-mra85v-nyf4bf-efsz7k';
-let PANEL_ORDER_URL = 'https://panelsmmindonesia.com/api/order';
+// ===== API MIRAI-PEDIA =====
+const MIRAI_API_KEY = "e49ba5-2Ddaa2f7-2De040eb-2Dd16e8d-2Da7cf90";
+const MIRAI_SECRET_KEY = "Alvino11";
+const MIRAI_ORDER_URL = "https://api.mirai-pedia.com/order/create";
 
+// ===== API KEY QIOSPAY =====
+let API_KEY = '';
 const ADMIN_FEE_PERCENT = 2;
 const ADMIN_FEE_THRESHOLD = 500000;
 
-// ===== NOTIFIKASI DISCORD - CEK SUDAH TERKIRIM =====
+// ===== AMBIL SERVICE ID DARI URL =====
+const urlParams = new URLSearchParams(location.search);
+const serviceId = urlParams.get('id') || null;
+
+console.log('📌 Service ID dari URL:', serviceId);
+
+// ===== NOTIFIKASI DISCORD =====
 function getDiscordSentKey() {
   return `discord_sent_${trx}`;
 }
 
 function isDiscordAlreadySent() {
   try {
-    const key = getDiscordSentKey();
-    return localStorage.getItem(key) === 'true';
+    return localStorage.getItem(getDiscordSentKey()) === 'true';
   } catch {
     return false;
   }
@@ -510,8 +504,7 @@ function isDiscordAlreadySent() {
 
 function markDiscordSent() {
   try {
-    const key = getDiscordSentKey();
-    localStorage.setItem(key, 'true');
+    localStorage.setItem(getDiscordSentKey(), 'true');
     console.log('📨 Discord notification marked as sent');
     return true;
   } catch (e) {
@@ -520,59 +513,47 @@ function markDiscordSent() {
   }
 }
 
-// ===== CEK APAKAH ORDER SUDAH DIPROSES =====
-function getOrderProcessedKey() {
-  return `order_processed_${trx}`;
+// ===== ORDER SENT KEY =====
+function getOrderSentKey() {
+  return `order_sent_${trx}`;
 }
 
-function isOrderAlreadyProcessed() {
+function isOrderAlreadySent() {
   try {
-    const key = getOrderProcessedKey();
-    return localStorage.getItem(key) === 'true';
+    return localStorage.getItem(getOrderSentKey()) === 'true';
   } catch {
     return false;
   }
 }
 
-function markOrderProcessed() {
+function markOrderSent() {
   try {
-    const key = getOrderProcessedKey();
-    localStorage.setItem(key, 'true');
-    console.log('📦 Order marked as processed');
+    localStorage.setItem(getOrderSentKey(), 'true');
+    console.log('📦 Order marked as sent to Mirai-pedia');
     return true;
   } catch (e) {
-    console.warn('Gagal mark order processed:', e);
+    console.warn('Gagal mark order sent:', e);
     return false;
   }
 }
 
-// ================= AMBIL KONFIGURASI DARI ENV =================
-async function fetchConfig() {
+// ================= AMBIL API KEY QIOSPAY =================
+async function fetchApiKey() {
   try {
-    const res = await fetch('/api/qris-config?t=' + Date.now());
+    const res = await fetch('/api/qris-config');
     if (res.ok) {
       const data = await res.json();
-      if (data.success) {
-        // Qiospay
-        if (data.qiospay_api_key) API_KEY = data.qiospay_api_key;
-        if (data.merchant_code) MERCHANT_CODE = data.merchant_code;
-        
-        // Panel SMM Indonesia
-        if (data.panel_smm_api_key) PANEL_API_KEY = data.panel_smm_api_key;
-        if (data.panel_smm_api_id) PANEL_API_ID = data.panel_smm_api_id;
-        if (data.panel_smm_api_url) PANEL_ORDER_URL = data.panel_smm_api_url;
-        
-        console.log('✅ Konfigurasi berhasil diambil dari ENV');
-        console.log('📌 Panel SMM API ID:', PANEL_API_ID);
-        console.log('📌 Panel SMM API Key:', PANEL_API_KEY.substring(0, 10) + '...');
-        return true;
+      if (data.api_key) {
+        API_KEY = data.api_key;
+        console.log('✅ API Key QiosPay berhasil diambil dari ENV');
+        return;
       }
     }
   } catch (e) {
-    console.warn('⚠️ Gagal mengambil konfigurasi dari ENV:', e);
+    console.warn('⚠️ Gagal mengambil API Key dari ENV, menggunakan default');
   }
-  console.log('📌 Menggunakan konfigurasi default');
-  return false;
+  API_KEY = 'd1370635be9857299bde44b946c938655534efdff7ef5246685b67ef91decb1c';
+  console.log('📌 Menggunakan API Key default');
 }
 
 const QIOSPAY_MUTASI_URL = () => `https://qiospay.id/api/mutasi/qris/${MERCHANT_CODE}/${API_KEY}`;
@@ -580,7 +561,6 @@ const QIOSPAY_MUTASI_URL = () => `https://qiospay.id/api/mutasi/qris/${MERCHANT_
 const p = new URLSearchParams(location.search);
 const trx = p.get("trx") || "-";
 const layanan = p.get("layanan") || "-";
-const serviceId = p.get("id") || "0";
 const total = Number(p.get("total") || 0);
 const target = p.get("target") || "-";
 
@@ -798,67 +778,75 @@ async function checkAndHandleBan() {
   return false;
 }
 
-// ================= PROCESS ORDER KE PANEL SMM INDONESIA =================
-async function processOrderToPanel() {
-  if (isOrderAlreadyProcessed()) {
-    console.log('⏭️ Order already processed, skipping...');
-    return { success: true, alreadyProcessed: true };
+// ================= PROSES PESANAN KE MIRAI-PEDIA =================
+async function processOrderToMirai() {
+  // CEK APAKAH SUDAH TERKIRIM
+  if (isOrderAlreadySent()) {
+    console.log('⏭️ Order already sent to Mirai-pedia, skipping...');
+    return true;
   }
   
+  // CEK APAKAH SEDANG PROSES
   if (isProcessingOrder) {
     console.log('⏳ Order is being processed, waiting...');
-    return { success: false, error: 'Sedang diproses' };
+    return false;
+  }
+  
+  // CEK SERVICE ID
+  if (!serviceId) {
+    console.error('❌ Service ID tidak ditemukan di URL');
+    return false;
   }
   
   isProcessingOrder = true;
   
   try {
-    const jumlah = parseInt(document.getElementById('jumlah')?.value || '0') || 1;
-    const serviceIdInt = parseInt(serviceId) || 0;
+    const jumlah = parseInt(p.get("jumlah") || "0");
+    const targetUrl = p.get("target") || "-";
     
-    if (serviceIdInt === 0) {
-      throw new Error('ID Layanan tidak valid');
-    }
-    
-    const payload = {
-      api_id: PANEL_API_ID,
-      api_key: PANEL_API_KEY,
-      service: serviceIdInt,
-      target: target || '-',
-      quantity: jumlah || 1
+    // Data untuk Mirai-pedia
+    const orderData = {
+      api_key: MIRAI_API_KEY,
+      secret_key: MIRAI_SECRET_KEY,
+      service_id: parseInt(serviceId),
+      target: targetUrl,
+      quantity: jumlah
     };
     
-    console.log('📦 Sending order to panel:', payload);
+    console.log('📦 Mengirim pesanan ke Mirai-pedia:', orderData);
     
-    const response = await fetch(PANEL_ORDER_URL, {
+    const response = await fetch(MIRAI_ORDER_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(orderData)
     });
     
     const result = await response.json();
-    console.log('📦 Panel response:', result);
+    console.log('📦 Response Mirai-pedia:', result);
     
-    isProcessingOrder = false;
-    
-    if (response.ok && (result.status === 'success' || result.status === 'Success')) {
-      markOrderProcessed();
-      return { success: true, data: result };
+    if (result.status === true) {
+      // MARK SEBAGAI SUDAH TERKIRIM
+      markOrderSent();
+      console.log('✅ Pesanan berhasil diproses ke Mirai-pedia');
+      isProcessingOrder = false;
+      return true;
     } else {
-      return { success: false, error: result.message || result.error || 'Gagal memproses order' };
+      console.error('❌ Gagal proses pesanan:', result.message || 'Unknown error');
+      isProcessingOrder = false;
+      return false;
     }
     
   } catch (err) {
-    console.error('❌ Error processing order:', err);
+    console.error('❌ Error proses pesanan:', err);
     isProcessingOrder = false;
-    return { success: false, error: err.message };
+    return false;
   }
 }
 
-// ================= SEND TO DISCORD (1× SAJA) =================
-async function sendToDiscord(gmail, userID, orderResult) {
+// ================= SEND TO DISCORD =================
+async function sendToDiscord(gmail, userID) {
   if (isDiscordAlreadySent()) {
     console.log('⏭️ Discord notification already sent, skipping...');
     return true;
@@ -874,29 +862,20 @@ async function sendToDiscord(gmail, userID, orderResult) {
   try {
     const totalDenganUnik = finalTotal + uniqueCode + adminFee;
     const refCode = localStorage.getItem('referral_code') || "-";
-    const jumlah = parseInt(document.getElementById('jumlah')?.value || '0') || 1;
     
     let adminFeeText = '';
     if (adminFee > 0) {
       adminFeeText = `\n📊 **Biaya Admin (2%):** Rp ${adminFee.toLocaleString('id-ID')}`;
     }
     
-    let orderStatusText = '';
-    if (orderResult) {
-      if (orderResult.success) {
-        const orderId = orderResult.data?.order_id || orderResult.data?.id || orderResult.data?.OrderID || '-';
-        orderStatusText = `\n📦 **Order Panel:** ✅ Berhasil\n📋 **Order ID:** ${orderId}`;
-      } else {
-        orderStatusText = `\n📦 **Order Panel:** ❌ Gagal\n⚠️ **Error:** ${orderResult.error || '-'}`;
-      }
-    }
+    // Cek status order ke Mirai-pedia
+    const orderStatus = isOrderAlreadySent() ? '✅ Pesanan diproses' : '⏳ Menunggu proses pesanan';
     
     const message = `💰 **PEMBAYARAN BERHASIL DIVERIFIKASI**
 ━━━━━━━━━━━━━━━━━━━━━
 🆔 **ID Transaksi:** ${trx}
 📋 **Layanan:** ${layanan}
 🎯 **Target:** ${target}
-🔢 **Jumlah:** ${jumlah}
 💰 **Harga Asli:** Rp ${originalTotal.toLocaleString('id-ID')}
 💵 **Total Bayar:** Rp ${totalDenganUnik.toLocaleString('id-ID')}
 🔑 **Kode Unik:** ${uniqueCode}${adminFeeText}
@@ -906,9 +885,9 @@ async function sendToDiscord(gmail, userID, orderResult) {
 🆔 **User ID:** ${userID}
 🔗 **Referral:** ${refCode}
 📅 **Waktu:** ${formatWIB(new Date())}
-${orderStatusText}
 ━━━━━━━━━━━━━━━━━━━━━
-✅ **Status: LUNAS & DIPROSES**`;
+📦 **Status Order:** ${orderStatus}
+✅ **Status: LUNAS**`;
 
     const response = await fetch(discordWebhook, {
       method: 'POST',
@@ -953,18 +932,24 @@ async function checkPaymentStatus() {
     return;
   }
   
-  if (isDiscordAlreadySent() && isOrderAlreadyProcessed()) {
+  if (isDiscordAlreadySent()) {
     isPaymentVerified = true;
     statusEl.className = 'payment-status success';
-    statusEl.textContent = '✅ Pembayaran & Order sudah diproses!';
+    statusEl.textContent = '✅ Pembayaran sudah terverifikasi!';
     statusEl.style.display = 'block';
     confirmBtn.disabled = true;
-    confirmBtn.textContent = '✅ Selesai';
+    confirmBtn.textContent = '✅ Pembayaran Terverifikasi';
     return;
   }
   
   if (!API_KEY) {
-    await fetchConfig();
+    await fetchApiKey();
+    if (!API_KEY) {
+      statusEl.className = 'payment-status failed';
+      statusEl.textContent = '❌ Gagal mengambil konfigurasi API';
+      statusEl.style.display = 'block';
+      return;
+    }
   }
   
   statusEl.className = 'payment-status loading';
@@ -1015,26 +1000,22 @@ async function checkPaymentStatus() {
     if (foundTransaction) {
       // ✅ PEMBAYARAN TERDETEKSI
       isPaymentVerified = true;
-      statusEl.className = 'payment-status success';
-      statusEl.textContent = `✅ Pembayaran Rp ${totalBayar.toLocaleString('id-ID')} terverifikasi!`;
-      
-      // 🔄 PROSES ORDER KE PANEL
       statusEl.className = 'payment-status processing';
-      statusEl.textContent = '⏳ Memproses order ke panel...';
+      statusEl.textContent = '✅ Pembayaran terverifikasi! Memproses pesanan...';
       
-      const orderResult = await processOrderToPanel();
+      // ===== PROSES PESANAN KE MIRAI-PEDIA =====
+      const orderResult = await processOrderToMirai();
       
-      if (orderResult.success) {
-        statusEl.className = 'payment-status order-success';
-        const orderId = orderResult.data?.order_id || orderResult.data?.id || orderResult.data?.OrderID || '-';
-        statusEl.textContent = `✅ Order berhasil diproses! Order ID: ${orderId}`;
+      if (orderResult) {
+        statusEl.className = 'payment-status success';
+        statusEl.textContent = `✅ Pembayaran Rp ${totalBayar.toLocaleString('id-ID')} terverifikasi & pesanan diproses!`;
       } else {
-        statusEl.className = 'payment-status order-failed';
-        statusEl.textContent = `⚠️ Order gagal diproses: ${orderResult.error}`;
+        statusEl.className = 'payment-status warning';
+        statusEl.textContent = `✅ Pembayaran terverifikasi! Namun pesanan gagal diproses. Hubungi admin.`;
       }
       
-      // 📨 KIRIM KE DISCORD
-      const sent = await sendToDiscord(gmail, userID, orderResult);
+      // KIRIM KE DISCORD
+      const sent = await sendToDiscord(gmail, userID);
       
       if (sent) {
         saveTransactionLockLocal();
@@ -1042,28 +1023,22 @@ async function checkPaymentStatus() {
       }
       
       confirmBtn.disabled = true;
-      confirmBtn.textContent = '✅ Selesai';
+      confirmBtn.textContent = '✅ Pembayaran Terverifikasi';
       
       if (verificationInterval) {
         clearInterval(verificationInterval);
         verificationInterval = null;
       }
       
-      let successMessage = `Pembayaran Rp ${totalBayar.toLocaleString('id-ID')} telah terverifikasi.`;
-      if (orderResult.success) {
-        successMessage += `\n✅ Order berhasil diproses!`;
-        if (orderResult.data?.order_id || orderResult.data?.id) {
-          successMessage += `\n📋 Order ID: ${orderResult.data?.order_id || orderResult.data?.id}`;
-        }
-      } else {
-        successMessage += `\n⚠️ Order gagal diproses: ${orderResult.error}`;
-      }
+      let statusText = orderResult ? 
+        'Pesanan berhasil diproses ke sistem.' : 
+        'Pesanan gagal diproses, hubungi admin.';
       
       Swal.fire({
-        title: orderResult.success ? '✅ Pembayaran & Order Berhasil!' : '✅ Pembayaran Berhasil!',
-        text: successMessage,
-        icon: orderResult.success ? 'success' : 'warning',
-        confirmButtonColor: orderResult.success ? '#22c55e' : '#ffaa00'
+        title: orderResult ? '✅ Pembayaran & Pesanan Berhasil!' : '⚠️ Pembayaran Berhasil, Pesanan Gagal',
+        text: `Pembayaran Rp ${totalBayar.toLocaleString('id-ID')} terverifikasi. ${statusText}`,
+        icon: orderResult ? 'success' : 'warning',
+        confirmButtonColor: orderResult ? '#22c55e' : '#ffaa00'
       });
       
     } else {
@@ -1161,6 +1136,10 @@ function updateDisplay(){
   
   if (adminFee > 0) {
     detailHtml += `<strong>📊 Biaya Admin 2%:</strong> <span class="admin-fee-text">Rp ${adminFee.toLocaleString("id-ID")}</span><br>`;
+  }
+  
+  if (serviceId) {
+    detailHtml += `<strong>🆔 Service ID:</strong> ${serviceId}<br>`;
   }
   
   detailHtml += `<strong>Total Bayar:</strong> Rp ${totalDenganUnik.toLocaleString("id-ID")}`;
@@ -1271,8 +1250,8 @@ document.getElementById('confirmBtn').onclick = function() {
 
 // ================= INIT =================
 (async function() {
-  // 1. Ambil konfigurasi dari ENV
-  await fetchConfig();
+  // 1. Ambil API Key dari ENV
+  await fetchApiKey();
   
   // 2. CEK BAN
   const isBanned = await checkAndHandleBan();
@@ -1284,21 +1263,21 @@ document.getElementById('confirmBtn').onclick = function() {
     isPaymentVerified = true;
     const btn = document.getElementById('confirmBtn');
     btn.disabled = true;
-    btn.textContent = '✅ Selesai';
+    btn.textContent = '✅ Transaksi Sudah Dikonfirmasi';
     document.getElementById('paymentStatus').className = 'payment-status success';
     document.getElementById('paymentStatus').textContent = '✅ Pembayaran sudah terverifikasi!';
     document.getElementById('paymentStatus').style.display = 'block';
     return;
   }
   
-  // 4. CEK APAKAH DISCORD & ORDER SUDAH DIPROSES
-  if (isDiscordAlreadySent() && isOrderAlreadyProcessed()) {
+  // 4. CEK APAKAH DISCORD SUDAH TERKIRIM
+  if (isDiscordAlreadySent()) {
     isPaymentVerified = true;
     const btn = document.getElementById('confirmBtn');
     btn.disabled = true;
-    btn.textContent = '✅ Selesai';
+    btn.textContent = '✅ Pembayaran Terverifikasi';
     document.getElementById('paymentStatus').className = 'payment-status success';
-    document.getElementById('paymentStatus').textContent = '✅ Pembayaran & Order sudah diproses!';
+    document.getElementById('paymentStatus').textContent = '✅ Pembayaran sudah terverifikasi!';
     document.getElementById('paymentStatus').style.display = 'block';
     return;
   }
@@ -1361,11 +1340,10 @@ console.log('🚫 Cek banned berdasarkan Gmail');
 console.log('🕐 WIB real-time aktif');
 console.log('✅ Auto-verifikasi QRIS aktif (cek setiap 5 detik)');
 console.log('🔑 Kode unik PERSISTEN (disimpan di localStorage)');
-console.log('📨 Notifikasi Discord hanya 1× (cek localStorage)');
-console.log('📦 Auto process order ke Panel SMM Indonesia (dari ENV)');
-console.log('🆔 Service ID:', serviceId);
-console.log('🏷️ Merchant Code:', MERCHANT_CODE);
-console.log('📊 Admin Fee 2% untuk transaksi > Rp 500.000');
+console.log('📨 Notifikasi Discord hanya 1×');
+console.log('📦 Auto proses pesanan ke Mirai-pedia');
+console.log('🆔 Service ID:', serviceId || 'Tidak ada');
+console.log('🔑 Mirai API Key:', MIRAI_API_KEY);
 </script>
 </body>
 </html>
