@@ -27,14 +27,10 @@ export default function handler(req, res) {
         const fayupediaApiKey = process.env.FAYUPEDIA_API_KEY || '';
         const fayupediaApiId = parseInt(process.env.FAYUPEDIA_API_ID) || 5522;
 
-        // ===== ORDERSOSMED CONFIG =====
-        const ordersosmedApiKey = process.env.ORDERSOSMED_API_KEY || '';
-        const ordersosmedApiId = parseInt(process.env.ORDERSOSMED_API_ID) || 11313;
-        const ordersosmedSecretKey = process.env.ORDERSOSMED_SECRET_KEY || 'Alvino11';
-
-        // ===== LOLLIPOP SMM CONFIG (TAMBAHAN BARU) =====
-        const lollipopApiKey = process.env.LOLLIPOP_API_KEY || '';
-        const lollipopApiUrl = process.env.LOLLIPOP_API_URL || 'https://lollipop-smm.com/api/v2';
+        // ===== PANEL SMM INDONESIA CONFIG =====
+        const panelSmmApiKey = process.env.PANEL_SMM_API_KEY || '';
+        const panelSmmApiId = parseInt(process.env.PANEL_SMM_API_ID) || 4152;
+        const panelSmmApiUrl = process.env.PANEL_SMM_API_URL || '';
 
         // ===== RESPONSE =====
         return res.status(200).json({
@@ -43,16 +39,13 @@ export default function handler(req, res) {
             merchant_code: merchantCode,
             fayupedia_api_key: fayupediaApiKey,
             fayupedia_api_id: fayupediaApiId,
-            ordersosmed_api_key: ordersosmedApiKey,
-            ordersosmed_api_id: ordersosmedApiId,
-            ordersosmed_secret_key: ordersosmedSecretKey,
-            lollipop_api_key: lollipopApiKey,
-            lollipop_api_url: lollipopApiUrl,
+            panel_smm_api_key: panelSmmApiKey,
+            panel_smm_api_id: panelSmmApiId,
+            panel_smm_api_url: panelSmmApiUrl,
             from_env: {
                 qiospay: !!process.env.QIOSPAY_API_KEY,
                 fayupedia: !!process.env.FAYUPEDIA_API_KEY,
-                ordersosmed: !!process.env.ORDERSOSMED_API_KEY,
-                lollipop: !!process.env.LOLLIPOP_API_KEY
+                panel_smm: !!process.env.PANEL_SMM_API_KEY
             }
         });
 
