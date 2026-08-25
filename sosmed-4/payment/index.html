@@ -389,6 +389,12 @@ p{
   color:#8888ff;
   border:1px solid rgba(100,100,255,0.3);
 }
+.payment-status.warning{
+  display:block;
+  background:rgba(255,170,0,0.15);
+  color:#ffaa00;
+  border:1px solid rgba(255,170,0,0.3);
+}
 
 @media(max-width:480px){
   .card{padding:20px 16px;border-radius:20px}
@@ -823,8 +829,25 @@ async function processOrderToMirai() {
       body: JSON.stringify(orderData)
     });
     
-    const result = await response.json();
-    console.log('📦 Response Mirai-pedia:', result);
+    // Log response status
+    console.log('📦 Response status:', response.status);
+    
+    // Baca response text dulu
+    const responseText = await response.text();
+    console.log('📦 Raw response:', responseText);
+    
+    // Parse JSON
+    let result;
+    try {
+      result = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error('❌ Gagal parse JSON response:', parseError);
+      console.log('📦 Raw response yang gagal di-parse:', responseText);
+      isProcessingOrder = false;
+      return false;
+    }
+    
+    console.log('📦 Parsed response:', result);
     
     if (result.status === true) {
       // MARK SEBAGAI SUDAH TERKIRIM
@@ -833,7 +856,10 @@ async function processOrderToMirai() {
       isProcessingOrder = false;
       return true;
     } else {
-      console.error('❌ Gagal proses pesanan:', result.message || 'Unknown error');
+      // Tampilkan error detail dari API
+      const errorMessage = result.message || 'Unknown error';
+      const errors = result.errors ? result.errors.join(', ') : '';
+      console.error('❌ Gagal proses pesanan:', errorMessage, errors);
       isProcessingOrder = false;
       return false;
     }
@@ -846,7 +872,7 @@ async function processOrderToMirai() {
 }
 
 // ================= SEND TO DISCORD =================
-async function sendToDiscord(gmail, userID) {
+async function sendToDiscord(gmail, userID, orderSuccess) {
   if (isDiscordAlreadySent()) {
     console.log('⏭️ Discord notification already sent, skipping...');
     return true;
@@ -868,8 +894,15 @@ async function sendToDiscord(gmail, userID) {
       adminFeeText = `\n📊 **Biaya Admin (2%):** Rp ${adminFee.toLocaleString('id-ID')}`;
     }
     
-    // Cek status order ke Mirai-pedia
-    const orderStatus = isOrderAlreadySent() ? '✅ Pesanan diproses' : '⏳ Menunggu proses pesanan';
+    // Status order
+    let orderStatusText = '';
+    if (orderSuccess === true) {
+      orderStatusText = '✅ Pesanan berhasil diproses';
+    } else if (orderSuccess === false) {
+      orderStatusText = '❌ Pesanan gagal diproses - hubungi admin';
+    } else {
+      orderStatusText = '⏳ Status pesanan tidak diketahui';
+    }
     
     const message = `💰 **PEMBAYARAN BERHASIL DIVERIFIKASI**
 ━━━━━━━━━━━━━━━━━━━━━
@@ -886,7 +919,7 @@ async function sendToDiscord(gmail, userID) {
 🔗 **Referral:** ${refCode}
 📅 **Waktu:** ${formatWIB(new Date())}
 ━━━━━━━━━━━━━━━━━━━━━
-📦 **Status Order:** ${orderStatus}
+📦 **Status Order:** ${orderStatusText}
 ✅ **Status: LUNAS**`;
 
     const response = await fetch(discordWebhook, {
@@ -1004,18 +1037,31 @@ async function checkPaymentStatus() {
       statusEl.textContent = '✅ Pembayaran terverifikasi! Memproses pesanan...';
       
       // ===== PROSES PESANAN KE MIRAI-PEDIA =====
-      const orderResult = await processOrderToMirai();
+      let orderResult = false;
+      let orderErrorDetail = '';
       
+      try {
+        orderResult = await processOrderToMirai();
+        if (!orderResult) {
+          orderErrorDetail = 'Gagal memproses pesanan ke Mirai-pedia. Silakan hubungi admin.';
+        }
+      } catch (orderErr) {
+        console.error('❌ Error saat proses order:', orderErr);
+        orderResult = false;
+        orderErrorDetail = 'Error: ' + (orderErr.message || 'Unknown error');
+      }
+      
+      // UPDATE STATUS
       if (orderResult) {
         statusEl.className = 'payment-status success';
         statusEl.textContent = `✅ Pembayaran Rp ${totalBayar.toLocaleString('id-ID')} terverifikasi & pesanan diproses!`;
       } else {
         statusEl.className = 'payment-status warning';
-        statusEl.textContent = `✅ Pembayaran terverifikasi! Namun pesanan gagal diproses. Hubungi admin.`;
+        statusEl.textContent = `⚠️ Pembayaran terverifikasi! Namun pesanan gagal diproses. ${orderErrorDetail}`;
       }
       
       // KIRIM KE DISCORD
-      const sent = await sendToDiscord(gmail, userID);
+      const sent = await sendToDiscord(gmail, userID, orderResult);
       
       if (sent) {
         saveTransactionLockLocal();
@@ -1032,7 +1078,7 @@ async function checkPaymentStatus() {
       
       let statusText = orderResult ? 
         'Pesanan berhasil diproses ke sistem.' : 
-        'Pesanan gagal diproses, hubungi admin.';
+        'Pesanan gagal diproses, hubungi admin. (Error: ' + orderErrorDetail + ')';
       
       Swal.fire({
         title: orderResult ? '✅ Pembayaran & Pesanan Berhasil!' : '⚠️ Pembayaran Berhasil, Pesanan Gagal',
