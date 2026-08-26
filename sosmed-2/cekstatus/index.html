@@ -167,6 +167,14 @@
             padding: 6px 14px;
             font-size: 11px;
         }
+        .btn-refill-check {
+            background: #00ccff44;
+            color: #00ccff;
+            border: 1px solid #00ccff55;
+        }
+        .btn-refill-check:hover {
+            background: #00ccff66;
+        }
         .header-actions {
             display: flex;
             gap: 10px;
@@ -383,6 +391,47 @@
             margin-top: 4px;
         }
 
+        /* ===== TABS ===== */
+        .tabs {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 20px;
+            background: #0d0d0d;
+            border-radius: 12px;
+            padding: 4px;
+            border: 1px solid #00ffaa15;
+        }
+        .tabs .tab {
+            flex: 1;
+            padding: 10px 16px;
+            border-radius: 10px;
+            border: none;
+            background: transparent;
+            color: #888;
+            font-weight: 600;
+            font-size: 13px;
+            cursor: pointer;
+            transition: 0.3s;
+            font-family: 'Poppins', sans-serif;
+        }
+        .tabs .tab:hover {
+            color: #fff;
+            background: rgba(255,255,255,0.05);
+        }
+        .tabs .tab.active {
+            background: #00ffaa22;
+            color: #00ffaa;
+            border: 1px solid #00ffaa33;
+        }
+
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+            animation: fadeUp 0.3s ease both;
+        }
+
         .loading-spinner {
             display: inline-block;
             width: 20px;
@@ -421,6 +470,12 @@
                 width: 100%;
                 text-align: center;
             }
+            .tabs {
+                flex-direction: column;
+            }
+            .tabs .tab {
+                text-align: center;
+            }
         }
     </style>
 </head>
@@ -431,7 +486,7 @@
             <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;">
                 <div>
                     <h2>📦 Cek Status Pesanan</h2>
-                    <div class="sub">Cek status pesanan dari Sosmed 2 + Refill</div>
+                    <div class="sub">Cek status pesanan & refill dari Sosmed 2</div>
                 </div>
                 <div class="header-actions">
                     <button class="btn btn-back" onclick="location.href='/'">🏠 Home</button>
@@ -440,24 +495,46 @@
             <div class="env-status" id="envStatus">🔌 Memuat konfigurasi...</div>
         </div>
 
-        <!-- ===== FORM ===== -->
-        <div class="card" id="formCard">
-            <h2>🔍 Cek Status</h2>
-            <div class="sub">Masukkan ID pesanan untuk cek status</div>
-
-            <div class="form-group">
-                <label>🆔 ID Pesanan <span class="required">*</span></label>
-                <input type="text" id="orderIdInput" placeholder="Contoh: 1107 atau 1107,1108,1109" oninput="toggleMassalMode()">
-                <div class="hint">💡 Pisahkan dengan koma (,) untuk cek massal (maks 50 ID)</div>
+        <!-- ===== TABS ===== -->
+        <div class="card">
+            <div class="tabs">
+                <button class="tab active" onclick="switchTab('order')" id="tabOrder">📦 Cek Pesanan</button>
+                <button class="tab" onclick="switchTab('refill')" id="tabRefill">🔄 Cek Refill</button>
             </div>
 
-            <div id="massalInfo" style="display:none;background:#00ccff08;border:1px solid #00ccff33;border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:#00ccff;">
-                📋 Mode <strong>Massal</strong> terdeteksi. Akan mengecek semua ID yang dimasukkan.
+            <!-- ===== TAB 1: CEK PESANAN ===== -->
+            <div class="tab-content active" id="tabOrderContent">
+                <div class="sub" style="margin-bottom:16px;">Masukkan ID pesanan untuk cek status</div>
+
+                <div class="form-group">
+                    <label>🆔 ID Pesanan <span class="required">*</span></label>
+                    <input type="text" id="orderIdInput" placeholder="Contoh: 1107 atau 1107,1108,1109" oninput="toggleMassalMode()">
+                    <div class="hint">💡 Pisahkan dengan koma (,) untuk cek massal (maks 50 ID)</div>
+                </div>
+
+                <div id="massalInfo" style="display:none;background:#00ccff08;border:1px solid #00ccff33;border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:#00ccff;">
+                    📋 Mode <strong>Massal</strong> terdeteksi. Akan mengecek semua ID yang dimasukkan.
+                </div>
+
+                <button class="btn btn-primary" id="checkBtn" onclick="checkStatus()">
+                    ✅ Cek Status
+                </button>
             </div>
 
-            <button class="btn btn-primary" id="checkBtn" onclick="checkStatus()">
-                ✅ Cek Status
-            </button>
+            <!-- ===== TAB 2: CEK REFILL ===== -->
+            <div class="tab-content" id="tabRefillContent">
+                <div class="sub" style="margin-bottom:16px;">Masukkan ID Refill untuk cek status</div>
+
+                <div class="form-group">
+                    <label>🔄 ID Refill <span class="required">*</span></label>
+                    <input type="text" id="refillIdInput" placeholder="Contoh: 12345">
+                    <div class="hint">💡 Masukkan ID refill yang ingin dicek statusnya</div>
+                </div>
+
+                <button class="btn btn-primary" id="checkRefillBtnMain" onclick="checkRefillStatusDirect()">
+                    🔄 Cek Status Refill
+                </button>
+            </div>
         </div>
 
         <!-- ===== HASIL ===== -->
@@ -470,7 +547,7 @@
         </div>
 
         <div class="text-muted" style="text-align:center;margin-top:20px;">
-            © Shine Shop · Cek Status Pesanan
+            © Shine Shop · Cek Status Pesanan & Refill
         </div>
         <div class="security-badge">🔒 Data dari Fayupedia API</div>
     </div>
@@ -485,6 +562,25 @@
         let FAYUPEDIA_API_ID = 5522;
         let FAYUPEDIA_API_KEY = '';
         let configLoaded = false;
+
+        // ===================== SWITCH TAB =====================
+        function switchTab(tab) {
+            // Hide all tab contents
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+
+            if (tab === 'order') {
+                document.getElementById('tabOrderContent').classList.add('active');
+                document.getElementById('tabOrder').classList.add('active');
+                document.getElementById('resultCard').style.display = 'none';
+                document.getElementById('resultContainer').innerHTML = '';
+            } else {
+                document.getElementById('tabRefillContent').classList.add('active');
+                document.getElementById('tabRefill').classList.add('active');
+                document.getElementById('resultCard').style.display = 'none';
+                document.getElementById('resultContainer').innerHTML = '';
+            }
+        }
 
         // ===================== AMBIL KONFIGURASI DARI ENV =====================
         async function fetchConfig() {
@@ -506,10 +602,9 @@
                     FAYUPEDIA_API_ID = data.fayupedia_api_id;
                 }
 
-                // Fallback jika tidak ada dari ENV
                 if (!FAYUPEDIA_API_KEY) {
                     FAYUPEDIA_API_KEY = '';
-                    console.warn('⚠️ FAYUPEDIA_API_KEY tidak ditemukan di ENV, menggunakan default');
+                    console.warn('⚠️ FAYUPEDIA_API_KEY tidak ditemukan di ENV');
                 }
 
                 configLoaded = true;
@@ -517,7 +612,7 @@
                 statusEl.style.color = '#00ffaa';
                 console.log('✅ Fayupedia Config loaded');
                 console.log('📌 API ID:', FAYUPEDIA_API_ID);
-                console.log('📌 API Key:', FAYUPEDIA_API_KEY.substring(0, 10) + '...');
+                console.log('📌 API Key:', FAYUPEDIA_API_KEY ? FAYUPEDIA_API_KEY.substring(0, 10) + '...' : '❌ Tidak ada');
 
                 return true;
 
@@ -579,7 +674,7 @@
             return icons[status] || '❓';
         }
 
-        // ===================== CEK STATUS =====================
+        // ===================== CEK STATUS PESANAN =====================
         async function checkStatus() {
             const input = document.getElementById('orderIdInput');
             const checkBtn = document.getElementById('checkBtn');
@@ -599,7 +694,6 @@
                 return;
             }
 
-            // Cek apakah config sudah dimuat
             if (!configLoaded) {
                 const loaded = await fetchConfig();
                 if (!loaded) {
@@ -613,33 +707,27 @@
                 }
             }
 
-            // Disable button
             checkBtn.disabled = true;
             checkBtn.innerHTML = '<span class="loading-spinner"></span> Mengecek...';
 
-            // Sembunyikan hasil sebelumnya
             resultCard.style.display = 'none';
             resultContainer.innerHTML = '';
 
             try {
-                // Cek apakah massal atau single
                 const ids = orderIds.split(',').map(id => id.trim()).filter(id => id !== '');
                 const isMassal = ids.length > 1;
 
-                // Validasi ID
                 const validIds = ids.filter(id => /^\d+$/.test(id));
                 if (validIds.length === 0) {
                     throw new Error('ID pesanan harus berupa angka.');
                 }
 
-                // Batasi 50 ID
                 if (validIds.length > 50) {
                     throw new Error('Maksimal 50 ID pesanan dalam satu permintaan.');
                 }
 
                 const idParam = validIds.join(',');
 
-                // Kirim request ke Fayupedia
                 const payload = {
                     api_id: FAYUPEDIA_API_ID,
                     api_key: FAYUPEDIA_API_KEY,
@@ -660,7 +748,6 @@
                 const data = await response.json();
                 console.log('📦 Fayupedia Response:', data);
 
-                // Tampilkan hasil
                 resultCard.style.display = 'block';
 
                 if (data.status === true) {
@@ -686,9 +773,136 @@
                 `;
             }
 
-            // Enable button
             checkBtn.disabled = false;
             checkBtn.innerHTML = '✅ Cek Status';
+        }
+
+        // ===================== CEK STATUS REFILL LANGSUNG =====================
+        async function checkRefillStatusDirect() {
+            const input = document.getElementById('refillIdInput');
+            const checkBtn = document.getElementById('checkRefillBtnMain');
+            const resultCard = document.getElementById('resultCard');
+            const resultContainer = document.getElementById('resultContainer');
+
+            const refillId = input.value.trim();
+
+            if (!refillId) {
+                Swal.fire({
+                    title: '⚠️ Masukkan ID Refill',
+                    text: 'Silakan masukkan ID refill yang ingin dicek.',
+                    icon: 'warning',
+                    confirmButtonColor: '#ffaa00'
+                });
+                input.focus();
+                return;
+            }
+
+            if (!configLoaded) {
+                const loaded = await fetchConfig();
+                if (!loaded) {
+                    Swal.fire({
+                        title: '❌ Gagal Memuat Konfigurasi',
+                        text: 'Tidak dapat mengambil konfigurasi API. Hubungi admin.',
+                        icon: 'error',
+                        confirmButtonColor: '#ff4444'
+                    });
+                    return;
+                }
+            }
+
+            checkBtn.disabled = true;
+            checkBtn.innerHTML = '<span class="loading-spinner"></span> Mengecek...';
+
+            resultCard.style.display = 'none';
+            resultContainer.innerHTML = '';
+
+            try {
+                const payload = {
+                    api_id: FAYUPEDIA_API_ID,
+                    api_key: FAYUPEDIA_API_KEY,
+                    id: refillId
+                };
+
+                console.log('📡 Check Refill Status:', payload);
+
+                const response = await fetch(FAYUPEDIA_REFILL_STATUS_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await response.json();
+                console.log('📦 Refill Status Response:', data);
+
+                resultCard.style.display = 'block';
+
+                if (data.status === true) {
+                    const status = data.refill_status || 'pending';
+                    const statusBadge = getRefillStatusBadge(status);
+
+                    const statusMap = {
+                        'pending': '⏳ Refill sedang menunggu diproses...',
+                        'processing': '🔄 Refill sedang diproses...',
+                        'completed': '✅ Refill selesai!',
+                        'rejected': '❌ Refill ditolak.',
+                        'failed': '❌ Refill gagal.'
+                    };
+
+                    resultContainer.innerHTML = `
+                        <div class="result-card show">
+                            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
+                                <div style="font-size:16px;font-weight:700;color:#fff;">
+                                    🔄 Status Refill
+                                </div>
+                                <button class="btn btn-copy btn-small" onclick="copyResult('${refillId}')">📋 Salin ID</button>
+                            </div>
+                            <div class="detail-row">
+                                <span class="label">🆔 Refill ID</span>
+                                <span class="value" style="color:#ffaa00;">${data.refill_id || refillId}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="label">📊 Status</span>
+                                <span class="value">${statusBadge}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="label">📝 Pesan</span>
+                                <span class="value" style="color:#888;font-weight:400;">${statusMap[status] || data.msg || 'Tidak ada pesan'}</span>
+                            </div>
+                            <div style="margin-top:12px;padding:10px;background:#00ffaa08;border-radius:10px;border:1px solid #00ffaa15;text-align:center;font-size:12px;color:#888;">
+                                📅 Terakhir diperbarui: ${new Date().toLocaleString('id-ID')}
+                            </div>
+                        </div>
+                    `;
+
+                } else {
+                    resultContainer.innerHTML = `
+                        <div style="background:#ff444415;border:1px solid #ff444455;border-radius:12px;padding:20px;text-align:center;color:#ff6666;">
+                            <div style="font-size:36px;margin-bottom:8px;">❌</div>
+                            <div style="font-size:15px;font-weight:600;">${data.msg || 'Refill tidak ditemukan'}</div>
+                            <div style="font-size:13px;color:#888;margin-top:4px;">ID: ${refillId}</div>
+                            <button class="btn btn-refresh" onclick="checkRefillStatusDirect()" style="margin-top:12px;">🔄 Coba Lagi</button>
+                        </div>
+                    `;
+                }
+
+            } catch (err) {
+                console.error('Error check refill:', err);
+                resultCard.style.display = 'block';
+                resultContainer.innerHTML = `
+                    <div style="background:#ff444415;border:1px solid #ff444455;border-radius:12px;padding:20px;text-align:center;color:#ff6666;">
+                        <div style="font-size:36px;margin-bottom:8px;">❌</div>
+                        <div style="font-size:15px;font-weight:600;">Terjadi Error</div>
+                        <div style="font-size:13px;color:#888;margin-top:4px;">${err.message}</div>
+                        <button class="btn btn-refresh" onclick="checkRefillStatusDirect()" style="margin-top:12px;">🔄 Coba Lagi</button>
+                    </div>
+                `;
+            }
+
+            checkBtn.disabled = false;
+            checkBtn.innerHTML = '🔄 Cek Status Refill';
         }
 
         // ===================== RENDER SINGLE RESULT =====================
@@ -908,7 +1122,6 @@
                 console.log('📦 Refill Response:', data);
 
                 if (data.status === true) {
-                    // SUCCESS
                     const refillId = data.refill || 'N/A';
                     Swal.fire({
                         title: '✅ Refill Berhasil!',
@@ -926,7 +1139,6 @@
                         confirmButtonText: 'OK'
                     });
 
-                    // Tampilkan refill status di bawah
                     const box = document.getElementById(`refillStatusBox_${orderId}`);
                     if (box) {
                         box.classList.add('show');
@@ -935,7 +1147,6 @@
                         document.getElementById(`refillMsgDisplay_${orderId}`).textContent = '🔄 Refill sedang diproses...';
                     }
 
-                    // Tampilkan tombol cek status refill
                     const checkRefillBtn = document.getElementById('checkRefillBtn');
                     if (checkRefillBtn) {
                         checkRefillBtn.style.display = 'inline-block';
@@ -945,7 +1156,6 @@
                     }
 
                 } else {
-                    // GAGAL
                     const errorMsg = data.msg || 'Gagal membuat refill.';
                     Swal.fire({
                         title: '❌ Refill Gagal',
@@ -971,7 +1181,7 @@
             }
         }
 
-        // ===================== CEK STATUS REFILL =====================
+        // ===================== CEK STATUS REFILL (DARI TOMBOL) =====================
         async function checkRefillStatus(orderId, refillId) {
             if (!configLoaded) {
                 const loaded = await fetchConfig();
@@ -986,7 +1196,6 @@
                 }
             }
 
-            // Coba ambil refillId dari DOM kalo ga dikirim
             if (!refillId) {
                 const idDisplay = document.getElementById(`refillIdDisplay_${orderId}`);
                 if (idDisplay) {
@@ -1028,7 +1237,6 @@
                     const status = data.refill_status || 'pending';
                     const statusBadge = getRefillStatusBadge(status);
 
-                    // Update display
                     const display = document.getElementById(`refillStatusDisplay_${orderId}`);
                     if (display) {
                         display.innerHTML = statusBadge;
@@ -1046,7 +1254,6 @@
                         msgDisplay.textContent = statusMap[status] || `Status: ${status}`;
                     }
 
-                    // Show box
                     const box = document.getElementById(`refillStatusBox_${orderId}`);
                     if (box) {
                         box.classList.add('show');
@@ -1154,6 +1361,7 @@
         // ===================== RESET FORM =====================
         function resetForm() {
             document.getElementById('orderIdInput').value = '';
+            document.getElementById('refillIdInput').value = '';
             document.getElementById('resultCard').style.display = 'none';
             document.getElementById('resultContainer').innerHTML = '';
             document.getElementById('massalInfo').style.display = 'none';
@@ -1165,6 +1373,13 @@
             if (e.key === 'Enter') {
                 e.preventDefault();
                 checkStatus();
+            }
+        });
+
+        document.getElementById('refillIdInput').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                checkRefillStatusDirect();
             }
         });
 
@@ -1187,7 +1402,6 @@
             }
         });
 
-        // Deteksi DevTools
         setInterval(() => {
             const threshold = 160;
             if (window.devtoolsOpen) return;
