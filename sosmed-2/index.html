@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">    
 <title>Shine Shop - SMM</title>    
 <style>  
-	/* ===============================    
+  /* ===============================    
    ROOT THEME    
 =================================*/    
 :root {    
@@ -363,6 +363,27 @@ box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.15);
 background: rgba(15, 23, 42, 0.85);
 }
 
+textarea {
+width: 100%;
+padding: 12px 16px;
+margin-top: 6px;
+border-radius: var(--radius-sm);
+border: 1px solid var(--border);
+background: rgba(15, 23, 42, 0.6);
+color: white;
+font-size: 14px;
+font-family: 'Poppins', sans-serif;
+resize: vertical;
+min-height: 120px;
+}
+
+textarea:focus {
+outline: none;
+border-color: var(--accent2);
+box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.15);
+background: rgba(15, 23, 42, 0.85);
+}
+
 .desc, .aver {
 margin-top: 12px;
 padding: 14px 18px;
@@ -372,6 +393,30 @@ border: 1px dashed rgba(255, 255, 255, 0.08);
 font-size: 13px;
 color: var(--text-muted);
 line-height: 1.6;
+}
+
+.comment-info {
+margin-top: 8px;
+padding: 10px 14px;
+background: rgba(6, 182, 212, 0.08);
+border-radius: var(--radius-sm);
+border: 1px solid rgba(6, 182, 212, 0.15);
+font-size: 12px;
+color: #06b6d4;
+display: none;
+}
+
+.comment-info.show {
+display: block;
+}
+
+.comment-info .count {
+color: #facc15;
+font-weight: 700;
+}
+
+.comment-info .error {
+color: #f87171;
 }
 
 .discount-badge {
@@ -630,7 +675,7 @@ width: 16px;
 height: 2px;
 }
 
-input, select {
+input, select, textarea {
 padding: 10px 12px;
 font-size: 13px;
 }
@@ -683,49 +728,39 @@ animation: fadeUp 0.5s ease both;
   'use strict';
 
   // ===== KONFIGURASI =====
-  const TARGET_DATE = new Date('2026-08-22T13:00:00+07:00'); // 26 Agustus 2026 jam 15.30 WIB
-  const REDIRECT_URL = '/tutup/'; // Halaman libur
-  const CHECK_INTERVAL = 3000; // Cek setiap 3 detik
+  const TARGET_DATE = new Date('2026-08-26T15:30:00+07:00');
+  const REDIRECT_URL = '/tutup/';
+  const CHECK_INTERVAL = 3000;
 
-  // ===== CEK APAKAH WAKTU SUDAH SAMPE =====
   function isTimeReached() {
     const now = new Date();
     return now >= TARGET_DATE;
   }
 
-  // ===== CEK APAKAH SEDANG DI HALAMAN LIBUR =====
   function isOnClosedPage() {
     return window.location.pathname.startsWith('/tutup/');
   }
 
-  // ===== ALOKASI =====
   function handleRedirect() {
     const timeReached = isTimeReached();
 
-    // KALO WAKTU BELUM SAMPE DAN BUKAN DI HALAMAN LIBUR -> REDIRECT
     if (!timeReached && !isOnClosedPage()) {
       console.log('⏳ Toko masih tutup. Mengalihkan ke', REDIRECT_URL);
-      console.log('📅 Target buka:', TARGET_DATE.toLocaleString('id-ID'));
-      
-      // Redirect dengan sedikit delay biar ga brutal
       window.location.replace(REDIRECT_URL);
       return true;
     }
 
-    // KALO WAKTU UDAH SAMPE DAN SEDANG DI HALAMAN LIBUR -> KEMBALI KE HALAMAN UTAMA
     if (timeReached && isOnClosedPage()) {
       console.log('🎉 Toko sudah buka! Kembali ke halaman utama.');
       window.location.replace('/');
       return true;
     }
 
-    // KALO WAKTU UDAH SAMPE DAN DI HALAMAN UTAMA -> AMAN
     if (timeReached && !isOnClosedPage()) {
       console.log('✅ Toko buka. Silakan akses.');
       return false;
     }
 
-    // KALO WAKTU BELUM SAMPE DAN UDAH DI HALAMAN LIBUR -> AMAN
     if (!timeReached && isOnClosedPage()) {
       console.log('🏖️ Toko tutup. Menampilkan halaman libur.');
       return false;
@@ -734,22 +769,18 @@ animation: fadeUp 0.5s ease both;
     return false;
   }
 
-  // ===== JALANKAN PERTAMA KALI =====
   handleRedirect();
 
-  // ===== CEK PERIODIK (BUAT YANG BUKA TAB LAMA) =====
   setInterval(function() {
     const timeReached = isTimeReached();
     const onClosed = isOnClosedPage();
 
-    // KALO WAKTU UDAH SAMPE DAN SEDANG DI HALAMAN LIBUR -> PULANGIN
     if (timeReached && onClosed) {
       console.log('🎉 Waktu buka tiba! Kembali ke halaman utama.');
       window.location.replace('/');
       return;
     }
 
-    // KALO WAKTU BELUM SAMPE DAN SEDANG DI HALAMAN UTAMA -> KIRIM KE LIBUR
     if (!timeReached && !onClosed) {
       console.log('⏳ Masih tutup. Mengalihkan ke halaman libur.');
       window.location.replace(REDIRECT_URL);
@@ -757,12 +788,9 @@ animation: fadeUp 0.5s ease both;
     }
   }, CHECK_INTERVAL);
 
-  // ===== DEBUG =====
   console.log('🔧 AUTO-REDIRECT ACTIVE');
   console.log('📅 Target buka:', TARGET_DATE.toLocaleString('id-ID'));
-  console.log('🕐 Waktu sekarang:', new Date().toLocaleString('id-ID'));
   console.log('📊 Status:', isTimeReached() ? '✅ BUKA' : '⏳ TUTUP');
-  console.log('🔗 Redirect ke:', REDIRECT_URL);
 
 })();
 </script>
@@ -794,8 +822,8 @@ animation: fadeUp 0.5s ease both;
     <button class="close" id="menuClose" style="font-size:22px;background:none;border:0;color:white;cursor:pointer">✕</button>    
   </header>    
   <ul class="menu-list"> 
-	  <li><a href='/sosmed-2/cekstatus'> Cek Pesanan</a></li>     
-	<li><a href='https://whatsapp.com/channel/0029Vb8pYHd0G0XjnloL680y'> Channel WhatsApp</a></li>    
+      <li><a href='/sosmed-2/cekstatus'> Cek Pesanan</a></li>     
+    <li><a href='https://whatsapp.com/channel/0029Vb8pYHd0G0XjnloL680y'> Channel WhatsApp</a></li>    
   </ul>    
 </nav>    
 <script>    
@@ -840,10 +868,20 @@ overlay.onclick=closeMenu;
 <div class="aver" id="average"></div>    
 
 <label>Jumlah Pesanan:</label>
-<input type="number" id="jumlah" min="1" oninput="hitungTotal()">
+<input type="number" id="jumlah" min="1" oninput="onJumlahChange()">
 
 <label>Target / Link:</label>
 <input type="text" id="target" placeholder="Masukkan username atau link">
+
+<!-- ===== FORM KOMENTAR (HIDDEN DEFAULT) ===== -->
+<div id="commentSection" style="display:none;">
+  <label for="comments">📝 Komentar (1 baris = 1 unit):</label>
+  <textarea id="comments" placeholder="Masukkan komentar per baris&#10;Contoh:&#10;Komentar 1&#10;Komentar 2&#10;Komentar 3" oninput="validateComments()"></textarea>
+  <div class="comment-info" id="commentInfo">
+    📊 Jumlah komentar: <span class="count" id="commentCount">0</span> / <span id="commentRequired">0</span> unit
+    <span id="commentStatus"></span>
+  </div>
+</div>
 
 <label>Total Harga (Rp):</label>
 <input type="text" id="total" readonly>
@@ -901,6 +939,7 @@ const termsToggleBtn = document.getElementById('termsToggleBtn');
   
 let termsData = '';  
 let isTermsLoaded = false;  
+let requiresComment = false; // FLAG APAKAH LAYANAN BUTUH KOMENTAR
 
 function openRules(e) {  
   if (e) e.preventDefault();  
@@ -984,7 +1023,8 @@ let savedFormState = {
   jumlah: '',  
   target: '',  
   total: '',  
-  search: ''  
+  search: '',  
+  comments: ''  
 };  
 
 function saveFormState() {  
@@ -994,6 +1034,7 @@ function saveFormState() {
   savedFormState.target = document.getElementById('target').value;  
   savedFormState.total = document.getElementById('total').value;  
   savedFormState.search = document.getElementById('search').value;  
+  savedFormState.comments = document.getElementById('comments')?.value || '';  
 }  
 
 function restoreFormState() {  
@@ -1003,6 +1044,9 @@ function restoreFormState() {
   if (savedFormState.target) document.getElementById('target').value = savedFormState.target;  
   if (savedFormState.total) document.getElementById('total').value = savedFormState.total;  
   if (savedFormState.search) document.getElementById('search').value = savedFormState.search;  
+  if (savedFormState.comments && document.getElementById('comments')) {  
+    document.getElementById('comments').value = savedFormState.comments;  
+  }  
 }  
 
 // Fungsi refresh data (TANPA LAG)  
@@ -1067,7 +1111,6 @@ async function loadData() {
 // Jalankan saat halaman selesai dimuat  
 window.addEventListener("load", function() {  
   loadData();  
-  // Refresh setiap 10 detik (lebih hemat)  
   if (refreshInterval) clearInterval(refreshInterval);  
   refreshInterval = setInterval(refreshDataSilent, 10000);  
   loadTerms();  
@@ -1088,12 +1131,16 @@ function loadLayanan(){
       opt.value = l.id;    
       let label = l.name + " (ID: "+l.id+")";  
       if(l.diskon && l.diskon < l.pricePerFollower) label += " 🔥 DISKON";  
+      if(l.comment === true) label += " 📝 KOMENTAR";  
       opt.textContent = label;  
       layanan.appendChild(opt);    
     });    
   }    
   document.getElementById("infoLayanan").innerHTML = "";    
   selectedService = null;    
+  // Sembunyikan comment section  
+  document.getElementById('commentSection').style.display = 'none';  
+  requiresComment = false;  
   saveFormState();  
 }    
 
@@ -1103,6 +1150,7 @@ function showInfo(){
   if (!kategori || !layananData[kategori]) return;  
   selectedService = layananData[kategori].find(l => String(l.id) === String(layananID));    
   if(!selectedService) return;  
+  
   let priceDisplay = '';  
   let diskonDisplay = '';  
   if(selectedService.diskon && selectedService.diskon < selectedService.pricePerFollower) {  
@@ -1111,6 +1159,23 @@ function showInfo(){
   } else {  
     priceDisplay = `Rp${selectedService.pricePerFollower}/unit`;  
   }  
+  
+  // CEK APAKAH BUTUH KOMENTAR  
+  requiresComment = selectedService.comment === true;  
+  const commentSection = document.getElementById('commentSection');  
+  const commentInfo = document.getElementById('commentInfo');  
+  
+  if (requiresComment) {  
+    commentSection.style.display = 'block';  
+    commentInfo.classList.add('show');  
+    document.getElementById('commentRequired').textContent = '0';  
+    document.getElementById('commentCount').textContent = '0';  
+    validateComments();  
+  } else {  
+    commentSection.style.display = 'none';  
+    commentInfo.classList.remove('show');  
+  }  
+  
   document.getElementById("average").innerHTML = `<b>${selectedService.average || "-"}</b>`;  
   document.getElementById("infoLayanan").innerHTML =    
   `<b>${selectedService.name}</b><br>    
@@ -1122,7 +1187,7 @@ function showInfo(){
   saveFormState();  
 }    
 
-// ===================== FIXED: HITUNG TOTAL (TANPA DESIMAL) =====================  
+// ===================== HITUNG TOTAL + VALIDASI KOMENTAR =====================  
 function hitungTotal(){    
   if(!selectedService) return;    
   const jumlah = parseInt(document.getElementById("jumlah").value || "0");    
@@ -1133,11 +1198,63 @@ function hitungTotal(){
   const hargaAktif = (selectedService.diskon && selectedService.diskon < selectedService.pricePerFollower)   
     ? selectedService.diskon : selectedService.pricePerFollower;  
   
-  // PAKAI Math.round() BIAR HASILNYA INTEGER (TANPA DESIMAL)  
   const total = Math.round(jumlah * hargaAktif);  
   document.getElementById("total").value = total;    
   saveFormState();  
-}    
+}  
+
+// ===================== VALIDASI KOMENTAR =====================  
+function validateComments() {  
+  if (!requiresComment) return;  
+  
+  const commentsEl = document.getElementById('comments');  
+  const commentCountEl = document.getElementById('commentCount');  
+  const commentRequiredEl = document.getElementById('commentRequired');  
+  const commentStatusEl = document.getElementById('commentStatus');  
+  const commentInfo = document.getElementById('commentInfo');  
+  const jumlah = parseInt(document.getElementById('jumlah').value || '0');  
+  
+  const text = commentsEl.value;  
+  const lines = text.split('\n').filter(line => line.trim() !== '');  
+  const count = lines.length;  
+  
+  commentCountEl.textContent = count;  
+  commentRequiredEl.textContent = jumlah;  
+  
+  if (jumlah === 0) {  
+    commentStatusEl.innerHTML = ' ⚠️ Masukkan jumlah pesanan terlebih dahulu';  
+    commentStatusEl.style.color = '#ffaa00';  
+    commentInfo.style.borderColor = 'rgba(255,170,0,0.3)';  
+    return;  
+  }  
+  
+  if (count === jumlah) {  
+    commentStatusEl.innerHTML = ' ✅ Jumlah komentar sesuai!';  
+    commentStatusEl.style.color = '#22c55e';  
+    commentInfo.style.borderColor = 'rgba(34,197,94,0.3)';  
+  } else if (count < jumlah) {  
+    commentStatusEl.innerHTML = ` ⚠️ Kurang ${jumlah - count} komentar lagi`;  
+    commentStatusEl.style.color = '#ffaa00';  
+    commentInfo.style.borderColor = 'rgba(255,170,0,0.3)';  
+  } else {  
+    commentStatusEl.innerHTML = ` ❌ Terlalu banyak! Maksimal ${jumlah} komentar (1 baris = 1 unit)`;  
+    commentStatusEl.style.color = '#f87171';  
+    commentInfo.style.borderColor = 'rgba(248,113,113,0.3)';  
+  }  
+  
+  saveFormState();  
+}  
+
+// ===================== ON JUMLAH CHANGE =====================  
+function onJumlahChange() {  
+  hitungTotal();  
+  if (requiresComment) {  
+    validateComments();  
+    // Update required count  
+    const jumlah = parseInt(document.getElementById('jumlah').value || '0');  
+    document.getElementById('commentRequired').textContent = jumlah;  
+  }  
+}  
 
 function generateTransactionID(){    
   return `TRX${Date.now()}${Math.floor(Math.random()*1000)}`;    
@@ -1161,7 +1278,7 @@ function searchLayanan(){
   saveFormState();  
 }    
 
-// ===================== FIXED: LANJUT PEMBAYARAN (TANPA DESIMAL) =====================  
+// ===================== LANJUT PEMBAYARAN (DENGAN KOMENTAR) =====================  
 function lanjutPembayaran(){    
   if (!termsCheckbox.checked) {  
     termsError.classList.add('show');  
@@ -1175,16 +1292,47 @@ function lanjutPembayaran(){
     alert(`Jumlah harus antara ${selectedService.min} dan ${selectedService.max}`);    
     return;    
   }    
+  
+  // VALIDASI KOMENTAR JIKA DIBUTUHKAN  
+  if (requiresComment) {  
+    const commentsEl = document.getElementById('comments');  
+    const text = commentsEl.value;  
+    const lines = text.split('\n').filter(line => line.trim() !== '');  
+    const count = lines.length;  
+  
+    if (count === 0) {  
+      alert('⚠️ Layanan ini membutuhkan komentar! Silakan isi komentar per baris.');  
+      commentsEl.focus();  
+      return;  
+    }  
+  
+    if (count !== jumlah) {  
+      alert(`⚠️ Jumlah komentar (${count}) harus sama dengan jumlah pesanan (${jumlah})!`);  
+      commentsEl.focus();  
+      return;  
+    }  
+  }  
+  
   const trxID = generateTransactionID();    
   const kategori = document.getElementById("kategori").value;    
   const target = document.getElementById("target").value;    
   const hargaAktif = (selectedService.diskon && selectedService.diskon < selectedService.pricePerFollower)   
     ? selectedService.diskon : selectedService.pricePerFollower;  
   
-  // PAKAI Math.round() BIAR HASILNYA INTEGER (TANPA DESIMAL)  
   const total = Math.round(jumlah * hargaAktif);  
   
-  window.location.href = `payment/?trx=${trxID}&kategori=${kategori}&layanan=${selectedService.name}&id=${selectedService.id}&jumlah=${jumlah}&total=${total}&target=${encodeURIComponent(target)}`;    
+  // BUILD URL DENGAN KOMENTAR JIKA ADA  
+  let url = `payment/?trx=${trxID}&kategori=${kategori}&layanan=${encodeURIComponent(selectedService.name)}&id=${selectedService.id}&jumlah=${jumlah}&total=${total}&target=${encodeURIComponent(target)}`;  
+  
+  if (requiresComment) {  
+    const commentsEl = document.getElementById('comments');  
+    const text = commentsEl.value;  
+    const lines = text.split('\n').filter(line => line.trim() !== '');  
+    const commentStr = lines.join('\r\n');  
+    url += `&comment=${encodeURIComponent(commentStr)}`;  
+  }  
+  
+  window.location.href = url;    
 }  
 
      
