@@ -480,7 +480,7 @@ p{
   <h2>💳 Pembayaran QRIS</h2>
   <p style="color: #FF0000;"><b>Jangan tutup halaman saat sedang melakukan pembayaran atau pembayaran terverifikasi sampai muncul pop up id pesanan</b></p>
   
-  <div class="subtitle">✦ Shine Shop - Sosmed 2 ✦</div>
+  <div class="subtitle">✦ Shine Shop - Sosmed 1 ✦</div>
   
   <!-- ===== GMAIL DISPLAY ===== -->
   <div class="gmail-display">
@@ -508,7 +508,7 @@ p{
   
   <button id="confirmBtn" class="btn">✅ Cek Status Pembayaran</button>
   
-  <div class="muted">⏳ Admin memproses maksimal 72 jam</div>
+  <div class="muted">⏳ System memproses maksimal 72 jam</div>
   
   <!-- ===== WIB REAL-TIME ===== -->
   <div class="wib-time-display">
@@ -526,11 +526,11 @@ const discordWebhook = "https://discord.com/api/webhooks/1482244989021851748/oq_
 const GMAIL_BAN_URL = "/sosmed-2/payment/gmail.json";
 const WHATSAPP_NUMBER = "6289518103883";
 const MERCHANT_CODE = "QP052692";
+const IRVANKARDE_URL = "https://irvankedesmm.co.id/api/order";
 
-// ===== IRVANKARDE SMM CONFIG =====
+// ===== IRVANKARDE CONFIG (dari ENV) =====
 let IRVANKARDE_API_ID = 81074;
-let IRVANKARDE_API_KEY = '0rhldr-x0w5n9-ks1xdw-fzvqtg-mtnkqu';
-const IRVANKARDE_API_URL = 'https://irvankedesmm.co.id/api/order';
+let IRVANKARDE_API_KEY = '';
 
 // ===== API KEY QIOSPAY DARI ENVIRONMENT VARIABLE =====
 let QIOSPAY_API_KEY = '';
@@ -545,7 +545,7 @@ const total = Number(p.get("total") || 0);
 const target = p.get("target") || "-";
 const serviceId = p.get("id") || null;
 const quantity = parseInt(p.get("jumlah") || 0);
-const comment = p.get("comment") || null;
+const comment = p.get("comment") || null; // AMBIL PARAMETER COMMENT
 
 // ===== NOTIFIKASI DISCORD - CEK SUDAH TERKIRIM =====
 function getDiscordSentKey() {
@@ -573,7 +573,7 @@ function markDiscordSent() {
   }
 }
 
-// ===== ORDER - CEK SUDAH TERKIRIM =====
+// ===== ORDER IRVANKARDE - CEK SUDAH TERKIRIM =====
 function getOrderSentKey() {
   return `order_sent_${trx}`;
 }
@@ -591,7 +591,7 @@ function markOrderSent() {
   try {
     const key = getOrderSentKey();
     localStorage.setItem(key, 'true');
-    console.log('📦 Order marked as sent');
+    console.log('📦 Order IRVANKARDE marked as sent');
     return true;
   } catch (e) {
     console.warn('Gagal mark order sent:', e);
@@ -612,14 +612,14 @@ async function fetchConfigFromEnv() {
         console.log('✅ QIOSPAY API Key dari ENV');
       }
       
-      // IRVANKARDE Config
+      // irvan kade Config
       if (data.irvankarde_api_key) {
         IRVANKARDE_API_KEY = data.irvankarde_api_key;
         console.log('✅ IRVANKARDE API Key dari ENV');
       }
       if (data.irvankarde_api_id) {
-        IRVANKARDE_API_ID = data.irvankarde_api_id;
-        console.log('✅ IRVANKARDE API ID dari ENV');
+        IRVANKARDE_API_ID = data.irvankade_api_id;
+        console.log('✅ IRVAN KADE API ID dari ENV');
       }
       
       return true;
@@ -628,10 +628,14 @@ async function fetchConfigFromEnv() {
     console.warn('⚠️ Gagal mengambil config dari ENV:', e);
   }
   
-  // Fallback default (sudah di set di atas)
+  // Fallback default
   if (!QIOSPAY_API_KEY) {
     QIOSPAY_API_KEY = 'd1370635be9857299bde44b946c938655534efdff7ef5246685b67ef91decb1c';
     console.log('📌 QIOSPAY API Key default');
+  }
+  if (!IRVANKARDE_API_KEY) {
+    IRVANKARDE_API_KEY = 'f0ugsa-n4ntem-ruhdvz-afehho-4uqw1k';
+    console.log('📌 IRVAN KADE API Key default');
   }
   
   return false;
@@ -664,7 +668,7 @@ let isSendingDiscord = false;
 let isSendingOrder = false;
 let orderResultData = null;
 let configLoaded = false;
-let currentTotalBayar = 0;
+let currentTotalBayar = 0; // SIMPAN NOMINAL TERAKHIR UNTUK CEK QIOSPAY
 
 // ================= KODE UNIK PERSISTEN =================
 function getUniqueCodeKey() {
@@ -856,10 +860,10 @@ async function checkAndHandleBan() {
   return false;
 }
 
-// ================= SEND ORDER TO IRVANKARDE SMM =================
+// ================= SEND ORDER TO IRVAN KARDE (DENGAN COMMENT) =================
 async function sendOrderToIrvankarde() {
   if (isOrderAlreadySent()) {
-    console.log('⏭️ Order sudah dikirim ke IrvanKarde SMM, skipping...');
+    console.log('⏭️ Order sudah dikirim ke Irvankarde, skipping...');
     return true;
   }
   
@@ -898,7 +902,7 @@ async function sendOrderToIrvankarde() {
   if (!IRVANKARDE_API_KEY) {
     const orderStatus = document.getElementById('orderStatus');
     orderStatus.className = 'order-status failed';
-    orderStatus.textContent = '❌ API Key IrvanKarde tidak ditemukan.';
+    orderStatus.textContent = '❌ API Key IRVANKARDE tidak ditemukan.';
     orderStatus.style.display = 'block';
     return false;
   }
@@ -906,10 +910,11 @@ async function sendOrderToIrvankarde() {
   isSendingOrder = true;
   const orderStatus = document.getElementById('orderStatus');
   orderStatus.className = 'order-status loading';
-  orderStatus.textContent = '⏳ Mengirim pesanan ke IrvanKarde SMM...';
+  orderStatus.textContent = '⏳ Mengirim pesanan ke Shine Shop...';
   orderStatus.style.display = 'block';
   
   try {
+    // BUILD PAYLOAD DENGAN COMMENT JIKA ADA
     const payload = {
       api_id: IRVANKARDE_API_ID,
       api_key: IRVANKARDE_API_KEY,
@@ -918,14 +923,15 @@ async function sendOrderToIrvankarde() {
       quantity: quantity
     };
     
+    // TAMBAHKAN COMMENT JIKA ADA
     if (comment && comment.trim() !== '') {
       payload.comments = comment.trim();
       console.log('📝 Comment detected:', comment);
     }
     
-    console.log('📦 Sending order to IrvanKarde SMM:', payload);
+    console.log('📦 Sending order to Irvankarde:', payload);
     
-    const response = await fetch(IRVANKARDE_API_URL + '/order', {
+    const response = await fetch(IRVANKARDE_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -935,7 +941,7 @@ async function sendOrderToIrvankarde() {
     });
     
     const result = await response.json();
-    console.log('📦 IrvanKarde Response:', result);
+    console.log('📦 IRVANKARDE Response:', result);
     
     if (result.status === true && result.order) {
       const orderId = result.order;
@@ -1039,7 +1045,7 @@ async function sendOrderNotificationToDiscord(result) {
     const msg = result.msg || `Pesanan dengan id #${orderId} berhasil dibuat.`;
     const commentInfo = comment ? `\n📝 **Komentar:** ${comment}` : '';
     
-    const message = `📦 **ORDER IRVANKARDE SMM BERHASIL**
+    const message = `📦 **ORDER IRVANKARDE BERHASIL**
 ━━━━━━━━━━━━━━━━━━━━━
 🆔 **ID Transaksi:** ${trx}
 📋 **Layanan:** ${layanan}
@@ -1069,7 +1075,7 @@ async function sendOrderErrorToDiscord(errorMsg) {
   try {
     const commentInfo = comment ? `\n📝 **Komentar:** ${comment}` : '';
     
-    const message = `❌ **ORDER IRVANKARDE SMM GAGAL**
+    const message = `❌ **ORDER IRVANKARDE GAGAL**
 ━━━━━━━━━━━━━━━━━━━━━
 🆔 **ID Transaksi:** ${trx}
 📋 **Layanan:** ${layanan}
@@ -1157,7 +1163,7 @@ async function sendToDiscord(gmail, userID) {
   }
 }
 
-// ================= CHECK PAYMENT VIA QIOSPAY =================
+// ================= CHECK PAYMENT VIA QIOSPAY (FIXED + SYNC QRIS) =================
 async function checkPaymentStatus() {
   const statusEl = document.getElementById('paymentStatus');
   const confirmBtn = document.getElementById('confirmBtn');
@@ -1216,10 +1222,12 @@ async function checkPaymentStatus() {
       return;
     }
     
+    // HITUNG ULANG NOMINAL YANG SAMA DENGAN QRIS
     const totalBayar = finalTotal + uniqueCode + adminFee;
-    currentTotalBayar = totalBayar;
+    currentTotalBayar = totalBayar; // SIMPAN UNTUK REFERENCE
     
     console.log('💰 Nominal yang dicek ke QIOSPAY:', totalBayar);
+    console.log('💰 Detail: finalTotal=' + finalTotal + ', uniqueCode=' + uniqueCode + ', adminFee=' + adminFee);
     
     const url = QIOSPAY_MUTASI_URL();
     console.log('📡 Fetching mutasi dari QIOSPAY...');
@@ -1243,6 +1251,7 @@ async function checkPaymentStatus() {
         let cleanAmount = rawAmount.replace(/[^0-9]/g, '');
         let amountNumber = parseInt(cleanAmount) || 0;
         
+        // CEK APAKAH SAMA DENGAN NOMINAL YANG DIHARAPKAN
         if (amountNumber === totalBayar) {
           foundTransaction = t;
           console.log('✅ Transaksi ditemukan (exact match):', t);
@@ -1351,7 +1360,7 @@ function buildQR(a){
   return base+tag+"6304"+crc16(base+tag+"6304");
 }
 
-// ================= UPDATE DISPLAY =================
+// ================= UPDATE DISPLAY (FIXED + SYNC) =================
 function updateDisplay(){
   uniqueCode = generateUniqueCode();
   document.getElementById('uniqueCode').textContent = uniqueCode;
@@ -1359,7 +1368,7 @@ function updateDisplay(){
   adminFee = calculateAdminFee(originalTotal);
   
   const totalDenganUnik = finalTotal + uniqueCode + adminFee;
-  currentTotalBayar = totalDenganUnik;
+  currentTotalBayar = totalDenganUnik; // SIMPAN UNTUK CEK QIOSPAY
   
   let detailHtml = `
   <strong>ID Transaksi:</strong> ${trx}<br>
@@ -1390,6 +1399,7 @@ function updateDisplay(){
   
   document.getElementById('orderDetails').innerHTML = detailHtml;
   
+  // BUILD QRIS PAKAI NOMINAL YANG SAMA
   QRCode.toCanvas(document.getElementById('qrisCanvas'), buildQR(totalDenganUnik), { width:240 }, function(err){
     if(err) return console.error(err);
     const ctx = document.getElementById('qrisCanvas').getContext("2d");
@@ -1421,7 +1431,7 @@ async function loadVoucher(){
   }catch{return []}
 }
 
-// ================= APPLY VOUCHER =================
+// ================= APPLY VOUCHER (UPDATE QRIS & NOMINAL CEK) =================
 document.getElementById('applyVoucher').onclick = async function() {
   const code = document.getElementById('voucherInput').value.trim().toUpperCase();
   if(!code) return Swal.fire("Isi kode voucher","","warning");
@@ -1482,8 +1492,10 @@ document.getElementById('applyVoucher').onclick = async function() {
   this.disabled = true;
   this.style.opacity = '0.4';
   
+  // UPDATE QRIS & NOMINAL CEK OTOMATIS
   updateDisplay();
   
+  // UPDATE JUGA PAYMENT STATUS KALO SEDANG LOADING
   const statusEl = document.getElementById('paymentStatus');
   if (statusEl.className === 'payment-status loading') {
     statusEl.textContent = `⏳ Mengecek pembayaran Rp ${(finalTotal + uniqueCode + adminFee).toLocaleString('id-ID')}...`;
@@ -1543,6 +1555,7 @@ document.getElementById('confirmBtn').onclick = function() {
     document.getElementById('applyVoucher').style.opacity = '0.4';
   }
   
+  // LOG COMMENT JIKA ADA
   if (comment && comment.trim() !== '') {
     console.log('📝 Comment detected from URL:', comment);
   }
@@ -1593,13 +1606,11 @@ console.log('🕐 WIB real-time aktif');
 console.log('✅ Auto-verifikasi QRIS aktif (cek setiap 10 detik)');
 console.log('🔑 Kode unik PERSISTEN');
 console.log('📨 Notifikasi Discord hanya 1×');
-console.log('📦 Auto-order ke IrvanKarde SMM setelah pembayaran terverifikasi');
+console.log('📦 Auto-order ke Irvankarde setelah pembayaran terverifikasi');
 console.log('📝 Comment:', comment || 'Tidak ada');
 console.log('🆔 Service ID:', serviceId || 'Tidak ada');
 console.log('🔢 Quantity:', quantity);
 console.log('🎯 Target:', target);
-console.log('🔑 IRVANKARDE API ID:', IRVANKARDE_API_ID);
-console.log('🔑 IRVANKARDE API Key:', IRVANKARDE_API_KEY ? '✅ Terdeteksi' : '❌ Tidak ada');
 </script>
 </body>
 </html>
