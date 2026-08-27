@@ -28,10 +28,9 @@ export default function handler(req, res) {
         const fayupediaApiId = parseInt(process.env.FAYUPEDIA_API_ID) || 5522;
 
         // ===== IRVANKARDE SMM CONFIG =====
-        const irvankardeApiKey = process.env.IRVANKARDE_API_KEY || 'qxy0j2-4rvp5g-fc0dxu-gdr7qp-xbqawa';
+        const irvankardeApiKey = process.env.IRVANKARDE_API_KEY || '';
         const irvankardeApiId = parseInt(process.env.IRVANKARDE_API_ID) || 81074;
-        const irvankardeApiUrl = process.env.IRVANKARDE_API_URL || 'https://irvankedesmm.co.id/api';
-
+        
         // ===== RESPONSE =====
         return res.status(200).json({
             success: true,
@@ -41,7 +40,6 @@ export default function handler(req, res) {
             fayupedia_api_id: fayupediaApiId,
             irvankarde_api_key: irvankardeApiKey,
             irvankarde_api_id: irvankardeApiId,
-            irvankarde_api_url: irvankardeApiUrl,
             from_env: {
                 qiospay: !!process.env.QIOSPAY_API_KEY,
                 fayupedia: !!process.env.FAYUPEDIA_API_KEY,
