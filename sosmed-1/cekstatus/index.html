@@ -3,1456 +3,637 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cek Status Pesanan - Shine Shop</title>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700;800&display=swap" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <title>Cek Status & Refill Pesanan - Shine Shop</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        body {
-            font-family: 'Poppins', sans-serif;
-            background: #0a0a0a;
-            min-height: 100vh;
-            padding: 30px 20px;
-            background: radial-gradient(circle at 20% 30%, #00ffaa10, transparent 50%),
-                        radial-gradient(circle at 80% 70%, #00c6ff10, transparent 50%),
-                        #0a0a0a;
-        }
-        .container {
-            max-width: 700px;
-            margin: 0 auto;
-        }
-        .card {
-            background: #1a1a1a;
-            border-radius: 24px;
-            padding: 30px 28px;
-            border: 1px solid #00ffaa33;
-            box-shadow: 0 0 40px rgba(0,255,170,0.05);
-            margin-bottom: 20px;
-        }
-        .card h2 {
-            color: #00ffaa;
-            font-size: 22px;
-            margin-bottom: 6px;
-        }
-        .card .sub {
-            color: #888;
-            font-size: 14px;
-            margin-bottom: 20px;
-        }
-        .form-group {
-            margin-bottom: 16px;
-        }
-        .form-group label {
-            color: #ccc;
-            font-size: 13px;
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .status-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
             font-weight: 600;
-            display: block;
-            margin-bottom: 6px;
-        }
-        .form-group label .required {
-            color: #ff6666;
-        }
-        .form-group input,
-        .form-group textarea {
-            width: 100%;
-            padding: 12px 16px;
-            border-radius: 12px;
-            border: 1px solid #00ffaa33;
-            background: #0d0d0d;
-            color: #fff;
-            font-size: 14px;
-            outline: none;
-            transition: 0.3s;
-            font-family: 'Poppins', sans-serif;
-        }
-        .form-group input:focus,
-        .form-group textarea:focus {
-            border-color: #00ffaa;
-            box-shadow: 0 0 20px rgba(0,255,170,0.1);
-        }
-        .form-group input::placeholder,
-        .form-group textarea::placeholder {
-            color: #555;
-        }
-        .form-group textarea {
-            min-height: 80px;
-            resize: vertical;
-        }
-        .form-group .hint {
-            color: #666;
-            font-size: 11px;
-            margin-top: 4px;
-        }
-        .form-row {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 16px;
-        }
-        .btn {
-            padding: 12px 24px;
-            border-radius: 30px;
-            border: none;
-            font-weight: 600;
-            cursor: pointer;
-            transition: 0.3s;
-            font-size: 13px;
-            font-family: 'Poppins', sans-serif;
-        }
-        .btn-back {
-            background: #444;
-            color: #fff;
-        }
-        .btn-back:hover {
-            background: #555;
-        }
-        .btn-primary {
-            background: #00ffaa;
-            color: #0a0a0a;
-        }
-        .btn-primary:hover {
-            background: #00dd99;
-            transform: scale(0.97);
-        }
-        .btn-primary:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            transform: none;
-        }
-        .btn-refresh {
-            background: #00ffaa22;
-            color: #00ffaa;
-            border: 1px solid #00ffaa44;
-        }
-        .btn-refresh:hover {
-            background: #00ffaa44;
-        }
-        .btn-refill {
-            background: #ffaa0044;
-            color: #ffaa00;
-            border: 1px solid #ffaa0055;
-        }
-        .btn-refill:hover {
-            background: #ffaa0066;
-        }
-        .btn-refill:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-        .btn-refill-success {
-            background: #00ffaa44;
-            color: #00ffaa;
-            border: 1px solid #00ffaa55;
-        }
-        .btn-refill-success:hover {
-            background: #00ffaa66;
-        }
-        .btn-copy {
-            background: #ffaa0044;
-            color: #ffaa00;
-            border: 1px solid #ffaa0055;
-            padding: 4px 14px;
-            border-radius: 20px;
-            font-size: 11px;
-            cursor: pointer;
-            transition: 0.3s;
-        }
-        .btn-copy:hover {
-            background: #ffaa0066;
-        }
-        .btn-small {
-            padding: 6px 14px;
-            font-size: 11px;
-        }
-        .btn-refill-check {
-            background: #00ccff44;
-            color: #00ccff;
-            border: 1px solid #00ccff55;
-        }
-        .btn-refill-check:hover {
-            background: #00ccff66;
-        }
-        .header-actions {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-            margin-top: 10px;
-        }
-        .text-muted {
-            color: #666;
-            font-size: 12px;
-        }
-        .text-success {
-            color: #00ffaa;
-        }
-        .text-danger {
-            color: #ff4444;
-        }
-        .text-warning {
-            color: #ffaa00;
-        }
-        .text-info {
-            color: #00ccff;
-        }
-        .security-badge {
-            text-align: center;
-            font-size: 10px;
-            color: #444;
-            margin-top: 12px;
-            border-top: 1px solid #00ffaa15;
-            padding-top: 12px;
-        }
-        .env-status {
-            text-align: center;
-            font-size: 11px;
-            color: #555;
-            margin-top: 8px;
-        }
-
-        /* ===== RESULT ===== */
-        .result-card {
-            background: #0d0d0d;
-            border-radius: 16px;
-            padding: 20px;
-            border: 1px solid #00ffaa15;
-            margin-top: 12px;
-            display: none;
-            animation: fadeUp 0.4s ease both;
-        }
-        .result-card.show {
-            display: block;
-        }
-        @keyframes fadeUp {
-            from { opacity: 0; transform: translateY(15px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        .result-card .status-badge {
-            display: inline-block;
-            padding: 4px 16px;
-            border-radius: 20px;
-            font-size: 13px;
-            font-weight: 700;
             text-transform: uppercase;
+            letter-spacing: 0.025em;
         }
-        .result-card .status-badge.pending {
-            background: #ffaa0022;
-            color: #ffaa00;
-            border: 1px solid #ffaa0044;
-        }
-        .result-card .status-badge.processing {
-            background: #00ccff22;
-            color: #00ccff;
-            border: 1px solid #00ccff44;
-        }
-        .result-card .status-badge.completed {
-            background: #00ffaa22;
-            color: #00ffaa;
-            border: 1px solid #00ffaa44;
-        }
-        .result-card .status-badge.canceled {
-            background: #ff444422;
-            color: #ff4444;
-            border: 1px solid #ff444444;
-        }
-        .result-card .status-badge.partial {
-            background: #ffaa0044;
-            color: #ffaa00;
-            border: 1px solid #ffaa0066;
-        }
-        .result-card .status-badge.not-found {
-            background: #444;
-            color: #888;
-            border: 1px solid #555;
-        }
-        .result-card .status-badge.rejected {
-            background: #ff444422;
-            color: #ff4444;
-            border: 1px solid #ff444444;
-        }
-        .result-card .status-badge.failed {
-            background: #ff444422;
-            color: #ff4444;
-            border: 1px solid #ff444444;
-        }
-        .result-card .detail-row {
-            display: flex;
-            justify-content: space-between;
-            padding: 8px 0;
-            border-bottom: 1px solid #00ffaa08;
-        }
-        .result-card .detail-row:last-child {
-            border-bottom: none;
-        }
-        .result-card .detail-row .label {
-            color: #888;
-            font-size: 13px;
-        }
-        .result-card .detail-row .value {
-            color: #fff;
-            font-size: 13px;
-            font-weight: 600;
-        }
-        .result-card .detail-row .value.green {
-            color: #00ffaa;
-        }
-        .result-card .detail-row .value.yellow {
-            color: #ffaa00;
-        }
-        .result-card .detail-row .value.red {
-            color: #ff4444;
-        }
-        .result-card .detail-row .value.blue {
-            color: #00ccff;
-        }
-
-        .action-bar {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-            margin-top: 14px;
-            padding-top: 14px;
-            border-top: 1px solid #00ffaa10;
-        }
-
-        /* ===== REFILL STATUS ===== */
-        .refill-status-box {
-            background: #0d0d0d;
-            border-radius: 12px;
-            padding: 14px 16px;
-            margin-top: 12px;
-            border: 1px solid #ffaa0033;
-            display: none;
-        }
-        .refill-status-box.show {
-            display: block;
-            animation: fadeUp 0.3s ease both;
-        }
-        .refill-status-box .refill-id {
-            color: #ffaa00;
-            font-weight: 700;
-            font-size: 15px;
-        }
-        .refill-status-box .refill-status-badge {
-            display: inline-block;
-            padding: 2px 14px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: 600;
-        }
-        .refill-status-box .refill-status-badge.pending {
-            background: #ffaa0022;
-            color: #ffaa00;
-            border: 1px solid #ffaa0044;
-        }
-        .refill-status-box .refill-status-badge.processing {
-            background: #00ccff22;
-            color: #00ccff;
-            border: 1px solid #00ccff44;
-        }
-        .refill-status-box .refill-status-badge.completed {
-            background: #00ffaa22;
-            color: #00ffaa;
-            border: 1px solid #00ffaa44;
-        }
-        .refill-status-box .refill-status-badge.rejected {
-            background: #ff444422;
-            color: #ff4444;
-            border: 1px solid #ff444444;
-        }
-        .refill-status-box .refill-status-badge.failed {
-            background: #ff444422;
-            color: #ff4444;
-            border: 1px solid #ff444444;
-        }
-
-        /* ===== MASSAL ===== */
-        .massal-item {
-            background: #0d0d0d;
-            border-radius: 12px;
-            padding: 14px 16px;
-            margin-bottom: 8px;
-            border: 1px solid #00ffaa10;
-        }
-        .massal-item .order-id {
-            color: #ffaa00;
-            font-weight: 700;
-            font-size: 14px;
-        }
-        .massal-item .order-status {
-            font-size: 12px;
-            font-weight: 600;
-        }
-        .massal-item .order-detail {
-            font-size: 12px;
-            color: #888;
-            margin-top: 4px;
-        }
-
-        /* ===== TABS ===== */
-        .tabs {
-            display: flex;
-            gap: 4px;
-            margin-bottom: 20px;
-            background: #0d0d0d;
-            border-radius: 12px;
-            padding: 4px;
-            border: 1px solid #00ffaa15;
-        }
-        .tabs .tab {
-            flex: 1;
-            padding: 10px 16px;
-            border-radius: 10px;
-            border: none;
-            background: transparent;
-            color: #888;
-            font-weight: 600;
-            font-size: 13px;
-            cursor: pointer;
-            transition: 0.3s;
-            font-family: 'Poppins', sans-serif;
-        }
-        .tabs .tab:hover {
-            color: #fff;
-            background: rgba(255,255,255,0.05);
-        }
-        .tabs .tab.active {
-            background: #00ffaa22;
-            color: #00ffaa;
-            border: 1px solid #00ffaa33;
-        }
-
-        .tab-content {
-            display: none;
-        }
-        .tab-content.active {
-            display: block;
-            animation: fadeUp 0.3s ease both;
-        }
-
-        .loading-spinner {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 2px solid #00ffaa33;
-            border-top-color: #00ffaa;
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-        }
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        @media (max-width: 600px) {
-            .card {
-                padding: 20px 16px;
-            }
-            .form-row {
-                grid-template-columns: 1fr;
-            }
-            .header-actions {
-                flex-direction: column;
-            }
-            .header-actions .btn {
-                width: 100%;
-                text-align: center;
-            }
-            .result-card .detail-row {
-                flex-wrap: wrap;
-                gap: 4px;
-            }
-            .action-bar {
-                flex-direction: column;
-            }
-            .action-bar .btn {
-                width: 100%;
-                text-align: center;
-            }
-            .tabs {
-                flex-direction: column;
-            }
-            .tabs .tab {
-                text-align: center;
-            }
-        }
+        .status-pending { background: #fef3c7; color: #92400e; }
+        .status-processing { background: #dbeafe; color: #1e40af; }
+        .status-success, .status-completed { background: #d1fae5; color: #065f46; }
+        .status-error, .status-failed, .status-rejected { background: #fee2e2; color: #991b1b; }
+        .status-partial { background: #ffedd5; color: #9a3412; }
+        .status-unknown { background: #f3f4f6; color: #374151; }
+        .card-hover:hover { transform: translateY(-2px); box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1); }
+        .fade-in { animation: fadeIn 0.3s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .tab-active { border-bottom: 3px solid #2563eb; color: #2563eb; font-weight: 600; }
+        .tab-inactive { border-bottom: 3px solid transparent; color: #6b7280; }
     </style>
 </head>
-<body>
-    <div class="container">
-        <!-- ===== HEADER ===== -->
-        <div class="card">
-            <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;">
+<body class="bg-gradient-to-br from-slate-50 to-blue-50 min-h-screen">
+    <div class="container mx-auto px-4 py-8 max-w-3xl">
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <div class="inline-flex items-center justify-center w-16 h-16 bg-blue-600 rounded-2xl shadow-lg mb-4">
+                <i class="fas fa-box-open text-white text-2xl"></i>
+            </div>
+            <h1 class="text-3xl font-bold text-gray-800 mb-2">Cek Status & Refill Pesanan suntik sosmed 1</h1>
+            <p class="text-gray-500">Kelola status pesanan dan permintaan refill dengan mudah</p>
+        </div>
+
+        <!-- Tabs -->
+        <div class="flex border-b border-gray-200 mb-6">
+            <button onclick="switchTab('order')" id="tab-order" class="flex-1 py-3 text-center tab-active transition">
+                <i class="fas fa-clipboard-list mr-2"></i>Status Pesanan
+            </button>
+            <button onclick="switchTab('refill')" id="tab-refill" class="flex-1 py-3 text-center tab-inactive transition">
+                <i class="fas fa-sync-alt mr-2"></i>Status Refill
+            </button>
+        </div>
+
+        <!-- ==================== TAB: ORDER ==================== -->
+        <div id="panel-order">
+            <!-- Form Card Order -->
+            <div class="bg-white rounded-2xl shadow-xl p-6 mb-6 border border-gray-100">
+                <div class="mb-4">
+                    <label for="orderId" class="block text-sm font-medium text-gray-700 mb-2">
+                        <i class="fas fa-hashtag mr-1 text-blue-500"></i> ID Pesanan
+                    </label>
+                    <textarea 
+                        id="orderId" 
+                        rows="3"
+                        placeholder="Masukkan ID pesanan (satu atau lebih, pisahkan dengan koma atau spasi)&#10;Contoh: 1107, 1234, 5678"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition resize-none text-gray-800 placeholder-gray-400"
+                    ></textarea>
+                    <p class="text-xs text-gray-400 mt-2">
+                        <i class="fas fa-info-circle mr-1"></i>
+                        Bisa cek / refill multiple order sekaligus
+                    </p>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <button 
+                        id="cekBtn"
+                        onclick="cekStatus()"
+                        class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3.5 px-6 rounded-xl transition duration-200 flex items-center justify-center gap-2 shadow-md hover:shadow-lg disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                        <i class="fas fa-search" id="btnIcon"></i>
+                        <span id="btnText">Cek Status</span>
+                    </button>
+
+                    <button 
+                        id="refillBtn"
+                        onclick="refillOrder()"
+                        class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3.5 px-6 rounded-xl transition duration-200 flex items-center justify-center gap-2 shadow-md hover:shadow-lg disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                        <i class="fas fa-sync-alt" id="refillBtnIcon"></i>
+                        <span id="refillBtnText">Refill Pesanan</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== TAB: REFILL STATUS ==================== -->
+        <div id="panel-refill" class="hidden">
+            <div class="bg-white rounded-2xl shadow-xl p-6 mb-6 border border-gray-100">
+                <div class="mb-4">
+                    <label for="refillId" class="block text-sm font-medium text-gray-700 mb-2">
+                        <i class="fas fa-hashtag mr-1 text-emerald-500"></i> ID Refill
+                    </label>
+                    <textarea 
+                        id="refillId" 
+                        rows="2"
+                        placeholder="Masukkan ID Refill (satu atau lebih, pisahkan dengan koma atau spasi)&#10;Contoh: 123, 456"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition resize-none text-gray-800 placeholder-gray-400"
+                    ></textarea>
+                    <p class="text-xs text-gray-400 mt-2">
+                        <i class="fas fa-info-circle mr-1"></i>
+                        ID Refill didapat setelah berhasil request refill
+                    </p>
+                </div>
+
+                <button 
+                    id="cekRefillBtn"
+                    onclick="cekRefillStatus()"
+                    class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3.5 px-6 rounded-xl transition duration-200 flex items-center justify-center gap-2 shadow-md hover:shadow-lg disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                    <i class="fas fa-search" id="cekRefillBtnIcon"></i>
+                    <span id="cekRefillBtnText">Cek Status Refill</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Loading -->
+        <div id="loading" class="hidden text-center py-8">
+            <div class="inline-block animate-spin rounded-full h-10 w-10 border-4 border-blue-500 border-t-transparent"></div>
+            <p class="text-gray-500 mt-3" id="loadingText">Sedang memproses...</p>
+        </div>
+
+        <!-- Results -->
+        <div id="results" class="space-y-4"></div>
+
+        <!-- Error -->
+        <div id="errorBox" class="hidden bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl fade-in">
+            <div class="flex items-start gap-3">
+                <i class="fas fa-exclamation-circle mt-0.5"></i>
                 <div>
-                    <h2>📦 Cek Status Pesanan</h2>
-                    <div class="sub">Cek status pesanan & refill dari Shine Shop</div>
+                    <p class="font-medium" id="errorTitle">Terjadi Kesalahan</p>
+                    <p class="text-sm mt-1" id="errorMsg"></p>
                 </div>
-                <div class="header-actions">
-                    <button class="btn btn-back" onclick="location.href='/'">🏠 Home</button>
-                </div>
-            </div>
-            <div class="env-status" id="envStatus">🔌 Memuat konfigurasi...</div>
-        </div>
-
-        <!-- ===== TABS ===== -->
-        <div class="card">
-            <div class="tabs">
-                <button class="tab active" onclick="switchTab('order')" id="tabOrder">📦 Cek Pesanan</button>
-                <button class="tab" onclick="switchTab('refill')" id="tabRefill">🔄 Cek Refill</button>
-            </div>
-
-            <!-- ===== TAB 1: CEK PESANAN ===== -->
-            <div class="tab-content active" id="tabOrderContent">
-                <div class="sub" style="margin-bottom:16px;">Masukkan ID pesanan untuk cek status</div>
-
-                <div class="form-group">
-                    <label>🆔 ID Pesanan <span class="required">*</span></label>
-                    <input type="text" id="orderIdInput" placeholder="Contoh: 1107 atau 1107,1108,1109" oninput="toggleMassalMode()">
-                    <div class="hint">💡 Pisahkan dengan koma (,) untuk cek massal (maks 50 ID)</div>
-                </div>
-
-                <div id="massalInfo" style="display:none;background:#00ccff08;border:1px solid #00ccff33;border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:#00ccff;">
-                    📋 Mode <strong>Massal</strong> terdeteksi. Akan mengecek semua ID yang dimasukkan.
-                </div>
-
-                <button class="btn btn-primary" id="checkBtn" onclick="checkStatus()">
-                    ✅ Cek Status
-                </button>
-            </div>
-
-            <!-- ===== TAB 2: CEK REFILL ===== -->
-            <div class="tab-content" id="tabRefillContent">
-                <div class="sub" style="margin-bottom:16px;">Masukkan ID Refill untuk cek status</div>
-
-                <div class="form-group">
-                    <label>🔄 ID Refill <span class="required">*</span></label>
-                    <input type="text" id="refillIdInput" placeholder="Contoh: 12345">
-                    <div class="hint">💡 Masukkan ID refill yang ingin dicek statusnya</div>
-                </div>
-
-                <button class="btn btn-primary" id="checkRefillBtnMain" onclick="checkRefillStatusDirect()">
-                    🔄 Cek Status Refill
-                </button>
             </div>
         </div>
 
-        <!-- ===== HASIL ===== -->
-        <div class="card" id="resultCard" style="display:none;">
-            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
-                <h2>📊 Hasil Pengecekan</h2>
-                <button class="btn btn-refresh" onclick="resetForm()" style="padding:6px 16px;font-size:11px;">🔄 Cek Lagi</button>
+        <!-- Success Toast-like -->
+        <div id="successBox" class="hidden bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 rounded-xl fade-in">
+            <div class="flex items-start gap-3">
+                <i class="fas fa-check-circle mt-0.5"></i>
+                <div>
+                    <p class="font-medium" id="successTitle">Berhasil</p>
+                    <p class="text-sm mt-1" id="successMsg"></p>
+                </div>
             </div>
-            <div id="resultContainer"></div>
         </div>
 
-        <div class="text-muted" style="text-align:center;margin-top:20px;">
-            © Shine Shop · Cek Status Pesanan & Refill
+        <!-- Footer -->
+        <div class="text-center mt-10 text-sm text-gray-400">
+            <p>Powered by Shine Shop</p>
         </div>
-        <div class="security-badge">🔒 Data dari IRVANKARDE API</div>
     </div>
 
     <script>
-        // ===================== KONFIGURASI =====================
-        // ENDPOINT IRVANKARDE
-        const IRVANKARDE_STATUS_URL = 'https://irvankedesmm.co.id/api/status';
-        const IRVANKARDE_REFILL_URL = 'https://irvankedesmm.co.id/api/refill';
-        const IRVANKARDE_REFILL_STATUS_URL = 'https://irvankedesmm.co.id/api/refill/status';
-        const CONFIG_API = '/api/qris-config';
+        const API_ID = 81074;
+        const API_KEY = 'f0ugsa-n4ntem-ruhdvz-afehho-4uqw1k';
 
-        // API ID FIXED = 81074
-        const IRVANKARDE_API_ID = 81074;
-        let IRVANKARDE_API_KEY = 'f0ugsa-n4ntem-ruhdvz-afehho-4uqw1k';
-        let configLoaded = false;
+        const ENDPOINTS = {
+            status: 'https://irvankedesmm.co.id/api/status',
+            refill: 'https://irvankedesmm.co.id/api/refill',
+            refillStatus: 'https://irvankedesmm.co.id/api/refill/status'
+        };
 
-        // ===================== SWITCH TAB =====================
+        // ==================== UI Helpers ====================
         function switchTab(tab) {
-            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-            document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+            const orderTab = document.getElementById('tab-order');
+            const refillTab = document.getElementById('tab-refill');
+            const orderPanel = document.getElementById('panel-order');
+            const refillPanel = document.getElementById('panel-refill');
+
+            document.getElementById('results').innerHTML = '';
+            hideError();
+            hideSuccess();
 
             if (tab === 'order') {
-                document.getElementById('tabOrderContent').classList.add('active');
-                document.getElementById('tabOrder').classList.add('active');
-                document.getElementById('resultCard').style.display = 'none';
-                document.getElementById('resultContainer').innerHTML = '';
+                orderTab.classList.add('tab-active');
+                orderTab.classList.remove('tab-inactive');
+                refillTab.classList.add('tab-inactive');
+                refillTab.classList.remove('tab-active');
+                orderPanel.classList.remove('hidden');
+                refillPanel.classList.add('hidden');
             } else {
-                document.getElementById('tabRefillContent').classList.add('active');
-                document.getElementById('tabRefill').classList.add('active');
-                document.getElementById('resultCard').style.display = 'none';
-                document.getElementById('resultContainer').innerHTML = '';
+                refillTab.classList.add('tab-active');
+                refillTab.classList.remove('tab-inactive');
+                orderTab.classList.add('tab-inactive');
+                orderTab.classList.remove('tab-active');
+                refillPanel.classList.remove('hidden');
+                orderPanel.classList.add('hidden');
             }
         }
 
-        // ===================== AMBIL KONFIGURASI DARI ENV =====================
-        async function fetchConfig() {
-            const statusEl = document.getElementById('envStatus');
-            try {
-                statusEl.textContent = '⏳ Mengambil konfigurasi...';
-                statusEl.style.color = '#888';
-
-                const res = await fetch(CONFIG_API + '?t=' + Date.now());
-                if (!res.ok) throw new Error('Gagal mengambil konfigurasi');
-
-                const data = await res.json();
-                if (!data.success) throw new Error(data.message || 'Format data tidak valid');
-
-                // Ambil IRVANKARDE_API_KEY dari environment variable
-                if (data.irvankarde_api_key) {
-                    IRVANKARDE_API_KEY = data.irvankarde_api_key;
-                }
-
-                if (!IRVANKARDE_API_KEY) {
-                    console.warn('⚠️ IRVANKARDE_API_KEY tidak ditemukan di ENV');
-                }
-
-                configLoaded = true;
-                statusEl.textContent = '✅ Konfigurasi berhasil dimuat';
-                statusEl.style.color = '#00ffaa';
-                console.log('✅ IRVANKARDE Config loaded');
-                console.log('📌 API ID:', IRVANKARDE_API_ID);
-                console.log('📌 API Key:', IRVANKARDE_API_KEY ? IRVANKARDE_API_KEY.substring(0, 10) + '...' : '❌ Tidak ada');
-
-                return true;
-
-            } catch (err) {
-                console.error('Error fetch config:', err);
-                statusEl.textContent = '❌ ' + err.message;
-                statusEl.style.color = '#ff6666';
-                return false;
-            }
-        }
-
-        // ===================== TOGGLE MASSAL MODE =====================
-        function toggleMassalMode() {
-            const input = document.getElementById('orderIdInput');
-            const massalInfo = document.getElementById('massalInfo');
-            const value = input.value.trim();
-
-            if (value.includes(',')) {
-                massalInfo.style.display = 'block';
-            } else {
-                massalInfo.style.display = 'none';
-            }
-        }
-
-        // ===================== FORMAT STATUS =====================
-        function getStatusBadge(status) {
-            const statusMap = {
-                'pending': { class: 'pending', label: '⏳ Pending' },
-                'processing': { class: 'processing', label: '🔄 Processing' },
-                'completed': { class: 'completed', label: '✅ Completed' },
-                'canceled': { class: 'canceled', label: '❌ Canceled' },
-                'partial': { class: 'partial', label: '⚠️ Partial' },
-                'not-found': { class: 'not-found', label: '❓ Tidak Ditemukan' },
-                'rejected': { class: 'rejected', label: '❌ Rejected' },
-                'failed': { class: 'failed', label: '❌ Failed' }
-            };
-            const s = statusMap[status] || statusMap['not-found'];
-            return `<span class="status-badge ${s.class}">${s.label}</span>`;
-        }
-
-        function getRefillStatusBadge(status) {
-            const statusMap = {
-                'pending': { class: 'pending', label: '⏳ Pending' },
-                'processing': { class: 'processing', label: '🔄 Processing' },
-                'completed': { class: 'completed', label: '✅ Completed' },
-                'rejected': { class: 'rejected', label: '❌ Rejected' },
-                'failed': { class: 'failed', label: '❌ Failed' }
-            };
-            const s = statusMap[status] || { class: 'pending', label: '⏳ Pending' };
-            return `<span class="refill-status-badge ${s.class}">${s.label}</span>`;
+        function getStatusClass(status) {
+            if (!status) return 'status-unknown';
+            const s = status.toLowerCase();
+            if (s === 'pending') return 'status-pending';
+            if (s === 'processing') return 'status-processing';
+            if (s === 'success' || s === 'completed') return 'status-success';
+            if (s === 'error' || s === 'failed' || s === 'rejected') return 'status-error';
+            if (s === 'partial') return 'status-partial';
+            return 'status-unknown';
         }
 
         function getStatusIcon(status) {
-            const icons = {
-                'pending': '⏳',
-                'processing': '🔄',
-                'completed': '✅',
-                'canceled': '❌',
-                'partial': '⚠️'
-            };
-            return icons[status] || '❓';
+            if (!status) return 'fa-question';
+            const s = status.toLowerCase();
+            if (s === 'pending') return 'fa-clock';
+            if (s === 'processing') return 'fa-spinner';
+            if (s === 'success' || s === 'completed') return 'fa-check-circle';
+            if (s === 'error' || s === 'failed' || s === 'rejected') return 'fa-times-circle';
+            if (s === 'partial') return 'fa-adjust';
+            return 'fa-question';
         }
 
-        // ===================== CEK STATUS PESANAN =====================
-        async function checkStatus() {
-            const input = document.getElementById('orderIdInput');
-            const checkBtn = document.getElementById('checkBtn');
-            const resultCard = document.getElementById('resultCard');
-            const resultContainer = document.getElementById('resultContainer');
-
-            const orderIds = input.value.trim();
-
-            if (!orderIds) {
-                Swal.fire({
-                    title: '⚠️ Masukkan ID Pesanan',
-                    text: 'Silakan masukkan ID pesanan yang ingin dicek.',
-                    icon: 'warning',
-                    confirmButtonColor: '#ffaa00'
-                });
-                input.focus();
-                return;
-            }
-
-            if (!configLoaded) {
-                const loaded = await fetchConfig();
-                if (!loaded) {
-                    Swal.fire({
-                        title: '❌ Gagal Memuat Konfigurasi',
-                        text: 'Tidak dapat mengambil konfigurasi API. Hubungi admin.',
-                        icon: 'error',
-                        confirmButtonColor: '#ff4444'
-                    });
-                    return;
-                }
-            }
-
-            if (!IRVANKARDE_API_KEY) {
-                Swal.fire({
-                    title: '❌ API Key Tidak Ditemukan',
-                    text: 'IRVANKARDE_API_KEY tidak ditemukan di environment. Hubungi admin.',
-                    icon: 'error',
-                    confirmButtonColor: '#ff4444'
-                });
-                return;
-            }
-
-            checkBtn.disabled = true;
-            checkBtn.innerHTML = '<span class="loading-spinner"></span> Mengecek...';
-
-            resultCard.style.display = 'none';
-            resultContainer.innerHTML = '';
-
-            try {
-                const ids = orderIds.split(',').map(id => id.trim()).filter(id => id !== '');
-                const isMassal = ids.length > 1;
-
-                const validIds = ids.filter(id => /^\d+$/.test(id));
-                if (validIds.length === 0) {
-                    throw new Error('ID pesanan harus berupa angka.');
-                }
-
-                if (validIds.length > 50) {
-                    throw new Error('Maksimal 50 ID pesanan dalam satu permintaan.');
-                }
-
-                const idParam = validIds.join(',');
-
-                const payload = {
-                    api_id: IRVANKARDE_API_ID,
-                    api_key: IRVANKARDE_API_KEY,
-                    id: idParam
-                };
-
-                console.log('📡 Sending request to IRVANKARDE:', payload);
-
-                const response = await fetch(IRVANKARDE_STATUS_URL, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    },
-                    body: JSON.stringify(payload)
-                });
-
-                const data = await response.json();
-                console.log('📦 IRVANKARDE Response:', data);
-
-                resultCard.style.display = 'block';
-
-                if (data.status === true) {
-                    if (isMassal) {
-                        renderMassalResult(data, validIds);
-                    } else {
-                        renderSingleResult(data, validIds[0]);
-                    }
-                } else {
-                    renderErrorResult(data, validIds);
-                }
-
-            } catch (err) {
-                console.error('Error:', err);
-                resultCard.style.display = 'block';
-                resultContainer.innerHTML = `
-                    <div style="background:#ff444415;border:1px solid #ff444455;border-radius:12px;padding:20px;text-align:center;color:#ff6666;">
-                        <div style="font-size:36px;margin-bottom:8px;">❌</div>
-                        <div style="font-size:15px;font-weight:600;">Terjadi Error</div>
-                        <div style="font-size:13px;color:#888;margin-top:4px;">${err.message}</div>
-                        <button class="btn btn-refresh" onclick="checkStatus()" style="margin-top:12px;">🔄 Coba Lagi</button>
-                    </div>
-                `;
-            }
-
-            checkBtn.disabled = false;
-            checkBtn.innerHTML = '✅ Cek Status';
+        function formatNumber(num) {
+            if (num === undefined || num === null) return '-';
+            return new Intl.NumberFormat('id-ID').format(num);
         }
 
-        // ===================== CEK STATUS REFILL LANGSUNG =====================
-        async function checkRefillStatusDirect() {
-            const input = document.getElementById('refillIdInput');
-            const checkBtn = document.getElementById('checkRefillBtnMain');
-            const resultCard = document.getElementById('resultCard');
-            const resultContainer = document.getElementById('resultContainer');
-
-            const refillId = input.value.trim();
-
-            if (!refillId) {
-                Swal.fire({
-                    title: '⚠️ Masukkan ID Refill',
-                    text: 'Silakan masukkan ID refill yang ingin dicek.',
-                    icon: 'warning',
-                    confirmButtonColor: '#ffaa00'
-                });
-                input.focus();
-                return;
-            }
-
-            if (!configLoaded) {
-                const loaded = await fetchConfig();
-                if (!loaded) {
-                    Swal.fire({
-                        title: '❌ Gagal Memuat Konfigurasi',
-                        text: 'Tidak dapat mengambil konfigurasi API. Hubungi admin.',
-                        icon: 'error',
-                        confirmButtonColor: '#ff4444'
-                    });
-                    return;
-                }
-            }
-
-            if (!IRVANKARDE_API_KEY) {
-                Swal.fire({
-                    title: '❌ API Key Tidak Ditemukan',
-                    text: 'IRVANKARDE_API_KEY tidak ditemukan di environment.',
-                    icon: 'error',
-                    confirmButtonColor: '#ff4444'
-                });
-                return;
-            }
-
-            checkBtn.disabled = true;
-            checkBtn.innerHTML = '<span class="loading-spinner"></span> Mengecek...';
-
-            resultCard.style.display = 'none';
-            resultContainer.innerHTML = '';
-
-            try {
-                const payload = {
-                    api_id: IRVANKARDE_API_ID,
-                    api_key: IRVANKARDE_API_KEY,
-                    id: refillId
-                };
-
-                console.log('📡 Check Refill Status:', payload);
-
-                const response = await fetch(IRVANKARDE_REFILL_STATUS_URL, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    },
-                    body: JSON.stringify(payload)
-                });
-
-                const data = await response.json();
-                console.log('📦 Refill Status Response:', data);
-
-                resultCard.style.display = 'block';
-
-                if (data.status === true) {
-                    const status = data.refill_status || 'pending';
-                    const statusBadge = getRefillStatusBadge(status);
-
-                    const statusMap = {
-                        'pending': '⏳ Refill sedang menunggu diproses...',
-                        'processing': '🔄 Refill sedang diproses...',
-                        'completed': '✅ Refill selesai!',
-                        'rejected': '❌ Refill ditolak.',
-                        'failed': '❌ Refill gagal.'
-                    };
-
-                    resultContainer.innerHTML = `
-                        <div class="result-card show">
-                            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
-                                <div style="font-size:16px;font-weight:700;color:#fff;">
-                                    🔄 Status Refill
-                                </div>
-                                <button class="btn btn-copy btn-small" onclick="copyResult('${refillId}')">📋 Salin ID</button>
-                            </div>
-                            <div class="detail-row">
-                                <span class="label">🆔 Refill ID</span>
-                                <span class="value" style="color:#ffaa00;">${data.refill_id || refillId}</span>
-                            </div>
-                            <div class="detail-row">
-                                <span class="label">📊 Status</span>
-                                <span class="value">${statusBadge}</span>
-                            </div>
-                            <div class="detail-row">
-                                <span class="label">📝 Pesan</span>
-                                <span class="value" style="color:#888;font-weight:400;">${statusMap[status] || data.msg || 'Tidak ada pesan'}</span>
-                            </div>
-                            <div style="margin-top:12px;padding:10px;background:#00ffaa08;border-radius:10px;border:1px solid #00ffaa15;text-align:center;font-size:12px;color:#888;">
-                                📅 Terakhir diperbarui: ${new Date().toLocaleString('id-ID')}
-                            </div>
-                        </div>
-                    `;
-
-                } else {
-                    resultContainer.innerHTML = `
-                        <div style="background:#ff444415;border:1px solid #ff444455;border-radius:12px;padding:20px;text-align:center;color:#ff6666;">
-                            <div style="font-size:36px;margin-bottom:8px;">❌</div>
-                            <div style="font-size:15px;font-weight:600;">${data.msg || 'Refill tidak ditemukan'}</div>
-                            <div style="font-size:13px;color:#888;margin-top:4px;">ID: ${refillId}</div>
-                            <button class="btn btn-refresh" onclick="checkRefillStatusDirect()" style="margin-top:12px;">🔄 Coba Lagi</button>
-                        </div>
-                    `;
-                }
-
-            } catch (err) {
-                console.error('Error check refill:', err);
-                resultCard.style.display = 'block';
-                resultContainer.innerHTML = `
-                    <div style="background:#ff444415;border:1px solid #ff444455;border-radius:12px;padding:20px;text-align:center;color:#ff6666;">
-                        <div style="font-size:36px;margin-bottom:8px;">❌</div>
-                        <div style="font-size:15px;font-weight:600;">Terjadi Error</div>
-                        <div style="font-size:13px;color:#888;margin-top:4px;">${err.message}</div>
-                        <button class="btn btn-refresh" onclick="checkRefillStatusDirect()" style="margin-top:12px;">🔄 Coba Lagi</button>
-                    </div>
-                `;
-            }
-
-            checkBtn.disabled = false;
-            checkBtn.innerHTML = '🔄 Cek Status Refill';
+        function parseIds(input) {
+            return input
+                .split(/[\s,]+/)
+                .map(id => id.trim())
+                .filter(id => id.length > 0);
         }
 
-        // ===================== RENDER SINGLE RESULT =====================
-        function renderSingleResult(data, orderId) {
-            const container = document.getElementById('resultContainer');
+        function showLoading(text = 'Sedang memproses...') {
+            document.getElementById('loadingText').textContent = text;
+            document.getElementById('loading').classList.remove('hidden');
+            document.getElementById('results').innerHTML = '';
+            hideError();
+            hideSuccess();
+        }
 
-            const status = data.order_status || 'not-found';
-            const isFound = status !== 'not-found';
+        function hideLoading() {
+            document.getElementById('loading').classList.add('hidden');
+        }
 
-            let statusBadge = getStatusBadge(status);
+        function showError(title, msg) {
+            document.getElementById('errorTitle').textContent = title;
+            document.getElementById('errorMsg').textContent = msg;
+            document.getElementById('errorBox').classList.remove('hidden');
+            document.getElementById('successBox').classList.add('hidden');
+        }
 
-            let detailsHtml = '';
-            if (isFound) {
-                detailsHtml = `
-                    <div class="detail-row">
-                        <span class="label">🆔 Order ID</span>
-                        <span class="value" style="color:#ffaa00;">${data.order_id || orderId}</span>
-                    </div>
-                    <div class="detail-row">
-                        <span class="label">📊 Status</span>
-                        <span class="value">${statusBadge}</span>
-                    </div>
-                    <div class="detail-row">
-                        <span class="label">📊 Start Count</span>
-                        <span class="value blue">${data.start_count || 0}</span>
-                    </div>
-                    <div class="detail-row">
-                        <span class="label">📉 Remains</span>
-                        <span class="value ${(data.remains || 0) > 0 ? 'yellow' : 'green'}">${data.remains || 0}</span>
-                    </div>
-                `;
+        function hideError() {
+            document.getElementById('errorBox').classList.add('hidden');
+        }
+
+        function showSuccess(title, msg) {
+            document.getElementById('successTitle').textContent = title;
+            document.getElementById('successMsg').textContent = msg;
+            document.getElementById('successBox').classList.remove('hidden');
+            document.getElementById('errorBox').classList.add('hidden');
+        }
+
+        function hideSuccess() {
+            document.getElementById('successBox').classList.add('hidden');
+        }
+
+        function setButtonLoading(btnId, iconId, textId, loading, defaultText, defaultIcon) {
+            const btn = document.getElementById(btnId);
+            const icon = document.getElementById(iconId);
+            const text = document.getElementById(textId);
+            btn.disabled = loading;
+            if (loading) {
+                icon.className = 'fas fa-spinner fa-spin';
+                text.textContent = 'Memproses...';
             } else {
-                detailsHtml = `
-                    <div class="detail-row">
-                        <span class="label">🆔 Order ID</span>
-                        <span class="value" style="color:#ff4444;">${orderId}</span>
-                    </div>
-                    <div class="detail-row">
-                        <span class="label">📊 Status</span>
-                        <span class="value">${statusBadge}</span>
-                    </div>
-                    <div class="detail-row">
-                        <span class="label">📝 Pesan</span>
-                        <span class="value" style="color:#888;font-weight:400;">${data.msg || 'Pesanan tidak ditemukan'}</span>
-                    </div>
-                `;
+                icon.className = 'fas ' + defaultIcon;
+                text.textContent = defaultText;
             }
+        }
 
-            let refillHtml = '';
-            if (isFound) {
-                refillHtml = `
-                    <div class="action-bar">
-                        <button class="btn btn-refill" id="refillBtn" onclick="requestRefill('${data.order_id || orderId}')">
-                            🔄 Refill Pesanan
-                        </button>
-                        <button class="btn btn-refresh btn-small" id="checkRefillBtn" onclick="checkRefillStatus('${data.order_id || orderId}')" style="display:none;">
-                            📊 Cek Status Refill
-                        </button>
-                        <button class="btn btn-copy btn-small" onclick="copyResult('${data.order_id || orderId}')">📋 Salin ID</button>
-                    </div>
-                    <div class="refill-status-box" id="refillStatusBox_${data.order_id || orderId}">
-                        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;">
-                            <span>🔄 Refill ID: <span class="refill-id" id="refillIdDisplay_${data.order_id || orderId}">-</span></span>
-                            <span id="refillStatusDisplay_${data.order_id || orderId}">${getRefillStatusBadge('pending')}</span>
+        // ==================== Card Renderers ====================
+        function createOrderCard(id, data) {
+            const isFound = data.status && !String(data.msg || '').toLowerCase().includes('tidak ditemukan');
+            const status = data.status || 'Tidak Ditemukan';
+            const statusClass = getStatusClass(status);
+            const statusIcon = getStatusIcon(status);
+
+            return `
+                <div class="bg-white rounded-2xl shadow-md border border-gray-100 p-5 card-hover transition-all duration-200 fade-in">
+                    <div class="flex items-start justify-between mb-4">
+                        <div>
+                            <p class="text-xs text-gray-400 uppercase tracking-wide font-medium">Order ID</p>
+                            <p class="text-xl font-bold text-gray-800">#${id}</p>
                         </div>
-                        <div style="margin-top:6px;font-size:12px;color:#888;" id="refillMsgDisplay_${data.order_id || orderId}"></div>
+                        <span class="status-badge ${statusClass}">
+                            <i class="fas ${statusIcon} mr-1"></i>${status}
+                        </span>
                     </div>
-                `;
-            }
-
-            container.innerHTML = `
-                <div class="result-card show">
+                    
                     ${isFound ? `
-                        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
-                            <div style="font-size:16px;font-weight:700;color:#fff;">
-                                ${getStatusIcon(status)} Status: ${status.toUpperCase()}
+                        <div class="grid grid-cols-2 gap-4 mt-4 pt-4 border-t border-gray-100">
+                            <div>
+                                <p class="text-xs text-gray-400 mb-1">Charge</p>
+                                <p class="font-semibold text-gray-800">Rp ${formatNumber(data.charge)}</p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-gray-400 mb-1">Start Count</p>
+                                <p class="font-semibold text-gray-800">${formatNumber(data.start_count)}</p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-gray-400 mb-1">Remains</p>
+                                <p class="font-semibold text-gray-800">${formatNumber(data.remains)}</p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-gray-400 mb-1">Pesan</p>
+                                <p class="font-medium text-gray-600 text-sm">${data.msg || '-'}</p>
                             </div>
                         </div>
                     ` : `
-                        <div style="text-align:center;padding:8px 0;color:#ff6666;font-size:15px;font-weight:600;">
-                            ${getStatusIcon('not-found')} Pesanan Tidak Ditemukan
+                        <div class="mt-3 pt-3 border-t border-gray-100">
+                            <p class="text-sm text-red-500">
+                                <i class="fas fa-info-circle mr-1"></i>
+                                ${data.msg || 'Pesanan tidak ditemukan.'}
+                            </p>
                         </div>
                     `}
-                    <div style="margin-top:12px;">
-                        ${detailsHtml}
-                    </div>
-                    ${refillHtml}
-                    ${isFound ? `
-                        <div style="margin-top:12px;padding:10px;background:#00ffaa08;border-radius:10px;border:1px solid #00ffaa15;text-align:center;font-size:12px;color:#888;">
-                            📅 Terakhir diperbarui: ${new Date().toLocaleString('id-ID')}
-                        </div>
-                    ` : ''}
                 </div>
             `;
         }
 
-        // ===================== RENDER MASSAL RESULT =====================
-        function renderMassalResult(data, orderIds) {
-            const container = document.getElementById('resultContainer');
-
-            const orders = data.orders || {};
-            const totalFound = Object.keys(orders).length;
-
-            let html = `
-                <div style="margin-bottom:12px;color:#888;font-size:13px;">
-                    📊 Menampilkan ${totalFound} dari ${orderIds.length} ID pesanan
-                </div>
-                <div style="max-height:400px;overflow-y:auto;">
-            `;
-
-            orderIds.forEach(id => {
-                const orderData = orders[id] || null;
-                const isFound = orderData !== null && orderData.order_status !== undefined;
-
-                let statusBadge = '';
-                let details = '';
-
-                if (isFound) {
-                    const status = orderData.order_status || 'pending';
-                    statusBadge = getStatusBadge(status);
-                    details = `
-                        <div style="font-size:12px;color:#888;margin-top:4px;">
-                            📊 ${orderData.start_count || 0} | 
-                            📉 ${orderData.remains || 0}
+        function createRefillResultCard(id, data, isRequest = false) {
+            if (isRequest) {
+                // Result of requesting refill
+                const success = data.status === true;
+                return `
+                    <div class="bg-white rounded-2xl shadow-md border border-gray-100 p-5 card-hover transition-all duration-200 fade-in">
+                        <div class="flex items-start justify-between mb-3">
+                            <div>
+                                <p class="text-xs text-gray-400 uppercase tracking-wide font-medium">Order ID</p>
+                                <p class="text-xl font-bold text-gray-800">#${id}</p>
+                            </div>
+                            <span class="status-badge ${success ? 'status-success' : 'status-error'}">
+                                <i class="fas ${success ? 'fa-check-circle' : 'fa-times-circle'} mr-1"></i>
+                                ${success ? 'Berhasil' : 'Gagal'}
+                            </span>
                         </div>
-                    `;
-                } else {
-                    statusBadge = getStatusBadge('not-found');
-                    details = `
-                        <div style="font-size:12px;color:#888;margin-top:4px;">
-                            ${orderData?.msg || 'Pesanan tidak ditemukan'}
+                        <div class="mt-3 pt-3 border-t border-gray-100">
+                            <p class="text-sm ${success ? 'text-emerald-600' : 'text-red-500'}">
+                                <i class="fas ${success ? 'fa-info-circle' : 'fa-exclamation-circle'} mr-1"></i>
+                                ${data.msg || (success ? 'Refill berhasil dibuat.' : 'Gagal membuat refill.')}
+                            </p>
+                            ${success && data.data?.refill ? `
+                                <div class="mt-3 bg-emerald-50 rounded-lg p-3">
+                                    <p class="text-xs text-emerald-600 mb-1">ID Refill</p>
+                                    <p class="font-bold text-emerald-800 text-lg">#${data.data.refill}</p>
+                                    <p class="text-xs text-emerald-500 mt-1">Gunakan ID ini di tab Status Refill untuk memantau</p>
+                                </div>
+                            ` : ''}
                         </div>
-                    `;
-                }
-
-                html += `
-                    <div class="massal-item">
-                        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">
-                            <span class="order-id">🆔 ${id}</span>
-                            <span class="order-status">${statusBadge}</span>
-                        </div>
-                        ${details}
                     </div>
                 `;
-            });
-
-            html += `
-                </div>
-                <div style="margin-top:12px;padding:10px;background:#00ffaa08;border-radius:10px;border:1px solid #00ffaa15;text-align:center;font-size:12px;color:#888;">
-                    📅 Terakhir diperbarui: ${new Date().toLocaleString('id-ID')}
-                    <br>
-                    <button class="btn-copy" onclick="copyMassalResult('${orderIds.join(',')}')" style="margin-top:6px;">📋 Salin Semua ID</button>
-                </div>
-            `;
-
-            container.innerHTML = html;
-        }
-
-        // ===================== RENDER ERROR RESULT =====================
-        function renderErrorResult(data, orderIds) {
-            const container = document.getElementById('resultContainer');
-
-            const msg = data.msg || 'Pesanan tidak ditemukan.';
-
-            let html = `
-                <div style="background:#ff444415;border:1px solid #ff444455;border-radius:12px;padding:20px;text-align:center;color:#ff6666;">
-                    <div style="font-size:36px;margin-bottom:8px;">❌</div>
-                    <div style="font-size:15px;font-weight:600;">${msg}</div>
-                    <div style="font-size:13px;color:#888;margin-top:4px;">ID: ${orderIds.join(', ')}</div>
-                    <button class="btn btn-refresh" onclick="checkStatus()" style="margin-top:12px;">🔄 Coba Lagi</button>
-                </div>
-            `;
-
-            container.innerHTML = html;
-        }
-
-        // ===================== REQUEST REFILL =====================
-        async function requestRefill(orderId) {
-            if (!configLoaded) {
-                const loaded = await fetchConfig();
-                if (!loaded) {
-                    Swal.fire({
-                        title: '❌ Gagal Memuat Konfigurasi',
-                        text: 'Tidak dapat mengambil konfigurasi API.',
-                        icon: 'error',
-                        confirmButtonColor: '#ff4444'
-                    });
-                    return;
-                }
             }
 
-            if (!IRVANKARDE_API_KEY) {
-                Swal.fire({
-                    title: '❌ API Key Tidak Ditemukan',
-                    text: 'IRVANKARDE_API_KEY tidak ditemukan di environment.',
-                    icon: 'error',
-                    confirmButtonColor: '#ff4444'
-                });
+            // Result of checking refill status
+            const isFound = data.status === true && data.data;
+            const refillStatus = data.data?.refill_status || 'Tidak Ditemukan';
+            const statusClass = getStatusClass(refillStatus);
+            const statusIcon = getStatusIcon(refillStatus);
+
+            return `
+                <div class="bg-white rounded-2xl shadow-md border border-gray-100 p-5 card-hover transition-all duration-200 fade-in">
+                    <div class="flex items-start justify-between mb-4">
+                        <div>
+                            <p class="text-xs text-gray-400 uppercase tracking-wide font-medium">Refill ID</p>
+                            <p class="text-xl font-bold text-gray-800">#${data.data?.refill_id || id}</p>
+                        </div>
+                        <span class="status-badge ${statusClass}">
+                            <i class="fas ${statusIcon} mr-1"></i>${refillStatus}
+                        </span>
+                    </div>
+                    <div class="mt-3 pt-3 border-t border-gray-100">
+                        <p class="text-sm ${isFound ? 'text-gray-600' : 'text-red-500'}">
+                            <i class="fas fa-info-circle mr-1"></i>
+                            ${data.msg || (isFound ? 'Refill ditemukan.' : 'Refill tidak ditemukan.')}
+                        </p>
+                    </div>
+                </div>
+            `;
+        }
+
+        // ==================== API Calls ====================
+        async function apiPost(url, ids) {
+            const formData = new URLSearchParams();
+            formData.append('api_id', API_ID);
+            formData.append('api_key', API_KEY);
+            formData.append('id', ids.join(','));
+
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: formData
+            });
+
+            if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
+            return await response.json();
+        }
+
+        // Cek Status Pesanan
+        async function cekStatus() {
+            const orderInput = document.getElementById('orderId').value.trim();
+            const resultsDiv = document.getElementById('results');
+
+            if (!orderInput) {
+                showError('Input Kosong', 'Silakan masukkan minimal satu ID pesanan.');
                 return;
             }
 
-            const btn = document.getElementById('refillBtn');
-            if (btn) {
-                btn.disabled = true;
-                btn.innerHTML = '⏳ Memproses...';
-            }
-
-            try {
-                const payload = {
-                    api_id: IRVANKARDE_API_ID,
-                    api_key: IRVANKARDE_API_KEY,
-                    id: orderId
-                };
-
-                console.log('📡 Request Refill:', payload);
-
-                const response = await fetch(IRVANKARDE_REFILL_URL, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    },
-                    body: JSON.stringify(payload)
-                });
-
-                const data = await response.json();
-                console.log('📦 Refill Response:', data);
-
-                if (data.status === true) {
-                    const refillId = data.refill || 'N/A';
-                    Swal.fire({
-                        title: '✅ Refill Berhasil!',
-                        html: `
-                            Refill dengan ID <strong>#${refillId}</strong> berhasil dibuat.<br>
-                            <span style="color:#888;font-size:13px;">${data.msg || ''}</span>
-                            <br><br>
-                            <button onclick="checkRefillStatus('${orderId}', '${refillId}')" 
-                                    style="background:#ffaa0044;color:#ffaa00;border:1px solid #ffaa0055;padding:8px 20px;border-radius:20px;cursor:pointer;">
-                                📊 Cek Status Refill
-                            </button>
-                        `,
-                        icon: 'success',
-                        confirmButtonColor: '#00ffaa',
-                        confirmButtonText: 'OK'
-                    });
-
-                    const box = document.getElementById(`refillStatusBox_${orderId}`);
-                    if (box) {
-                        box.classList.add('show');
-                        document.getElementById(`refillIdDisplay_${orderId}`).textContent = refillId;
-                        document.getElementById(`refillStatusDisplay_${orderId}`).innerHTML = getRefillStatusBadge('pending');
-                        document.getElementById(`refillMsgDisplay_${orderId}`).textContent = '🔄 Refill sedang diproses...';
-                    }
-
-                    const checkRefillBtn = document.getElementById('checkRefillBtn');
-                    if (checkRefillBtn) {
-                        checkRefillBtn.style.display = 'inline-block';
-                        checkRefillBtn.onclick = function() {
-                            checkRefillStatus(orderId, refillId);
-                        };
-                    }
-
-                } else {
-                    const errorMsg = data.msg || 'Gagal membuat refill.';
-                    Swal.fire({
-                        title: '❌ Refill Gagal',
-                        text: errorMsg,
-                        icon: 'error',
-                        confirmButtonColor: '#ff4444'
-                    });
-                }
-
-            } catch (err) {
-                console.error('Error refill:', err);
-                Swal.fire({
-                    title: '❌ Error',
-                    text: err.message || 'Terjadi kesalahan saat request refill.',
-                    icon: 'error',
-                    confirmButtonColor: '#ff4444'
-                });
-            }
-
-            if (btn) {
-                btn.disabled = false;
-                btn.innerHTML = '🔄 Refill Pesanan';
-            }
-        }
-
-        // ===================== CEK STATUS REFILL (DARI TOMBOL) =====================
-        async function checkRefillStatus(orderId, refillId) {
-            if (!configLoaded) {
-                const loaded = await fetchConfig();
-                if (!loaded) {
-                    Swal.fire({
-                        title: '❌ Gagal Memuat Konfigurasi',
-                        text: 'Tidak dapat mengambil konfigurasi API.',
-                        icon: 'error',
-                        confirmButtonColor: '#ff4444'
-                    });
-                    return;
-                }
-            }
-
-            if (!IRVANKARDE_API_KEY) {
-                Swal.fire({
-                    title: '❌ API Key Tidak Ditemukan',
-                    text: 'IRVANKARDE_API_KEY tidak ditemukan di environment.',
-                    icon: 'error',
-                    confirmButtonColor: '#ff4444'
-                });
+            const ids = parseIds(orderInput);
+            if (ids.length === 0) {
+                showError('Input Tidak Valid', 'Tidak ada ID pesanan yang valid.');
                 return;
             }
 
-            if (!refillId) {
-                const idDisplay = document.getElementById(`refillIdDisplay_${orderId}`);
-                if (idDisplay) {
-                    refillId = idDisplay.textContent.trim();
-                }
-                if (!refillId || refillId === '-') {
-                    Swal.fire({
-                        title: '⚠️ Belum Ada Refill',
-                        text: 'Pesanan ini belum memiliki refill. Silakan request refill terlebih dahulu.',
-                        icon: 'warning',
-                        confirmButtonColor: '#ffaa00'
-                    });
-                    return;
-                }
-            }
+            setButtonLoading('cekBtn', 'btnIcon', 'btnText', true, 'Cek Status', 'fa-search');
+            showLoading('Sedang mengecek status pesanan...');
 
             try {
-                const payload = {
-                    api_id: IRVANKARDE_API_ID,
-                    api_key: IRVANKARDE_API_KEY,
-                    id: refillId
-                };
+                const data = await apiPost(ENDPOINTS.status, ids);
+                hideLoading();
 
-                console.log('📡 Check Refill Status:', payload);
-
-                const response = await fetch(IRVANKARDE_REFILL_STATUS_URL, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    },
-                    body: JSON.stringify(payload)
-                });
-
-                const data = await response.json();
-                console.log('📦 Refill Status Response:', data);
-
-                if (data.status === true) {
-                    const status = data.refill_status || 'pending';
-                    const statusBadge = getRefillStatusBadge(status);
-
-                    const display = document.getElementById(`refillStatusDisplay_${orderId}`);
-                    if (display) {
-                        display.innerHTML = statusBadge;
+                if (data.status === false && !data.orders) {
+                    resultsDiv.innerHTML = createOrderCard(ids[0], { msg: data.msg, status: null });
+                } else if (data.orders) {
+                    let html = '';
+                    for (const [orderId, orderData] of Object.entries(data.orders)) {
+                        html += createOrderCard(orderId, orderData);
                     }
-
-                    const msgDisplay = document.getElementById(`refillMsgDisplay_${orderId}`);
-                    if (msgDisplay) {
-                        const statusMap = {
-                            'pending': '⏳ Refill sedang menunggu diproses...',
-                            'processing': '🔄 Refill sedang diproses...',
-                            'completed': '✅ Refill selesai!',
-                            'rejected': '❌ Refill ditolak.',
-                            'failed': '❌ Refill gagal.'
-                        };
-                        msgDisplay.textContent = statusMap[status] || `Status: ${status}`;
-                    }
-
-                    const box = document.getElementById(`refillStatusBox_${orderId}`);
-                    if (box) {
-                        box.classList.add('show');
-                    }
-
-                    Swal.fire({
-                        title: '📊 Status Refill',
-                        html: `
-                            <div style="text-align:center;">
-                                <div style="font-size:16px;font-weight:700;color:#fff;margin-bottom:8px;">
-                                    Refill ID: <span style="color:#ffaa00;">#${refillId}</span>
-                                </div>
-                                <div style="font-size:14px;">
-                                    ${statusBadge}
-                                </div>
-                                <div style="font-size:13px;color:#888;margin-top:8px;">
-                                    ${data.msg || 'Tidak ada pesan tambahan.'}
-                                </div>
-                            </div>
-                        `,
-                        icon: 'info',
-                        confirmButtonColor: '#00ccff',
-                        confirmButtonText: 'OK'
+                    resultsDiv.innerHTML = html;
+                } else if (data.status === true && data.data) {
+                    resultsDiv.innerHTML = createOrderCard(data.data.id || ids[0], {
+                        ...data.data,
+                        msg: data.msg
                     });
-
                 } else {
-                    Swal.fire({
-                        title: '❌ Refill Tidak Ditemukan',
-                        text: data.msg || 'Refill dengan ID tersebut tidak ditemukan.',
-                        icon: 'error',
-                        confirmButtonColor: '#ff4444'
-                    });
+                    showError('Respon Tidak Dikenal', JSON.stringify(data));
+                }
+            } catch (err) {
+                hideLoading();
+                showError('Gagal Terhubung', err.message || 'Tidak dapat terhubung ke server.');
+            } finally {
+                setButtonLoading('cekBtn', 'btnIcon', 'btnText', false, 'Cek Status', 'fa-search');
+            }
+        }
+
+        // Request Refill
+        async function refillOrder() {
+            const orderInput = document.getElementById('orderId').value.trim();
+            const resultsDiv = document.getElementById('results');
+
+            if (!orderInput) {
+                showError('Input Kosong', 'Silakan masukkan minimal satu ID pesanan untuk di-refill.');
+                return;
+            }
+
+            const ids = parseIds(orderInput);
+            if (ids.length === 0) {
+                showError('Input Tidak Valid', 'Tidak ada ID pesanan yang valid.');
+                return;
+            }
+
+            setButtonLoading('refillBtn', 'refillBtnIcon', 'refillBtnText', true, 'Refill Pesanan', 'fa-sync-alt');
+            showLoading('Sedang meminta refill...');
+
+            try {
+                // Support multiple: call one by one or assume API supports comma
+                // We'll try mass first, fallback to sequential if needed
+                let html = '';
+                let hasSuccess = false;
+
+                // Try mass request first
+                const data = await apiPost(ENDPOINTS.refill, ids);
+
+                hideLoading();
+
+                // Handle response
+                if (data.status === true && data.data) {
+                    // Single success
+                    html = createRefillResultCard(ids[0], data, true);
+                    hasSuccess = true;
+                    showSuccess('Refill Berhasil', data.msg || `Refill #${data.data.refill} berhasil dibuat.`);
+                } else if (data.orders || data.data?.orders) {
+                    // Mass style (if supported)
+                    const orders = data.orders || data.data.orders;
+                    for (const [orderId, orderData] of Object.entries(orders)) {
+                        html += createRefillResultCard(orderId, orderData, true);
+                        if (orderData.status === true) hasSuccess = true;
+                    }
+                } else if (data.status === false) {
+                    // Single fail or overall fail
+                    html = createRefillResultCard(ids[0], data, true);
+                } else {
+                    // Unknown, try sequential for multiple
+                    if (ids.length > 1) {
+                        for (const id of ids) {
+                            try {
+                                const singleData = await apiPost(ENDPOINTS.refill, [id]);
+                                html += createRefillResultCard(id, singleData, true);
+                                if (singleData.status === true) hasSuccess = true;
+                            } catch (e) {
+                                html += createRefillResultCard(id, { status: false, msg: e.message }, true);
+                            }
+                        }
+                    } else {
+                        html = createRefillResultCard(ids[0], data, true);
+                    }
+                }
+
+                resultsDiv.innerHTML = html;
+
+                if (hasSuccess) {
+                    // Auto switch hint
+                    setTimeout(() => {
+                        // Optional: bisa auto isi refill ID, tapi biarkan user copy manual
+                    }, 500);
                 }
 
             } catch (err) {
-                console.error('Error check refill status:', err);
-                Swal.fire({
-                    title: '❌ Error',
-                    text: err.message || 'Terjadi kesalahan saat cek status refill.',
-                    icon: 'error',
-                    confirmButtonColor: '#ff4444'
-                });
+                hideLoading();
+                // Fallback sequential for multiple IDs
+                if (ids.length > 1) {
+                    let html = '';
+                    for (const id of ids) {
+                        try {
+                            const singleData = await apiPost(ENDPOINTS.refill, [id]);
+                            html += createRefillResultCard(id, singleData, true);
+                        } catch (e) {
+                            html += createRefillResultCard(id, { status: false, msg: e.message }, true);
+                        }
+                    }
+                    resultsDiv.innerHTML = html;
+                } else {
+                    showError('Gagal Terhubung', err.message || 'Tidak dapat terhubung ke server.');
+                }
+            } finally {
+                setButtonLoading('refillBtn', 'refillBtnIcon', 'refillBtnText', false, 'Refill Pesanan', 'fa-sync-alt');
             }
         }
 
-        // ===================== COPY FUNCTIONS =====================
-        function copyResult(text) {
-            navigator.clipboard.writeText(String(text)).then(() => {
-                Swal.fire({
-                    title: '✅ Berhasil Disalin!',
-                    text: `ID ${text} telah disalin ke clipboard.`,
-                    icon: 'success',
-                    timer: 1500,
-                    showConfirmButton: false,
-                    toast: true,
-                    position: 'top-end'
-                });
-            }).catch(() => {
-                const textarea = document.createElement('textarea');
-                textarea.value = text;
-                document.body.appendChild(textarea);
-                textarea.select();
-                document.execCommand('copy');
-                document.body.removeChild(textarea);
-                Swal.fire({
-                    title: '✅ Berhasil Disalin!',
-                    icon: 'success',
-                    timer: 1500,
-                    showConfirmButton: false,
-                    toast: true,
-                    position: 'top-end'
-                });
-            });
+        // Cek Status Refill
+        async function cekRefillStatus() {
+            const refillInput = document.getElementById('refillId').value.trim();
+            const resultsDiv = document.getElementById('results');
+
+            if (!refillInput) {
+                showError('Input Kosong', 'Silakan masukkan minimal satu ID Refill.');
+                return;
+            }
+
+            const ids = parseIds(refillInput);
+            if (ids.length === 0) {
+                showError('Input Tidak Valid', 'Tidak ada ID Refill yang valid.');
+                return;
+            }
+
+            setButtonLoading('cekRefillBtn', 'cekRefillBtnIcon', 'cekRefillBtnText', true, 'Cek Status Refill', 'fa-search');
+            showLoading('Sedang mengecek status refill...');
+
+            try {
+                let html = '';
+
+                // API mungkin support mass atau single. Kita coba mass dulu.
+                const data = await apiPost(ENDPOINTS.refillStatus, ids);
+
+                hideLoading();
+
+                if (data.status === true && data.data) {
+                    // Single
+                    html = createRefillResultCard(ids[0], data, false);
+                } else if (data.orders || (data.data && typeof data.data === 'object' && !data.data.refill_id)) {
+                    const orders = data.orders || data.data;
+                    for (const [rid, rdata] of Object.entries(orders)) {
+                        html += createRefillResultCard(rid, rdata.status !== undefined ? rdata : { status: true, data: rdata, msg: rdata.msg }, false);
+                    }
+                } else if (data.status === false) {
+                    html = createRefillResultCard(ids[0], data, false);
+                } else {
+                    // Sequential fallback
+                    for (const id of ids) {
+                        try {
+                            const single = await apiPost(ENDPOINTS.refillStatus, [id]);
+                            html += createRefillResultCard(id, single, false);
+                        } catch (e) {
+                            html += createRefillResultCard(id, { status: false, msg: e.message }, false);
+                        }
+                    }
+                }
+
+                resultsDiv.innerHTML = html || '<p class="text-center text-gray-500">Tidak ada data.</p>';
+
+            } catch (err) {
+                hideLoading();
+                if (ids.length > 1) {
+                    let html = '';
+                    for (const id of ids) {
+                        try {
+                            const single = await apiPost(ENDPOINTS.refillStatus, [id]);
+                            html += createRefillResultCard(id, single, false);
+                        } catch (e) {
+                            html += createRefillResultCard(id, { status: false, msg: e.message }, false);
+                        }
+                    }
+                    resultsDiv.innerHTML = html;
+                } else {
+                    showError('Gagal Terhubung', err.message || 'Tidak dapat terhubung ke server.');
+                }
+            } finally {
+                setButtonLoading('cekRefillBtn', 'cekRefillBtnIcon', 'cekRefillBtnText', false, 'Cek Status Refill', 'fa-search');
+            }
         }
 
-        function copyMassalResult(text) {
-            navigator.clipboard.writeText(text).then(() => {
-                Swal.fire({
-                    title: '✅ Berhasil Disalin!',
-                    text: 'Semua ID pesanan telah disalin.',
-                    icon: 'success',
-                    timer: 1500,
-                    showConfirmButton: false,
-                    toast: true,
-                    position: 'top-end'
-                });
-            }).catch(() => {
-                const textarea = document.createElement('textarea');
-                textarea.value = text;
-                document.body.appendChild(textarea);
-                textarea.select();
-                document.execCommand('copy');
-                document.body.removeChild(textarea);
-                Swal.fire({
-                    title: '✅ Berhasil Disalin!',
-                    icon: 'success',
-                    timer: 1500,
-                    showConfirmButton: false,
-                    toast: true,
-                    position: 'top-end'
-                });
-            });
-        }
-
-        // ===================== RESET FORM =====================
-        function resetForm() {
-            document.getElementById('orderIdInput').value = '';
-            document.getElementById('refillIdInput').value = '';
-            document.getElementById('resultCard').style.display = 'none';
-            document.getElementById('resultContainer').innerHTML = '';
-            document.getElementById('massalInfo').style.display = 'none';
-            document.getElementById('orderIdInput').focus();
-        }
-
-        // ===================== ENTER KEY =====================
-        document.getElementById('orderIdInput').addEventListener('keydown', function(e) {
-            if (e.key === 'Enter') {
+        // Enter key support
+        document.getElementById('orderId').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
-                checkStatus();
+                cekStatus();
             }
         });
 
-        document.getElementById('refillIdInput').addEventListener('keydown', function(e) {
-            if (e.key === 'Enter') {
+        document.getElementById('refillId').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
-                checkRefillStatusDirect();
+                cekRefillStatus();
             }
         });
-
-        // ===================== INIT =====================
-        document.addEventListener('DOMContentLoaded', async function() {
-            await fetchConfig();
-
-            console.log('📦 Cek Status Pesanan + Refill siap!');
-            console.log('📌 API ID:', IRVANKARDE_API_ID);
-            console.log('📌 API Key:', IRVANKARDE_API_KEY ? '✅ Terdeteksi' : '❌ Tidak ada');
-            console.log('📌 Endpoint Status:', IRVANKARDE_STATUS_URL);
-            console.log('📌 Endpoint Refill:', IRVANKARDE_REFILL_URL);
-            console.log('📌 Endpoint Refill Status:', IRVANKARDE_REFILL_STATUS_URL);
-        });
-
-        // ===================== ANTI INSPECT =====================
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'F12' ||
-                (e.ctrlKey && e.shiftKey && ['I', 'C', 'J'].includes(e.key)) ||
-                (e.ctrlKey && e.key === 'u')) {
-                e.preventDefault();
-                return false;
-            }
-        });
-
-        setInterval(() => {
-            const threshold = 160;
-            if (window.devtoolsOpen) return;
-            const widthThreshold = window.outerWidth - window.innerWidth > threshold;
-            if (widthThreshold && !/Android|iPhone|iPad/i.test(navigator.userAgent)) {
-                document.body.innerHTML = "<h1 style='color:gold;text-align:center;margin-top:40vh;'>🚫 Developer Tools Terdeteksi</h1>";
-            }
-        }, 2000);
     </script>
 </body>
 </html>
