@@ -1,1958 +1,760 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Pembayaran QRIS - Shine Shop</title>
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700;800&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
-<style>
-*{box-sizing:border-box;margin:0;padding:0}
-body{
-  font-family:'Poppins',sans-serif;
-  min-height:100vh;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  padding:20px;
-  color:#fff;
-  background:#0a0e1a;
-  position:relative;
-  overflow-x:hidden;
-}
-body::before{
-  content:'';
-  position:fixed;
-  top:-50%;
-  left:-50%;
-  width:200%;
-  height:200%;
-  background:
-    radial-gradient(circle at 20% 30%, rgba(0,198,255,0.12) 0%, transparent 50%),
-    radial-gradient(circle at 80% 70%, rgba(0,114,255,0.10) 0%, transparent 50%),
-    radial-gradient(circle at 50% 50%, rgba(168,85,247,0.06) 0%, transparent 60%);
-  animation:bgFloat 20s ease-in-out infinite alternate;
-  z-index:0;
-  pointer-events:none;
-}
-@keyframes bgFloat{
-  0%{transform:translate(0,0) rotate(0deg)}
-  33%{transform:translate(2%,-2%) rotate(2deg)}
-  66%{transform:translate(-1%,3%) rotate(-1deg)}
-  100%{transform:translate(1%,-1%) rotate(1deg)}
-}
-.orb{
-  position:fixed;
-  border-radius:50%;
-  filter:blur(80px);
-  pointer-events:none;
-  z-index:0;
-  animation:orbPulse 6s ease-in-out infinite alternate;
-}
-.orb-1{width:400px;height:400px;top:-100px;right:-100px;background:rgba(0,198,255,0.10);animation-delay:0s}
-.orb-2{width:300px;height:300px;bottom:-50px;left:-50px;background:rgba(168,85,247,0.08);animation-delay:2s}
-.orb-3{width:200px;height:200px;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,114,255,0.06);animation-delay:4s}
-@keyframes orbPulse{
-  0%{transform:scale(0.8);opacity:0.6}
-  100%{transform:scale(1.2);opacity:1}
-}
-.card{
-  width:100%;
-  max-width:480px;
-  background:rgba(255,255,255,0.04);
-  backdrop-filter:blur(24px) saturate(180%);
-  -webkit-backdrop-filter:blur(24px) saturate(180%);
-  border-radius:28px;
-  padding:32px 28px;
-  border:1px solid rgba(255,255,255,0.06);
-  box-shadow:0 30px 80px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05);
-  position:relative;
-  z-index:1;
-  transition:transform 0.3s ease, box-shadow 0.3s ease;
-}
-.card:hover{
-  transform:translateY(-3px);
-  box-shadow:0 40px 100px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.08);
-}
-.card::before{
-  content:'';
-  position:absolute;
-  top:0;
-  left:20%;
-  right:20%;
-  height:2px;
-  background:linear-gradient(90deg,transparent,#00c6ff,#0072ff,#8b5cf6,transparent);
-  border-radius:100%;
-  filter:blur(2px);
-  opacity:0.5;
-}
-h2{
-  font-size:24px;
-  font-weight:800;
-  letter-spacing:-0.5px;
-  background:linear-gradient(135deg,#f0f9ff 0%,#b6d4fe 40%,#a5b4fc 70%,#c4b5fd 100%);
-  -webkit-background-clip:text;
-  -webkit-text-fill-color:transparent;
-  background-clip:text;
-  margin-bottom:2px;
-}
-.subtitle{
-  font-size:13px;
-  color:#94a3b8;
-  font-weight:300;
-  letter-spacing:0.5px;
-  margin-top:2px;
-}
-.qr-wrapper{
-  background:#fff;
-  border-radius:20px;
-  padding:20px;
-  margin:18px auto;
-  width:fit-content;
-  box-shadow:0 8px 32px rgba(0,0,0,0.3);
-  transition:transform 0.3s ease, box-shadow 0.3s ease;
-  position:relative;
-}
-.qr-wrapper:hover{
-  transform:scale(1.02);
-  box-shadow:0 12px 40px rgba(0,0,0,0.4);
-}
-#qrisCanvas{
-  display:block;
-  border-radius:12px;
-}
-.timer-overlay{
-  position:absolute;
-  inset:0;
-  background:rgba(0,0,0,0.7);
-  border-radius:20px;
-  display:none;
-  flex-direction:column;
-  align-items:center;
-  justify-content:center;
-  color:#fff;
-  z-index:5;
-}
-.timer-overlay.show{
-  display:flex;
-}
-.timer-overlay .timer-icon{
-  font-size:40px;
-  margin-bottom:8px;
-}
-.timer-overlay .timer-text{
-  font-size:14px;
-  font-weight:600;
-  color:#ffaa00;
-}
-.timer-overlay .timer-sub{
-  font-size:12px;
-  color:#94a3b8;
-  margin-top:4px;
-}
-.timer-display{
-  text-align:center;
-  margin:6px 0 10px 0;
-  font-size:14px;
-  color:#94a3b8;
-}
-.timer-display .time-value{
-  color:#00ffaa;
-  font-weight:700;
-  font-size:18px;
-  font-variant-numeric:tabular-nums;
-}
-.timer-display .time-value.warning{
-  color:#ffaa00;
-}
-.timer-display .time-value.danger{
-  color:#ff4444;
-  animation:blink 1s ease-in-out infinite;
-}
-@keyframes blink{
-  0%,100%{opacity:1}
-  50%{opacity:0.3}
-}
-.unique-code{
-  background:rgba(30,41,59,0.6);
-  backdrop-filter:blur(8px);
-  padding:12px 16px;
-  border-radius:14px;
-  text-align:center;
-  font-size:20px;
-  font-weight:700;
-  color:#facc15;
-  margin:14px 0 10px 0;
-  border:1px solid rgba(250,204,21,0.15);
-  box-shadow:0 4px 20px rgba(250,204,21,0.05);
-  letter-spacing:1px;
-}
-.unique-code span{
-  background:linear-gradient(135deg,#fbbf24,#f59e0b);
-  -webkit-background-clip:text;
-  -webkit-text-fill-color:transparent;
-  background-clip:text;
-  font-weight:800;
-}
-.details{
-  font-size:13.5px;
-  line-height:1.8;
-  background:rgba(255,255,255,0.04);
-  padding:14px 16px;
-  border-radius:14px;
-  border-left:3px solid #00c6ff;
-  margin:8px 0 12px 0;
-  color:#e2e8f0;
-}
-.details strong{color:#f8fafc;font-weight:600}
-.details .discount-text{color:#22c55e;font-weight:600}
-.details .voucher-text{color:#facc15;font-weight:600}
-.details .admin-fee-text{color:#ffaa00;font-weight:600}
-.gmail-display{
-  background:rgba(255,255,255,0.04);
-  padding:10px 16px;
-  border-radius:12px;
-  margin:8px 0 4px 0;
-  border:1px solid rgba(0,198,255,0.12);
-  display:flex;
-  align-items:center;
-  gap:10px;
-  flex-wrap:wrap;
-}
-.gmail-display .label{
-  color:#94a3b8;
-  font-size:12px;
-  font-weight:500;
-}
-.gmail-display .value{
-  color:#00ffaa;
-  font-size:14px;
-  font-weight:600;
-  word-break:break-all;
-}
-.gmail-display .value.not-set{
-  color:#ff6666;
-  font-style:italic;
-  font-weight:400;
-}
-input{
-  width:100%;
-  padding:14px 16px;
-  border-radius:14px;
-  border:1px solid rgba(255,255,255,0.08);
-  background:rgba(255,255,255,0.05);
-  margin-top:12px;
-  font-size:14px;
-  color:#f1f5f9;
-  transition:all 0.25s ease;
-  outline:none;
-  backdrop-filter:blur(4px);
-  font-family:'Poppins',sans-serif;
-}
-input::placeholder{color:#94a3b8;font-weight:300}
-input:focus{
-  border-color:#00c6ff;
-  background:rgba(255,255,255,0.08);
-  box-shadow:0 0 0 4px rgba(0,198,255,0.10);
-}
-input:disabled{opacity:0.4;cursor:not-allowed}
-p{
-  color:#fca5a5;
-  font-size:13px;
-  line-height:1.7;
-  margin-top:16px;
-  margin-bottom:0;
-  padding:12px 14px;
-  background:rgba(239,68,68,0.06);
-  border-radius:14px;
-  border-left:3px solid #ef4444;
-  text-align:left;
-}
-.btn{
-  width:100%;
-  margin-top:16px;
-  padding:16px;
-  border-radius:999px;
-  border:none;
-  font-size:15px;
-  font-weight:700;
-  color:#fff;
-  background:linear-gradient(135deg,#00c6ff,#0072ff);
-  cursor:pointer;
-  transition:all 0.25s ease;
-  letter-spacing:0.5px;
-  text-transform:uppercase;
-  box-shadow:0 8px 24px rgba(0,114,255,0.25);
-  font-family:'Poppins',sans-serif;
-}
-.btn:hover:not(:disabled){
-  transform:translateY(-2px);
-  box-shadow:0 12px 32px rgba(0,114,255,0.35);
-  background:linear-gradient(135deg,#00d4ff,#0066ff);
-}
-.btn:active:not(:disabled){transform:scale(0.97)}
-.btn:disabled{opacity:0.4;cursor:not-allowed;transform:none!important;box-shadow:none!important}
-#applyVoucher{
-  background:linear-gradient(135deg,#22c55e,#16a34a);
-  box-shadow:0 8px 24px rgba(34,197,94,0.25);
-}
-#applyVoucher:hover:not(:disabled){
-  background:linear-gradient(135deg,#2dd4bf,#059669);
-  box-shadow:0 12px 32px rgba(34,197,94,0.35);
-}
-#regenerateBtn{
-  background:linear-gradient(135deg,#f59e0b,#d97706);
-  box-shadow:0 8px 24px rgba(245,158,11,0.25);
-  display:none;
-}
-#regenerateBtn:hover:not(:disabled){
-  background:linear-gradient(135deg,#fbbf24,#f59e0b);
-  box-shadow:0 12px 32px rgba(245,158,11,0.35);
-}
-.muted{
-  text-align:center;
-  font-size:12px;
-  color:#94a3b8;
-  margin-top:16px;
-  font-weight:300;
-  letter-spacing:0.2px;
-}
-.voucher-status{
-  font-size:12px;
-  margin-top:8px;
-  text-align:center;
-  min-height:24px;
-}
-.voucher-status .active{color:#22c55e}
-.voucher-status .used{color:#ef4444}
-.voucher-status .info{color:#94a3b8}
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cek Status Pesanan Suntik Sosmed 1 | Shine Shop</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Plus Jakarta Sans', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50:  '#f5f3ff',
+                            100: '#ede9fe',
+                            200: '#ddd6fe',
+                            300: '#c4b5fd',
+                            400: '#a78bfa',
+                            500: '#8b5cf6',
+                            600: '#7c3aed',
+                            700: '#6d28d9',
+                            800: '#5b21b6',
+                            900: '#4c1d95',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        .status-badge {
+            padding: 0.3rem 0.85rem;
+            border-radius: 9999px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        .status-pending   { background: #fef3c7; color: #92400e; }
+        .status-processing{ background: #dbeafe; color: #1e40af; }
+        .status-success,
+        .status-completed { background: #d1fae5; color: #065f46; }
+        .status-error,
+        .status-failed,
+        .status-rejected  { background: #fee2e2; color: #991b1b; }
+        .status-partial   { background: #ffedd5; color: #9a3412; }
+        .status-unknown   { background: #f3f4f6; color: #374151; }
 
-/* ===== BANNED PAGE ===== */
-.banned-page{
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  min-height:100vh;
-  padding:20px;
-  background:linear-gradient(135deg,#0f2027,#203a43,#2c5364);
-  color:white;
-  text-align:center;
-}
-.banned-card{
-  max-width:460px;
-  background:rgba(255,255,255,0.06);
-  backdrop-filter:blur(20px);
-  padding:40px 30px;
-  border-radius:24px;
-  border:1px solid rgba(255,68,68,0.3);
-  box-shadow:0 0 60px rgba(255,68,68,0.1);
-}
-.banned-card .icon{font-size:64px;display:block;margin-bottom:16px}
-.banned-card h1{color:#ff4444;font-size:28px;margin-bottom:8px}
-.banned-card .banned-gmail{color:#00ffaa;font-size:16px;font-weight:600;word-break:break-all;margin:8px 0}
-.banned-card .banned-reason{
-  color:#f1f5f9;
-  font-size:14px;
-  line-height:1.8;
-  background:rgba(255,68,68,0.08);
-  padding:14px 18px;
-  border-radius:12px;
-  border-left:3px solid #ff4444;
-  text-align:left;
-  margin:12px 0;
-}
-.banned-card .banned-until{
-  color:#ffaa00;
-  font-size:13px;
-  font-weight:600;
-  margin:8px 0;
-}
-.banned-card .banned-current-time{
-  color:#94a3b8;
-  font-size:12px;
-  margin:4px 0 16px 0;
-}
-.banned-card .btn-appeal{
-  display:inline-block;
-  background:#ffaa0044;
-  color:#ffaa00;
-  border:1px solid #ffaa0055;
-  padding:12px 30px;
-  border-radius:30px;
-  text-decoration:none;
-  font-weight:600;
-  font-size:14px;
-  transition:0.3s;
-  font-family:'Poppins',sans-serif;
-  margin-top:8px;
-}
-.banned-card .btn-appeal:hover{
-  background:#ffaa0066;
-  transform:scale(1.02);
-}
-.banned-card .banned-id{
-  color:#666;
-  font-size:11px;
-  margin-top:12px;
-  word-break:break-all;
-}
+        .card-hover { transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); }
+        .card-hover:hover { transform: translateY(-3px); box-shadow: 0 20px 40px -12px rgba(124, 58, 237, 0.15); }
 
-/* ===== WIB TIME DISPLAY ===== */
-.wib-time-display{
-  text-align:center;
-  color:#94a3b8;
-  font-size:11px;
-  margin-top:6px;
-  padding:4px 0;
-  border-top:1px solid rgba(255,255,255,0.04);
-}
-.wib-time-display .wib-label{
-  color:#666;
-  font-weight:300;
-}
-.wib-time-display .wib-value{
-  color:#00ffaa;
-  font-weight:500;
-  font-variant-numeric:tabular-nums;
-}
+        .fade-in { animation: fadeIn 0.35s ease-out; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(12px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
 
-/* ===== PAYMENT STATUS ===== */
-.payment-status{
-  margin-top:12px;
-  padding:12px 16px;
-  border-radius:12px;
-  text-align:center;
-  font-size:13px;
-  font-weight:600;
-  display:none;
-}
-.payment-status.loading{
-  display:block;
-  background:rgba(255,170,0,0.15);
-  color:#ffaa00;
-  border:1px solid rgba(255,170,0,0.3);
-}
-.payment-status.success{
-  display:block;
-  background:rgba(34,197,94,0.15);
-  color:#22c55e;
-  border:1px solid rgba(34,197,94,0.3);
-}
-.payment-status.failed{
-  display:block;
-  background:rgba(239,68,68,0.15);
-  color:#ef4444;
-  border:1px solid rgba(239,68,68,0.3);
-}
-.payment-status.expired{
-  display:block;
-  background:rgba(255,170,0,0.15);
-  color:#ffaa00;
-  border:1px solid rgba(255,170,0,0.3);
-}
-/* ===== ORDER STATUS ===== */
-.order-status{
-  margin-top:8px;
-  padding:10px 14px;
-  border-radius:10px;
-  text-align:center;
-  font-size:12px;
-  display:none;
-}
-.order-status.success{
-  display:block;
-  background:rgba(34,197,94,0.12);
-  color:#22c55e;
-  border:1px solid rgba(34,197,94,0.2);
-}
-.order-status.failed{
-  display:block;
-  background:rgba(239,68,68,0.12);
-  color:#ef4444;
-  border:1px solid rgba(239,68,68,0.2);
-}
-.order-status.loading{
-  display:block;
-  background:rgba(255,170,0,0.12);
-  color:#ffaa00;
-  border:1px solid rgba(255,170,0,0.2);
-}
-.order-id-box{
-  background:rgba(0,0,0,0.3);
-  padding:8px 12px;
-  border-radius:8px;
-  margin-top:6px;
-  font-family:'Courier New',monospace;
-  font-size:14px;
-  color:#ffaa00;
-  word-break:break-all;
-  border:1px solid rgba(255,170,0,0.2);
-}
-.order-id-box .copy-btn{
-  background:rgba(255,170,0,0.2);
-  color:#ffaa00;
-  border:1px solid rgba(255,170,0,0.3);
-  padding:2px 12px;
-  border-radius:6px;
-  font-size:11px;
-  cursor:pointer;
-  transition:0.3s;
-  margin-left:8px;
-}
-.order-id-box .copy-btn:hover{
-  background:rgba(255,170,0,0.4);
-}
+        .tab-active {
+            background: linear-gradient(135deg, #7c3aed, #6d28d9);
+            color: white !important;
+            box-shadow: 0 4px 14px -3px rgba(124, 58, 237, 0.45);
+        }
+        .tab-inactive {
+            background: #f5f3ff;
+            color: #6d28d9;
+        }
+        .tab-inactive:hover { background: #ede9fe; }
 
-@media(max-width:480px){
-  .card{padding:20px 16px;border-radius:20px}
-  h2{font-size:20px}
-  .qr-wrapper{padding:12px;margin:14px auto}
-  #qrisCanvas{width:200px;height:200px}
-  .unique-code{font-size:17px;padding:10px 12px}
-  .btn{font-size:14px;padding:14px}
-  input{font-size:13px;padding:12px 14px}
-  .banned-card{padding:28px 20px}
-  .banned-card h1{font-size:22px}
-}
-</style>
+        .btn-primary {
+            background: linear-gradient(135deg, #7c3aed, #6d28d9);
+            box-shadow: 0 4px 14px -3px rgba(124, 58, 237, 0.4);
+        }
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #6d28d9, #5b21b6);
+            box-shadow: 0 6px 20px -3px rgba(124, 58, 237, 0.5);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #059669, #047857);
+            box-shadow: 0 4px 14px -3px rgba(5, 150, 105, 0.4);
+        }
+        .btn-success:hover {
+            background: linear-gradient(135deg, #047857, #065f46);
+            box-shadow: 0 6px 20px -3px rgba(5, 150, 105, 0.5);
+        }
+
+        .glass {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+
+        .shine-text {
+            background: linear-gradient(135deg, #7c3aed 0%, #a78bfa 50%, #c4b5fd 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+    </style>
 </head>
+<body class="bg-gradient-to-br from-brand-50 via-white to-violet-50 min-h-screen">
 
-<body>
-    
-<div class="orb orb-1"></div>
-<div class="orb orb-2"></div>
-<div class="orb orb-3"></div>
-
-<!-- ===== BANNED CONTAINER ===== -->
-<div id="bannedContainer" style="display:none;" class="banned-page">
-  <div class="banned-card">
-    <span class="icon">🚫</span>
-    <h1>Akses Diblokir</h1>
-    <p style="color:#94a3b8;font-size:14px;border:none;background:none;padding:0;margin:0;">Akun Anda telah diblokir</p>
-    <div class="banned-gmail" id="bannedGmail">-</div>
-    <div class="banned-reason" id="bannedReason">-</div>
-    <div class="banned-until" id="bannedUntil">-</div>
-    <div class="banned-current-time" id="bannedCurrentTime">-</div>
-    <a href="https://wa.me/6289518103883?text=Halo%20Admin%2C%20saya%20ingin%20mengajukan%20banding%20atas%20ban%20akun%20saya.%20Gmail%3A%20" 
-       target="_blank" 
-       class="btn-appeal">
-       📱 Ajukan Banding
-    </a>
-    <div class="banned-id" id="bannedUserId">-</div>
-  </div>
-</div>
-
-<!-- ===== QRIS CARD ===== -->
-<div id="qrisCard" class="card">
-  <h2>💳 Pembayaran QRIS</h2>
-  <p style="color: #FF0000;"><b>Jangan tutup halaman saat sedang melakukan pembayaran atau pembayaran terverifikasi sampai muncul pop up id pesanan</b></p>
-  
-  <div class="subtitle">✦ Shine Shop - Sosmed 1 ✦</div>
-  
-  <!-- ===== GMAIL DISPLAY ===== -->
-  <div class="gmail-display">
-    <span class="label">📧 Gmail:</span>
-    <span class="value" id="gmailDisplay">Belum diatur</span>
-  </div>
-  
-  <!-- ===== TIMER DISPLAY ===== -->
-  <div class="timer-display" id="timerDisplay">
-    ⏱️ Sisa Waktu: <span class="time-value" id="timerValue">30:00</span>
-  </div>
-  
-  <div class="qr-wrapper">
-    <canvas id="qrisCanvas" width="240" height="240"></canvas>
-    <div class="timer-overlay" id="timerOverlay">
-      <span class="timer-icon">⏰</span>
-      <span class="timer-text">QRIS Expired</span>
-      <span class="timer-sub">Silakan generate ulang</span>
+    <!-- Decorative blobs -->
+    <div class="fixed inset-0 overflow-hidden pointer-events-none -z-10">
+        <div class="absolute -top-40 -right-40 w-96 h-96 bg-brand-200/40 rounded-full blur-3xl"></div>
+        <div class="absolute top-1/3 -left-32 w-80 h-80 bg-violet-200/30 rounded-full blur-3xl"></div>
+        <div class="absolute bottom-0 right-1/4 w-72 h-72 bg-purple-100/40 rounded-full blur-3xl"></div>
     </div>
-  </div>
-  
-  <div class="unique-code">🔑 Kode Unik: <span id="uniqueCode">-</span></div>
-  
-  <div class="details" id="orderDetails"></div>
-  
-  <input type="text" id="voucherInput" placeholder="Kode Voucher (opsional)">
-  <button id="applyVoucher" class="btn">🎫 Gunakan Voucher</button>
-  <div class="voucher-status" id="voucherStatus"></div>
-  
-  <!-- ===== PAYMENT STATUS ===== -->
-  <div id="paymentStatus" class="payment-status"></div>
-  
-  <!-- ===== ORDER STATUS ===== -->
-  <div id="orderStatus" class="order-status"></div>
-  
-  <button id="confirmBtn" class="btn">✅ Cek Status Pembayaran</button>
-  <button id="regenerateBtn" class="btn">🔄 Generate QRIS Ulang</button>
-  
-  <div class="muted">⏳ System memproses maksimal 72 jam</div>
-  
-  <!-- ===== WIB REAL-TIME ===== -->
-  <div class="wib-time-display">
-    <span class="wib-label">🕐 WIB (GMT+7):</span>
-    <span class="wib-value" id="wibTimeDisplay">--:--:--</span>
-  </div>
-  
-  <p>📸 Screenshot seluruh transaksi serta bukti transfer untuk berjaga-jaga jika terdapat kendala, anda bisa menghubungi admin melalui CS Bot</p>
-</div>
 
-<script>
+    <div class="container mx-auto px-4 py-8 max-w-2xl relative">
 
-// ===================== KONFIGURASI =====================
-const QRIS_EXPIRY_MINUTES = 30; // 30 MENIT
-const QRIS_EXPIRY_MS = QRIS_EXPIRY_MINUTES * 60 * 1000;
+        <!-- ===== HEADER / BRAND ===== -->
+        <div class="text-center mb-8 fade-in">
+            <div class="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-gradient-to-br from-brand-500 to-brand-700 shadow-xl shadow-brand-500/30 mb-5 relative">
+                <i class="fas fa-bolt text-white text-3xl"></i>
+                <div class="absolute -bottom-1 -right-1 w-6 h-6 bg-emerald-400 rounded-full border-4 border-white"></div>
+            </div>
 
-const discordWebhook = "https://discord.com/api/webhooks/1482244989021851748/oq__kcKXWHJILOG96lbfFxfZKoKCLEqkLJrlSS_rTQ6YEhgSTnFL_Guu8ZulERNEmCZV";
-const GMAIL_BAN_URL = "/sosmed-2/payment/gmail.json";
-const WHATSAPP_NUMBER = "6289518103883";
-const MERCHANT_CODE = "QP052692";
-const IRVANKARDE_URL = "https://irvankedesmm.co.id/api/order";
-
-// ===== IRVANKARDE CONFIG =====
-let IRVANKARDE_API_ID = 81074;
-let IRVANKARDE_API_KEY = '';
-
-// ===== API KEY QIOSPAY =====
-let QIOSPAY_API_KEY = '';
-const ADMIN_FEE_PERCENT = 2;
-const ADMIN_FEE_THRESHOLD = 10000;
-
-// ===== AMBIL PARAMETER DARI URL =====
-const p = new URLSearchParams(location.search);
-const trx = p.get("trx") || "-";
-const layanan = p.get("layanan") || "-";
-const total = Number(p.get("total") || 0);
-const target = p.get("target") || "-";
-const serviceId = p.get("id") || null;
-const quantity = parseInt(p.get("jumlah") || 0);
-const comment = p.get("comment") || null;
-
-// ===== QRIS EXPIRY =====
-let qrisExpiryTime = null;
-let timerInterval = null;
-let isQrisExpired = false;
-let isRegenerating = false;
-
-// ===== NOTIFIKASI DISCORD =====
-function getDiscordSentKey() {
-  return `discord_sent_${trx}`;
-}
-
-function isDiscordAlreadySent() {
-  try {
-    const key = getDiscordSentKey();
-    return localStorage.getItem(key) === 'true';
-  } catch {
-    return false;
-  }
-}
-
-function markDiscordSent() {
-  try {
-    const key = getDiscordSentKey();
-    localStorage.setItem(key, 'true');
-    console.log('📨 Discord notification marked as sent');
-    return true;
-  } catch (e) {
-    console.warn('Gagal mark Discord sent:', e);
-    return false;
-  }
-}
-
-// ===== ORDER IRVANKARDE =====
-function getOrderSentKey() {
-  return `order_sent_${trx}`;
-}
-
-function isOrderAlreadySent() {
-  try {
-    const key = getOrderSentKey();
-    return localStorage.getItem(key) === 'true';
-  } catch {
-    return false;
-  }
-}
-
-function markOrderSent() {
-  try {
-    const key = getOrderSentKey();
-    localStorage.setItem(key, 'true');
-    console.log('📦 Order IRVANKARDE marked as sent');
-    return true;
-  } catch (e) {
-    console.warn('Gagal mark order sent:', e);
-    return false;
-  }
-}
-
-// ===================== QRIS TIMER =====================
-function getQrisExpiryKey() {
-  return `qris_expiry_${trx}`;
-}
-
-function getStoredExpiry() {
-  try {
-    const key = getQrisExpiryKey();
-    const stored = localStorage.getItem(key);
-    if (stored) {
-      const parsed = parseInt(stored);
-      if (!isNaN(parsed) && parsed > Date.now()) {
-        console.log('⏱️ Expiry dari localStorage:', new Date(parsed).toLocaleTimeString());
-        return parsed;
-      }
-    }
-  } catch (e) {
-    console.warn('Gagal baca expiry:', e);
-  }
-  return null;
-}
-
-function saveExpiry(expiryTime) {
-  try {
-    const key = getQrisExpiryKey();
-    localStorage.setItem(key, String(expiryTime));
-    console.log('💾 Expiry disimpan:', new Date(expiryTime).toLocaleTimeString());
-    return true;
-  } catch (e) {
-    console.warn('Gagal simpan expiry:', e);
-    return false;
-  }
-}
-
-function clearExpiry() {
-  try {
-    const key = getQrisExpiryKey();
-    localStorage.removeItem(key);
-    console.log('🗑️ Expiry dihapus');
-  } catch (e) {
-    console.warn('Gagal hapus expiry:', e);
-  }
-}
-
-function initQrisTimer() {
-  // Cek apakah ada expiry tersimpan
-  const storedExpiry = getStoredExpiry();
-  const now = Date.now();
-  
-  if (storedExpiry && storedExpiry > now) {
-    qrisExpiryTime = storedExpiry;
-    console.log('⏱️ QRIS Expiry dari storage:', new Date(qrisExpiryTime).toLocaleTimeString());
-    startTimer();
-    return;
-  }
-  
-  // Buat expiry baru
-  qrisExpiryTime = now + QRIS_EXPIRY_MS;
-  saveExpiry(qrisExpiryTime);
-  console.log('⏱️ QRIS Expiry baru:', new Date(qrisExpiryTime).toLocaleTimeString());
-  startTimer();
-}
-
-function startTimer() {
-  if (timerInterval) clearInterval(timerInterval);
-  updateTimerDisplay();
-  timerInterval = setInterval(updateTimerDisplay, 1000);
-}
-
-function updateTimerDisplay() {
-  const timerEl = document.getElementById('timerValue');
-  const overlay = document.getElementById('timerOverlay');
-  const qrWrapper = document.querySelector('.qr-wrapper');
-  
-  if (!qrisExpiryTime) return;
-  
-  const now = Date.now();
-  const remaining = qrisExpiryTime - now;
-  
-  if (remaining <= 0) {
-    // QRIS EXPIRED
-    clearInterval(timerInterval);
-    timerInterval = null;
-    isQrisExpired = true;
-    timerEl.textContent = '00:00';
-    timerEl.className = 'time-value danger';
-    overlay.classList.add('show');
-    qrWrapper.style.border = '2px solid #ff4444';
-    
-    // Sembunyikan tombol cek pembayaran, tampilkan tombol regenerate
-    document.getElementById('confirmBtn').style.display = 'none';
-    document.getElementById('regenerateBtn').style.display = 'block';
-    document.getElementById('paymentStatus').className = 'payment-status expired';
-    document.getElementById('paymentStatus').textContent = '⏰ QRIS telah kadaluwarsa! Silakan generate ulang.';
-    document.getElementById('paymentStatus').style.display = 'block';
-    
-    // Nonaktifkan voucher
-    document.getElementById('voucherInput').disabled = true;
-    document.getElementById('applyVoucher').disabled = true;
-    
-    return;
-  }
-  
-  // QRIS masih aktif
-  isQrisExpired = false;
-  overlay.classList.remove('show');
-  qrWrapper.style.border = 'none';
-  document.getElementById('confirmBtn').style.display = 'block';
-  document.getElementById('regenerateBtn').style.display = 'none';
-  
-  const minutes = Math.floor(remaining / 60000);
-  const seconds = Math.floor((remaining % 60000) / 1000);
-  const timeStr = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-  
-  timerEl.textContent = timeStr;
-  
-  // Ubah warna berdasarkan sisa waktu
-  if (remaining < 60000) { // < 1 menit
-    timerEl.className = 'time-value danger';
-  } else if (remaining < 300000) { // < 5 menit
-    timerEl.className = 'time-value warning';
-  } else {
-    timerEl.className = 'time-value';
-  }
-}
-
-function regenerateQris() {
-  if (isRegenerating) return;
-  isRegenerating = true;
-  
-  Swal.fire({
-    title: '🔄 Generate Ulang QRIS?',
-    text: 'QRIS akan dibuat ulang dengan kode unik baru. Pembayaran sebelumnya tidak akan berlaku.',
-    icon: 'warning',
-    showCancelButton: true,
-    confirmButtonColor: '#f59e0b',
-    cancelButtonColor: '#6b7280',
-    confirmButtonText: '🔄 Ya, Generate Ulang',
-    cancelButtonText: '❌ Batal'
-  }).then(async (result) => {
-    if (result.isConfirmed) {
-      // Reset status
-      clearExpiry();
-      isQrisExpired = false;
-      isPaymentVerified = false;
-      transactionLocked = false;
-      
-      // Reset unique code
-      const key = getUniqueCodeKey();
-      localStorage.removeItem(key);
-      uniqueCode = generateUniqueCode();
-      
-      // Reset expiry
-      qrisExpiryTime = Date.now() + QRIS_EXPIRY_MS;
-      saveExpiry(qrisExpiryTime);
-      
-      // Reset UI
-      document.getElementById('confirmBtn').style.display = 'block';
-      document.getElementById('regenerateBtn').style.display = 'none';
-      document.getElementById('paymentStatus').className = 'payment-status';
-      document.getElementById('paymentStatus').style.display = 'none';
-      document.getElementById('voucherInput').disabled = false;
-      document.getElementById('applyVoucher').disabled = false;
-      
-      // Update display
-      updateDisplay();
-      startTimer();
-      
-      // Reset lock status
-      const confirmed = JSON.parse(localStorage.getItem('confirmed_transactions') || '[]');
-      const newConfirmed = confirmed.filter(id => id !== trx);
-      localStorage.setItem('confirmed_transactions', JSON.stringify(newConfirmed));
-      
-      // Reset discord sent
-      const discordKey = getDiscordSentKey();
-      localStorage.removeItem(discordKey);
-      
-      // Reset order sent
-      const orderKey = getOrderSentKey();
-      localStorage.removeItem(orderKey);
-      
-      // Reset verification interval
-      if (verificationInterval) {
-        clearInterval(verificationInterval);
-        verificationInterval = null;
-      }
-      
-      // Mulai auto cek ulang
-      setTimeout(() => {
-        checkPaymentStatus();
-        verificationInterval = setInterval(checkPaymentStatus, 10000);
-      }, 3000);
-      
-      Swal.fire({
-        title: '✅ QRIS Berhasil Digenerate Ulang!',
-        text: 'QRIS baru telah dibuat. Silakan lakukan pembayaran.',
-        icon: 'success',
-        confirmButtonColor: '#22c55e',
-        timer: 3000,
-        timerProgressBar: true
-      });
-    }
-    isRegenerating = false;
-  });
-}
-
-// ================= AMBIL KONFIGURASI DARI ENV =================
-async function fetchConfigFromEnv() {
-  try {
-    const res = await fetch('/api/qris-config');
-    if (res.ok) {
-      const data = await res.json();
-      
-      if (data.qiospay_api_key) {
-        QIOSPAY_API_KEY = data.qiospay_api_key;
-        console.log('✅ QIOSPAY API Key dari ENV');
-      }
-      
-      if (data.irvankarde_api_key) {
-        IRVANKARDE_API_KEY = data.irvankarde_api_key;
-        console.log('✅ IRVANKARDE API Key dari ENV');
-      }
-      if (data.irvankarde_api_id) {
-        IRVANKARDE_API_ID = data.irvankarde_api_id;
-        console.log('✅ IRVANKARDE API ID dari ENV');
-      }
-      
-      return true;
-    }
-  } catch (e) {
-    console.warn('⚠️ Gagal mengambil config dari ENV:', e);
-  }
-  
-  if (!QIOSPAY_API_KEY) {
-    QIOSPAY_API_KEY = 'd1370635be9857299bde44b946c938655534efdff7ef5246685b67ef91decb1c';
-    console.log('📌 QIOSPAY API Key default');
-  }
-  if (!IRVANKARDE_API_KEY) {
-    IRVANKARDE_API_KEY = 'f0ugsa-n4ntem-ruhdvz-afehho-4uqw1k';
-    console.log('📌 IRVANKARDE API Key default');
-  }
-  
-  return false;
-}
-
-const QIOSPAY_MUTASI_URL = () => `https://qiospay.id/api/mutasi/qris/${MERCHANT_CODE}/${QIOSPAY_API_KEY}`;
-
-const maintenance = false;
-if (maintenance === true) {
-  window.location.replace("/tutup/");
-}
-
-function maskID(id) {
-  id = String(id || "-");
-  if (id.length <= 4) return id;
-  return id.slice(0, 2) + "**" + id.slice(-2);
-}
-const maskedTrx = maskID(trx);
-
-let originalTotal = total;
-let finalTotal = total;
-let appliedVoucher = null;
-let appliedDiscount = 0;
-let uniqueCode = 0;
-let transactionLocked = false;
-let isPaymentVerified = false;
-let verificationInterval = null;
-let adminFee = 0;
-let isSendingDiscord = false;
-let isSendingOrder = false;
-let orderResultData = null;
-let configLoaded = false;
-let currentTotalBayar = 0;
-
-// ================= KODE UNIK PERSISTEN =================
-function getUniqueCodeKey() {
-  return `unique_code_${trx}`;
-}
-
-function getStoredUniqueCode() {
-  try {
-    const key = getUniqueCodeKey();
-    const stored = localStorage.getItem(key);
-    if (stored !== null) {
-      const parsed = parseInt(stored);
-      if (!isNaN(parsed) && parsed >= 0 && parsed <= 50) {
-        console.log('🔑 Kode unik dari localStorage:', parsed);
-        return parsed;
-      }
-    }
-  } catch (e) {
-    console.warn('Gagal baca kode unik dari localStorage:', e);
-  }
-  return null;
-}
-
-function saveUniqueCode(code) {
-  try {
-    const key = getUniqueCodeKey();
-    localStorage.setItem(key, String(code));
-    console.log('💾 Kode unik disimpan ke localStorage:', code);
-    return true;
-  } catch (e) {
-    console.warn('Gagal simpan kode unik:', e);
-    return false;
-  }
-}
-
-function generateUniqueCode() {
-  const existingCode = getStoredUniqueCode();
-  if (existingCode !== null) {
-    return existingCode;
-  }
-  const newCode = Math.floor(Math.random() * 50);
-  saveUniqueCode(newCode);
-  return newCode;
-}
-
-// ================= HITUNG BIAYA ADMIN =================
-function calculateAdminFee(amount) {
-  if (amount > ADMIN_FEE_THRESHOLD) {
-    return Math.round(amount * (ADMIN_FEE_PERCENT / 100));
-  }
-  return 0;
-}
-
-// ================= USER ID =================
-function generateUserID(){
-  return 'user-' + Math.random().toString(36).substring(2,10) + '-' + Date.now().toString(36);
-}
-async function getUserID(){
-  let id = localStorage.getItem("user_id");
-  if(!id){id = generateUserID();localStorage.setItem("user_id", id);}
-  return id;
-}
-
-// ================= GMAIL =================
-function getStoredGmail() {
-  return localStorage.getItem('user_gmail') || null;
-}
-
-function validateEmail(email) {
-  return email && email.includes('@') && email.includes('.') && email.length > 5;
-}
-
-// ================= WIB REAL-TIME =================
-function getWIBTime() { return new Date(); }
-
-function formatWIB(date) {
-  return new Intl.DateTimeFormat('id-ID', {
-    timeZone: 'Asia/Jakarta',
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false
-  }).format(date);
-}
-
-function formatWIBTime(date) {
-  return new Intl.DateTimeFormat('id-ID', {
-    timeZone: 'Asia/Jakarta',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false
-  }).format(date);
-}
-
-function updateWIBDisplay() {
-  const displayEl = document.getElementById('wibTimeDisplay');
-  if (displayEl) {
-    displayEl.textContent = formatWIBTime(getWIBTime());
-  }
-}
-
-function updateBannedWIBDisplay() {
-  const timeEl = document.getElementById('bannedCurrentTime');
-  const containerEl = document.getElementById('bannedContainer');
-  if (timeEl && containerEl && containerEl.style.display !== 'none') {
-    timeEl.textContent = '🕐 WIB (GMT+7): ' + formatWIB(getWIBTime());
-  }
-}
-
-function startWIBClock() {
-  if (window.wibInterval) clearInterval(window.wibInterval);
-  if (window.bannedInterval) clearInterval(window.bannedInterval);
-  updateWIBDisplay();
-  updateBannedWIBDisplay();
-  window.wibInterval = setInterval(updateWIBDisplay, 1000);
-  window.bannedInterval = setInterval(updateBannedWIBDisplay, 1000);
-}
-startWIBClock();
-
-// ================= CEK BANNED GMAIL =================
-async function checkGmailBanned(gmail) {
-  if (!gmail || !validateEmail(gmail)) return null;
-  try {
-    const res = await fetch(GMAIL_BAN_URL + '?t=' + Date.now(), { cache: "no-store" });
-    if (!res.ok) return null;
-    const list = await res.json();
-    if (!Array.isArray(list)) return null;
-    const banned = list.find(item => 
-      item.Gmail && item.Gmail.toLowerCase() === gmail.toLowerCase()
-    );
-    if (!banned) return null;
-    if (banned["Dibanned sampai"]) {
-      const untilDate = new Date(banned["Dibanned sampai"]);
-      if (getWIBTime() > untilDate) return null;
-    }
-    return banned;
-  } catch (err) {
-    console.error('Error check banned:', err);
-    return null;
-  }
-}
-
-// ================= SHOW BANNED PAGE =================
-function showBannedPage(bannedData, userID, gmail) {
-  document.getElementById('bannedContainer').style.display = 'flex';
-  document.getElementById('qrisCard').style.display = 'none';
-  document.getElementById('bannedGmail').textContent = gmail || '-';
-  document.getElementById('bannedReason').textContent = bannedData.Alasan || 'Tidak ada keterangan';
-  document.getElementById('bannedUserId').textContent = '🆔 User ID: ' + (userID || '-');
-  let untilText = '-';
-  if (bannedData["Dibanned sampai"]) {
-    untilText = formatWIB(new Date(bannedData["Dibanned sampai"]));
-  }
-  document.getElementById('bannedUntil').textContent = '⏳ Dibanned sampai: ' + untilText;
-  updateBannedWIBDisplay();
-  const appealLink = document.querySelector('.btn-appeal');
-  if (appealLink && gmail) {
-    appealLink.href = `https://wa.me/${WHATSAPP_NUMBER}?text=Halo%20Admin%2C%20saya%20ingin%20mengajukan%20banding%20atas%20ban%20akun%20saya.%20Gmail%3A%20${encodeURIComponent(gmail)}%0AUser%20ID%3A%20${encodeURIComponent(userID || '-')}`;
-  }
-}
-
-// ================= CEK BAN =================
-async function checkAndHandleBan() {
-  const gmail = getStoredGmail();
-  const userID = await getUserID();
-  const gmailDisplay = document.getElementById('gmailDisplay');
-  if (gmailDisplay) {
-    if (gmail && validateEmail(gmail)) {
-      gmailDisplay.textContent = gmail;
-      gmailDisplay.className = 'value';
-    } else {
-      gmailDisplay.textContent = '⚠️ Belum diatur!';
-      gmailDisplay.className = 'value not-set';
-    }
-  }
-  if (!gmail || !validateEmail(gmail)) {
-    console.warn('⚠️ Gmail belum diatur');
-    return false;
-  }
-  const bannedData = await checkGmailBanned(gmail);
-  if (bannedData) {
-    showBannedPage(bannedData, userID, gmail);
-    return true;
-  }
-  return false;
-}
-
-// ================= SEND ORDER TO IRVANKARDE =================
-async function sendOrderToIrvankarde() {
-  if (isQrisExpired) {
-    console.warn('⏰ QRIS expired, tidak bisa kirim order');
-    return false;
-  }
-  
-  if (isOrderAlreadySent()) {
-    console.log('⏭️ Order sudah dikirim ke Irvankarde, skipping...');
-    return true;
-  }
-  
-  if (isSendingOrder) {
-    console.log('⏳ Order sedang diproses, waiting...');
-    return false;
-  }
-  
-  if (!serviceId) {
-    console.warn('⚠️ Tidak ada ID layanan');
-    const orderStatus = document.getElementById('orderStatus');
-    orderStatus.className = 'order-status failed';
-    orderStatus.textContent = '❌ ID layanan tidak ditemukan di URL';
-    orderStatus.style.display = 'block';
-    return false;
-  }
-  
-  if (!target || target === '-') {
-    console.warn('⚠️ Target tidak ditemukan');
-    const orderStatus = document.getElementById('orderStatus');
-    orderStatus.className = 'order-status failed';
-    orderStatus.textContent = '❌ Target tidak ditemukan.';
-    orderStatus.style.display = 'block';
-    return false;
-  }
-  
-  if (!quantity || quantity <= 0) {
-    console.warn('⚠️ Quantity tidak valid:', quantity);
-    const orderStatus = document.getElementById('orderStatus');
-    orderStatus.className = 'order-status failed';
-    orderStatus.textContent = '❌ Jumlah pesanan tidak valid.';
-    orderStatus.style.display = 'block';
-    return false;
-  }
-  
-  if (!IRVANKARDE_API_KEY) {
-    const orderStatus = document.getElementById('orderStatus');
-    orderStatus.className = 'order-status failed';
-    orderStatus.textContent = '❌ API Key IRVANKARDE tidak ditemukan.';
-    orderStatus.style.display = 'block';
-    return false;
-  }
-  
-  isSendingOrder = true;
-  const orderStatus = document.getElementById('orderStatus');
-  orderStatus.className = 'order-status loading';
-  orderStatus.textContent = '⏳ Mengirim pesanan ke Shine Shop...';
-  orderStatus.style.display = 'block';
-  
-  try {
-    const payload = {
-      api_id: IRVANKARDE_API_ID,
-      api_key: IRVANKARDE_API_KEY,
-      service: parseInt(serviceId),
-      target: target,
-      quantity: quantity
-    };
-    
-    if (comment && comment.trim() !== '') {
-      payload.comments = comment.trim();
-      console.log('📝 Comment detected:', comment);
-    }
-    
-    console.log('📦 Sending order to Irvankarde:', payload);
-    
-    const response = await fetch(IRVANKARDE_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
-      body: JSON.stringify(payload)
-    });
-    
-    const result = await response.json();
-    console.log('📦 IRVANKARDE Response:', result);
-    
-    if (result.status === true && result.data && result.data.id) {
-      const orderId = result.data.id;
-      const msg = result.msg || `Pesanan dengan ID #${orderId} berhasil dibuat.`;
-      
-      orderResultData = { orderId, message: msg };
-      
-      orderStatus.className = 'order-status success';
-      orderStatus.innerHTML = `
-        ✅ ${msg}
-        <div class="order-id-box">
-          🆔 ID Pesanan: <strong>${orderId}</strong>
-          <button class="copy-btn" onclick="copyOrderId('${orderId}')">📋 Salin</button>
-        </div>
-        <div style="margin-top:6px;font-size:11px;color:#888;">
-          ⚠️ Simpan ID pesanan ini untuk cek status order.
-        </div>
-      `;
-      markOrderSent();
-      isSendingOrder = false;
-      
-      await sendOrderNotificationToDiscord(result);
-      
-      await Swal.fire({
-        title: '✅ Pesanan Berhasil!',
-        html: `
-          <div style="text-align:left;color:#ddd;font-size:14px;">
-            <p style="color:#22c55e;border-left-color:#22c55e;background:rgba(34,197,94,0.06);">
-              ${msg}
+            <p class="text-sm font-semibold tracking-widest text-brand-500 uppercase mb-1">Shine Shop</p>
+            <h1 class="text-2xl sm:text-3xl font-extrabold text-gray-900 leading-tight">
+                Cek Status Pesanan<br>
+                <span class="shine-text">Suntik Sosmed 1</span>
+            </h1>
+            <p class="text-gray-500 text-sm mt-2 max-w-md mx-auto">
+                Pantau status pesanan & request refill dengan cepat dan mudah
             </p>
-            <div style="background:#0d0d0d;padding:16px;border-radius:12px;margin:12px 0;border:1px solid #ffaa0033;text-align:center;">
-              <span style="color:#888;font-size:11px;text-transform:uppercase;letter-spacing:1px;">🆔 ID Pesanan</span><br>
-              <span style="color:#ffaa00;font-size:28px;font-weight:800;font-family:monospace;display:block;margin:6px 0;">${orderId}</span>
-              <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
-                <button onclick="copyOrderId('${orderId}')" style="background:#ffaa0022;color:#ffaa00;border:1px solid #ffaa0044;padding:6px 20px;border-radius:20px;cursor:pointer;font-size:12px;font-weight:600;">
-                  📋 Salin ID
+
+            <p id="configStatus" class="text-xs text-gray-400 mt-4 inline-flex items-center gap-1.5 bg-white/70 px-3 py-1.5 rounded-full border border-gray-100">
+                <i class="fas fa-spinner fa-spin"></i>
+                <span>Memuat konfigurasi...</span>
+            </p>
+        </div>
+
+        <!-- ===== TABS ===== -->
+        <div class="flex gap-2 mb-6 p-1.5 bg-white/60 rounded-2xl border border-white shadow-sm">
+            <button onclick="switchTab('order')" id="tab-order"
+                class="flex-1 py-3 px-4 rounded-xl text-sm font-semibold transition-all duration-200 tab-active flex items-center justify-center gap-2">
+                <i class="fas fa-clipboard-list"></i>
+                <span>Status Pesanan</span>
+            </button>
+            <button onclick="switchTab('refill')" id="tab-refill"
+                class="flex-1 py-3 px-4 rounded-xl text-sm font-semibold transition-all duration-200 tab-inactive flex items-center justify-center gap-2">
+                <i class="fas fa-sync-alt"></i>
+                <span>Status Refill</span>
+            </button>
+        </div>
+
+        <!-- ==================== TAB: ORDER ==================== -->
+        <div id="panel-order">
+            <div class="glass rounded-3xl shadow-xl shadow-brand-500/5 p-6 mb-6 border border-white">
+                <div class="mb-5">
+                    <label for="orderId" class="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2.5">
+                        <span class="w-7 h-7 rounded-lg bg-brand-100 text-brand-600 flex items-center justify-center text-xs">
+                            <i class="fas fa-hashtag"></i>
+                        </span>
+                        ID Pesanan
+                    </label>
+                    <textarea 
+                        id="orderId" 
+                        rows="3"
+                        placeholder="Masukkan ID pesanan (satu atau lebih)&#10;Contoh: 1107, 1234, 5678"
+                        class="w-full px-4 py-3.5 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 outline-none transition resize-none text-gray-800 placeholder-gray-400 text-sm"
+                    ></textarea>
+                    <p class="text-xs text-gray-400 mt-2.5 flex items-center gap-1.5">
+                        <i class="fas fa-info-circle text-brand-400"></i>
+                        Bisa cek / refill beberapa order sekaligus (pisahkan dengan koma)
+                    </p>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <button id="cekBtn" onclick="cekStatus()"
+                        class="btn-primary text-white font-semibold py-3.5 px-5 rounded-2xl transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed">
+                        <i class="fas fa-search" id="btnIcon"></i>
+                        <span id="btnText">Cek Status</span>
+                    </button>
+
+                    <button id="refillBtn" onclick="refillOrder()"
+                        class="btn-success text-white font-semibold py-3.5 px-5 rounded-2xl transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed">
+                        <i class="fas fa-sync-alt" id="refillBtnIcon"></i>
+                        <span id="refillBtnText">Refill Pesanan</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== TAB: REFILL STATUS ==================== -->
+        <div id="panel-refill" class="hidden">
+            <div class="glass rounded-3xl shadow-xl shadow-brand-500/5 p-6 mb-6 border border-white">
+                <div class="mb-5">
+                    <label for="refillId" class="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2.5">
+                        <span class="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center text-xs">
+                            <i class="fas fa-hashtag"></i>
+                        </span>
+                        ID Refill
+                    </label>
+                    <textarea 
+                        id="refillId" 
+                        rows="2"
+                        placeholder="Masukkan ID Refill&#10;Contoh: 123, 456"
+                        class="w-full px-4 py-3.5 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 outline-none transition resize-none text-gray-800 placeholder-gray-400 text-sm"
+                    ></textarea>
+                    <p class="text-xs text-gray-400 mt-2.5 flex items-center gap-1.5">
+                        <i class="fas fa-info-circle text-emerald-400"></i>
+                        ID Refill didapat setelah berhasil request refill
+                    </p>
+                </div>
+
+                <button id="cekRefillBtn" onclick="cekRefillStatus()"
+                    class="w-full btn-success text-white font-semibold py-3.5 px-5 rounded-2xl transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed">
+                    <i class="fas fa-search" id="cekRefillBtnIcon"></i>
+                    <span id="cekRefillBtnText">Cek Status Refill</span>
                 </button>
-                <a href="/sosmed-2/cekstatus" target="_blank" style="background:#00ccff22;color:#00ccff;border:1px solid #00ccff44;padding:6px 20px;border-radius:20px;text-decoration:none;font-size:12px;font-weight:600;">
-                  📊 Cek Status
-                </a>
-              </div>
             </div>
-            <div style="font-size:12px;color:#888;text-align:center;padding:8px;background:#00ffaa08;border-radius:8px;border:1px solid #00ffaa15;">
-              ⚠️ Simpan ID pesanan ini untuk cek status order nanti.
+        </div>
+
+        <!-- Loading -->
+        <div id="loading" class="hidden text-center py-12">
+            <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-brand-100 mb-4">
+                <div class="w-7 h-7 border-3 border-brand-500 border-t-transparent rounded-full animate-spin" style="border-width: 3px;"></div>
             </div>
-          </div>
-        `,
-        icon: 'success',
-        confirmButtonColor: '#22c55e',
-        confirmButtonText: '✅ OK, Saya Simpan',
-        allowOutsideClick: false,
-        width: 500
-      });
-      
-      return true;
-      
-    } else {
-      const errorMsg = result.msg || 'Transaksi gagal dilakukan.';
-      orderStatus.className = 'order-status failed';
-      orderStatus.textContent = `❌ ${errorMsg}`;
-      isSendingOrder = false;
-      await sendOrderErrorToDiscord(errorMsg);
-      return false;
-    }
-    
-  } catch (err) {
-    console.error('❌ Error send order to IrvanKarde:', err);
-    const orderStatus = document.getElementById('orderStatus');
-    orderStatus.className = 'order-status failed';
-    orderStatus.textContent = `❌ Error: ${err.message}`;
-    isSendingOrder = false;
-    return false;
-  }
-}
+            <p class="text-gray-500 text-sm font-medium" id="loadingText">Sedang memproses...</p>
+        </div>
 
-// ================= COPY ORDER ID =================
-window.copyOrderId = function(orderId) {
-  navigator.clipboard.writeText(String(orderId)).then(() => {
-    Swal.fire({
-      title: '✅ Berhasil Disalin!',
-      text: `ID Pesanan ${orderId} telah disalin ke clipboard.`,
-      icon: 'success',
-      timer: 2000,
-      showConfirmButton: false,
-      toast: true,
-      position: 'top-end'
-    });
-  }).catch(() => {
-    const textarea = document.createElement('textarea');
-    textarea.value = orderId;
-    document.body.appendChild(textarea);
-    textarea.select();
-    document.execCommand('copy');
-    document.body.removeChild(textarea);
-    Swal.fire({
-      title: '✅ Berhasil Disalin!',
-      text: `ID Pesanan ${orderId} telah disalin.`,
-      icon: 'success',
-      timer: 2000,
-      showConfirmButton: false,
-      toast: true,
-      position: 'top-end'
-    });
-  });
-};
+        <!-- Results -->
+        <div id="results" class="space-y-4"></div>
 
-// ================= SEND ORDER NOTIFICATION TO DISCORD =================
-async function sendOrderNotificationToDiscord(result) {
-  try {
-    const orderId = result.data?.id || '-';
-    const msg = result.msg || `Pesanan dengan id #${orderId} berhasil dibuat.`;
-    const commentInfo = comment ? `\n📝 **Komentar:** ${comment}` : '';
-    
-    const message = `📦 **ORDER IRVANKARDE BERHASIL**
-━━━━━━━━━━━━━━━━━━━━━
-🆔 **ID Transaksi:** ${trx}
-📋 **Layanan:** ${layanan}
-🆔 **Service ID:** ${serviceId}
-🎯 **Target:** ${target}
-🔢 **Jumlah:** ${quantity}${commentInfo}
-📊 **Status:** ✅ SUCCESS
-🆔 **Order ID:** ${orderId}
-📝 **Pesan:** ${msg}
-📅 **Waktu:** ${formatWIB(new Date())}
-━━━━━━━━━━━━━━━━━━━━━
-✅ **Pesanan berhasil dibuat!**`;
+        <!-- Error -->
+        <div id="errorBox" class="hidden bg-red-50 border border-red-100 text-red-700 px-5 py-4 rounded-2xl fade-in">
+            <div class="flex items-start gap-3">
+                <div class="w-9 h-9 rounded-xl bg-red-100 flex items-center justify-center flex-shrink-0">
+                    <i class="fas fa-exclamation-circle text-red-500"></i>
+                </div>
+                <div>
+                    <p class="font-semibold text-sm" id="errorTitle">Terjadi Kesalahan</p>
+                    <p class="text-sm mt-0.5 text-red-600/80" id="errorMsg"></p>
+                </div>
+            </div>
+        </div>
 
-    await fetch(discordWebhook, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content: message })
-    });
-    console.log('✅ Notifikasi order ke Discord terkirim');
-  } catch (err) {
-    console.error('❌ Gagal kirim notifikasi order ke Discord:', err);
-  }
-}
+        <!-- Success -->
+        <div id="successBox" class="hidden bg-emerald-50 border border-emerald-100 text-emerald-700 px-5 py-4 rounded-2xl fade-in">
+            <div class="flex items-start gap-3">
+                <div class="w-9 h-9 rounded-xl bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                    <i class="fas fa-check-circle text-emerald-500"></i>
+                </div>
+                <div>
+                    <p class="font-semibold text-sm" id="successTitle">Berhasil</p>
+                    <p class="text-sm mt-0.5 text-emerald-600/80" id="successMsg"></p>
+                </div>
+            </div>
+        </div>
 
-// ================= SEND ORDER ERROR TO DISCORD =================
-async function sendOrderErrorToDiscord(errorMsg) {
-  try {
-    const commentInfo = comment ? `\n📝 **Komentar:** ${comment}` : '';
-    
-    const message = `❌ **ORDER IRVANKARDE GAGAL**
-━━━━━━━━━━━━━━━━━━━━━
-🆔 **ID Transaksi:** ${trx}
-📋 **Layanan:** ${layanan}
-🆔 **Service ID:** ${serviceId}
-🎯 **Target:** ${target}
-🔢 **Jumlah:** ${quantity}${commentInfo}
-📊 **Status:** ❌ FAILED
-📝 **Error:** ${errorMsg}
-📅 **Waktu:** ${formatWIB(new Date())}
-━━━━━━━━━━━━━━━━━━━━━
-⚠️ **Order gagal dibuat!**`;
+        <!-- Footer -->
+        <div class="text-center mt-12 pb-6">
+            <div class="inline-flex items-center gap-2 text-sm text-gray-400">
+                <span class="w-8 h-px bg-gray-200"></span>
+                <span class="font-medium text-brand-500">Shine Shop</span>
+                <span class="w-8 h-px bg-gray-200"></span>
+            </div>
+            <p class="text-xs text-gray-400 mt-2">Cek Status Pesanan Suntik Sosmed 1</p>
+        </div>
+    </div>
 
-    await fetch(discordWebhook, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content: message })
-    });
-    console.log('✅ Notifikasi error order ke Discord terkirim');
-  } catch (err) {
-    console.error('❌ Gagal kirim notifikasi error ke Discord:', err);
-  }
-}
+    <script>
+        // ==================== CONFIG ====================
+        let API_ID = null;
+        let API_KEY = null;
+        let configLoaded = false;
 
-// ================= SEND TO DISCORD (PAYMENT) =================
-async function sendToDiscord(gmail, userID) {
-  if (isQrisExpired) {
-    console.warn('⏰ QRIS expired, tidak bisa kirim notifikasi');
-    return false;
-  }
-  
-  if (isDiscordAlreadySent()) {
-    console.log('⏭️ Discord notification already sent, skipping...');
-    return true;
-  }
-  
-  if (isSendingDiscord) {
-    console.log('⏳ Discord notification is being sent, waiting...');
-    return false;
-  }
-  
-  isSendingDiscord = true;
-  
-  try {
-    const totalDenganUnik = finalTotal + uniqueCode + adminFee;
-    const refCode = localStorage.getItem('referral_code') || "-";
-    const commentInfo = comment ? `\n📝 **Komentar:** ${comment}` : '';
-    
-    let adminFeeText = '';
-    if (adminFee > 0) {
-      adminFeeText = `\n📊 **Biaya Admin (2%):** Rp ${adminFee.toLocaleString('id-ID')}`;
-    }
-    
-    const message = `💰 **PEMBAYARAN BERHASIL DIVERIFIKASI**
-━━━━━━━━━━━━━━━━━━━━━
-🆔 **ID Transaksi:** ${trx}
-📋 **Layanan:** ${layanan}
-🎯 **Target:** ${target}
-💰 **Harga Asli:** Rp ${originalTotal.toLocaleString('id-ID')}
-💵 **Total Bayar:** Rp ${totalDenganUnik.toLocaleString('id-ID')}
-🔑 **Kode Unik:** ${uniqueCode}${adminFeeText}
-🎫 **Voucher:** ${appliedVoucher || "-"}
-📉 **Diskon:** ${appliedVoucher ? `Rp ${appliedDiscount.toLocaleString('id-ID')}` : "-"}${commentInfo}
-📧 **Gmail:** ${gmail}
-🆔 **User ID:** ${userID}
-🔗 **Referral:** ${refCode}
-📅 **Waktu:** ${formatWIB(new Date())}
-━━━━━━━━━━━━━━━━━━━━━
-✅ **Status: LUNAS**`;
+        const ENDPOINTS = {
+            status:       'https://irvankedesmm.co.id/api/status',
+            refill:       'https://irvankedesmm.co.id/api/refill',
+            refillStatus: 'https://irvankedesmm.co.id/api/refill/status',
+            config:       '/api/qris-config'
+        };
 
-    const response = await fetch(discordWebhook, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content: message })
-    });
-    
-    if (response.ok) {
-      markDiscordSent();
-      console.log('✅ Notifikasi Discord terkirim (1×)');
-      isSendingDiscord = false;
-      return true;
-    } else {
-      console.error('❌ Gagal kirim ke Discord:', response.status);
-      isSendingDiscord = false;
-      return false;
-    }
-  } catch (err) {
-    console.error('❌ Error kirim ke Discord:', err);
-    isSendingDiscord = false;
-    return false;
-  }
-}
+        async function loadConfig() {
+            const statusEl = document.getElementById('configStatus');
+            try {
+                const res = await fetch(ENDPOINTS.config);
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                const data = await res.json();
 
-// ================= CHECK PAYMENT VIA QIOSPAY =================
-async function checkPaymentStatus() {
-  // CEK APAKAH QRIS EXPIRED
-  if (isQrisExpired) {
-    console.warn('⏰ QRIS expired, tidak bisa cek pembayaran');
-    return;
-  }
-  
-  const statusEl = document.getElementById('paymentStatus');
-  const confirmBtn = document.getElementById('confirmBtn');
-  
-  if (isPaymentVerified) {
-    statusEl.className = 'payment-status success';
-    statusEl.textContent = '✅ Pembayaran sudah terverifikasi!';
-    statusEl.style.display = 'block';
-    return;
-  }
-  
-  if (checkTransactionLockLocal()) {
-    isPaymentVerified = true;
-    statusEl.className = 'payment-status success';
-    statusEl.textContent = '✅ Transaksi sudah dikonfirmasi sebelumnya!';
-    statusEl.style.display = 'block';
-    return;
-  }
-  
-  if (isDiscordAlreadySent()) {
-    isPaymentVerified = true;
-    statusEl.className = 'payment-status success';
-    statusEl.textContent = '✅ Pembayaran sudah terverifikasi!';
-    statusEl.style.display = 'block';
-    confirmBtn.disabled = true;
-    confirmBtn.textContent = '✅ Pembayaran Terverifikasi';
-    return;
-  }
-  
-  if (!QIOSPAY_API_KEY) {
-    await fetchConfigFromEnv();
-    if (!QIOSPAY_API_KEY) {
-      statusEl.className = 'payment-status failed';
-      statusEl.textContent = '❌ Gagal mengambil konfigurasi API';
-      statusEl.style.display = 'block';
-      return;
-    }
-  }
-  
-  statusEl.className = 'payment-status loading';
-  statusEl.textContent = '⏳ Mengecek pembayaran...';
-  statusEl.style.display = 'block';
-  confirmBtn.disabled = true;
-  confirmBtn.textContent = '⏳ Mengecek...';
-  
-  try {
-    const gmail = getStoredGmail();
-    const userID = await getUserID();
-    
-    const bannedData = await checkGmailBanned(gmail);
-    if (bannedData) {
-      statusEl.className = 'payment-status failed';
-      statusEl.textContent = '🚫 Akun Anda diblokir!';
-      confirmBtn.disabled = false;
-      confirmBtn.textContent = '✅ Cek Status Pembayaran';
-      return;
-    }
-    
-    const totalBayar = finalTotal + uniqueCode + adminFee;
-    currentTotalBayar = totalBayar;
-    
-    console.log('💰 Nominal yang dicek ke QIOSPAY:', totalBayar);
-    
-    const url = QIOSPAY_MUTASI_URL();
-    console.log('📡 Fetching mutasi dari QIOSPAY...');
-    
-    const res = await fetch(url + '?t=' + Date.now());
-    
-    if (!res.ok) {
-      throw new Error('Gagal mengambil data mutasi: ' + res.status);
-    }
-    
-    const data = await res.json();
-    console.log('📊 Data Mutasi QIOSPAY:', data);
-    
-    let foundTransaction = null;
-    
-    if (data.status === 'success' && data.data) {
-      const transactions = Array.isArray(data.data) ? data.data : [data.data];
-      
-      for (const t of transactions) {
-        let rawAmount = String(t.amount || '');
-        let cleanAmount = rawAmount.replace(/[^0-9]/g, '');
-        let amountNumber = parseInt(cleanAmount) || 0;
-        
-        if (amountNumber === totalBayar) {
-          foundTransaction = t;
-          console.log('✅ Transaksi ditemukan (exact match):', t);
-          break;
+                if (!data.success) throw new Error(data.message || 'Gagal mengambil konfigurasi');
+
+                API_ID  = data.irvankarde_api_id;
+                API_KEY = data.irvankarde_api_key;
+
+                if (!API_ID || !API_KEY) {
+                    throw new Error('API ID / API Key belum diset');
+                }
+
+                configLoaded = true;
+                statusEl.innerHTML = `
+                    <i class="fas fa-check-circle text-emerald-500"></i>
+                    <span class="text-emerald-600">Konfigurasi siap · API ID: ${API_ID}</span>
+                `;
+            } catch (err) {
+                console.error('Gagal load config:', err);
+                configLoaded = false;
+                statusEl.innerHTML = `
+                    <i class="fas fa-exclamation-triangle text-red-500"></i>
+                    <span class="text-red-500">Gagal memuat konfigurasi</span>
+                `;
+            }
         }
-        
-        if (Math.round(amountNumber) === totalBayar) {
-          foundTransaction = t;
-          console.log('✅ Transaksi ditemukan (round match):', t);
-          break;
+
+        loadConfig();
+
+        // ==================== UI Helpers ====================
+        function switchTab(tab) {
+            const orderTab   = document.getElementById('tab-order');
+            const refillTab  = document.getElementById('tab-refill');
+            const orderPanel = document.getElementById('panel-order');
+            const refillPanel= document.getElementById('panel-refill');
+
+            document.getElementById('results').innerHTML = '';
+            hideError();
+            hideSuccess();
+
+            if (tab === 'order') {
+                orderTab.className  = 'flex-1 py-3 px-4 rounded-xl text-sm font-semibold transition-all duration-200 tab-active flex items-center justify-center gap-2';
+                refillTab.className = 'flex-1 py-3 px-4 rounded-xl text-sm font-semibold transition-all duration-200 tab-inactive flex items-center justify-center gap-2';
+                orderPanel.classList.remove('hidden');
+                refillPanel.classList.add('hidden');
+            } else {
+                refillTab.className = 'flex-1 py-3 px-4 rounded-xl text-sm font-semibold transition-all duration-200 tab-active flex items-center justify-center gap-2';
+                orderTab.className  = 'flex-1 py-3 px-4 rounded-xl text-sm font-semibold transition-all duration-200 tab-inactive flex items-center justify-center gap-2';
+                refillPanel.classList.remove('hidden');
+                orderPanel.classList.add('hidden');
+            }
         }
-      }
-    }
-    
-    if (foundTransaction) {
-      isPaymentVerified = true;
-      statusEl.className = 'payment-status success';
-      statusEl.textContent = `✅ Pembayaran Rp ${totalBayar.toLocaleString('id-ID')} terverifikasi!`;
-      
-      const sent = await sendToDiscord(gmail, userID);
-      
-      if (sent) {
-        await sendOrderToIrvankarde();
-        saveTransactionLockLocal();
-        console.log('🔒 Transaksi locked');
-      }
-      
-      confirmBtn.disabled = true;
-      confirmBtn.textContent = '✅ Pembayaran Terverifikasi';
-      
-      if (verificationInterval) {
-        clearInterval(verificationInterval);
-        verificationInterval = null;
-      }
-      
-    } else {
-      statusEl.className = 'payment-status loading';
-      statusEl.textContent = '⏳ Belum ada pembayaran terdeteksi. Silakan scan QRIS dan transfer.';
-      confirmBtn.disabled = false;
-      confirmBtn.textContent = '✅ Cek Status Pembayaran';
-    }
-    
-  } catch (err) {
-    console.error('Error cek payment:', err);
-    statusEl.className = 'payment-status failed';
-    statusEl.textContent = '❌ Gagal mengecek pembayaran: ' + err.message;
-    confirmBtn.disabled = false;
-    confirmBtn.textContent = '✅ Cek Status Pembayaran';
-  }
-}
 
-// ================= LOCK LOCAL STORAGE =================
-function checkTransactionLockLocal() {
-  try {
-    const confirmed = JSON.parse(localStorage.getItem('confirmed_transactions') || '[]');
-    return confirmed.includes(trx);
-  } catch { return false; }
-}
+        function getStatusClass(status) {
+            if (!status) return 'status-unknown';
+            const s = status.toLowerCase();
+            if (s === 'pending') return 'status-pending';
+            if (s === 'processing') return 'status-processing';
+            if (s === 'success' || s === 'completed') return 'status-success';
+            if (s === 'error' || s === 'failed' || s === 'rejected') return 'status-error';
+            if (s === 'partial') return 'status-partial';
+            return 'status-unknown';
+        }
 
-function saveTransactionLockLocal() {
-  try {
-    const confirmed = JSON.parse(localStorage.getItem('confirmed_transactions') || '[]');
-    if (!confirmed.includes(trx)) {
-      confirmed.push(trx);
-      localStorage.setItem('confirmed_transactions', JSON.stringify(confirmed));
-    }
-  } catch(e) { console.error("Gagal simpan lock:", e); }
-}
+        function getStatusIcon(status) {
+            if (!status) return 'fa-question';
+            const s = status.toLowerCase();
+            if (s === 'pending') return 'fa-clock';
+            if (s === 'processing') return 'fa-spinner';
+            if (s === 'success' || s === 'completed') return 'fa-check-circle';
+            if (s === 'error' || s === 'failed' || s === 'rejected') return 'fa-times-circle';
+            if (s === 'partial') return 'fa-adjust';
+            return 'fa-question';
+        }
 
-// ================= VOUCHER SYSTEM =================
-function getUsedVouchers() {
-  try { return JSON.parse(localStorage.getItem('used_vouchers_' + trx) || '[]'); } 
-  catch { return []; }
-}
+        function formatNumber(num) {
+            if (num === undefined || num === null) return '-';
+            return new Intl.NumberFormat('id-ID').format(num);
+        }
 
-function markVoucherUsed(code) {
-  try {
-    const used = getUsedVouchers();
-    if (!used.includes(code)) {
-      used.push(code);
-      localStorage.setItem('used_vouchers_' + trx, JSON.stringify(used));
-    }
-  } catch(e) { console.error("Gagal simpan voucher used:", e); }
-}
+        function parseIds(input) {
+            return input.split(/[\s,]+/).map(id => id.trim()).filter(id => id.length > 0);
+        }
 
-function isVoucherUsed(code) {
-  return getUsedVouchers().includes(code);
-}
+        function showLoading(text = 'Sedang memproses...') {
+            document.getElementById('loadingText').textContent = text;
+            document.getElementById('loading').classList.remove('hidden');
+            document.getElementById('results').innerHTML = '';
+            hideError();
+            hideSuccess();
+        }
 
-// ================= QRIS =================
-function crc16(s){
-  let c=0xFFFF;
-  for(let i=0;i<s.length;i++){
-    c^=s.charCodeAt(i)<<8;
-    for(let j=0;j<8;j++){
-      c=c&0x8000?(c<<1)^0x1021:c<<1;
-    }
-  }
-  return (c&0xFFFF).toString(16).toUpperCase().padStart(4,'0');
-}
+        function hideLoading() {
+            document.getElementById('loading').classList.add('hidden');
+        }
 
-function buildQR(a){
-  const str=String(parseInt(a));
-  const tag="54"+String(str.length).padStart(2,"0")+str;
-  const base="00020101021126670016COM.NOBUBANK.WWW01189360050300000907180214260818000016290303UMI51440014ID.CO.QRIS.WWW0215ID10265728797100303UMI5204481253033605802ID5918SHINE SHOP ID CELL6008SURABAYA61056011162070703A016304743A";
-  return base+tag+"6304"+crc16(base+tag+"6304");
-}
+        function showError(title, msg) {
+            document.getElementById('errorTitle').textContent = title;
+            document.getElementById('errorMsg').textContent = msg;
+            document.getElementById('errorBox').classList.remove('hidden');
+            document.getElementById('successBox').classList.add('hidden');
+        }
 
-// ================= UPDATE DISPLAY =================
-function updateDisplay(){
-  uniqueCode = generateUniqueCode();
-  document.getElementById('uniqueCode').textContent = uniqueCode;
-  
-  adminFee = calculateAdminFee(originalTotal);
-  
-  const totalDenganUnik = finalTotal + uniqueCode + adminFee;
-  currentTotalBayar = totalDenganUnik;
-  
-  let detailHtml = `
-  <strong>ID Transaksi:</strong> ${trx}<br>
-  <strong>Layanan:</strong> ${layanan}<br>
-  <strong>Target:</strong> ${target}<br>
-  <strong>Total:</strong> <s>Rp ${originalTotal.toLocaleString("id-ID")}</s><br>
-  `;
-  
-  if (appliedVoucher) {
-    detailHtml += `<strong>🎫 Voucher:</strong> <span class="voucher-text">${appliedVoucher}</span> <span class="discount-text">(Diskon Rp ${appliedDiscount.toLocaleString("id-ID")})</span><br>`;
-  }
-  
-  if (adminFee > 0) {
-    detailHtml += `<strong>📊 Biaya Admin 2%:</strong> <span class="admin-fee-text">Rp ${adminFee.toLocaleString("id-ID")}</span><br>`;
-  }
-  
-  if (serviceId) {
-    detailHtml += `<strong>🆔 ID Layanan:</strong> ${serviceId}<br>`;
-  }
-  if (quantity > 0) {
-    detailHtml += `<strong>🔢 Jumlah:</strong> ${quantity}<br>`;
-  }
-  if (comment && comment.trim() !== '') {
-    detailHtml += `<strong>📝 Komentar:</strong> ${comment}<br>`;
-  }
-  
-  detailHtml += `<strong>Total Bayar:</strong> Rp ${totalDenganUnik.toLocaleString("id-ID")}`;
-  
-  document.getElementById('orderDetails').innerHTML = detailHtml;
-  
-  // BUILD QRIS
-  QRCode.toCanvas(document.getElementById('qrisCanvas'), buildQR(totalDenganUnik), { width:240 }, function(err){
-    if(err) return console.error(err);
-    const ctx = document.getElementById('qrisCanvas').getContext("2d");
-    const logo = new Image();
-    logo.src = "/home/logo.png";
-    logo.onload = function(){
-      const size = 50;
-      const x = (240 - size)/2;
-      const y = (240 - size)/2;
-      ctx.fillStyle = "#fff";
-      ctx.fillRect(x-5,y-5,size+10,size+10);
-      ctx.drawImage(logo,x,y,size,size);
-    };
-    logo.onerror = function(){
-      console.warn('Logo tidak ditemukan, melanjutkan tanpa logo');
-    };
-  });
-  
-  console.log('🔄 QRIS & nominal cek di-update ke:', totalDenganUnik);
-}
+        function hideError() {
+            document.getElementById('errorBox').classList.add('hidden');
+        }
 
-// ================= LOAD VOUCHER =================
-async function loadVoucher(){
-  try{
-    const r = await fetch("/sosmed-1/payment/voucher.json",{cache:"no-store"});
-    if(!r.ok) return [];
-    const data = await r.json();
-    return Array.isArray(data) ? data : [];
-  }catch{return []}
-}
+        function showSuccess(title, msg) {
+            document.getElementById('successTitle').textContent = title;
+            document.getElementById('successMsg').textContent = msg;
+            document.getElementById('successBox').classList.remove('hidden');
+            document.getElementById('errorBox').classList.add('hidden');
+        }
 
-// ================= APPLY VOUCHER =================
-document.getElementById('applyVoucher').onclick = async function() {
-  if (isQrisExpired) {
-    Swal.fire({
-      title: '⏰ QRIS Kadaluwarsa',
-      text: 'QRIS sudah expired. Silakan generate ulang QRIS terlebih dahulu.',
-      icon: 'warning',
-      confirmButtonColor: '#f59e0b'
-    });
-    return;
-  }
-  
-  const code = document.getElementById('voucherInput').value.trim().toUpperCase();
-  if(!code) return Swal.fire("Isi kode voucher","","warning");
-  
-  if (isVoucherUsed(code)) {
-    return Swal.fire({
-      title: "❌ Voucher Sudah Dipakai",
-      text: `Kode voucher "${code}" sudah digunakan untuk transaksi ini. Hanya bisa digunakan 1×.`,
-      icon: "error",
-      confirmButtonColor: "#22c55e"
-    });
-  }
-  
-  const list = await loadVoucher();
-  if(!list || list.length === 0) {
-    return Swal.fire("Error", "Gagal memuat data voucher", "error");
-  }
-  
-  const v = list.find(x => x.code && x.code.toUpperCase() === code);
-  if(!v) return Swal.fire("❌ Voucher tidak valid","","error");
-  
-  const minPurchase = v.min_purchase || 0;
-  if (originalTotal < minPurchase) {
-    return Swal.fire({
-      title: "❌ Minimal Pembelian",
-      text: `Minimal pembelian untuk voucher ini adalah Rp ${minPurchase.toLocaleString("id-ID")}`,
-      icon: "warning",
-      confirmButtonColor: "#22c55e"
-    });
-  }
-  
-  let discount = 0;
-  if (v.type === "percent") {
-    discount = originalTotal * (v.value / 100);
-    if (v.max_discount) discount = Math.min(discount, v.max_discount);
-  } else if (v.type === "fixed") {
-    discount = v.value;
-  } else {
-    return Swal.fire("❌ Tipe voucher tidak valid","","error");
-  }
-  
-  discount = Math.max(0, discount);
-  finalTotal = Math.max(originalTotal - discount, 0);
-  appliedVoucher = v.code;
-  appliedDiscount = Math.round(discount);
-  
-  markVoucherUsed(v.code);
-  
-  let discountText = `Rp ${discount.toLocaleString("id-ID")}`;
-  if (v.type === "percent") {
-    discountText += ` (${v.value}% dari total)`;
-  }
-  
-  document.getElementById('voucherStatus').innerHTML = `<span class="active">✅ Voucher ${v.code} berhasil digunakan! Diskon: ${discountText}</span>`;
-  
-  document.getElementById('voucherInput').disabled = true;
-  document.getElementById('voucherInput').style.opacity = '0.4';
-  this.disabled = true;
-  this.style.opacity = '0.4';
-  
-  updateDisplay();
-  
-  const statusEl = document.getElementById('paymentStatus');
-  if (statusEl.className === 'payment-status loading') {
-    statusEl.textContent = `⏳ Mengecek pembayaran Rp ${(finalTotal + uniqueCode + adminFee).toLocaleString('id-ID')}...`;
-  }
-  
-  Swal.fire({
-    title: "✅ Berhasil!",
-    html: `Voucher <b>${v.code}</b> berhasil digunakan!<br>Diskon: <b>${discountText}</b><br><span style="color:#888;font-size:12px;">QRIS & nominal cek otomatis diperbarui.</span>`,
-    icon: "success",
-    confirmButtonColor: "#22c55e"
-  });
-};
+        function hideSuccess() {
+            document.getElementById('successBox').classList.add('hidden');
+        }
 
-// ================= CONFIRM BUTTON =================
-document.getElementById('confirmBtn').onclick = function() {
-  if (isQrisExpired) {
-    Swal.fire({
-      title: '⏰ QRIS Kadaluwarsa',
-      text: 'QRIS sudah expired. Silakan generate ulang QRIS terlebih dahulu.',
-      icon: 'warning',
-      confirmButtonColor: '#f59e0b',
-      confirmButtonText: '🔄 Generate Ulang'
-    }).then((result) => {
-      if (result.isConfirmed) {
-        regenerateQris();
-      }
-    });
-    return;
-  }
-  checkPaymentStatus();
-};
+        function setButtonLoading(btnId, iconId, textId, loading, defaultText, defaultIcon) {
+            const btn  = document.getElementById(btnId);
+            const icon = document.getElementById(iconId);
+            const text = document.getElementById(textId);
+            btn.disabled = loading;
+            if (loading) {
+                icon.className = 'fas fa-spinner fa-spin';
+                text.textContent = 'Memproses...';
+            } else {
+                icon.className = 'fas ' + defaultIcon;
+                text.textContent = defaultText;
+            }
+        }
 
-// ================= REGENERATE BUTTON =================
-document.getElementById('regenerateBtn').onclick = regenerateQris;
+        function ensureConfig() {
+            if (!configLoaded || !API_ID || !API_KEY) {
+                showError('Konfigurasi Belum Siap', 'API Key belum berhasil dimuat. Silakan refresh halaman.');
+                return false;
+            }
+            return true;
+        }
 
-// ================= INIT =================
-(async function() {
-  await fetchConfigFromEnv();
-  configLoaded = true;
-  
-  const isBanned = await checkAndHandleBan();
-  if (isBanned) return;
-  
-  // CEK APAKAH SUDAH LOCK
-  if (checkTransactionLockLocal()) {
-    transactionLocked = true;
-    isPaymentVerified = true;
-    const btn = document.getElementById('confirmBtn');
-    btn.disabled = true;
-    btn.textContent = '✅ Transaksi Sudah Dikonfirmasi';
-    document.getElementById('paymentStatus').className = 'payment-status success';
-    document.getElementById('paymentStatus').textContent = '✅ Pembayaran sudah terverifikasi!';
-    document.getElementById('paymentStatus').style.display = 'block';
-    return;
-  }
-  
-  // CEK APAKAH DISCORD SUDAH TERKIRIM
-  if (isDiscordAlreadySent()) {
-    isPaymentVerified = true;
-    const btn = document.getElementById('confirmBtn');
-    btn.disabled = true;
-    btn.textContent = '✅ Pembayaran Terverifikasi';
-    document.getElementById('paymentStatus').className = 'payment-status success';
-    document.getElementById('paymentStatus').textContent = '✅ Pembayaran sudah terverifikasi!';
-    document.getElementById('paymentStatus').style.display = 'block';
-    return;
-  }
-  
-  // CEK VOUCHER
-  const usedVouchers = getUsedVouchers();
-  if (usedVouchers.length > 0) {
-    const lastUsed = usedVouchers[usedVouchers.length - 1];
-    document.getElementById('voucherStatus').innerHTML = `<span class="used">⚠️ Voucher ${lastUsed} sudah digunakan untuk transaksi ini (1×)</span>`;
-    document.getElementById('voucherInput').disabled = true;
-    document.getElementById('voucherInput').style.opacity = '0.4';
-    document.getElementById('applyVoucher').disabled = true;
-    document.getElementById('applyVoucher').style.opacity = '0.4';
-  }
-  
-  if (comment && comment.trim() !== '') {
-    console.log('📝 Comment detected from URL:', comment);
-  }
-  
-  updateDisplay();
-  
-  // INIT QRIS TIMER
-  initQrisTimer();
-  
-  // AUTO CHECK PAYMENT
-  setTimeout(() => {
-    if (!isQrisExpired) {
-      checkPaymentStatus();
-      verificationInterval = setInterval(checkPaymentStatus, 10000);
-    }
-  }, 3000);
-})();
+        // ==================== Card Renderers ====================
+        function createOrderCard(id, data) {
+            const isFound = data.status && !String(data.msg || '').toLowerCase().includes('tidak ditemukan');
+            const status = data.status || 'Tidak Ditemukan';
+            const statusClass = getStatusClass(status);
+            const statusIcon = getStatusIcon(status);
 
-// ================= REFERRAL =================
-function ambilReferral() {
-  const savedRef = localStorage.getItem('referral_code');
-  const statusElement = document.getElementById('status-ref');
-  if (statusElement) {
-    if (savedRef) {
-      statusElement.innerHTML = `Terdeteksi! Kode referral Anda adalah: <strong>${savedRef}</strong>`;
-    } else {
-      statusElement.innerHTML = `Tidak ada kode referral yang tersimpan.`;
-    }
-  }
-  return savedRef;
-}
-ambilReferral();
+            return `
+                <div class="bg-white rounded-3xl shadow-lg shadow-gray-200/50 border border-gray-100 p-5 card-hover fade-in">
+                    <div class="flex items-start justify-between mb-4">
+                        <div>
+                            <p class="text-[11px] text-gray-400 uppercase tracking-wider font-semibold mb-0.5">Order ID</p>
+                            <p class="text-xl font-extrabold text-gray-900">#${id}</p>
+                        </div>
+                        <span class="status-badge ${statusClass}">
+                            <i class="fas ${statusIcon} mr-1"></i>${status}
+                        </span>
+                    </div>
+                    
+                    ${isFound ? `
+                        <div class="grid grid-cols-2 gap-3 mt-1 pt-4 border-t border-gray-100">
+                            <div class="bg-gray-50 rounded-xl p-3">
+                                <p class="text-[11px] text-gray-400 mb-0.5">Charge</p>
+                                <p class="font-bold text-gray-800 text-sm">Rp ${formatNumber(data.charge)}</p>
+                            </div>
+                            <div class="bg-gray-50 rounded-xl p-3">
+                                <p class="text-[11px] text-gray-400 mb-0.5">Start Count</p>
+                                <p class="font-bold text-gray-800 text-sm">${formatNumber(data.start_count)}</p>
+                            </div>
+                            <div class="bg-gray-50 rounded-xl p-3">
+                                <p class="text-[11px] text-gray-400 mb-0.5">Remains</p>
+                                <p class="font-bold text-gray-800 text-sm">${formatNumber(data.remains)}</p>
+                            </div>
+                            <div class="bg-gray-50 rounded-xl p-3">
+                                <p class="text-[11px] text-gray-400 mb-0.5">Pesan</p>
+                                <p class="font-medium text-gray-600 text-xs leading-snug">${data.msg || '-'}</p>
+                            </div>
+                        </div>
+                    ` : `
+                        <div class="mt-2 pt-3 border-t border-gray-100">
+                            <p class="text-sm text-red-500 flex items-center gap-1.5">
+                                <i class="fas fa-info-circle"></i>
+                                ${data.msg || 'Pesanan tidak ditemukan.'}
+                            </p>
+                        </div>
+                    `}
+                </div>
+            `;
+        }
 
-// ================= ANTI DEVTOOLS =================
-document.addEventListener("keydown", function(e){
-  if(e.key === "F12") e.preventDefault();
-  if(e.ctrlKey && e.shiftKey && ["I","J"].includes(e.key)) e.preventDefault();
-  if(e.ctrlKey && e.key === "u") e.preventDefault();
-});
+        function createRefillResultCard(id, data, isRequest = false) {
+            if (isRequest) {
+                const success = data.status === true;
+                return `
+                    <div class="bg-white rounded-3xl shadow-lg shadow-gray-200/50 border border-gray-100 p-5 card-hover fade-in">
+                        <div class="flex items-start justify-between mb-3">
+                            <div>
+                                <p class="text-[11px] text-gray-400 uppercase tracking-wider font-semibold mb-0.5">Order ID</p>
+                                <p class="text-xl font-extrabold text-gray-900">#${id}</p>
+                            </div>
+                            <span class="status-badge ${success ? 'status-success' : 'status-error'}">
+                                <i class="fas ${success ? 'fa-check-circle' : 'fa-times-circle'} mr-1"></i>
+                                ${success ? 'Berhasil' : 'Gagal'}
+                            </span>
+                        </div>
+                        <div class="mt-2 pt-3 border-t border-gray-100">
+                            <p class="text-sm ${success ? 'text-emerald-600' : 'text-red-500'} flex items-start gap-1.5">
+                                <i class="fas ${success ? 'fa-info-circle' : 'fa-exclamation-circle'} mt-0.5"></i>
+                                <span>${data.msg || (success ? 'Refill berhasil dibuat.' : 'Gagal membuat refill.')}</span>
+                            </p>
+                            ${success && data.data?.refill ? `
+                                <div class="mt-3 bg-gradient-to-r from-emerald-50 to-teal-50 rounded-2xl p-4 border border-emerald-100">
+                                    <p class="text-[11px] text-emerald-600 font-semibold mb-1">ID Refill</p>
+                                    <p class="font-extrabold text-emerald-800 text-xl">#${data.data.refill}</p>
+                                    <p class="text-xs text-emerald-500 mt-1.5">Gunakan ID ini di tab <strong>Status Refill</strong></p>
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                `;
+            }
 
-setInterval(() => {
-  const threshold = 160;
-  if (window.devtoolsOpen) return;
-  const widthThreshold = window.outerWidth - window.innerWidth > threshold;
-  if (widthThreshold && !/Android|iPhone|iPad/i.test(navigator.userAgent)) {
-    document.body.innerHTML = "<h1 style='color:gold;text-align:center;margin-top:40vh;'>🚫 Developer Tools Terdeteksi</h1>";
-  }
-}, 2000);
+            const isFound = data.status === true && data.data;
+            const refillStatus = data.data?.refill_status || 'Tidak Ditemukan';
+            const statusClass = getStatusClass(refillStatus);
+            const statusIcon = getStatusIcon(refillStatus);
 
-console.log('💳 QRIS Payment - Sosmed 1 siap!');
-console.log('⏱️ QRIS Expiry:', QRIS_EXPIRY_MINUTES, 'menit');
-console.log('📧 Gmail diambil dari localStorage');
-console.log('🚫 Cek banned berdasarkan Gmail');
-console.log('🕐 WIB real-time aktif');
-console.log('✅ Auto-verifikasi QRIS aktif (cek setiap 10 detik)');
-console.log('🔑 Kode unik PERSISTEN');
-console.log('📨 Notifikasi Discord hanya 1×');
-console.log('📦 Auto-order ke Irvankarde setelah pembayaran terverifikasi');
-</script>
+            return `
+                <div class="bg-white rounded-3xl shadow-lg shadow-gray-200/50 border border-gray-100 p-5 card-hover fade-in">
+                    <div class="flex items-start justify-between mb-4">
+                        <div>
+                            <p class="text-[11px] text-gray-400 uppercase tracking-wider font-semibold mb-0.5">Refill ID</p>
+                            <p class="text-xl font-extrabold text-gray-900">#${data.data?.refill_id || id}</p>
+                        </div>
+                        <span class="status-badge ${statusClass}">
+                            <i class="fas ${statusIcon} mr-1"></i>${refillStatus}
+                        </span>
+                    </div>
+                    <div class="mt-2 pt-3 border-t border-gray-100">
+                        <p class="text-sm ${isFound ? 'text-gray-600' : 'text-red-500'} flex items-center gap-1.5">
+                            <i class="fas fa-info-circle"></i>
+                            ${data.msg || (isFound ? 'Refill ditemukan.' : 'Refill tidak ditemukan.')}
+                        </p>
+                    </div>
+                </div>
+            `;
+        }
+
+        // ==================== API Calls ====================
+        async function apiPost(url, ids) {
+            const formData = new URLSearchParams();
+            formData.append('api_id', API_ID);
+            formData.append('api_key', API_KEY);
+            formData.append('id', ids.join(','));
+
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: formData
+            });
+
+            if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
+            return await response.json();
+        }
+
+        async function cekStatus() {
+            if (!ensureConfig()) return;
+
+            const orderInput = document.getElementById('orderId').value.trim();
+            const resultsDiv = document.getElementById('results');
+
+            if (!orderInput) {
+                showError('Input Kosong', 'Silakan masukkan minimal satu ID pesanan.');
+                return;
+            }
+
+            const ids = parseIds(orderInput);
+            if (ids.length === 0) {
+                showError('Input Tidak Valid', 'Tidak ada ID pesanan yang valid.');
+                return;
+            }
+
+            setButtonLoading('cekBtn', 'btnIcon', 'btnText', true, 'Cek Status', 'fa-search');
+            showLoading('Sedang mengecek status pesanan...');
+
+            try {
+                const data = await apiPost(ENDPOINTS.status, ids);
+                hideLoading();
+
+                if (data.status === false && !data.orders) {
+                    resultsDiv.innerHTML = createOrderCard(ids[0], { msg: data.msg, status: null });
+                } else if (data.orders) {
+                    let html = '';
+                    for (const [orderId, orderData] of Object.entries(data.orders)) {
+                        html += createOrderCard(orderId, orderData);
+                    }
+                    resultsDiv.innerHTML = html;
+                } else if (data.status === true && data.data) {
+                    resultsDiv.innerHTML = createOrderCard(data.data.id || ids[0], {
+                        ...data.data,
+                        msg: data.msg
+                    });
+                } else {
+                    showError('Respon Tidak Dikenal', JSON.stringify(data));
+                }
+            } catch (err) {
+                hideLoading();
+                showError('Gagal Terhubung', err.message || 'Tidak dapat terhubung ke server.');
+            } finally {
+                setButtonLoading('cekBtn', 'btnIcon', 'btnText', false, 'Cek Status', 'fa-search');
+            }
+        }
+
+        async function refillOrder() {
+            if (!ensureConfig()) return;
+
+            const orderInput = document.getElementById('orderId').value.trim();
+            const resultsDiv = document.getElementById('results');
+
+            if (!orderInput) {
+                showError('Input Kosong', 'Silakan masukkan minimal satu ID pesanan untuk di-refill.');
+                return;
+            }
+
+            const ids = parseIds(orderInput);
+            if (ids.length === 0) {
+                showError('Input Tidak Valid', 'Tidak ada ID pesanan yang valid.');
+                return;
+            }
+
+            setButtonLoading('refillBtn', 'refillBtnIcon', 'refillBtnText', true, 'Refill Pesanan', 'fa-sync-alt');
+            showLoading('Sedang meminta refill...');
+
+            try {
+                let html = '';
+                let hasSuccess = false;
+
+                const data = await apiPost(ENDPOINTS.refill, ids);
+                hideLoading();
+
+                if (data.status === true && data.data) {
+                    html = createRefillResultCard(ids[0], data, true);
+                    hasSuccess = true;
+                    showSuccess('Refill Berhasil', data.msg || `Refill #${data.data.refill} berhasil dibuat.`);
+                } else if (data.orders || data.data?.orders) {
+                    const orders = data.orders || data.data.orders;
+                    for (const [orderId, orderData] of Object.entries(orders)) {
+                        html += createRefillResultCard(orderId, orderData, true);
+                        if (orderData.status === true) hasSuccess = true;
+                    }
+                } else if (data.status === false) {
+                    html = createRefillResultCard(ids[0], data, true);
+                } else {
+                    if (ids.length > 1) {
+                        for (const id of ids) {
+                            try {
+                                const singleData = await apiPost(ENDPOINTS.refill, [id]);
+                                html += createRefillResultCard(id, singleData, true);
+                                if (singleData.status === true) hasSuccess = true;
+                            } catch (e) {
+                                html += createRefillResultCard(id, { status: false, msg: e.message }, true);
+                            }
+                        }
+                    } else {
+                        html = createRefillResultCard(ids[0], data, true);
+                    }
+                }
+
+                resultsDiv.innerHTML = html;
+            } catch (err) {
+                hideLoading();
+                if (ids.length > 1) {
+                    let html = '';
+                    for (const id of ids) {
+                        try {
+                            const singleData = await apiPost(ENDPOINTS.refill, [id]);
+                            html += createRefillResultCard(id, singleData, true);
+                        } catch (e) {
+                            html += createRefillResultCard(id, { status: false, msg: e.message }, true);
+                        }
+                    }
+                    resultsDiv.innerHTML = html;
+                } else {
+                    showError('Gagal Terhubung', err.message || 'Tidak dapat terhubung ke server.');
+                }
+            } finally {
+                setButtonLoading('refillBtn', 'refillBtnIcon', 'refillBtnText', false, 'Refill Pesanan', 'fa-sync-alt');
+            }
+        }
+
+        async function cekRefillStatus() {
+            if (!ensureConfig()) return;
+
+            const refillInput = document.getElementById('refillId').value.trim();
+            const resultsDiv = document.getElementById('results');
+
+            if (!refillInput) {
+                showError('Input Kosong', 'Silakan masukkan minimal satu ID Refill.');
+                return;
+            }
+
+            const ids = parseIds(refillInput);
+            if (ids.length === 0) {
+                showError('Input Tidak Valid', 'Tidak ada ID Refill yang valid.');
+                return;
+            }
+
+            setButtonLoading('cekRefillBtn', 'cekRefillBtnIcon', 'cekRefillBtnText', true, 'Cek Status Refill', 'fa-search');
+            showLoading('Sedang mengecek status refill...');
+
+            try {
+                let html = '';
+                const data = await apiPost(ENDPOINTS.refillStatus, ids);
+                hideLoading();
+
+                if (data.status === true && data.data) {
+                    html = createRefillResultCard(ids[0], data, false);
+                } else if (data.orders || (data.data && typeof data.data === 'object' && !data.data.refill_id)) {
+                    const orders = data.orders || data.data;
+                    for (const [rid, rdata] of Object.entries(orders)) {
+                        html += createRefillResultCard(rid, rdata.status !== undefined ? rdata : { status: true, data: rdata, msg: rdata.msg }, false);
+                    }
+                } else if (data.status === false) {
+                    html = createRefillResultCard(ids[0], data, false);
+                } else {
+                    for (const id of ids) {
+                        try {
+                            const single = await apiPost(ENDPOINTS.refillStatus, [id]);
+                            html += createRefillResultCard(id, single, false);
+                        } catch (e) {
+                            html += createRefillResultCard(id, { status: false, msg: e.message }, false);
+                        }
+                    }
+                }
+
+                resultsDiv.innerHTML = html || '<p class="text-center text-gray-400 text-sm py-6">Tidak ada data.</p>';
+            } catch (err) {
+                hideLoading();
+                if (ids.length > 1) {
+                    let html = '';
+                    for (const id of ids) {
+                        try {
+                            const single = await apiPost(ENDPOINTS.refillStatus, [id]);
+                            html += createRefillResultCard(id, single, false);
+                        } catch (e) {
+                            html += createRefillResultCard(id, { status: false, msg: e.message }, false);
+                        }
+                    }
+                    resultsDiv.innerHTML = html;
+                } else {
+                    showError('Gagal Terhubung', err.message || 'Tidak dapat terhubung ke server.');
+                }
+            } finally {
+                setButtonLoading('cekRefillBtn', 'cekRefillBtnIcon', 'cekRefillBtnText', false, 'Cek Status Refill', 'fa-search');
+            }
+        }
+
+        // Enter key support
+        document.getElementById('orderId').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                cekStatus();
+            }
+        });
+
+        document.getElementById('refillId').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                cekRefillStatus();
+            }
+        });
+    </script>
 </body>
 </html>
