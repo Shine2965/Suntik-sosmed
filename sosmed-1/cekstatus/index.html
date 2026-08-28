@@ -486,7 +486,7 @@
             <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;">
                 <div>
                     <h2>📦 Cek Status Pesanan</h2>
-                    <div class="sub">Cek status pesanan & refill dari Sosmed 2</div>
+                    <div class="sub">Cek status pesanan & refill dari Shine Shop</div>
                 </div>
                 <div class="header-actions">
                     <button class="btn btn-back" onclick="location.href='/'">🏠 Home</button>
@@ -549,18 +549,19 @@
         <div class="text-muted" style="text-align:center;margin-top:20px;">
             © Shine Shop · Cek Status Pesanan & Refill
         </div>
-        <div class="security-badge">🔒 Data dari Irvankarde API</div>
+        <div class="security-badge">🔒 Data dari IRVANKARDE API</div>
     </div>
 
     <script>
-        // ===================== KONFIGURASI IRVANKARDE =====================
+        // ===================== KONFIGURASI =====================
+        // ENDPOINT IRVANKARDE
         const IRVANKARDE_STATUS_URL = 'https://irvankedesmm.co.id/api/status';
         const IRVANKARDE_REFILL_URL = 'https://irvankedesmm.co.id/api/refill';
         const IRVANKARDE_REFILL_STATUS_URL = 'https://irvankedesmm.co.id/api/refill/status';
         const CONFIG_API = '/api/qris-config';
 
-        // ===== IRVANKARDE CONFIG =====
-        let IRVANKARDE_API_ID = 81074;
+        // API ID FIXED = 81074
+        const IRVANKARDE_API_ID = 81074;
         let IRVANKARDE_API_KEY = '';
         let configLoaded = false;
 
@@ -595,22 +596,19 @@
                 const data = await res.json();
                 if (!data.success) throw new Error(data.message || 'Format data tidak valid');
 
+                // Ambil IRVANKARDE_API_KEY dari environment variable
                 if (data.irvankarde_api_key) {
                     IRVANKARDE_API_KEY = data.irvankarde_api_key;
                 }
-                if (data.irvankarde_api_id) {
-                    IRVANKARDE_API_ID = data.irvankarde_api_id;
-                }
 
                 if (!IRVANKARDE_API_KEY) {
-                    IRVANKARDE_API_KEY = '';
                     console.warn('⚠️ IRVANKARDE_API_KEY tidak ditemukan di ENV');
                 }
 
                 configLoaded = true;
                 statusEl.textContent = '✅ Konfigurasi berhasil dimuat';
                 statusEl.style.color = '#00ffaa';
-                console.log('✅ Irvankarde Config loaded');
+                console.log('✅ IRVANKARDE Config loaded');
                 console.log('📌 API ID:', IRVANKARDE_API_ID);
                 console.log('📌 API Key:', IRVANKARDE_API_KEY ? IRVANKARDE_API_KEY.substring(0, 10) + '...' : '❌ Tidak ada');
 
@@ -645,7 +643,9 @@
                 'completed': { class: 'completed', label: '✅ Completed' },
                 'canceled': { class: 'canceled', label: '❌ Canceled' },
                 'partial': { class: 'partial', label: '⚠️ Partial' },
-                'not-found': { class: 'not-found', label: '❓ Tidak Ditemukan' }
+                'not-found': { class: 'not-found', label: '❓ Tidak Ditemukan' },
+                'rejected': { class: 'rejected', label: '❌ Rejected' },
+                'failed': { class: 'failed', label: '❌ Failed' }
             };
             const s = statusMap[status] || statusMap['not-found'];
             return `<span class="status-badge ${s.class}">${s.label}</span>`;
@@ -707,6 +707,16 @@
                 }
             }
 
+            if (!IRVANKARDE_API_KEY) {
+                Swal.fire({
+                    title: '❌ API Key Tidak Ditemukan',
+                    text: 'IRVANKARDE_API_KEY tidak ditemukan di environment. Hubungi admin.',
+                    icon: 'error',
+                    confirmButtonColor: '#ff4444'
+                });
+                return;
+            }
+
             checkBtn.disabled = true;
             checkBtn.innerHTML = '<span class="loading-spinner"></span> Mengecek...';
 
@@ -734,7 +744,7 @@
                     id: idParam
                 };
 
-                console.log('📡 Sending request to Irvankarde (POST):', payload);
+                console.log('📡 Sending request to IRVANKARDE:', payload);
 
                 const response = await fetch(IRVANKARDE_STATUS_URL, {
                     method: 'POST',
@@ -746,7 +756,7 @@
                 });
 
                 const data = await response.json();
-                console.log('📦 Irvankarde Response:', data);
+                console.log('📦 IRVANKARDE Response:', data);
 
                 resultCard.style.display = 'block';
 
@@ -810,6 +820,16 @@
                 }
             }
 
+            if (!IRVANKARDE_API_KEY) {
+                Swal.fire({
+                    title: '❌ API Key Tidak Ditemukan',
+                    text: 'IRVANKARDE_API_KEY tidak ditemukan di environment.',
+                    icon: 'error',
+                    confirmButtonColor: '#ff4444'
+                });
+                return;
+            }
+
             checkBtn.disabled = true;
             checkBtn.innerHTML = '<span class="loading-spinner"></span> Mengecek...';
 
@@ -823,7 +843,7 @@
                     id: refillId
                 };
 
-                console.log('📡 Check Refill Status (POST):', payload);
+                console.log('📡 Check Refill Status:', payload);
 
                 const response = await fetch(IRVANKARDE_REFILL_STATUS_URL, {
                     method: 'POST',
@@ -1094,6 +1114,16 @@
                 }
             }
 
+            if (!IRVANKARDE_API_KEY) {
+                Swal.fire({
+                    title: '❌ API Key Tidak Ditemukan',
+                    text: 'IRVANKARDE_API_KEY tidak ditemukan di environment.',
+                    icon: 'error',
+                    confirmButtonColor: '#ff4444'
+                });
+                return;
+            }
+
             const btn = document.getElementById('refillBtn');
             if (btn) {
                 btn.disabled = true;
@@ -1107,7 +1137,7 @@
                     id: orderId
                 };
 
-                console.log('📡 Request Refill to Irvankarde (POST):', payload);
+                console.log('📡 Request Refill:', payload);
 
                 const response = await fetch(IRVANKARDE_REFILL_URL, {
                     method: 'POST',
@@ -1196,6 +1226,16 @@
                 }
             }
 
+            if (!IRVANKARDE_API_KEY) {
+                Swal.fire({
+                    title: '❌ API Key Tidak Ditemukan',
+                    text: 'IRVANKARDE_API_KEY tidak ditemukan di environment.',
+                    icon: 'error',
+                    confirmButtonColor: '#ff4444'
+                });
+                return;
+            }
+
             if (!refillId) {
                 const idDisplay = document.getElementById(`refillIdDisplay_${orderId}`);
                 if (idDisplay) {
@@ -1219,7 +1259,7 @@
                     id: refillId
                 };
 
-                console.log('📡 Check Refill Status (POST):', payload);
+                console.log('📡 Check Refill Status:', payload);
 
                 const response = await fetch(IRVANKARDE_REFILL_STATUS_URL, {
                     method: 'POST',
@@ -1387,10 +1427,12 @@
         document.addEventListener('DOMContentLoaded', async function() {
             await fetchConfig();
 
-            console.log('📦 Cek Status Pesanan + Refill (Irvankarde) siap!');
+            console.log('📦 Cek Status Pesanan + Refill siap!');
             console.log('📌 API ID:', IRVANKARDE_API_ID);
             console.log('📌 API Key:', IRVANKARDE_API_KEY ? '✅ Terdeteksi' : '❌ Tidak ada');
-            console.log('📌 Method: POST (JSON)');
+            console.log('📌 Endpoint Status:', IRVANKARDE_STATUS_URL);
+            console.log('📌 Endpoint Refill:', IRVANKARDE_REFILL_URL);
+            console.log('📌 Endpoint Refill Status:', IRVANKARDE_REFILL_STATUS_URL);
         });
 
         // ===================== ANTI INSPECT =====================
