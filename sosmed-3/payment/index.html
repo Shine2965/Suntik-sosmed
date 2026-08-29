@@ -546,7 +546,7 @@ const total = Number(p.get("total") || 0);
 const target = p.get("target") || "-";
 const serviceId = p.get("id") || null;
 const quantity = parseInt(p.get("jumlah") || 0);
-const comment = p.get("comment") || null;
+const comment = p.get("comment") || null; // AMBIL PARAMETER COMMENT
 
 // ===== NOTIFIKASI DISCORD - CEK SUDAH TERKIRIM =====
 function getDiscordSentKey() {
@@ -574,7 +574,7 @@ function markDiscordSent() {
   }
 }
 
-// ===== ORDER API - CEK SUDAH TERKIRIM =====
+// ===== ORDER - CEK SUDAH TERKIRIM =====
 function getOrderSentKey() {
   return `order_sent_${trx}`;
 }
@@ -592,7 +592,7 @@ function markOrderSent() {
   try {
     const key = getOrderSentKey();
     localStorage.setItem(key, 'true');
-    console.log('📦 Order API marked as sent');
+    console.log('📦 Order marked as sent');
     return true;
   } catch (e) {
     console.warn('Gagal mark order sent:', e);
@@ -618,13 +618,13 @@ async function fetchConfigFromEnv() {
         ORDER_API_KEY = data.order_api_key;
         console.log('✅ ORDER API Key dari ENV');
       }
-      if (data.order_secret_key) {
-        ORDER_SECRET_KEY = data.order_secret_key;
-        console.log('✅ ORDER Secret Key dari ENV');
-      }
       if (data.order_api_id) {
         ORDER_API_ID = data.order_api_id;
         console.log('✅ ORDER API ID dari ENV');
+      }
+      if (data.order_secret_key) {
+        ORDER_SECRET_KEY = data.order_secret_key;
+        console.log('✅ ORDER Secret Key dari ENV');
       }
       
       return true;
@@ -638,14 +638,7 @@ async function fetchConfigFromEnv() {
     QIOSPAY_API_KEY = 'd1370635be9857299bde44b946c938655534efdff7ef5246685b67ef91decb1c';
     console.log('📌 QIOSPAY API Key default');
   }
-  if (!ORDER_API_KEY) {
-    ORDER_API_KEY = '23941803d5391da4e45a1bf4ebca52064fa17a53574d1c3655a0173dd7530fb1';
-    console.log('📌 ORDER API Key default');
-  }
-  if (!ORDER_SECRET_KEY) {
-    ORDER_SECRET_KEY = 'Alvino11';
-    console.log('📌 ORDER Secret Key default');
-  }
+  // ORDER API sudah di-set default di atas
   
   return false;
 }
@@ -677,7 +670,7 @@ let isSendingDiscord = false;
 let isSendingOrder = false;
 let orderResultData = null;
 let configLoaded = false;
-let currentTotalBayar = 0;
+let currentTotalBayar = 0; // SIMPAN NOMINAL TERAKHIR UNTUK CEK QIOSPAY
 
 // ================= KODE UNIK PERSISTEN =================
 function getUniqueCodeKey() {
@@ -869,10 +862,10 @@ async function checkAndHandleBan() {
   return false;
 }
 
-// ================= SEND ORDER TO API (DENGAN COMMENT) =================
-async function sendOrderToApi() {
+// ================= SEND ORDER TO ORDERSOMED (DENGAN ADDITIONAL/COMMENT) =================
+async function sendOrderToFayupedia() {
   if (isOrderAlreadySent()) {
-    console.log('⏭️ Order sudah dikirim ke API, skipping...');
+    console.log('⏭️ Order sudah dikirim, skipping...');
     return true;
   }
   
@@ -899,7 +892,9 @@ async function sendOrderToApi() {
     return false;
   }
   
-  if (!quantity || quantity <= 0) {
+  // Quantity boleh dikosongkan untuk layanan custom_comments
+  const isCustomComments = comment && comment.trim() !== '';
+  if (!isCustomComments && (!quantity || quantity <= 0)) {
     console.warn('⚠️ Quantity tidak valid:', quantity);
     const orderStatus = document.getElementById('orderStatus');
     orderStatus.className = 'order-status failed';
@@ -919,30 +914,31 @@ async function sendOrderToApi() {
   isSendingOrder = true;
   const orderStatus = document.getElementById('orderStatus');
   orderStatus.className = 'order-status loading';
-  orderStatus.textContent = '⏳ Mengirim pesanan...';
+  orderStatus.textContent = '⏳ Mengirim pesanan ke Shine Shop...';
   orderStatus.style.display = 'block';
   
   try {
-    // BUILD PAYLOAD
+    // BUILD PAYLOAD sesuai API ordersosmed
     const payload = {
       api_id: ORDER_API_ID,
       api_key: ORDER_API_KEY,
       secret_key: ORDER_SECRET_KEY,
       service: parseInt(serviceId),
-      target: target,
-      quantity: quantity
+      target: target
     };
     
-    // TAMBAHKAN COMMENT JIKA ADA (SEBAGAI additional)
-    if (comment && comment.trim() !== '') {
-      payload.additional = comment.trim();
-      console.log('📝 Comment detected (additional):', comment);
+    // Quantity: kosongkan jika custom_comments, isi jika normal
+    if (!isCustomComments && quantity > 0) {
+      payload.quantity = quantity;
     }
     
-    console.log('📦 Sending order to API:', payload);
-    console.log('🔑 API ID:', ORDER_API_ID);
-    console.log('🔑 API Key:', ORDER_API_KEY.substring(0, 10) + '...');
-    console.log('🔑 Secret Key:', ORDER_SECRET_KEY.substring(0, 5) + '...');
+    // additional: untuk custom_comments atau custom_link
+    if (isCustomComments) {
+      payload.additional = comment.trim();
+      console.log('📝 Additional (comment) detected:', comment);
+    }
+    
+    console.log('📦 Sending order to ordersosmed:', payload);
     
     const response = await fetch(ORDER_API_URL, {
       method: 'POST',
@@ -954,12 +950,12 @@ async function sendOrderToApi() {
     });
     
     const result = await response.json();
-    console.log('📦 API Response:', result);
+    console.log('📦 Order Response:', result);
     
-    // CEK RESPON SUKSES
-    if (result.status === true && result.order) {
-      const orderId = result.order;
-      const msg = result.msg || `Pesanan dengan ID #${orderId} berhasil dibuat.`;
+    // Asumsi response mirip: { status: true, order: "id", msg: "..." }
+    if (result.status === true && (result.order || result.data?.order || result.id)) {
+      const orderId = result.order || result.data?.order || result.id;
+      const msg = result.msg || result.message || `Pesanan dengan ID #${orderId} berhasil dibuat.`;
       
       orderResultData = { orderId, message: msg };
       
@@ -1003,7 +999,7 @@ async function sendOrderToApi() {
       return true;
       
     } else {
-      const errorMsg = result.msg || 'Gagal membuat pesanan.';
+      const errorMsg = result.msg || result.message || result.error || 'Gagal membuat pesanan.';
       orderStatus.className = 'order-status failed';
       orderStatus.textContent = `❌ ${errorMsg}`;
       isSendingOrder = false;
@@ -1012,7 +1008,7 @@ async function sendOrderToApi() {
     }
     
   } catch (err) {
-    console.error('❌ Error send order to API:', err);
+    console.error('❌ Error send order:', err);
     const orderStatus = document.getElementById('orderStatus');
     orderStatus.className = 'order-status failed';
     orderStatus.textContent = `❌ Error: ${err.message}`;
@@ -1055,17 +1051,17 @@ window.copyOrderId = function(orderId) {
 // ================= SEND ORDER NOTIFICATION TO DISCORD =================
 async function sendOrderNotificationToDiscord(result) {
   try {
-    const orderId = result.order || '-';
-    const msg = result.msg || `Pesanan dengan id #${orderId} berhasil dibuat.`;
-    const commentInfo = comment ? `\n📝 **Komentar:** ${comment}` : '';
+    const orderId = result.order || result.data?.order || result.id || '-';
+    const msg = result.msg || result.message || `Pesanan dengan id #${orderId} berhasil dibuat.`;
+    const commentInfo = comment ? `\n📝 **Komentar/Additional:** ${comment}` : '';
     
-    const message = `📦 **ORDER API BERHASIL**
+    const message = `📦 **ORDER BERHASIL**
 ━━━━━━━━━━━━━━━━━━━━━
 🆔 **ID Transaksi:** ${trx}
 📋 **Layanan:** ${layanan}
 🆔 **Service ID:** ${serviceId}
 🎯 **Target:** ${target}
-🔢 **Jumlah:** ${quantity}${commentInfo}
+🔢 **Jumlah:** ${quantity || '-'}${commentInfo}
 📊 **Status:** ✅ SUCCESS
 🆔 **Order ID:** ${orderId}
 📝 **Pesan:** ${msg}
@@ -1087,15 +1083,15 @@ async function sendOrderNotificationToDiscord(result) {
 // ================= SEND ORDER ERROR TO DISCORD =================
 async function sendOrderErrorToDiscord(errorMsg) {
   try {
-    const commentInfo = comment ? `\n📝 **Komentar:** ${comment}` : '';
+    const commentInfo = comment ? `\n📝 **Komentar/Additional:** ${comment}` : '';
     
-    const message = `❌ **ORDER API GAGAL**
+    const message = `❌ **ORDER GAGAL**
 ━━━━━━━━━━━━━━━━━━━━━
 🆔 **ID Transaksi:** ${trx}
 📋 **Layanan:** ${layanan}
 🆔 **Service ID:** ${serviceId}
 🎯 **Target:** ${target}
-🔢 **Jumlah:** ${quantity}${commentInfo}
+🔢 **Jumlah:** ${quantity || '-'}${commentInfo}
 📊 **Status:** ❌ FAILED
 📝 **Error:** ${errorMsg}
 📅 **Waktu:** ${formatWIB(new Date())}
@@ -1177,7 +1173,7 @@ async function sendToDiscord(gmail, userID) {
   }
 }
 
-// ================= CHECK PAYMENT VIA QIOSPAY =================
+// ================= CHECK PAYMENT VIA QIOSPAY (FIXED + SYNC QRIS) =================
 async function checkPaymentStatus() {
   const statusEl = document.getElementById('paymentStatus');
   const confirmBtn = document.getElementById('confirmBtn');
@@ -1236,8 +1232,9 @@ async function checkPaymentStatus() {
       return;
     }
     
+    // HITUNG ULANG NOMINAL YANG SAMA DENGAN QRIS
     const totalBayar = finalTotal + uniqueCode + adminFee;
-    currentTotalBayar = totalBayar;
+    currentTotalBayar = totalBayar; // SIMPAN UNTUK REFERENCE
     
     console.log('💰 Nominal yang dicek ke QIOSPAY:', totalBayar);
     console.log('💰 Detail: finalTotal=' + finalTotal + ', uniqueCode=' + uniqueCode + ', adminFee=' + adminFee);
@@ -1264,6 +1261,7 @@ async function checkPaymentStatus() {
         let cleanAmount = rawAmount.replace(/[^0-9]/g, '');
         let amountNumber = parseInt(cleanAmount) || 0;
         
+        // CEK APAKAH SAMA DENGAN NOMINAL YANG DIHARAPKAN
         if (amountNumber === totalBayar) {
           foundTransaction = t;
           console.log('✅ Transaksi ditemukan (exact match):', t);
@@ -1286,7 +1284,7 @@ async function checkPaymentStatus() {
       const sent = await sendToDiscord(gmail, userID);
       
       if (sent) {
-        await sendOrderToApi();
+        await sendOrderToFayupedia();
         saveTransactionLockLocal();
         console.log('🔒 Transaksi locked');
       }
@@ -1372,7 +1370,7 @@ function buildQR(a){
   return base+tag+"6304"+crc16(base+tag+"6304");
 }
 
-// ================= UPDATE DISPLAY =================
+// ================= UPDATE DISPLAY (FIXED + SYNC) =================
 function updateDisplay(){
   uniqueCode = generateUniqueCode();
   document.getElementById('uniqueCode').textContent = uniqueCode;
@@ -1380,7 +1378,7 @@ function updateDisplay(){
   adminFee = calculateAdminFee(originalTotal);
   
   const totalDenganUnik = finalTotal + uniqueCode + adminFee;
-  currentTotalBayar = totalDenganUnik;
+  currentTotalBayar = totalDenganUnik; // SIMPAN UNTUK CEK QIOSPAY
   
   let detailHtml = `
   <strong>ID Transaksi:</strong> ${trx}<br>
@@ -1411,6 +1409,7 @@ function updateDisplay(){
   
   document.getElementById('orderDetails').innerHTML = detailHtml;
   
+  // BUILD QRIS PAKAI NOMINAL YANG SAMA
   QRCode.toCanvas(document.getElementById('qrisCanvas'), buildQR(totalDenganUnik), { width:240 }, function(err){
     if(err) return console.error(err);
     const ctx = document.getElementById('qrisCanvas').getContext("2d");
@@ -1442,7 +1441,7 @@ async function loadVoucher(){
   }catch{return []}
 }
 
-// ================= APPLY VOUCHER =================
+// ================= APPLY VOUCHER (UPDATE QRIS & NOMINAL CEK) =================
 document.getElementById('applyVoucher').onclick = async function() {
   const code = document.getElementById('voucherInput').value.trim().toUpperCase();
   if(!code) return Swal.fire("Isi kode voucher","","warning");
@@ -1503,8 +1502,10 @@ document.getElementById('applyVoucher').onclick = async function() {
   this.disabled = true;
   this.style.opacity = '0.4';
   
+  // UPDATE QRIS & NOMINAL CEK OTOMATIS
   updateDisplay();
   
+  // UPDATE JUGA PAYMENT STATUS KALO SEDANG LOADING
   const statusEl = document.getElementById('paymentStatus');
   if (statusEl.className === 'payment-status loading') {
     statusEl.textContent = `⏳ Mengecek pembayaran Rp ${(finalTotal + uniqueCode + adminFee).toLocaleString('id-ID')}...`;
@@ -1564,6 +1565,7 @@ document.getElementById('confirmBtn').onclick = function() {
     document.getElementById('applyVoucher').style.opacity = '0.4';
   }
   
+  // LOG COMMENT JIKA ADA
   if (comment && comment.trim() !== '') {
     console.log('📝 Comment detected from URL:', comment);
   }
@@ -1614,13 +1616,11 @@ console.log('🕐 WIB real-time aktif');
 console.log('✅ Auto-verifikasi QRIS aktif (cek setiap 10 detik)');
 console.log('🔑 Kode unik PERSISTEN');
 console.log('📨 Notifikasi Discord hanya 1×');
-console.log('📦 Auto-order ke API setelah pembayaran terverifikasi');
-console.log('📝 Comment:', comment || 'Tidak ada');
+console.log('📦 Auto-order ke ordersosmed setelah pembayaran terverifikasi');
+console.log('📝 Comment/Additional:', comment || 'Tidak ada');
 console.log('🆔 Service ID:', serviceId || 'Tidak ada');
 console.log('🔢 Quantity:', quantity);
 console.log('🎯 Target:', target);
-console.log('🔑 API Key:', ORDER_API_KEY ? '✅ Terdeteksi' : '❌ Tidak ada');
-console.log('🔑 Secret Key:', ORDER_SECRET_KEY ? '✅ Terdeteksi' : '❌ Tidak ada');
 </script>
 </body>
 </html>
