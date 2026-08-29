@@ -53,7 +53,7 @@ body {
   overflow-x: hidden;
 }
 
-/* Lightweight ambient glow (no heavy animation) */
+/* Lightweight ambient glow */
 body::before {
   content: '';
   position: fixed;
@@ -397,6 +397,41 @@ textarea {
 }
 
 /* ===============================
+   SORT BUTTONS
+=================================*/
+.sort-group {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 12px 0 4px;
+}
+
+.sort-btn {
+  background: var(--glass);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition);
+  font-family: inherit;
+}
+
+.sort-btn:hover {
+  background: var(--glass-strong);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.sort-btn.active {
+  background: rgba(139, 92, 246, 0.2);
+  color: #c4b5fd;
+  border-color: rgba(139, 92, 246, 0.3);
+}
+
+/* ===============================
    TERMS
 =================================*/
 .terms-container {
@@ -627,10 +662,22 @@ button.primary:disabled {
   <label for="search">Cari Layanan</label>
   <input type="text" id="search" placeholder="Contoh: Instagram / 14444" autocomplete="off">
 
-  <label for="kategori">Kategori</label>
-  <select id="kategori">
-    <option value="">-- Pilih Kategori --</option>
-  </select>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;">
+    <div style="flex:2;min-width:150px;">
+      <label for="kategori">Kategori</label>
+      <select id="kategori">
+        <option value="">-- Pilih Kategori --</option>
+      </select>
+    </div>
+    <div style="flex:1;min-width:120px;">
+      <label for="sortHarga">Urutkan</label>
+      <select id="sortHarga">
+        <option value="default">📋 Default</option>
+        <option value="asc" selected>⬆️ Termurah</option>
+        <option value="desc">⬇️ Termahal</option>
+      </select>
+    </div>
+  </div>
 
   <label for="layanan">Layanan</label>
   <select id="layanan">
@@ -731,6 +778,7 @@ button.primary:disabled {
   let layananData = {};
   let isLoading = false;
   let refreshTimer = null;
+  let currentSort = 'asc'; // default: termurah
 
   termsLink.addEventListener('click', function (e) {
     e.preventDefault();
@@ -798,11 +846,24 @@ button.primary:disabled {
     return service.pricePerFollower;
   }
 
+  // ===== FUNGSI SORTIR =====
+  function getSortedServices(services, sortMode) {
+    if (!services || !Array.isArray(services)) return services;
+    const sorted = [...services];
+    if (sortMode === 'asc') {
+      sorted.sort((a, b) => getActivePrice(a) - getActivePrice(b));
+    } else if (sortMode === 'desc') {
+      sorted.sort((a, b) => getActivePrice(b) - getActivePrice(a));
+    }
+    return sorted;
+  }
+
   function populateKategori(keepValue) {
     const kategori = document.getElementById('kategori');
     const current = keepValue || kategori.value;
     kategori.innerHTML = '<option value="">-- Pilih Kategori --</option>';
-    for (const k in layananData) {
+    const sortedKeys = Object.keys(layananData).sort((a, b) => a.localeCompare(b, 'id'));
+    for (const k of sortedKeys) {
       const opt = document.createElement('option');
       opt.value = k;
       opt.textContent = k;
@@ -811,65 +872,22 @@ button.primary:disabled {
     if (current && layananData[current]) kategori.value = current;
   }
 
-  async function loadData(silent) {
-    if (isLoading) return;
-    isLoading = true;
-    try {
-      const res = await fetch(SERVICES_ENDPOINT + '?ts=' + Date.now());
-      if (!res.ok) throw new Error('Gagal memuat data layanan');
-      const data = await res.json();
-      if (data && data.status === false) {
-        throw new Error(data.msg || 'Provider error');
-      }
-      layananData = data;
-      populateKategori(true);
-
-      if (selectedService) {
-        const kategoriVal = document.getElementById('kategori').value;
-        const layananVal = document.getElementById('layanan').value;
-        if (kategoriVal && layananVal && layananData[kategoriVal]) {
-          const found = layananData[kategoriVal].find(l => String(l.id) === String(layananVal));
-          if (found) {
-            selectedService = found;
-            showInfo();
-            hitungTotal();
-          }
-        }
-      }
-    } catch (err) {
-      if (!silent) {
-        console.error(err);
-        alert('Data layanan gagal dimuat.\n' + (err.message || ''));
-      }
-    } finally {
-      isLoading = false;
-    }
-  }
-
-  // Refresh only when tab is visible, every 45s (bukan 10s) → jauh lebih ringan
-  function startSmartRefresh() {
-    if (refreshTimer) clearInterval(refreshTimer);
-    refreshTimer = setInterval(function () {
-      if (document.visibilityState === 'visible') {
-        loadData(true);
-      }
-    }, 45000);
-  }
-
-  document.addEventListener('visibilitychange', function () {
-    if (document.visibilityState === 'visible') {
-      loadData(true);
-    }
-  });
-
-  // ===== FORM LOGIC =====
+  // ===== LOAD LAYANAN DENGAN SORTIR =====
   function loadLayanan() {
     const kategori = document.getElementById('kategori').value;
     const layanan = document.getElementById('layanan');
+    const sortMode = document.getElementById('sortHarga').value;
+    currentSort = sortMode;
+
     layanan.innerHTML = '<option value="">-- Pilih Layanan --</option>';
+    
     if (kategori && layananData[kategori]) {
+      // Ambil data, lalu sortir
+      let services = layananData[kategori];
+      const sortedServices = getSortedServices(services, sortMode);
+      
       const frag = document.createDocumentFragment();
-      layananData[kategori].forEach(function (l) {
+      sortedServices.forEach(function (l) {
         const opt = document.createElement('option');
         opt.value = l.id;
         const harga = getActivePrice(l);
@@ -881,14 +899,22 @@ button.primary:disabled {
         frag.appendChild(opt);
       });
       layanan.appendChild(frag);
+
+      // Auto-select first service jika ada
+      if (sortedServices.length > 0) {
+        layanan.value = sortedServices[0].id;
+        showInfo();
+      }
+    } else {
+      document.getElementById('infoLayanan').innerHTML = '';
+      document.getElementById('average').textContent = '—';
+      selectedService = null;
+      document.getElementById('commentSection').style.display = 'none';
+      requiresComment = false;
     }
-    document.getElementById('infoLayanan').innerHTML = '';
-    document.getElementById('average').textContent = '—';
-    selectedService = null;
-    document.getElementById('commentSection').style.display = 'none';
-    requiresComment = false;
   }
 
+  // ===== SHOW INFO =====
   function showInfo() {
     const kategori = document.getElementById('kategori').value;
     const layananID = document.getElementById('layanan').value;
@@ -939,6 +965,7 @@ button.primary:disabled {
     hitungTotal();
   }
 
+  // ===== HITUNG TOTAL =====
   function hitungTotal() {
     if (!selectedService) return;
     const jumlah = parseInt(document.getElementById('jumlah').value || '0', 10);
@@ -993,7 +1020,7 @@ button.primary:disabled {
     }
   }
 
-  // Debounce search agar tidak lag saat mengetik
+  // ===== SEARCH =====
   let searchTimer = null;
   function searchLayanan() {
     clearTimeout(searchTimer);
@@ -1016,10 +1043,67 @@ button.primary:disabled {
     }, 280);
   }
 
+  // ===== LOAD DATA =====
+  async function loadData(silent) {
+    if (isLoading) return;
+    isLoading = true;
+    try {
+      const res = await fetch(SERVICES_ENDPOINT + '?ts=' + Date.now());
+      if (!res.ok) throw new Error('Gagal memuat data layanan');
+      const data = await res.json();
+      if (data && data.status === false) {
+        throw new Error(data.msg || 'Provider error');
+      }
+      layananData = data;
+      populateKategori(true);
+
+      // Load layanan dengan sortir default
+      loadLayanan();
+
+      if (selectedService) {
+        const kategoriVal = document.getElementById('kategori').value;
+        const layananVal = document.getElementById('layanan').value;
+        if (kategoriVal && layananVal && layananData[kategoriVal]) {
+          const found = layananData[kategoriVal].find(l => String(l.id) === String(layananVal));
+          if (found) {
+            selectedService = found;
+            showInfo();
+            hitungTotal();
+          }
+        }
+      }
+    } catch (err) {
+      if (!silent) {
+        console.error(err);
+        alert('Data layanan gagal dimuat.\n' + (err.message || ''));
+      }
+    } finally {
+      isLoading = false;
+    }
+  }
+
+  // ===== SMART REFRESH =====
+  function startSmartRefresh() {
+    if (refreshTimer) clearInterval(refreshTimer);
+    refreshTimer = setInterval(function () {
+      if (document.visibilityState === 'visible') {
+        loadData(true);
+      }
+    }, 45000);
+  }
+
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible') {
+      loadData(true);
+    }
+  });
+
+  // ===== GENERATE TRX =====
   function generateTransactionID() {
     return 'TRX' + Date.now() + Math.floor(Math.random() * 1000);
   }
 
+  // ===== LANJUT PEMBAYARAN =====
   function lanjutPembayaran() {
     if (!termsCheckbox.checked) {
       termsError.classList.add('show');
@@ -1079,15 +1163,16 @@ button.primary:disabled {
     window.location.href = url;
   }
 
-  // Event binding
+  // ===== EVENT BINDING =====
   document.getElementById('kategori').addEventListener('change', loadLayanan);
+  document.getElementById('sortHarga').addEventListener('change', loadLayanan);
   document.getElementById('layanan').addEventListener('change', showInfo);
   document.getElementById('jumlah').addEventListener('input', onJumlahChange);
   document.getElementById('comments').addEventListener('input', validateComments);
   document.getElementById('search').addEventListener('input', searchLayanan);
   document.getElementById('btnBayar').addEventListener('click', lanjutPembayaran);
 
-  // Init
+  // ===== INIT =====
   window.addEventListener('load', function () {
     loadData(false);
     startSmartRefresh();
