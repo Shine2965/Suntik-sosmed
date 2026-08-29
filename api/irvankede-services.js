@@ -1,10 +1,10 @@
 // /api/irvankede-services.js
 // Vercel Serverless Function - Proxy ke Irvankede SMM API
-// Mengambil daftar layanan, markup harga 5%, group by category
 // Endpoint: https://irvankedesmm.co.id/api/services (POST)
+// Markup harga 5%, group by category
+// Harga provider = per 1.000 unit
 
 export default async function handler(req, res) {
-  // CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -21,9 +21,11 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Sesuai qris-config.js: IRVANKARDE_API_ID default 81074
     const apiId = parseInt(process.env.IRVANKARDE_API_ID || process.env.IRVANKEDE_API_ID) || 81074;
-    const apiKey = process.env.IRVANKARDE_API_KEY || process.env.IRVANKEDE_API_KEY || '';
+    const apiKey =
+      process.env.IRVANKARDE_API_KEY ||
+      process.env.IRVANKEDE_API_KEY ||
+      '';
 
     if (!apiKey) {
       console.error('IRVANKARDE_API_KEY / IRVANKEDE_API_KEY tidak ditemukan di environment');
@@ -33,12 +35,13 @@ export default async function handler(req, res) {
       });
     }
 
-    // POST ke Irvankede
-    const response = await fetch('https://irvankedesmm.co.id/api/services', {
+    // POST ke Irvankede — coba JSON dulu
+    let response = await fetch('https://irvankedesmm.co.id/api/services', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Accept': 'application/json'
+        Accept: 'application/json',
+        'User-Agent': 'ShineShop-Proxy/1.0'
       },
       body: JSON.stringify({
         api_id: apiId,
@@ -46,83 +49,97 @@ export default async function handler(req, res) {
       })
     });
 
+    // Fallback form-urlencoded jika JSON ditolak / HTML
+    const ct = (response.headers.get('content-type') || '').toLowerCase();
+    if (!response.ok || ct.includes('text/html')) {
+      response = await fetch('https://irvankedesmm.co.id/api/services', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          Accept: 'application/json',
+          'User-Agent': 'ShineShop-Proxy/1.0'
+        },
+        body: new URLSearchParams({
+          api_id: String(apiId),
+          api_key: apiKey
+        }).toString()
+      });
+    }
+
     if (!response.ok) {
       const text = await response.text().catch(() => '');
-      console.error('Irvankede API HTTP error:', response.status, text);
+      console.error('Irvankede API HTTP error:', response.status, text.slice(0, 500));
       return res.status(502).json({
         status: false,
-        msg: `Gagal menghubungi provider (HTTP ${response.status})`
+        msg: 'Gagal menghubungi provider (HTTP ' + response.status + ')'
       });
     }
 
     const data = await response.json();
 
-    // Support beberapa bentuk respon umum panel SMM
-    // 1) { status: true, services: [...] }
-    // 2) { status: true, data: [...] }
-    // 3) langsung array
-    let services = null;
+    // Support beberapa bentuk respon panel Indo:
+    // { status: true, services: [...] }
+    // { status: true, data: [...] }
+    // { success: true, data: [...] }
+    // langsung array
+    let list = [];
     if (Array.isArray(data)) {
-      services = data;
-    } else if (data && Array.isArray(data.services)) {
-      services = data.services;
-    } else if (data && Array.isArray(data.data)) {
-      services = data.data;
-    }
-
-    if (!services) {
-      console.error('Irvankede response invalid:', data);
+      list = data;
+    } else if (Array.isArray(data.services)) {
+      list = data.services;
+    } else if (Array.isArray(data.data)) {
+      list = data.data;
+    } else {
+      console.error('Irvankede response invalid:', JSON.stringify(data).slice(0, 400));
       return res.status(502).json({
         status: false,
-        msg: (data && (data.msg || data.message || data.error)) || 'Respon provider tidak valid'
+        msg: data.msg || data.message || data.error || 'Respon provider tidak valid'
       });
     }
 
-    // Group by category + markup 5% + map ke format frontend
+    if (data.status === false || data.success === false) {
+      return res.status(502).json({
+        status: false,
+        msg: data.msg || data.message || data.error || 'Kredensial tidak valid / provider error'
+      });
+    }
+
     const grouped = {};
     const MARKUP = 1.05; // +5%
 
-    for (const s of services) {
-      const category = (s.category || s.Category || 'Lainnya').toString().trim() || 'Lainnya';
-      if (!grouped[category]) {
-        grouped[category] = [];
-      }
+    for (const s of list) {
+      const category = String(s.category || s.category_name || 'Lainnya').trim() || 'Lainnya';
+      if (!grouped[category]) grouped[category] = [];
 
-      // Deteksi apakah butuh komentar berdasarkan type
-      const type = String(s.type || s.Type || 'default').toLowerCase();
+      const type = String(s.type || s.service_type || 'default').toLowerCase();
+      const name = String(s.name || s.service || s.service_name || ('Service #' + s.id)).trim();
+      const desc = String(s.description || s.desc || s.note || s.notes || '').trim();
+
       const needsComment =
         type.includes('comment') ||
         type === 'custom_comment' ||
         type === 'comment_likes' ||
-        type === 'comment_reply';
+        type === 'comment_reply' ||
+        /komentar|comment/i.test(name);
 
-      // Harga dari Irvankede = per 1.000 unit
-      // Markup 5%, dibulatkan — frontend: total = (jumlah / 1000) * price
-      const rawPrice = Number(s.price ?? s.rate ?? s.Price) || 0;
+      // Harga Irvankede = per 1.000 unit
+      const rawPrice = Number(s.price ?? s.rate ?? s.harga) || 0;
       const markedUpPrice = Math.round(rawPrice * MARKUP);
 
-      const id = s.id ?? s.service ?? s.service_id;
-      const name = s.name || s.service || s.service_name || `Service #${id}`;
-      const min = Number(s.min ?? s.minimum) || 1;
-      const max = Number(s.max ?? s.maximum) || 1000000;
-      const desc = s.description || s.desc || s.note || '';
-
       grouped[category].push({
-        id: id,
-        name: name,
-        // pricePerFollower = harga per 1000 (setelah markup)
+        id: s.id ?? s.service_id,
+        name,
         pricePerFollower: markedUpPrice,
-        min: min,
-        max: max,
-        average: s.average || '-',
-        desc: desc,
+        min: Number(s.min) || 1,
+        max: Number(s.max) || 1000000,
+        average: s.average || s.avg_time || '-',
+        desc,
         comment: needsComment,
         type: s.type || 'default',
         refill: s.refill === 1 || s.refill === true || s.refill === '1'
       });
     }
 
-    // Urutkan kategori & layanan
     const sorted = {};
     Object.keys(grouped)
       .sort((a, b) => a.localeCompare(b, 'id'))
@@ -133,7 +150,6 @@ export default async function handler(req, res) {
       });
 
     res.setHeader('Cache-Control', 's-maxage=30, stale-while-revalidate=60');
-
     return res.status(200).json(sorted);
   } catch (error) {
     console.error('Error irvankede-services:', error);
