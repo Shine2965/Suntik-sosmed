@@ -1,0 +1,62 @@
+<?php
+header('Content-Type: application/json; charset=utf-8');
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Methods: POST, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, Accept');
+
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(204);
+    exit;
+}
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    http_response_code(405);
+    echo json_encode(['success' => false, 'message' => 'Method not allowed']);
+    exit;
+}
+
+$input = json_decode(file_get_contents('php://input'), true);
+if (!$input) $input = $_POST;
+
+$api_key    = $input['api_key']    ?? 'd18db436519ea72a85bc49ff62f82b82';
+$product_id = isset($input['product_id']) ? (int)$input['product_id'] : 0;
+$qty        = isset($input['qty']) ? (int)$input['qty'] : 0;
+$ref_id     = $input['ref_id'] ?? '';
+
+if ($product_id < 1 || $qty < 1 || $ref_id === '') {
+    http_response_code(400);
+    echo json_encode(['success' => false, 'message' => 'product_id, qty, dan ref_id wajib']);
+    exit;
+}
+
+$ch = curl_init('https://premku.com/api/order');
+curl_setopt_array($ch, [
+    CURLOPT_RETURNTRANSFER => true,
+    CURLOPT_POST => true,
+    CURLOPT_HTTPHEADER => [
+        'Content-Type: application/json',
+        'Accept: application/json'
+    ],
+    CURLOPT_POSTFIELDS => json_encode([
+        'api_key'    => $api_key,
+        'product_id' => $product_id,
+        'qty'        => $qty,
+        'ref_id'     => $ref_id
+    ]),
+    CURLOPT_TIMEOUT => 45,
+    CURLOPT_SSL_VERIFYPEER => true,
+]);
+
+$response = curl_exec($ch);
+$httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+$error = curl_error($ch);
+curl_close($ch);
+
+if ($error) {
+    http_response_code(500);
+    echo json_encode(['success' => false, 'message' => 'Proxy error: ' . $error]);
+    exit;
+}
+
+http_response_code($httpCode ?: 200);
+echo $response ?: json_encode(['success' => false, 'message' => 'Empty response']);
