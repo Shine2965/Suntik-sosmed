@@ -1129,16 +1129,28 @@ function loadLayanan(){
     layananData[kategori].forEach(l => {    
       let opt = document.createElement("option");    
       opt.value = l.id;    
+      
+      // ===== FITUR BARU: HITUNG HARGA PER 1K FOLLOWERS =====
+      let hargaPer1k = l.pricePerFollower * 1000;
+      let hargaDisplay = "Rp" + hargaPer1k.toLocaleString('id-ID');
+      
       let label = l.name + " (ID: "+l.id+")";  
-      if(l.diskon && l.diskon < l.pricePerFollower) label += " 🔥 DISKON";  
-      if(l.comment === true) label += " 📝 KOMENTAR";  
+      if(l.diskon && l.diskon < l.pricePerFollower) {
+        label += " 🔥 DISKON";
+      }
+      if(l.comment === true) {
+        label += " 📝 KOMENTAR";
+      }
+      
+      // TAMBAHKAN INFORMASI HARGA PER 1K
+      label += " [1K = " + hargaDisplay + "]";
+      
       opt.textContent = label;  
       layanan.appendChild(opt);    
     });    
   }    
   document.getElementById("infoLayanan").innerHTML = "";    
   selectedService = null;    
-  // Sembunyikan comment section  
   document.getElementById('commentSection').style.display = 'none';  
   requiresComment = false;  
   saveFormState();  
@@ -1159,6 +1171,10 @@ function showInfo(){
   } else {  
     priceDisplay = `Rp${selectedService.pricePerFollower}/unit`;  
   }  
+
+  // TAMPILKAN HARGA PER 1K JUGA
+  let hargaPer1k = selectedService.pricePerFollower * 1000;
+  let hargaPer1kDisplay = `<br>💰 Harga per 1K: Rp${hargaPer1k.toLocaleString('id-ID')}`;
   
   // CEK APAKAH BUTUH KOMENTAR  
   requiresComment = selectedService.comment === true;  
@@ -1181,7 +1197,8 @@ function showInfo(){
   `<b>${selectedService.name}</b><br>    
    ID Produk: ${selectedService.id}<br>    
    Harga: ${priceDisplay}<br>    
-   ${diskonDisplay} <br><br>  
+   ${diskonDisplay}  
+   ${hargaPer1kDisplay}<br><br>  
    Min: ${selectedService.min} | Max: ${selectedService.max}<br>    
    ${selectedService.desc || ''}`;    
   saveFormState();  
@@ -1250,7 +1267,6 @@ function onJumlahChange() {
   hitungTotal();  
   if (requiresComment) {  
     validateComments();  
-    // Update required count  
     const jumlah = parseInt(document.getElementById('jumlah').value || '0');  
     document.getElementById('commentRequired').textContent = jumlah;  
   }  
