@@ -1049,14 +1049,24 @@ function restoreFormState() {
   }  
 }  
 
+// Endpoint proxy (serverless) → Fayupedia API + markup harga 5%
+// API Key TIDAK pernah dikirim ke browser (diambil dari env di server)
+const SERVICES_ENDPOINT = "/api/fayupedia-services";
+
 // Fungsi refresh data (TANPA LAG)  
 async function refreshDataSilent() {  
   if (isLoading) return;  
   isLoading = true;  
   try {  
-    const res = await fetch("/sosmed-2/list.json?ts=" + Date.now());  
+    const res = await fetch(SERVICES_ENDPOINT + "?ts=" + Date.now());  
     if (!res.ok) throw new Error("Gagal memuat");  
     const newData = await res.json();  
+    // Proxy bisa mengembalikan { status: false, msg: "..." }
+    if (newData && newData.status === false) {
+      console.error('Provider error:', newData.msg);
+      isLoading = false;
+      return;
+    }
     saveFormState();  
     layananData = newData;  
     const kategori = document.getElementById("kategori");  
@@ -1090,9 +1100,13 @@ async function refreshDataSilent() {
 
 async function loadData() {  
   try {  
-    const res = await fetch("/sosmed-2/list.json?ts=" + Date.now());  
-    if (!res.ok) throw new Error("Gagal memuat");  
-    layananData = await res.json();  
+    const res = await fetch(SERVICES_ENDPOINT + "?ts=" + Date.now());  
+    if (!res.ok) throw new Error("Gagal memuat data layanan");  
+    const data = await res.json();  
+    if (data && data.status === false) {
+      throw new Error(data.msg || "Provider mengembalikan error");
+    }
+    layananData = data;  
     const kategori = document.getElementById("kategori");  
     kategori.innerHTML = '<option value="">-- Pilih Kategori --</option>';  
     for (const k in layananData) {  
@@ -1101,10 +1115,10 @@ async function loadData() {
       opt.textContent = k;  
       kategori.appendChild(opt);  
     }  
-    console.log('✅ Data dimuat');  
+    console.log('✅ Data layanan dimuat dari Fayupedia (markup +5%)');  
   } catch (err) {  
     console.error(err);  
-    alert("Data layanan gagal dimuat.");  
+    alert("Data layanan gagal dimuat.\n" + (err.message || ""));  
   }  
 }  
 
@@ -1121,6 +1135,24 @@ window.addEventListener('beforeunload', function() {
   saveFormState();  
 });  
 
+// Format angka ke Rupiah (tanpa desimal)
+function formatRp(n) {
+  return 'Rp' + Number(n || 0).toLocaleString('id-ID');
+}
+
+// Harga dari Fayupedia = per 1000 unit → total = (jumlah / 1000) * harga
+function calcTotal(jumlah, hargaPerThousand) {
+  return Math.round((Number(jumlah) / 1000) * Number(hargaPerThousand));
+}
+
+function getActivePrice(service) {
+  if (!service) return 0;
+  if (service.diskon && service.diskon < service.pricePerFollower) {
+    return service.diskon;
+  }
+  return service.pricePerFollower;
+}
+
 function loadLayanan(){    
   const kategori = document.getElementById("kategori").value;    
   const layanan = document.getElementById("layanan");    
@@ -1129,7 +1161,9 @@ function loadLayanan(){
     layananData[kategori].forEach(l => {    
       let opt = document.createElement("option");    
       opt.value = l.id;    
-      let label = l.name + " (ID: "+l.id+")";  
+      const harga = getActivePrice(l);
+      let label = l.name + " — " + formatRp(harga) + "/1rb";
+      if (l.id) label += " (ID: " + l.id + ")";
       if(l.diskon && l.diskon < l.pricePerFollower) label += " 🔥 DISKON";  
       if(l.comment === true) label += " 📝 KOMENTAR";  
       opt.textContent = label;  
@@ -1154,10 +1188,10 @@ function showInfo(){
   let priceDisplay = '';  
   let diskonDisplay = '';  
   if(selectedService.diskon && selectedService.diskon < selectedService.pricePerFollower) {  
-    priceDisplay = `<span class="price-strike">Rp${selectedService.pricePerFollower}</span> <span class="price-discount">Rp${selectedService.diskon}</span> <span class="discount-badge">Diskon</span>`;  
-    diskonDisplay = `<br>Harga Diskon: Rp${selectedService.diskon}/unit (hemat Rp${selectedService.pricePerFollower - selectedService.diskon})`;  
+    priceDisplay = `<span class="price-strike">${formatRp(selectedService.pricePerFollower)}</span> <span class="price-discount">${formatRp(selectedService.diskon)}</span> <span class="discount-badge">Diskon</span> <span class="text-muted">/ 1.000</span>`;  
+    diskonDisplay = `<br>Harga Diskon: ${formatRp(selectedService.diskon)} / 1.000 (hemat ${formatRp(selectedService.pricePerFollower - selectedService.diskon)})`;  
   } else {  
-    priceDisplay = `Rp${selectedService.pricePerFollower}/unit`;  
+    priceDisplay = `${formatRp(selectedService.pricePerFollower)} <span class="text-muted">/ 1.000 unit</span>`;  
   }  
   
   // CEK APAKAH BUTUH KOMENTAR  
@@ -1182,12 +1216,13 @@ function showInfo(){
    ID Produk: ${selectedService.id}<br>    
    Harga: ${priceDisplay}<br>    
    ${diskonDisplay} <br><br>  
-   Min: ${selectedService.min} | Max: ${selectedService.max}<br>    
+   Min: ${selectedService.min.toLocaleString('id-ID')} | Max: ${selectedService.max.toLocaleString('id-ID')}<br>    
    ${selectedService.desc || ''}`;    
+  hitungTotal();
   saveFormState();  
 }    
 
-// ===================== HITUNG TOTAL + VALIDASI KOMENTAR =====================  
+// ===================== HITUNG TOTAL (harga per 1000) =====================  
 function hitungTotal(){    
   if(!selectedService) return;    
   const jumlah = parseInt(document.getElementById("jumlah").value || "0");    
@@ -1195,10 +1230,9 @@ function hitungTotal(){
     document.getElementById("total").value = "Jumlah tidak valid!";    
     return;    
   }  
-  const hargaAktif = (selectedService.diskon && selectedService.diskon < selectedService.pricePerFollower)   
-    ? selectedService.diskon : selectedService.pricePerFollower;  
-  
-  const total = Math.round(jumlah * hargaAktif);  
+  const hargaAktif = getActivePrice(selectedService);  
+  // Fayupedia: harga per 1.000 unit
+  const total = calcTotal(jumlah, hargaAktif);  
   document.getElementById("total").value = total;    
   saveFormState();  
 }  
@@ -1316,10 +1350,9 @@ function lanjutPembayaran(){
   const trxID = generateTransactionID();    
   const kategori = document.getElementById("kategori").value;    
   const target = document.getElementById("target").value;    
-  const hargaAktif = (selectedService.diskon && selectedService.diskon < selectedService.pricePerFollower)   
-    ? selectedService.diskon : selectedService.pricePerFollower;  
-  
-  const total = Math.round(jumlah * hargaAktif);  
+  const hargaAktif = getActivePrice(selectedService);  
+  // Fayupedia: harga per 1.000 unit
+  const total = calcTotal(jumlah, hargaAktif);  
   
   // BUILD URL DENGAN KOMENTAR JIKA ADA  
   let url = `payment/?trx=${trxID}&kategori=${kategori}&layanan=${encodeURIComponent(selectedService.name)}&id=${selectedService.id}&jumlah=${jumlah}&total=${total}&target=${encodeURIComponent(target)}`;  
