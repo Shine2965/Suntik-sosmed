@@ -1,6 +1,6 @@
 // /api/fayupedia-services.js
 // Vercel Serverless Function - Proxy ke Fayupedia API
-// Mengambil daftar layanan, markup harga 30%, group by category
+// Mengambil daftar layanan, markup harga 5%, group by category
 
 export default async function handler(req, res) {
   // CORS
@@ -63,16 +63,16 @@ export default async function handler(req, res) {
       });
     }
 
-    // Group by category + markup 30% + map ke format frontend
+    // Group by category + markup 5% + map ke format frontend
     const grouped = {};
-    const MARKUP = 1.3; // +30%
+    const MARKUP = 1.05; // +5%
 
     for (const s of data.services) {
       const category = (s.category || 'Lainnya').trim() || 'Lainnya';
       if (!grouped[category]) {
         grouped[category] = [];
       }
-
+    
       // Deteksi apakah butuh komentar berdasarkan type
       const type = (s.type || 'default').toLowerCase();
       const needsComment =
@@ -81,13 +81,15 @@ export default async function handler(req, res) {
         type === 'comment_likes' ||
         type === 'comment_reply';
 
-      // Harga asli dari provider, markup 30%, dibulatkan
+      // Harga dari Fayupedia = per 1.000 unit
+      // Markup 5%, dibulatkan — frontend: total = (jumlah / 1000) * price
       const rawPrice = Number(s.price) || 0;
       const markedUpPrice = Math.round(rawPrice * MARKUP);
 
       grouped[category].push({
         id: s.id,
         name: s.name || `Service #${s.id}`,
+        // pricePerFollower = harga per 1000 (setelah markup)
         pricePerFollower: markedUpPrice,
         // Tidak ada diskon dari provider → tidak set field diskon
         min: Number(s.min) || 1,
