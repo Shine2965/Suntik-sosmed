@@ -1,6 +1,5 @@
-// /api/irvankade-services.js
-// Vercel Serverless Function - Proxy ke API Irvankade SMM
-// Mengambil daftar layanan, markup harga 5%, group by category
+// /api/ivankarde-services.js
+// Vercel Serverless Function - Proxy ke Ivankarde API
 
 export default async function handler(req, res) {
   // CORS
@@ -21,7 +20,7 @@ export default async function handler(req, res) {
 
   try {
     const apiId = parseInt(process.env.IRVANKARDE_API_ID) || 81074;
-    const apiKey = process.env.IRVANKARDE_API_KEY || '';
+    const apiKey = process.env.IRVANKARDE_API_KEY || 'f0ugsa-n4ntem-ruhdvz-afehho-4uqw1k';
 
     if (!apiKey) {
       console.error('IRVANKARDE_API_KEY tidak ditemukan di environment');
@@ -31,7 +30,7 @@ export default async function handler(req, res) {
       });
     }
 
-    // POST ke Irvankade SMM
+    // POST ke Ivankarde
     const response = await fetch('https://irvankedesmm.co.id/api/services', {
       method: 'POST',
       headers: {
@@ -46,7 +45,7 @@ export default async function handler(req, res) {
 
     if (!response.ok) {
       const text = await response.text().catch(() => '');
-      console.error('Irvankade API HTTP error:', response.status, text);
+      console.error('Ivankarde API HTTP error:', response.status, text);
       return res.status(502).json({
         status: false,
         msg: `Gagal menghubungi provider (HTTP ${response.status})`
@@ -55,20 +54,21 @@ export default async function handler(req, res) {
 
     const data = await response.json();
 
+    // Cek struktur respon Ivankarde: { status, msg, data: [...] }
     if (!data.status || !Array.isArray(data.data)) {
-      console.error('Irvankade response invalid:', data);
+      console.error('Ivankarde response invalid:', data);
       return res.status(502).json({
         status: false,
         msg: data.msg || 'Respon provider tidak valid'
       });
     }
 
-    // Group by category + markup 5% + map ke format frontend
+    // Group by category + markup 6% + map ke format frontend
     const grouped = {};
-    const MARKUP = 1.06; // +6% (disesuaikan dengan Fayupedia)
+    const MARKUP = 1.06; // +6%
 
     for (const s of data.data) {
-      // Skip jika status 0 (tidak aktif)
+      // Skip service yang status = 0 (nonaktif)
       if (s.status === 0) continue;
 
       const category = (s.category || 'Lainnya').trim() || 'Lainnya';
@@ -76,17 +76,19 @@ export default async function handler(req, res) {
         grouped[category] = [];
       }
 
-      // Deteksi apakah butuh komentar berdasarkan type
+      // Deteksi tipe komentar: type mengandung 'comment' (case insensitive)
       const type = (s.type || 'default').toLowerCase();
       const needsComment =
         type.includes('comment') ||
         type === 'custom_comment' ||
         type === 'comment_likes' ||
         type === 'comment_reply' ||
-        type === 'custom comments';
+        type === 'custom comments' ||
+        type === 'mentions custom list' ||
+        type === 'poll' ||
+        type === 'comment replies';
 
-      // Harga dari Irvankade = per 1.000 unit (sudah dalam format Rupiah)
-      // Markup 6%, dibulatkan
+      // Harga dari Ivankarde = per 1.000 unit
       const rawPrice = Number(s.price) || 0;
       const markedUpPrice = Math.round(rawPrice * MARKUP);
 
@@ -96,16 +98,16 @@ export default async function handler(req, res) {
         pricePerFollower: markedUpPrice,
         min: Number(s.min) || 1,
         max: Number(s.max) || 1000000,
-        average: '-',
+        average: '-', // Ivankarde gak kirim average
         desc: s.note || s.description || '',
         comment: needsComment,
         type: s.type || 'default',
         refill: s.refill === 1 || s.refill === true,
-        status: s.status === 1
+        status: s.status === 1 || s.status === true
       });
     }
 
-    // Urutkan kategori & layanan
+    // Urutkan kategori & layanan biar rapi
     const sorted = {};
     Object.keys(grouped)
       .sort((a, b) => a.localeCompare(b, 'id'))
@@ -120,10 +122,10 @@ export default async function handler(req, res) {
 
     return res.status(200).json(sorted);
   } catch (error) {
-    console.error('Error irvankade-services:', error);
+    console.error('Error ivankarde-services:', error);
     return res.status(500).json({
       status: false,
-      msg: 'Internal server error'
+      msg: 'Internal server error: ' + (error.message || '')
     });
   }
 }
