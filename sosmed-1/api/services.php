@@ -1,188 +1,250 @@
 <?php
-declare(strict_types=1);
 
-/*
-|--------------------------------------------------------------------------
-| Shine Shop - Ordersosmed Service API Proxy
-|--------------------------------------------------------------------------
-| Frontend -> services.php -> ordersosmed.id
-|
-| API KEY dan SECRET KEY HANYA ADA DI SERVER.
-|--------------------------------------------------------------------------
-*/
+header("Content-Type: application/json; charset=UTF-8");
+header("Access-Control-Allow-Origin: *");
+header("Access-Control-Allow-Methods: GET, OPTIONS");
+header("Access-Control-Allow-Headers: Content-Type");
 
-header('Content-Type: application/json; charset=utf-8');
-header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+// ==============================
+// HANDLE OPTIONS / PREFLIGHT
+// ==============================
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(200);
+    exit;
+}
 
-// ===============================
-// KONFIGURASI API
-// ===============================
+// ==============================
+// ONLY GET
+// ==============================
+if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+    http_response_code(405);
 
-$api_id = '11313';
-$api_key = '23941803d5391da4e45a1bf4ebca52064fa17a53574d1c3655a0173dd7530fb1';
-$secret_key = 'Alvino11';
+    echo json_encode([
+        "response" => false,
+        "message" => "Method tidak diizinkan"
+    ]);
 
-$api_url = 'https://ordersosmed.id/api-1/service';
+    exit;
+}
 
-// ===============================
-// REQUEST KE PROVIDER
-// ===============================
+// ==============================
+// API CONFIG
+// ==============================
+// Jangan taruh API KEY langsung di frontend.
+//
+// Ganti value di bawah dengan credential Ordersosmed kamu.
+// Lebih aman jika hosting mendukung environment variable.
+$API_ID = getenv("ORDERSOSMED_API_ID");
+$API_KEY = getenv("ORDERSOSMED_API_KEY");
+$SECRET_KEY = getenv("ORDERSOSMED_SECRET_KEY");
 
-$postData = [
-    'api_id'     => $api_id,
-    'api_key'    => $api_key,
-    'secret_key' => $secret_key
-];
+// Fallback jika environment variable belum tersedia.
+// HAPUS bagian ini jika sudah menggunakan environment variable.
+if (!$API_ID) {
+    $API_ID = "11313";
+}
 
-$ch = curl_init($api_url);
+if (!$API_KEY) {
+    $API_KEY = "ISI_API_KEY_DI_SERVER";
+}
+
+if (!$SECRET_KEY) {
+    $SECRET_KEY = "ISI_SECRET_KEY_DI_SERVER";
+}
+
+// ==============================
+// VALIDASI CONFIG
+// ==============================
+if (
+    empty($API_ID) ||
+    empty($API_KEY) ||
+    empty($SECRET_KEY) ||
+    $API_KEY === "ISI_API_KEY_DI_SERVER" ||
+    $SECRET_KEY === "ISI_SECRET_KEY_DI_SERVER"
+) {
+    http_response_code(500);
+
+    echo json_encode([
+        "response" => false,
+        "message" => "Konfigurasi API belum lengkap di server."
+    ]);
+
+    exit;
+}
+
+// ==============================
+// REQUEST KE ORDERSOSMED
+// ==============================
+$url = "https://ordersosmed.id/api-1/service";
+
+$postData = http_build_query([
+    "api_id" => $API_ID,
+    "api_key" => $API_KEY,
+    "secret_key" => $SECRET_KEY
+]);
+
+$ch = curl_init($url);
 
 curl_setopt_array($ch, [
-    CURLOPT_POST            => true,
-    CURLOPT_POSTFIELDS      => http_build_query($postData),
-    CURLOPT_RETURNTRANSFER  => true,
-    CURLOPT_TIMEOUT         => 20,
-    CURLOPT_CONNECTTIMEOUT  => 10,
-    CURLOPT_SSL_VERIFYPEER  => true,
-    CURLOPT_SSL_VERIFYHOST  => 2,
-    CURLOPT_HTTPHEADER      => [
-        'Content-Type: application/x-www-form-urlencoded',
-        'Accept: application/json'
-    ]
+    CURLOPT_RETURNTRANSFER => true,
+    CURLOPT_POST => true,
+    CURLOPT_POSTFIELDS => $postData,
+
+    CURLOPT_HTTPHEADER => [
+        "Content-Type: application/x-www-form-urlencoded"
+    ],
+
+    CURLOPT_CONNECTTIMEOUT => 10,
+    CURLOPT_TIMEOUT => 30,
+
+    CURLOPT_SSL_VERIFYPEER => true,
+    CURLOPT_SSL_VERIFYHOST => 2
 ]);
 
 $response = curl_exec($ch);
+
 $curlError = curl_error($ch);
 $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
 
 curl_close($ch);
 
-// ===============================
-// ERROR CURL
-// ===============================
+// ==============================
+// CURL ERROR
+// ==============================
+if ($response === false || !empty($curlError)) {
 
-if ($response === false || $curlError) {
     http_response_code(502);
 
     echo json_encode([
-        'response' => false,
-        'error' => 'Gagal terhubung ke server provider.',
-        'detail' => $curlError
-    ], JSON_UNESCAPED_UNICODE);
+        "response" => false,
+        "message" => "Gagal menghubungi Ordersosmed.",
+        "error" => $curlError
+    ]);
 
     exit;
 }
 
-// ===============================
-// PARSE RESPONSE
-// ===============================
+// ==============================
+// PARSE JSON
+// ==============================
+$result = json_decode($response, true);
 
-$data = json_decode($response, true);
+if (!is_array($result)) {
 
-if (!is_array($data)) {
     http_response_code(502);
 
     echo json_encode([
-        'response' => false,
-        'error' => 'Response provider bukan JSON yang valid.'
-    ], JSON_UNESCAPED_UNICODE);
+        "response" => false,
+        "message" => "Response dari Ordersosmed bukan JSON.",
+        "raw" => substr($response, 0, 500)
+    ]);
 
     exit;
 }
 
-// Provider mengembalikan gagal
-if (isset($data['response']) && $data['response'] !== true) {
-    http_response_code(502);
+// ==============================
+// API ORDERSOSMED GAGAL
+// ==============================
+if (
+    !isset($result["response"]) ||
+    $result["response"] !== true
+) {
+
+    http_response_code(400);
 
     echo json_encode([
-        'response' => false,
-        'error' => 'Provider menolak request.',
-        'provider' => $data
-    ], JSON_UNESCAPED_UNICODE);
+        "response" => false,
+        "message" => $result["message"] ?? "Gagal mengambil layanan.",
+        "data" => $result["data"] ?? []
+    ]);
 
     exit;
 }
 
-// ===============================
-// KONVERSI DATA PROVIDER
-// KE FORMAT YANG DIPAKAI FRONTEND
-// ===============================
+// ==============================
+// NORMALISASI DATA
+// ==============================
+$categories = [];
 
-$hasil = [];
+foreach (($result["data"] ?? []) as $service) {
 
-if (!empty($data['data']) && is_array($data['data'])) {
+    $category = $service["category_name"] ?? "Lainnya";
 
-    foreach ($data['data'] as $service) {
-
-        $category = trim((string)($service['category_name'] ?? ''));
-        $serviceId = (string)($service['id'] ?? '');
-
-        if ($category === '' || $serviceId === '') {
-            continue;
-        }
-
-        $name = (string)($service['service_name'] ?? '');
-        $type = strtolower((string)($service['type'] ?? ''));
-
-        $price = (float)($service['price'] ?? 0);
-        $min = (int)($service['min'] ?? 0);
-        $max = (int)($service['max'] ?? 0);
-
-        $description = (string)($service['description'] ?? '');
-
-        /*
-         * custom_comments = layanan komentar
-         */
-        $isComment = ($type === 'custom_comments');
-
-        /*
-         * Jika nanti mau markup harga,
-         * ubah perhitungan di sini.
-         *
-         * Contoh:
-         * $sellingPrice = $price * 1.2;
-         */
-
-        $sellingPrice = $price;
-
-        $item = [
-            'id' => $serviceId,
-
-            'name' => $name,
-
-            'pricePerFollower' => $sellingPrice,
-
-            'min' => $min,
-            'max' => $max,
-
-            'comment' => $isComment,
-
-            'desc' => $description,
-
-            'average' => '-',
-
-            /*
-             * Harga provider disimpan internal
-             * hanya jika nanti diperlukan backend.
-             */
-            'refill' => (bool)($service['refill'] ?? false),
-
-            'type' => $type
-        ];
-
-        if (!isset($hasil[$category])) {
-            $hasil[$category] = [];
-        }
-
-        $hasil[$category][] = $item;
+    if (!isset($categories[$category])) {
+        $categories[$category] = [];
     }
+
+    /*
+     * Ordersosmed:
+     *
+     * price = harga per 1000
+     *
+     * Contoh:
+     *
+     * price = 50000
+     *
+     * 50000 / 1000 = Rp50 per unit
+     */
+
+    $pricePerUnit = ((float)($service["price"] ?? 0)) / 1000;
+
+    $type = $service["type"] ?? "primary";
+
+    $isComment =
+        $type === "custom_comments" ||
+        $type === "custom_comments_package";
+
+    $categories[$category][] = [
+
+        "id" => $service["id"] ?? null,
+
+        "name" =>
+            $service["service_name"]
+            ?? ("Layanan " . ($service["id"] ?? "")),
+
+        "pricePerFollower" => $pricePerUnit,
+
+        "diskon" => null,
+
+        "min" => (int)($service["min"] ?? 1),
+
+        "max" => (int)($service["max"] ?? 0),
+
+        "refill" =>
+            isset($service["refill"])
+            ? filter_var(
+                $service["refill"],
+                FILTER_VALIDATE_BOOLEAN
+            )
+            : false,
+
+        "type" => $type,
+
+        "category_id" =>
+            $service["category_id"] ?? null,
+
+        "category_name" =>
+            $service["category_name"] ?? $category,
+
+        "desc" =>
+            $service["description"] ?? "-",
+
+        "comment" => $isComment,
+
+        "average" => "-"
+    ];
 }
 
-// ===============================
-// RESPONSE
-// ===============================
+// ==============================
+// RESPONSE FRONTEND
+// ==============================
+http_response_code(200);
 
-echo json_encode(
-    $hasil,
-    JSON_UNESCAPED_UNICODE |
-    JSON_UNESCAPED_SLASHES
-);
+echo json_encode([
+    "response" => true,
+    "data" => $categories,
+    "updated_at" => date("c")
+], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+exit;
+?>
