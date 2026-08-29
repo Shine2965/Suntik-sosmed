@@ -435,7 +435,6 @@ p{
 .order-id-box .copy-btn:hover{
   background:rgba(255,170,0,0.4);
 }
-
 /* ===== ACCOUNT DISPLAY ===== */
 .account-box{
   background:rgba(0,255,170,0.05);
@@ -576,26 +575,24 @@ const MERCHANT_CODE = "QP052692";
 const PREMKU_API_KEY = 'd18db436519ea72a85bc49ff62f82b82';
 const PREMKU_ORDER_URL = 'https://premku.com/api/order';
 const PREMKU_STATUS_URL = 'https://premku.com/api/status';
+const PROFIT_PERCENT = 30; // 30% keuntungan
 
-// ===== PROFIT MARGIN 30% =====
-const PROFIT_MARGIN = 1.3;
+// ===== AMBIL PARAMETER DARI URL =====
+const p = new URLSearchParams(location.search);
+const trx = p.get("trx") || "INV-" + Date.now();
+const productId = parseInt(p.get("product_id")) || 1;
+const qty = parseInt(p.get("qty")) || 1;
+const productName = p.get("product") || "App Premium";
+const basePrice = parseInt(p.get("price")) || 0;
 
-// ===== PRODUCT ID (ambil dari URL atau default) =====
-const PRODUCT_ID = parseInt(new URLSearchParams(location.search).get("product_id") || 0) || 2;
+// ===== HITUNG HARGA JUAL (basePrice + 30%) =====
+const sellingPrice = Math.round(basePrice * (1 + PROFIT_PERCENT / 100));
+const totalAmount = sellingPrice * qty;
 
 // ===== API KEY QIOSPAY =====
 let QIOSPAY_API_KEY = '';
 const ADMIN_FEE_PERCENT = 2;
 const ADMIN_FEE_THRESHOLD = 500000;
-
-// ===== AMBIL PARAMETER DARI URL =====
-const p = new URLSearchParams(location.search);
-const trx = p.get("trx") || "-";
-const layanan = p.get("layanan") || "-";
-const total = Number(p.get("total") || 0);
-const target = p.get("target") || "-";
-const serviceId = p.get("id") || null;
-const quantity = parseInt(p.get("jumlah") || 1);
 
 // ===== NOTIFIKASI DISCORD =====
 function getDiscordSentKey() {
@@ -655,8 +652,8 @@ function maskID(id) {
 }
 const maskedTrx = maskID(trx);
 
-let originalTotal = total;
-let finalTotal = total;
+let originalTotal = totalAmount;
+let finalTotal = totalAmount;
 let appliedVoucher = null;
 let appliedDiscount = 0;
 let uniqueCode = 0;
@@ -792,6 +789,26 @@ async function checkAndHandleBan() {
   return false;
 }
 
+// ================= CEK STATUS PREMKU =================
+async function checkPremkuStatus(invoice) {
+  try {
+    const response = await fetch(PREMKU_STATUS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        api_key: PREMKU_API_KEY,
+        invoice: invoice
+      })
+    });
+    const data = await response.json();
+    console.log('📦 Premku Status Response:', data);
+    return data;
+  } catch (err) {
+    console.error('Error check status:', err);
+    return null;
+  }
+}
+
 // ================= SEND ORDER TO PREMKU =================
 async function sendOrderToPremku() {
   if (isOrderAlreadySent()) {
@@ -804,24 +821,6 @@ async function sendOrderToPremku() {
     return false;
   }
   
-  if (!PRODUCT_ID) {
-    console.warn('⚠️ Tidak ada ID produk');
-    const orderStatus = document.getElementById('orderStatus');
-    orderStatus.className = 'order-status failed';
-    orderStatus.textContent = '❌ ID produk tidak ditemukan';
-    orderStatus.style.display = 'block';
-    return false;
-  }
-  
-  if (!quantity || quantity <= 0) {
-    console.warn('⚠️ Quantity tidak valid:', quantity);
-    const orderStatus = document.getElementById('orderStatus');
-    orderStatus.className = 'order-status failed';
-    orderStatus.textContent = '❌ Jumlah pesanan tidak valid.';
-    orderStatus.style.display = 'block';
-    return false;
-  }
-  
   isSendingOrder = true;
   const orderStatus = document.getElementById('orderStatus');
   orderStatus.className = 'order-status loading';
@@ -829,62 +828,166 @@ async function sendOrderToPremku() {
   orderStatus.style.display = 'block';
   
   try {
-    const refId = `INV-${trx}-${Date.now()}`;
-    
     const payload = {
       api_key: PREMKU_API_KEY,
-      product_id: PRODUCT_ID,
-      qty: quantity,
-      ref_id: refId
+      product_id: productId,
+      qty: qty,
+      ref_id: trx
     };
     
     console.log('📦 Sending order to Premku:', payload);
     
     const response = await fetch(PREMKU_ORDER_URL, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
     
     const result = await response.json();
-    console.log('📦 Premku Order Response:', result);
+    console.log('📦 Premku Response:', result);
     
-    if (result.success === true) {
-      const invoice = result.invoice || '-';
-      const msg = result.message || `Pesanan dengan invoice #${invoice} berhasil dibuat.`;
+    if (result.success === true && result.invoice) {
+      const invoice = result.invoice;
+      orderResultData = { invoice, product: result.product, qty: result.qty, total: result.total };
       
-      orderResultData = { invoice, message: msg };
-      
-      orderStatus.className = 'order-status success';
+      orderStatus.className = 'order-status loading';
       orderStatus.innerHTML = `
-        ✅ ${msg}
-        <div class="order-id-box">
-          🆔 Invoice: <strong>${invoice}</strong>
-          <button class="copy-btn" onclick="copyOrderId('${invoice}')">📋 Salin</button>
-        </div>
-        <div style="margin-top:6px;font-size:11px;color:#888;">
-          ⏳ Sedang mengecek status pesanan...
-        </div>
+        ✅ Order diterima! ID: <strong>${invoice}</strong>
+        <div style="margin-top:6px;font-size:11px;color:#888;">⏳ Mengecek status pesanan...</div>
       `;
+      
       markOrderSent();
       isSendingOrder = false;
       
-      await sendOrderNotificationToDiscord(result);
+      // ===== KIRIM NOTIFIKASI DISCORD =====
+      try {
+        const msg = `📦 **ORDER PREMKU BERHASIL**\n🆔 Ref ID: ${trx}\n📋 Produk: ${result.product || productName}\n🔢 Qty: ${result.qty || qty}\n💰 Total: Rp ${(result.total || totalAmount).toLocaleString('id-ID')}\n🆔 Invoice: ${invoice}\n📅 Waktu: ${formatWIB(new Date())}`;
+        await fetch(discordWebhook, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: msg }) });
+      } catch {}
       
-      // ===== CEK STATUS PESANAN OTOMATIS =====
-      await checkPremkuStatus(invoice);
+      // ===== CEK STATUS =====
+      orderStatus.innerHTML = `
+        ⏳ Mengecek status invoice: <strong>${invoice}</strong>
+        <div style="margin-top:6px;font-size:11px;color:#888;">⏳ Mohon tunggu...</div>
+      `;
+      
+      let statusResult = await checkPremkuStatus(invoice);
+      let attempts = 0;
+      const maxAttempts = 10;
+      
+      while (statusResult && statusResult.status !== 'success' && attempts < maxAttempts) {
+        attempts++;
+        orderStatus.innerHTML = `
+          ⏳ Mengecek status (${attempts}/${maxAttempts})...
+          <div style="margin-top:4px;font-size:11px;color:#888;">Status saat ini: ${statusResult.status || 'pending'}</div>
+        `;
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        statusResult = await checkPremkuStatus(invoice);
+      }
+      
+      if (statusResult && statusResult.status === 'success') {
+        orderStatus.className = 'order-status success';
+        let accountsHtml = '';
+        if (statusResult.accounts && statusResult.accounts.length > 0) {
+          accountsHtml = `
+            <div class="account-box">
+              <div style="font-size:13px;font-weight:600;color:#00ffaa;margin-bottom:8px;">📋 Detail Akun</div>
+              ${statusResult.accounts.map((acc, idx) => `
+                <div class="account-item">
+                  <span class="account-label">Akun ${idx+1}</span>
+                  <span>
+                    <span class="account-value">${acc.username || acc.email || '-'}</span>
+                    <span class="account-value password"> | ${acc.password || '-'}</span>
+                    <button class="account-copy" onclick="copyAccount('${acc.username || acc.email || ''}', '${acc.password || ''}')">📋</button>
+                  </span>
+                </div>
+              `).join('')}
+            </div>
+          `;
+        }
+        
+        orderStatus.innerHTML = `
+          ✅ Status: <strong style="color:#22c55e;">SUCCESS</strong>
+          <div style="margin-top:4px;font-size:13px;color:#fff;">📋 Produk: ${statusResult.product || productName}</div>
+          <div style="margin-top:4px;font-size:13px;color:#fff;">🆔 Invoice: ${invoice}</div>
+          ${accountsHtml}
+          <div style="margin-top:8px;font-size:11px;color:#888;">✅ Pesanan selesai! Akun telah dikirim ke WhatsApp Anda.</div>
+        `;
+        
+        await Swal.fire({
+          title: '✅ Pesanan Berhasil!',
+          html: `
+            <div style="text-align:center;">
+              <div style="color:#22c55e;font-size:16px;font-weight:700;">Pesanan Selesai!</div>
+              <div style="color:#888;font-size:13px;margin-top:6px;">Invoice: <strong style="color:#ffaa00;">${invoice}</strong></div>
+              <div style="color:#888;font-size:13px;">Produk: ${statusResult.product || productName}</div>
+              ${statusResult.accounts && statusResult.accounts.length > 0 ? `
+                <div style="margin-top:10px;background:#0d0d0d;padding:12px;border-radius:10px;text-align:left;border:1px solid #00ffaa33;">
+                  ${statusResult.accounts.map((acc, idx) => `
+                    <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #00ffaa15;font-size:13px;">
+                      <span style="color:#94a3b8;">Akun ${idx+1}</span>
+                      <span><span style="color:#00ffaa;">${acc.username || acc.email || '-'}</span> | <span style="color:#ffaa00;">${acc.password || '-'}</span></span>
+                    </div>
+                  `).join('')}
+                </div>
+              ` : '<div style="color:#888;font-size:12px;margin-top:8px;">✅ Akun dikirim ke WhatsApp Anda</div>'}
+            </div>
+          `,
+          icon: 'success',
+          confirmButtonColor: '#22c55e',
+          confirmButtonText: '✅ OK'
+        });
+        
+      } else {
+        orderStatus.className = 'order-status loading';
+        orderStatus.innerHTML = `
+          ⏳ Pesanan dalam antrian...
+          <div style="margin-top:4px;font-size:12px;color:#888;">Invoice: ${invoice}</div>
+          <div style="margin-top:4px;font-size:12px;color:#ffaa00;">⏳ Status: ${statusResult?.status || 'pending'}</div>
+          <div style="margin-top:8px;font-size:11px;color:#888;">⚠️ Pesanan sedang diproses. Akun akan dikirim ke WhatsApp Anda.</div>
+        `;
+      }
       
       return true;
       
     } else {
-      const errorMsg = result.message || 'Gagal membuat pesanan.';
+      const errorMsg = result.message || result.msg || 'Gagal membuat pesanan.';
       orderStatus.className = 'order-status failed';
       orderStatus.textContent = `❌ ${errorMsg}`;
       isSendingOrder = false;
-      await sendOrderErrorToDiscord(errorMsg);
+      
+      // ===== CEK ERROR KHUSUS =====
+      let detailHtml = `<p style="color:#ff6666;">${errorMsg}</p>`;
+      if (errorMsg.includes('Saldo') || errorMsg.includes('balance')) {
+        detailHtml += `<p style="color:#ffaa00;font-size:12px;">💳 Saldo tidak mencukupi. Silakan top up saldo.</p>`;
+      } else if (errorMsg.includes('404') || errorMsg.includes('stok')) {
+        detailHtml += `<p style="color:#ffaa00;font-size:12px;">📦 Stok habis atau produk tidak ditemukan.</p>`;
+      } else if (errorMsg.includes('409') || errorMsg.includes('duplicate')) {
+        detailHtml += `<p style="color:#ffaa00;font-size:12px;">🔄 Pesanan ganda terdeteksi. Tunggu 30 detik.</p>`;
+      }
+      
+      await Swal.fire({
+        title: '❌ Order Gagal',
+        html: `
+          <div style="text-align:left;color:#ddd;">
+            ${detailHtml}
+            <div style="margin-top:12px;padding:10px;background:#ffaa0015;border-radius:10px;border:1px solid #ffaa0033;text-align:center;">
+              <a href="https://wa.me/${WHATSAPP_NUMBER}?text=Halo%20Admin%2C%20saya%20mengalami%20error%20saat%20order%0ARef%20ID:%20${trx}%0AError:%20${encodeURIComponent(errorMsg)}" 
+                 target="_blank" 
+                 style="display:inline-block;background:#ffaa0044;color:#ffaa00;border:1px solid #ffaa0055;padding:10px 24px;border-radius:30px;text-decoration:none;font-weight:600;font-size:13px;">
+                📱 Hubungi CS
+              </a>
+            </div>
+            <div style="font-size:12px;color:#888;text-align:center;margin-top:8px;">
+              📋 Ref ID: <strong style="color:#ffaa00;">${trx}</strong>
+            </div>
+          </div>
+        `,
+        icon: 'error',
+        confirmButtonColor: '#ff4444',
+        confirmButtonText: 'OK'
+      });
+      
       return false;
     }
     
@@ -898,173 +1001,13 @@ async function sendOrderToPremku() {
   }
 }
 
-// ================= CEK STATUS PREMKU =================
-async function checkPremkuStatus(invoice) {
-  try {
-    console.log('📡 Checking Premku status for invoice:', invoice);
-    
-    const payload = {
-      api_key: PREMKU_API_KEY,
-      invoice: invoice
-    };
-    
-    const response = await fetch(PREMKU_STATUS_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
-      body: JSON.stringify(payload)
-    });
-    
-    const result = await response.json();
-    console.log('📦 Premku Status Response:', result);
-    
-    const orderStatus = document.getElementById('orderStatus');
-    
-    if (result.success === true) {
-      const status = result.status || 'pending';
-      const product = result.product || '-';
-      const accounts = result.accounts || [];
-      
-      let statusEmoji = '⏳';
-      let statusColor = '#ffaa00';
-      if (status === 'success') { statusEmoji = '✅'; statusColor = '#22c55e'; }
-      else if (status === 'pending') { statusEmoji = '⏳'; statusColor = '#ffaa00'; }
-      else if (status === 'processing') { statusEmoji = '🔄'; statusColor = '#00ccff'; }
-      else if (status === 'failed') { statusEmoji = '❌'; statusColor = '#ef4444'; }
-      
-      let statusHtml = `
-        <div style="margin-top:8px;padding:12px;background:#0d0d0d;border-radius:10px;border:1px solid ${statusColor}33;">
-          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">
-            <span style="color:#fff;font-weight:600;">${statusEmoji} Status: <span style="color:${statusColor};text-transform:uppercase;">${status}</span></span>
-            <span style="color:#888;font-size:11px;">${product}</span>
-          </div>
-      `;
-      
-      // ===== TAMPILKAN AKUN JIKA ADA =====
-      if (accounts && accounts.length > 0) {
-        statusHtml += `
-          <div class="account-box" style="margin-top:10px;">
-            <div style="font-size:12px;color:#888;margin-bottom:6px;">📱 Akun:</div>
-        `;
-        
-        accounts.forEach((acc, index) => {
-          const username = acc.username || '-';
-          const password = acc.password || '-';
-          statusHtml += `
-            <div class="account-item">
-              <span class="account-label">Akun ${index + 1}</span>
-              <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-                <span class="account-value">${username}</span>
-                <span class="account-value password">${password}</span>
-                <button class="account-copy" onclick="copyAccount('${username}', '${password}')">📋 Salin</button>
-              </div>
-            </div>
-          `;
-        });
-        
-        statusHtml += `</div>`;
-      }
-      
-      statusHtml += `</div>`;
-      
-      orderStatus.className = 'order-status success';
-      orderStatus.innerHTML += statusHtml;
-      
-      // ===== POPUP SUKSES DENGAN AKUN =====
-      let popupHtml = `
-        <div style="text-align:left;color:#ddd;font-size:14px;">
-          <p style="color:#22c55e;">✅ Status: <strong>${status.toUpperCase()}</strong></p>
-          <p style="color:#888;font-size:13px;">Produk: <strong>${product}</strong></p>
-          <div style="background:#0d0d0d;padding:12px;border-radius:10px;margin:10px 0;border:1px solid #ffaa0033;text-align:center;">
-            <span style="color:#888;font-size:12px;">🆔 Invoice</span><br>
-            <span style="color:#ffaa00;font-size:20px;font-weight:700;font-family:monospace;">${invoice}</span>
-          </div>
-      `;
-      
-      if (accounts && accounts.length > 0) {
-        popupHtml += `<div style="background:#00ffaa08;border:1px solid #00ffaa20;border-radius:10px;padding:12px;margin-top:8px;">`;
-        popupHtml += `<div style="font-size:12px;color:#888;margin-bottom:6px;">📱 Detail Akun:</div>`;
-        accounts.forEach((acc, index) => {
-          popupHtml += `
-            <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #ffffff08;">
-              <span style="color:#94a3b8;font-size:12px;">Akun ${index+1}</span>
-              <span style="color:#00ffaa;font-size:13px;font-weight:600;">${acc.username || '-'}</span>
-              <span style="color:#ffaa00;font-size:13px;font-weight:600;">${acc.password || '-'}</span>
-              <button onclick="copyAccount('${acc.username || ''}', '${acc.password || ''}')" style="background:#ffaa0022;color:#ffaa00;border:1px solid #ffaa0044;padding:2px 10px;border-radius:4px;cursor:pointer;font-size:10px;">📋</button>
-            </div>
-          `;
-        });
-        popupHtml += `</div>`;
-      }
-      
-      popupHtml += `
-          <div style="margin-top:10px;font-size:12px;color:#888;text-align:center;">
-            ⚠️ Simpan invoice dan akun untuk referensi.
-          </div>
-        </div>
-      `;
-      
-      await Swal.fire({
-        title: status === 'success' ? '✅ Pesanan Selesai!' : '📊 Status Pesanan',
-        html: popupHtml,
-        icon: status === 'success' ? 'success' : 'info',
-        confirmButtonColor: status === 'success' ? '#22c55e' : '#00ccff',
-        confirmButtonText: '✅ OK, Saya Simpan',
-        width: 500
-      });
-      
-    } else {
-      const errorMsg = result.message || 'Gagal mengecek status pesanan.';
-      orderStatus.className = 'order-status failed';
-      orderStatus.innerHTML += `<div style="margin-top:8px;color:#ef4444;">❌ ${errorMsg}</div>`;
-    }
-    
-  } catch (err) {
-    console.error('❌ Error check premku status:', err);
-    const orderStatus = document.getElementById('orderStatus');
-    orderStatus.className = 'order-status failed';
-    orderStatus.innerHTML += `<div style="margin-top:8px;color:#ef4444;">❌ Error: ${err.message}</div>`;
-  }
-}
-
-// ================= COPY FUNCTIONS =================
-window.copyOrderId = function(orderId) {
-  navigator.clipboard.writeText(String(orderId)).then(() => {
-    Swal.fire({
-      title: '✅ Berhasil Disalin!',
-      text: `ID ${orderId} telah disalin.`,
-      icon: 'success',
-      timer: 1500,
-      showConfirmButton: false,
-      toast: true,
-      position: 'top-end'
-    });
-  }).catch(() => {
-    const ta = document.createElement('textarea');
-    ta.value = orderId;
-    document.body.appendChild(ta);
-    ta.select();
-    document.execCommand('copy');
-    document.body.removeChild(ta);
-    Swal.fire({
-      title: '✅ Berhasil Disalin!',
-      icon: 'success',
-      timer: 1500,
-      showConfirmButton: false,
-      toast: true,
-      position: 'top-end'
-    });
-  });
-};
-
+// ================= COPY ACCOUNT =================
 window.copyAccount = function(username, password) {
-  const text = `Username: ${username}\nPassword: ${password}`;
+  const text = `${username} | ${password}`;
   navigator.clipboard.writeText(text).then(() => {
     Swal.fire({
-      title: '✅ Akun Disalin!',
-      text: 'Username & password telah disalin.',
+      title: '✅ Disalin!',
+      text: 'Akun telah disalin ke clipboard.',
       icon: 'success',
       timer: 1500,
       showConfirmButton: false,
@@ -1079,7 +1022,7 @@ window.copyAccount = function(username, password) {
     document.execCommand('copy');
     document.body.removeChild(ta);
     Swal.fire({
-      title: '✅ Akun Disalin!',
+      title: '✅ Disalin!',
       icon: 'success',
       timer: 1500,
       showConfirmButton: false,
@@ -1089,75 +1032,13 @@ window.copyAccount = function(username, password) {
   });
 };
 
-// ================= SEND ORDER NOTIFICATION TO DISCORD =================
-async function sendOrderNotificationToDiscord(result) {
-  try {
-    const invoice = result.invoice || '-';
-    const msg = result.message || `Pesanan dengan invoice #${invoice} berhasil dibuat.`;
-    
-    const message = `📦 **ORDER PREMKU BERHASIL**
-━━━━━━━━━━━━━━━━━━━━━
-🆔 **ID Transaksi:** ${trx}
-📋 **Produk ID:** ${PRODUCT_ID}
-🔢 **Jumlah:** ${quantity}
-📊 **Status:** ✅ SUCCESS
-🆔 **Invoice:** ${invoice}
-📝 **Pesan:** ${msg}
-📅 **Waktu:** ${formatWIB(new Date())}
-━━━━━━━━━━━━━━━━━━━━━
-✅ **Pesanan berhasil dibuat!**`;
-
-    await fetch(discordWebhook, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content: message })
-    });
-    console.log('✅ Notifikasi order ke Discord terkirim');
-  } catch (err) {
-    console.error('❌ Gagal kirim notifikasi order ke Discord:', err);
-  }
-}
-
-// ================= SEND ORDER ERROR TO DISCORD =================
-async function sendOrderErrorToDiscord(errorMsg) {
-  try {
-    const message = `❌ **ORDER PREMKU GAGAL**
-━━━━━━━━━━━━━━━━━━━━━
-🆔 **ID Transaksi:** ${trx}
-📋 **Produk ID:** ${PRODUCT_ID}
-🔢 **Jumlah:** ${quantity}
-📊 **Status:** ❌ FAILED
-📝 **Error:** ${errorMsg}
-📅 **Waktu:** ${formatWIB(new Date())}
-━━━━━━━━━━━━━━━━━━━━━
-⚠️ **Order gagal dibuat!**`;
-
-    await fetch(discordWebhook, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content: message })
-    });
-    console.log('✅ Notifikasi error order ke Discord terkirim');
-  } catch (err) {
-    console.error('❌ Gagal kirim notifikasi error ke Discord:', err);
-  }
-}
-
-// ================= SEND TO DISCORD (PAYMENT) =================
+// ================= SEND TO DISCORD =================
 async function sendToDiscord(gmail, userID) {
   if (isDiscordAlreadySent() || isSendingDiscord) return false;
   isSendingDiscord = true;
   try {
     const totalDenganUnik = finalTotal + uniqueCode + adminFee;
-    const msg = `💰 **PEMBAYARAN BERHASIL DIVERIFIKASI**
-🆔 ID: ${trx}
-📋 Produk ID: ${PRODUCT_ID}
-🔢 Jumlah: ${quantity}
-💰 Total Bayar: Rp ${totalDenganUnik.toLocaleString('id-ID')}
-🔑 Kode Unik: ${uniqueCode}${adminFee > 0 ? `\n📊 Admin Fee: Rp ${adminFee.toLocaleString('id-ID')}` : ''}
-🎫 Voucher: ${appliedVoucher || "-"}
-📧 Gmail: ${gmail}
-📅 Waktu: ${formatWIB(new Date())}`;
+    const msg = `💰 **PEMBAYARAN BERHASIL DIVERIFIKASI**\n🆔 ID: ${trx}\n📋 Produk: ${productName}\n🔢 Qty: ${qty}\n💰 Harga Jual: Rp ${sellingPrice.toLocaleString('id-ID')}/unit\n💵 Total Bayar: Rp ${totalDenganUnik.toLocaleString('id-ID')}\n🔑 Kode Unik: ${uniqueCode}\n📧 Gmail: ${gmail}\n📅 Waktu: ${formatWIB(new Date())}`;
     await fetch(discordWebhook, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: msg }) });
     markDiscordSent();
     isSendingDiscord = false;
@@ -1165,7 +1046,7 @@ async function sendToDiscord(gmail, userID) {
   } catch { isSendingDiscord = false; return false; }
 }
 
-// ================= CHECK PAYMENT VIA QIOSPAY =================
+// ================= CHECK PAYMENT =================
 async function checkPaymentStatus() {
   const statusEl = document.getElementById('paymentStatus');
   const confirmBtn = document.getElementById('confirmBtn');
@@ -1195,8 +1076,7 @@ async function checkPaymentStatus() {
     if (banned) { statusEl.className = 'payment-status failed'; statusEl.textContent = '🚫 Akun diblokir!'; confirmBtn.disabled = false; confirmBtn.textContent = '✅ Cek Status'; return; }
     
     const totalBayar = finalTotal + uniqueCode + adminFee;
-    const url = QIOSPAY_MUTASI_URL() + '?t=' + Date.now();
-    const res = await fetch(url);
+    const res = await fetch(QIOSPAY_MUTASI_URL() + '?t=' + Date.now());
     if (!res.ok) throw new Error('Gagal mengambil data mutasi');
     const data = await res.json();
     
@@ -1278,11 +1158,21 @@ function updateDisplay(){
   document.getElementById('uniqueCode').textContent = uniqueCode;
   adminFee = calculateAdminFee(originalTotal);
   const totalDenganUnik = finalTotal + uniqueCode + adminFee;
-  currentTotalBayar = totalDenganUnik;
   
-  let html = `<strong>ID Transaksi:</strong> ${trx}<br><strong>Produk ID:</strong> ${PRODUCT_ID}<br><strong>Jumlah:</strong> ${quantity}<br><strong>Total:</strong> <s>Rp ${originalTotal.toLocaleString("id-ID")}</s><br>`;
-  if (appliedVoucher) html += `<strong>🎫 Voucher:</strong> <span class="voucher-text">${appliedVoucher}</span> <span class="discount-text">(Diskon Rp ${appliedDiscount.toLocaleString("id-ID")})</span><br>`;
-  if (adminFee > 0) html += `<strong>📊 Admin Fee 2%:</strong> <span class="admin-fee-text">Rp ${adminFee.toLocaleString("id-ID")}</span><br>`;
+  let html = `
+  <strong>ID Transaksi:</strong> ${trx}<br>
+  <strong>Produk:</strong> ${productName}<br>
+  <strong>Qty:</strong> ${qty}<br>
+  <strong>Harga Asli:</strong> <s>Rp ${basePrice.toLocaleString("id-ID")}</s><br>
+  <strong>💰 Harga Jual (+30%):</strong> Rp ${sellingPrice.toLocaleString("id-ID")}/unit<br>
+  `;
+  
+  if (appliedVoucher) {
+    html += `<strong>🎫 Voucher:</strong> <span class="voucher-text">${appliedVoucher}</span> <span class="discount-text">(Diskon Rp ${appliedDiscount.toLocaleString("id-ID")})</span><br>`;
+  }
+  if (adminFee > 0) {
+    html += `<strong>📊 Biaya Admin 2%:</strong> <span class="admin-fee-text">Rp ${adminFee.toLocaleString("id-ID")}</span><br>`;
+  }
   html += `<strong>Total Bayar:</strong> Rp ${totalDenganUnik.toLocaleString("id-ID")}`;
   document.getElementById('orderDetails').innerHTML = html;
   
@@ -1298,7 +1188,6 @@ function updateDisplay(){
       ctx.drawImage(logo,x,y,size,size);
     };
   });
-  console.log('🔄 QRIS updated:', totalDenganUnik);
 }
 
 // ================= LOAD VOUCHER =================
@@ -1393,10 +1282,13 @@ document.addEventListener("keydown", function(e){
 });
 
 console.log('💳 QRIS Payment - App Premium siap!');
-console.log('📦 Auto-order ke Premku setelah payment terverifikasi');
-console.log('📦 Product ID:', PRODUCT_ID);
-console.log('📦 Quantity:', quantity);
-console.log('💰 Profit margin: 30%');
+console.log('📦 Produk:', productName);
+console.log('🔢 Qty:', qty);
+console.log('💰 Harga Beli:', basePrice);
+console.log('💰 Harga Jual (+30%):', sellingPrice);
+console.log('📌 Profit 30% aktif');
+console.log('🔑 Ref ID:', trx);
+console.log('🆔 Product ID:', productId);
 </script>
 </body>
 </html>
