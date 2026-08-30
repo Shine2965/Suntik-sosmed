@@ -1,1020 +1,713 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PPKA INTERACTIVE MAP - DAOP 8</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: 'Courier New', monospace;
-            background: #f0f0f0;
-            color: #222;
-            min-height: 100vh;
-            padding: 15px;
-        }
-        .container {
-            max-width: 1500px;
-            margin: 0 auto;
-            background: #ffffff;
-            border: 2px solid #222;
-            border-radius: 15px;
-            padding: 20px;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
-        }
-        .header {
-            text-align: center;
-            border-bottom: 2px solid #222;
-            padding-bottom: 10px;
-            margin-bottom: 15px;
-        }
-        .header h1 { font-size: 26px; letter-spacing: 3px; color: #222; }
-        .header .sub { color: #666; font-size: 13px; }
-        .header .gapeka { color: #d4880f; font-size: 12px; margin-top: 5px; letter-spacing: 2px; }
-        .status-bar {
-            display: flex;
-            justify-content: space-between;
-            flex-wrap: wrap;
-            background: #f8f8f8;
-            padding: 10px 15px;
-            border-radius: 8px;
-            margin-bottom: 15px;
-            border: 1px solid #ddd;
-        }
-        .status-item { font-size: 13px; color: #444; }
-        .status-item span { color: #000; font-weight: bold; }
-        .status-item .realtime { color: #007bff; font-weight: bold; }
-        .main-layout {
-            display: flex;
-            gap: 15px;
-            flex-wrap: wrap;
-        }
-        .map-panel {
-            flex: 2;
-            min-width: 500px;
-            background: #ffffff;
-            border-radius: 10px;
-            padding: 15px;
-            border: 1px solid #ddd;
-        }
-        .map-panel .label {
-            color: #666;
-            font-size: 11px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-bottom: 10px;
-            display: block;
-        }
-        .railway-map {
-            position: relative;
-            width: 100%;
-            height: 500px;
-            background: #ffffff;
-            border-radius: 8px;
-            border: 1px solid #ddd;
-            overflow: hidden;
-            cursor: pointer;
-        }
-        .railway-map canvas {
-            width: 100%;
-            height: 100%;
-            display: block;
-            background: #ffffff;
-        }
-        .map-tooltip {
-            position: absolute;
-            background: #222;
-            color: #fff;
-            padding: 8px 12px;
-            border-radius: 6px;
-            font-size: 11px;
-            display: none;
-            z-index: 100;
-            pointer-events: none;
-            font-family: 'Courier New', monospace;
-        }
-        .control-panel {
-            flex: 1;
-            min-width: 320px;
-            background: #fafafa;
-            border-radius: 10px;
-            padding: 15px;
-            border: 1px solid #ddd;
-        }
-        .control-panel .label {
-            color: #666;
-            font-size: 11px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-        .station-info {
-            background: #ffffff;
-            border-radius: 8px;
-            padding: 12px;
-            margin: 10px 0;
-            border-left: 4px solid #222;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-        }
-        .station-info .s-name { font-size: 18px; font-weight: bold; color: #000; }
-        .station-info .s-detail { font-size: 12px; color: #888; }
-        .signal-control {
-            display: flex;
-            gap: 8px;
-            margin: 10px 0;
-            flex-wrap: wrap;
-        }
-        .signal-btn {
-            padding: 6px 12px;
-            border-radius: 20px;
-            border: 2px solid #ddd;
-            background: #fff;
-            cursor: pointer;
-            font-family: 'Courier New', monospace;
-            font-size: 10px;
-            font-weight: bold;
-            transition: all 0.2s;
-            flex: 1;
-            min-width: 55px;
-        }
-        .signal-btn:hover { transform: scale(1.05); }
-        .signal-btn.active-green { border-color: #28a745; background: #28a745; color: #fff; }
-        .signal-btn.active-yellow { border-color: #ffaa00; background: #ffaa00; color: #000; }
-        .signal-btn.active-red { border-color: #dc3545; background: #dc3545; color: #fff; }
-        .signal-btn.active-blue { border-color: #17a2b8; background: #17a2b8; color: #fff; }
-        .wesel-control {
-            margin: 10px 0;
-            padding: 10px;
-            background: #f8f8f8;
-            border-radius: 8px;
-            border: 1px solid #ddd;
-        }
-        .wesel-control .wesel-label {
-            font-size: 11px;
-            color: #666;
-            margin-bottom: 5px;
-            display: block;
-        }
-        .wesel-btn {
-            padding: 4px 12px;
-            border-radius: 15px;
-            border: 2px solid #ddd;
-            background: #fff;
-            cursor: pointer;
-            font-family: 'Courier New', monospace;
-            font-size: 10px;
-            font-weight: bold;
-            transition: all 0.2s;
-            margin: 2px;
-        }
-        .wesel-btn:hover { transform: scale(1.05); }
-        .wesel-btn.active { border-color: #222; background: #222; color: #fff; }
-        .train-list {
-            max-height: 150px;
-            overflow-y: auto;
-            margin: 10px 0;
-        }
-        .train-item {
-            display: flex;
-            justify-content: space-between;
-            padding: 4px 8px;
-            border-bottom: 1px solid #eee;
-            font-size: 11px;
-            align-items: center;
-            background: #fff;
-            border-radius: 5px;
-            margin-bottom: 2px;
-        }
-        .train-item .badge {
-            padding: 2px 8px;
-            border-radius: 12px;
-            font-size: 8px;
-            font-weight: bold;
-        }
-        .badge-arrive { background: #ffaa00; color: #000; }
-        .badge-depart { background: #dc3545; color: #fff; }
-        .badge-standby { background: #28a745; color: #fff; }
-        .badge-commuter { background: #17a2b8; color: #fff; }
-        .train-item .schedule-info { font-size: 9px; color: #888; text-align: right; }
-        .btn-group {
-            display: flex;
-            gap: 6px;
-            flex-wrap: wrap;
-            margin-top: 8px;
-        }
-        .btn {
-            background: #f8f8f8;
-            color: #222;
-            border: 2px solid #222;
-            padding: 6px 12px;
-            border-radius: 20px;
-            font-family: 'Courier New', monospace;
-            font-size: 10px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: all 0.2s;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            flex: 1;
-            min-width: 70px;
-        }
-        .btn:hover { background: #222; color: #fff; }
-        .btn-success { border-color: #28a745; color: #28a745; }
-        .btn-success:hover { background: #28a745; color: #fff; }
-        .btn-danger { border-color: #dc3545; color: #dc3545; }
-        .btn-danger:hover { background: #dc3545; color: #fff; }
-        .btn-warning { border-color: #ffaa00; color: #d4880f; }
-        .btn-warning:hover { background: #ffaa00; color: #000; }
-        .btn-info { border-color: #007bff; color: #007bff; }
-        .btn-info:hover { background: #007bff; color: #fff; }
-        .btn-commuter { border-color: #17a2b8; color: #17a2b8; }
-        .btn-commuter:hover { background: #17a2b8; color: #fff; }
-        .log-area {
-            margin-top: 8px;
-            background: #ffffff;
-            border-radius: 8px;
-            padding: 8px;
-            border: 1px solid #ddd;
-            max-height: 70px;
-            overflow-y: auto;
-            font-size: 10px;
-        }
-        .log-entry { padding: 2px 0; border-bottom: 1px solid #f0f0f0; }
-        .log-time { color: #999; margin-right: 6px; }
-        .log-commuter { color: #17a2b8; }
-        .log-ka { color: #6c757d; }
-        .log-warning { color: #d4880f; }
-        .log-danger { color: #dc3545; }
-        .log-success { color: #28a745; }
-        ::-webkit-scrollbar { width: 4px; background: #f0f0f0; }
-        ::-webkit-scrollbar-thumb { background: #888; border-radius: 10px; }
-        @media (max-width: 700px) {
-            .main-layout { flex-direction: column; }
-            .map-panel { min-width: unset; }
-            .railway-map { height: 350px; }
-        }
-        .estimation-box {
-            background: #f0f8ff;
-            border-radius: 6px;
-            padding: 6px 10px;
-            margin: 5px 0;
-            font-size: 10px;
-            border-left: 3px solid #007bff;
-        }
-        .estimation-box .est-title { font-weight: bold; color: #007bff; font-size: 10px; }
-        .station-label-map {
-            position: absolute;
-            color: #222;
-            font-size: 8px;
-            font-weight: bold;
-            pointer-events: none;
-            text-shadow: 0 0 4px #fff;
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Simulasi PPKA DAOP 8 | Realistik</title>
+<style>
+  :root {
+    --bg:#0b0e14; --panel:#131820; --panel2:#1a2230; --border:#2a3444;
+    --green:#3dd68c; --red:#ff5c5c; --yellow:#f0b429; --blue:#4dabf7;
+    --text:#e6edf3; --muted:#8b9bb4;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+
+  #screen-select{min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:28px 14px 50px}
+  .logo-area{text-align:center;margin-bottom:24px}
+  .logo-area h1{font-size:1.7rem;background:linear-gradient(90deg,var(--blue),var(--green));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+  .logo-area p{color:var(--muted);font-size:.92rem;margin-top:6px}
+  .station-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;max-width:980px;width:100%}
+  .station-card{background:var(--panel);border:1px solid var(--border);border-radius:11px;padding:15px;cursor:pointer;transition:.2s;position:relative}
+  .station-card:hover{border-color:var(--blue);transform:translateY(-3px);box-shadow:0 8px 20px rgba(31,111,235,.18)}
+  .station-card .code{font-size:1.45rem;font-weight:700;color:var(--blue)}
+  .station-card .name{font-size:.98rem;margin:3px 0}
+  .station-card .desc{font-size:.74rem;color:var(--muted);line-height:1.35}
+  .badge-type{position:absolute;top:9px;right:9px;font-size:.6rem;padding:2px 7px;border-radius:10px;background:var(--panel2);border:1px solid var(--border)}
+  .badge-type.besar{color:var(--green);border-color:var(--green)}
+  .badge-type.sedang{color:var(--yellow);border-color:var(--yellow)}
+
+  #screen-panel{display:none}
+  .topbar{display:flex;justify-content:space-between;align-items:center;background:var(--panel);border-bottom:1px solid var(--border);padding:9px 14px;flex-wrap:wrap;gap:8px}
+  .topbar-left h2{font-size:1.08rem;color:var(--blue)}
+  .topbar-left span{font-size:.76rem;color:var(--muted)}
+  .topbar-right{display:flex;align-items:center;gap:11px}
+  .clock{font-family:Consolas,monospace;font-size:1.25rem;color:var(--green);letter-spacing:1px}
+  .btn-back{background:transparent;border:1px solid var(--border);color:var(--muted);padding:5px 11px;border-radius:6px;cursor:pointer;font-size:.78rem}
+  .btn-back:hover{border-color:var(--blue);color:var(--blue)}
+
+  .workspace{display:grid;grid-template-columns:1fr 330px;height:calc(100vh - 52px)}
+  @media(max-width:960px){.workspace{grid-template-columns:1fr;height:auto}}
+  .left-col{padding:11px;overflow-y:auto}
+  .right-col{background:var(--panel);border-left:1px solid var(--border);padding:11px;overflow-y:auto;display:flex;flex-direction:column;gap:11px}
+
+  .panel-box{background:var(--panel2);border:1px solid var(--border);border-radius:9px;padding:11px}
+  .panel-title{font-size:.68rem;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:9px;display:flex;justify-content:space-between;align-items:center}
+
+  .track-canvas{position:relative;height:360px;background:#080b10;border-radius:8px;border:1px solid var(--border);overflow:hidden;margin-bottom:11px}
+  .track-line{position:absolute;height:5px;background:#3a4555;border-radius:3px;z-index:1}
+  .route-highlight{position:absolute;height:9px;border:3px solid var(--green);border-radius:5px;box-shadow:0 0 11px rgba(61,214,140,.5);z-index:2;pointer-events:none;opacity:0;transition:opacity .25s}
+  .route-highlight.show{opacity:1}
+
+  .signal-dot{position:absolute;width:15px;height:15px;border-radius:50%;border:2px solid #111;box-shadow:0 0 7px currentColor;z-index:5;cursor:pointer;transition:transform .12s}
+  .signal-dot:hover{transform:scale(1.25)}
+  .signal-dot.red{background:var(--red);color:var(--red)}
+  .signal-dot.green{background:var(--green);color:var(--green)}
+  .signal-dot.yellow{background:var(--yellow);color:var(--yellow)}
+
+  .wesel-btn{position:absolute;width:22px;height:22px;background:#1e2836;border:2px solid var(--blue);border-radius:4px;font-size:8px;font-weight:700;color:var(--blue);display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:6}
+  .wesel-btn.belok{background:var(--blue);color:#000}
+
+  .st-label{position:absolute;font-size:.66rem;color:var(--muted);background:rgba(0,0,0,.55);padding:2px 6px;border-radius:3px;z-index:3}
+
+  .train-box{position:absolute;height:21px;min-width:100px;padding:0 7px;background:linear-gradient(90deg,#1a56db,#3b82f6);border-radius:4px;font-size:.63rem;font-weight:600;color:#fff;display:flex;align-items:center;justify-content:center;white-space:nowrap;z-index:7;transition:left 1.25s cubic-bezier(.25,.8,.25,1);box-shadow:0 0 11px rgba(59,130,246,.4);cursor:pointer}
+  .train-box.stopped{background:linear-gradient(90deg,#b91c1c,#ef4444)}
+  .train-box.departing{background:linear-gradient(90deg,#047857,#10b981)}
+  .train-box.selected{outline:2px solid var(--yellow)}
+
+  .btn-row{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:9px}
+  button.act{background:#1e2836;border:1px solid var(--border);color:var(--text);padding:7px 11px;border-radius:6px;cursor:pointer;font-size:.78rem;transition:.15s}
+  button.act:hover{border-color:var(--blue);background:#243044}
+  button.act.primary{background:#0d5c2e;border-color:#16a34a}
+  button.act.primary:hover{background:#15803d}
+  button.act.danger{background:#7f1d1d;border-color:#dc2626}
+  button.act.danger:hover{background:#991b1b}
+  button.act.warn{background:#713f12;border-color:#d97706}
+  button.act:disabled{opacity:.35;cursor:not-allowed}
+
+  .status-row{display:flex;flex-wrap:wrap;gap:7px;margin-top:7px}
+  .pill{font-size:.7rem;padding:3px 9px;border-radius:18px;background:#1e2836;border:1px solid var(--border)}
+  .pill.ok{border-color:var(--green);color:var(--green)}
+  .pill.bad{border-color:var(--red);color:var(--red)}
+  .pill.warn{border-color:var(--yellow);color:var(--yellow)}
+
+  .ka-table{width:100%;font-size:.76rem;border-collapse:collapse}
+  .ka-table th{text-align:left;color:var(--muted);font-weight:500;padding:3px 5px;border-bottom:1px solid var(--border)}
+  .ka-table td{padding:5px;border-bottom:1px solid #1e2836}
+  .tag{font-size:.62rem;padding:1px 5px;border-radius:4px;background:#1e2836}
+  .tag.in{color:var(--blue)}.tag.out{color:var(--green)}.tag.stop{color:var(--yellow)}
+
+  .log-box{flex:1;min-height:150px;max-height:220px;overflow-y:auto;background:#080b10;border-radius:6px;padding:7px;font-family:Consolas,monospace;font-size:.7rem}
+  .log-line{margin-bottom:2px;line-height:1.3}
+  .log-line .t{color:var(--muted)}
+  .log-line .ok{color:var(--green)}.log-line .warn{color:var(--yellow)}.log-line .err{color:var(--red)}.log-line .info{color:var(--blue)}
+
+  .sched-item{font-size:.74rem;padding:4px 0;border-bottom:1px solid #1e2836;display:flex;justify-content:space-between;gap:6px}
+  .sched-item:last-child{border-bottom:none}
+  .sched-time{color:var(--blue);font-family:Consolas,monospace;min-width:42px}
+  .neighbor{display:flex;justify-content:space-between;font-size:.76rem;padding:4px 0;border-bottom:1px solid #1e2836}
+  .neighbor:last-child{border-bottom:none}
+  .n-status.aman{color:var(--green)}.n-status.sibuk{color:var(--yellow)}.n-status.blok{color:var(--red)}
+</style>
 </head>
 <body>
-<div class="container">
-    <div class="header">
-        <h1>🚂 PPKA INTERACTIVE MAP</h1>
-        <div class="sub">DAOP 8 - WIB (GMT+7) • KLIK STASIUN DI MAP</div>
-        <div class="gapeka">📅 GAPEKA 2026 • KONTROL SINYAL & WESEL VIA MAP</div>
-    </div>
 
-    <div class="status-bar">
-        <div class="status-item">⏰ WAKTU WIB: <span class="realtime" id="realTime">--:--:--</span></div>
-        <div class="status-item">🚆 KA: <span id="totalTrains">0</span></div>
-        <div class="status-item">🚃 COMMUTER: <span id="totalCommuter">0</span></div>
-        <div class="status-item">📍 PPKA: <span id="activeStation">-</span></div>
-    </div>
+<div id="screen-select">
+  <div class="logo-area">
+    <h1>SIMULASI PPKA DAOP 8</h1>
+    <p>Jalur & jadwal mendekati nyata • Sinyal bisa ditekan manual • Auto merah saat KA berhenti</p>
+  </div>
+  <div class="station-grid" id="stationGrid"></div>
+</div>
 
-    <div class="main-layout">
-        <div class="map-panel">
-            <span class="label">🗺️ KLIK STASIUN DI MAP UNTUK KONTROL</span>
-            <div class="railway-map" id="railwayMap">
-                <canvas id="mapCanvas"></canvas>
-                <div class="map-tooltip" id="tooltip"></div>
-            </div>
+<div id="screen-panel">
+  <div class="topbar">
+    <div class="topbar-left">
+      <h2 id="stName">—</h2>
+      <span id="stCode">—</span>
+    </div>
+    <div class="topbar-right">
+      <div class="clock" id="clock">00:00:00</div>
+      <button class="btn-back" onclick="backToSelect()">← Ganti Stasiun</button>
+    </div>
+  </div>
+
+  <div class="workspace">
+    <div class="left-col">
+      <div class="panel-box">
+        <div class="panel-title">
+          <span>Emplasemen (klik sinyal untuk ubah warna)</span>
+          <span id="layoutName" style="color:var(--blue)"></span>
         </div>
+        <div class="track-canvas" id="trackCanvas"></div>
 
-        <div class="control-panel">
-            <span class="label">🎛️ KONTROL PPKA</span>
-            <div id="stationControl">
-                <div class="station-info">
-                    <div class="s-name" id="stName">Pilih Stasiun</div>
-                    <div class="s-detail" id="stDetail">Klik stasiun di map untuk kontrol</div>
-                </div>
-                
-                <div class="signal-control" id="signalControl">
-                    <span style="font-size:10px;color:#666;width:100%;">🚦 SINYAL:</span>
-                    <button class="signal-btn" data-signal="green" onclick="setSignal('green')">🟢</button>
-                    <button class="signal-btn" data-signal="yellow" onclick="setSignal('yellow')">🟡</button>
-                    <button class="signal-btn" data-signal="red" onclick="setSignal('red')">🔴</button>
-                    <button class="signal-btn" data-signal="blue" onclick="setSignal('blue')">🔵</button>
-                </div>
-
-                <div class="wesel-control">
-                    <span class="wesel-label">🛤️ WESEL:</span>
-                    <button class="wesel-btn" data-wesel="lurus" onclick="setWesel('lurus')">⬆️</button>
-                    <button class="wesel-btn" data-wesel="belok" onclick="setWesel('belok')">↗️</button>
-                    <button class="wesel-btn" data-wesel="ganda" onclick="setWesel('ganda')">↕️</button>
-                    <span id="weselStatus" style="font-size:10px;color:#888;margin-left:8px;">LURUS</span>
-                </div>
-
-                <div class="estimation-box" id="estimationBox">
-                    <div class="est-title">📋 JADWAL & ESTIMASI</div>
-                    <div id="estimationContent" style="font-size:10px;">Pilih stasiun</div>
-                </div>
-
-                <div class="train-list" id="trainList"></div>
-                
-                <div class="btn-group">
-                    <button class="btn btn-success" onclick="aturKeberangkatan()">🚆 BERANGKAT</button>
-                    <button class="btn btn-warning" onclick="ubahStatusAll()">🔄 STATUS</button>
-                    <button class="btn btn-danger" onclick="hapusKeretaAll()">🗑️</button>
-                </div>
-                <div class="btn-group">
-                    <button class="btn btn-info" onclick="spawnManual()">➕ SPAWN</button>
-                    <button class="btn btn-commuter" onclick="toggleAutoSpawn()">⏸️ AUTO</button>
-                    <button class="btn btn-danger" onclick="resetSimulasi()">💥</button>
-                </div>
-            </div>
-            <div class="log-area" id="logArea">
-                <div class="log-entry"><span class="log-time">[--:--:--]</span> Klik stasiun di map untuk mulai</div>
-            </div>
+        <div class="btn-row" id="routeButtons"></div>
+        <div class="btn-row">
+          <button class="act primary" onclick="spawnIncoming()">Datangkan KA (Manual)</button>
+          <button class="act" onclick="spawnFromSchedule()">Datangkan sesuai Jadwal</button>
+          <button class="act warn" onclick="giveWarta('aman')">Warta Aman</button>
+          <button class="act" onclick="giveWarta('lepas')">Warta Lepas</button>
+          <button class="act danger" onclick="emergencyStop()">STOP DARURAT</button>
+          <button class="act" onclick="resetPanel()">Reset</button>
         </div>
+        <div class="status-row">
+          <span class="pill ok" id="pillInterlock">Interlocking: AKTIF</span>
+          <span class="pill ok" id="pillBlok">Blok: NORMAL</span>
+          <span class="pill" id="pillRoute">Rute: -</span>
+          <span class="pill" id="pillKaCount">KA: 0</span>
+        </div>
+      </div>
     </div>
+
+    <div class="right-col">
+      <div class="panel-box">
+        <div class="panel-title">Kereta di Emplasemen</div>
+        <div style="max-height:130px;overflow-y:auto">
+          <table class="ka-table">
+            <thead><tr><th>KA</th><th>Jalur</th><th>Status</th></tr></thead>
+            <tbody id="kaBody"><tr><td colspan="3" style="color:var(--muted);text-align:center">Belum ada KA</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="panel-box">
+        <div class="panel-title">Jadwal Pendekatan (Gapeka-like)</div>
+        <div id="schedList" style="max-height:130px;overflow-y:auto"></div>
+      </div>
+
+      <div class="panel-box">
+        <div class="panel-title">Stasiun Tetangga</div>
+        <div id="neighborList"></div>
+      </div>
+
+      <div class="panel-box" style="flex:1;display:flex;flex-direction:column">
+        <div class="panel-title">Log PPKA</div>
+        <div class="log-box" id="logBox"></div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script>
-    // ========== STASIUN ==========
-    const stasiunData = [
-        { id: 0, name: 'Gresik', daop: 'DAOP 8', x: 0.05, y: 0.10, type: 'kecil' },
-        { id: 1, name: 'Bojonegoro', daop: 'DAOP 8', x: 0.12, y: 0.15, type: 'sedang' },
-        { id: 2, name: 'Babat', daop: 'DAOP 8', x: 0.18, y: 0.22, type: 'kecil' },
-        { id: 3, name: 'Lamongan', daop: 'DAOP 8', x: 0.25, y: 0.28, type: 'sedang' },
-        { id: 4, name: 'Pasar Turi', daop: 'DAOP 8', x: 0.35, y: 0.18, type: 'utama' },
-        { id: 5, name: 'Gubeng', daop: 'DAOP 8', x: 0.42, y: 0.25, type: 'utama' },
-        { id: 6, name: 'Kota', daop: 'DAOP 8', x: 0.38, y: 0.35, type: 'utama' },
-        { id: 7, name: 'Wonokromo', daop: 'DAOP 8', x: 0.48, y: 0.42, type: 'besar' },
-        { id: 8, name: 'Waru', daop: 'DAOP 8', x: 0.55, y: 0.50, type: 'sedang' },
-        { id: 9, name: 'Gedangan', daop: 'DAOP 8', x: 0.62, y: 0.56, type: 'sedang' },
-        { id: 10, name: 'Sidoarjo', daop: 'DAOP 8', x: 0.70, y: 0.62, type: 'besar' },
-        { id: 11, name: 'Porong', daop: 'DAOP 8', x: 0.78, y: 0.68, type: 'sedang' },
-        { id: 12, name: 'Bangil', daop: 'DAOP 8', x: 0.85, y: 0.74, type: 'besar' },
-        { id: 13, name: 'Pasuruan', daop: 'DAOP 8', x: 0.90, y: 0.80, type: 'sedang' },
-        { id: 14, name: 'Probolinggo', daop: 'DAOP 8', x: 0.95, y: 0.86, type: 'sedang' },
-        { id: 15, name: 'Lawang', daop: 'DAOP 8', x: 0.84, y: 0.90, type: 'sedang' },
-        { id: 16, name: 'Malang Kotalama', daop: 'DAOP 8', x: 0.88, y: 0.95, type: 'besar' },
-        { id: 17, name: 'Malang', daop: 'DAOP 8', x: 0.93, y: 0.98, type: 'utama' }
-    ];
+/* ========== DATA STASIUN (jumlah jalur mendekati nyata) ========== */
+const STATIONS = {
+  SGU: {
+    code:"SGU", name:"Surabaya Gubeng", type:"Besar A",
+    desc:"6 jalur. Arah selatan (Wonokromo/Malang) & utara (Kota/Pasarturi).",
+    tracks:6,
+    leftDir:"← Utara (Kota / Pasarturi / Sidotopo)",
+    rightDir:"Selatan (Wonokromo / Sidoarjo / Malang) →",
+    neighbors:[
+      {code:"WO",name:"Wonokromo",status:"aman"},
+      {code:"SB",name:"Surabaya Kota",status:"sibuk"},
+      {code:"SDA",name:"Sidoarjo",status:"aman"}
+    ],
+    schedule:[
+      {time:"04:23", name:"Jayabaya", dir:"Malang", type:"in"},
+      {time:"06:30", name:"Gaya Baru Malam Selatan", dir:"Jakarta", type:"out"},
+      {time:"08:39", name:"Jayabaya", dir:"Malang", type:"out"},
+      {time:"09:35", name:"Arjuno Ekspres", dir:"Malang", type:"out"},
+      {time:"10:47", name:"Sancaka", dir:"Yogyakarta", type:"in"},
+      {time:"15:43", name:"Jayabaya", dir:"Pasarsenen", type:"out"},
+      {time:"18:10", name:"Mutiara Selatan", dir:"Bandung", type:"out"},
+      {time:"19:24", name:"Pandalungan", dir:"Gambir", type:"out"}
+    ]
+  },
+  SBI: {
+    code:"SBI", name:"Surabaya Pasarturi", type:"Besar A",
+    desc:"8 jalur (disederhanakan 5). Lintas utara Jawa.",
+    tracks:5,
+    leftDir:"← Utara (Lamongan / Bojonegoro / Semarang)",
+    rightDir:"Selatan (Kota / Gubeng) →",
+    neighbors:[
+      {code:"LMG",name:"Lamongan",status:"aman"},
+      {code:"SB",name:"Surabaya Kota",status:"aman"},
+      {code:"TES",name:"Tandes",status:"sibuk"}
+    ],
+    schedule:[
+      {time:"04:04", name:"Jayabaya", dir:"Malang", type:"out"},
+      {time:"05:15", name:"Sembrani", dir:"Gambir", type:"out"},
+      {time:"07:40", name:"Argo Bromo Anggrek", dir:"Gambir", type:"out"},
+      {time:"08:18", name:"Jayabaya", dir:"Malang", type:"out"},
+      {time:"14:20", name:"Gumarang", dir:"Pasarsenen", type:"in"},
+      {time:"16:05", name:"Airlangga", dir:"Pasarsenen", type:"out"},
+      {time:"20:10", name:"Harina", dir:"Bandung", type:"out"}
+    ]
+  },
+  SB: {
+    code:"SB", name:"Surabaya Kota (Semut)", type:"Besar B",
+    desc:"Emplasemen barat 4 jalur + simpan. Hub lokal.",
+    tracks:4,
+    leftDir:"← Sidotopo / Pasarturi",
+    rightDir:"Gubeng / Wonokromo →",
+    neighbors:[
+      {code:"SGU",name:"Gubeng",status:"sibuk"},
+      {code:"SBI",name:"Pasarturi",status:"aman"},
+      {code:"SDT",name:"Sidotopo",status:"aman"}
+    ],
+    schedule:[
+      {time:"05:50", name:"CL Dhoho", dir:"Malang", type:"out"},
+      {time:"06:20", name:"CL Penataran", dir:"Blitar", type:"out"},
+      {time:"07:15", name:"CL Jenggala", dir:"Sidoarjo", type:"out"},
+      {time:"12:30", name:"CL Supas", dir:"Pasuruan", type:"out"},
+      {time:"17:00", name:"CL Dhoho", dir:"Kertosono", type:"in"}
+    ]
+  },
+  WO: {
+    code:"WO", name:"Wonokromo", type:"Besar C",
+    desc:"5 jalur. Persimpangan penting lintas selatan & timur.",
+    tracks:5,
+    leftDir:"← Gubeng / Kota",
+    rightDir:"Sidoarjo / Mojokerto / Malang →",
+    neighbors:[
+      {code:"SGU",name:"Gubeng",status:"aman"},
+      {code:"SDA",name:"Sidoarjo",status:"aman"},
+      {code:"MR",name:"Mojokerto",status:"sibuk"}
+    ],
+    schedule:[
+      {time:"05:10", name:"CL Penataran", dir:"Malang", type:"in"},
+      {time:"06:45", name:"Pasundan", dir:"Bandung", type:"in"},
+      {time:"09:20", name:"Sri Tanjung", dir:"Ketapang", type:"out"},
+      {time:"11:05", name:"Logawa", dir:"Purwokerto", type:"in"},
+      {time:"16:40", name:"Probowangi", dir:"Ketapang", type:"out"}
+    ]
+  },
+  SDA: {
+    code:"SDA", name:"Sidoarjo", type:"Sedang",
+    desc:"4 jalur. Lintas selatan menuju Bangil–Malang.",
+    tracks:4,
+    leftDir:"← Wonokromo / Surabaya",
+    rightDir:"Bangil / Malang / Probolinggo →",
+    neighbors:[
+      {code:"WO",name:"Wonokromo",status:"aman"},
+      {code:"BG",name:"Bangil",status:"sibuk"},
+      {code:"MR",name:"Mojokerto",status:"aman"}
+    ],
+    schedule:[
+      {time:"05:40", name:"Jayabaya", dir:"Malang", type:"in"},
+      {time:"07:25", name:"CL Supas", dir:"Pasuruan", type:"out"},
+      {time:"10:15", name:"Ranggajati", dir:"Jember", type:"in"},
+      {time:"14:50", name:"Mutiara Timur", dir:"Ketapang", type:"out"}
+    ]
+  },
+  ML: {
+    code:"ML", name:"Malang", type:"Besar A",
+    desc:"Stasiun utama Malang Raya (\~5 jalur efektif).",
+    tracks:5,
+    leftDir:"← Lawang / Surabaya",
+    rightDir:"Kepanjen / Blitar →",
+    neighbors:[
+      {code:"LW",name:"Lawang",status:"aman"},
+      {code:"KPJ",name:"Kepanjen",status:"aman"},
+      {code:"BL",name:"Blitar",status:"sibuk"}
+    ],
+    schedule:[
+      {time:"05:30", name:"Arjuno Ekspres", dir:"Surabaya", type:"out"},
+      {time:"06:20", name:"Jayabaya", dir:"Surabaya", type:"in"},
+      {time:"11:37", name:"Arjuno Ekspres", dir:"Surabaya", type:"in"},
+      {time:"13:45", name:"Jayabaya", dir:"Pasarsenen", type:"out"},
+      {time:"16:10", name:"Gajayana", dir:"Gambir", type:"out"}
+    ]
+  },
+  LMG: {
+    code:"LMG", name:"Lamongan", type:"Sedang",
+    desc:"Lintas utara menuju Bojonegoro–Cepu.",
+    tracks:3,
+    leftDir:"← Pasarturi / Surabaya",
+    rightDir:"Babat / Bojonegoro →",
+    neighbors:[
+      {code:"SBI",name:"Pasarturi",status:"aman"},
+      {code:"BBT",name:"Babat",status:"aman"},
+      {code:"BJ",name:"Bojonegoro",status:"sibuk"}
+    ],
+    schedule:[
+      {time:"06:50", name:"CL Arjonegoro", dir:"Bojonegoro", type:"out"},
+      {time:"09:10", name:"Airlangga", dir:"Pasarsenen", type:"in"},
+      {time:"15:30", name:"Kertajaya", dir:"Pasarsenen", type:"out"}
+    ]
+  },
+  MR: {
+    code:"MR", name:"Mojokerto", type:"Sedang",
+    desc:"Persilangan lintas selatan & barat.",
+    tracks:4,
+    leftDir:"← Wonokromo / Surabaya",
+    rightDir:"Kertosono / Madiun →",
+    neighbors:[
+      {code:"WO",name:"Wonokromo",status:"aman"},
+      {code:"SDA",name:"Sidoarjo",status:"aman"},
+      {code:"KTS",name:"Kertosono",status:"sibuk"}
+    ],
+    schedule:[
+      {time:"06:15", name:"CL Dhoho", dir:"Kertosono", type:"out"},
+      {time:"08:55", name:"Sancaka", dir:"Yogyakarta", type:"in"},
+      {time:"12:40", name:"Pasundan", dir:"Bandung", type:"out"},
+      {time:"17:20", name:"Mutiara Selatan", dir:"Bandung", type:"in"}
+    ]
+  }
+};
 
-    const jalur = [
-        [0,1],[1,2],[2,3],[3,4],
-        [4,5],[5,6],[6,4],
-        [5,7],[7,8],[8,9],[9,10],
-        [10,11],[11,12],[12,13],[13,14],
-        [12,15],[15,16],[16,17],
-        [6,7],[7,10]
-    ];
+const KA_POOL = [
+  {name:"Argo Bromo Anggrek",num:"1/2"},{name:"Argo Semeru",num:"9/10"},
+  {name:"Bima",num:"5/6"},{name:"Turangga",num:"65/66"},{name:"Sancaka",num:"81/82"},
+  {name:"Gajayana",num:"55/56"},{name:"Jayabaya",num:"107/108"},{name:"Mutiara Timur",num:"181/182"},
+  {name:"Probowangi",num:"287/288"},{name:"Airlangga",num:"271/272"},{name:"Sritanjung",num:"177/178"},
+  {name:"Commuter Supas",num:"Lokal"},{name:"Commuter Jenggala",num:"Lokal"},{name:"KA Barang",num:"BB"}
+];
 
-    const gapeka2026 = {
-        ka: [
-            ['Argo Bromo','ka',0,120,[4,17]],['Gajayana','ka',1,90,[17,4]],
-            ['Bima','ka',2,120,[4,17]],['Sembrani','ka',3,90,[17,4]],
-            ['Taksaka','ka',4,180,[4,17]],['Purwojaya','ka',5,120,[17,4]],
-            ['Bangunkarta','ka',6,90,[4,17]],['Mutiara Timur','ka',7,120,[17,4]],
-            ['Ranggajati','ka',8,180,[4,17]],['Brantas','ka',9,150,[17,4]],
-            ['Kahuripan','ka',10,120,[4,17]],['Logawa','ka',11,90,[17,4]],
-            ['Jayakarta','ka',12,120,[4,17]],['Senja Utama','ka',13,150,[17,4]],
-            ['Singasari','ka',14,180,[4,17]],['Gumarang','ka',15,90,[17,4]],
-            ['Dharmawangsa','ka',16,120,[4,17]],['Rapih Dharma','ka',17,150,[17,4]],
-            ['Airlangga','ka',18,120,[4,17]],['Bojonegoro Exp','ka',19,90,[17,4]],
-            ['Sancaka','ka',20,120,[4,17]],['Penataran Utama','ka',21,150,[17,4]],
-            ['Wilis','ka',22,180,[4,17]],['Bromo','ka',23,120,[17,4]]
-        ],
-        commuter: [
-            ['Arjonegoro','commuter',0,25,[4,17]],['Jenggala','commuter',1,30,[5,6,7,8,9,10]],
-            ['Penataran','commuter',2,35,[4,7,10]],['Dhoho','commuter',3,40,[5,8,9]],
-            ['Supas','commuter',4,20,[4,5,6,7,8]],['Sindoro','commuter',5,30,[17,4]],
-            ['Lawu','commuter',6,35,[4,17]],['Merbabu','commuter',7,40,[5,17]],
-            ['Bromo Commuter','commuter',8,25,[17,5]],['Semeru','commuter',9,30,[4,5,7,17]],
-            ['Wilis Commuter','commuter',10,35,[5,8,10,17]],['Kelud','commuter',11,40,[17,7,4]],
-            ['Rinjani','commuter',12,25,[4,17]],['Tengger','commuter',13,30,[5,17]],
-            ['Ijen','commuter',14,35,[17,5]],['Raung','commuter',15,40,[4,5,7,17]],
-            ['Kawi','commuter',16,25,[5,7,8,9,10,17]],['Arjuno','commuter',17,30,[4,5,17]],
-            ['Welirang','commuter',18,35,[17,4]],['Anjasmoro','commuter',19,40,[5,17]],
-            ['Kendeng','commuter',20,25,[4,7,17]],['Muria','commuter',21,30,[17,5]],
-            ['Panderman','commuter',22,35,[4,17]],['Galunggung','commuter',23,40,[5,7,8,9,10,17]]
-        ]
-    };
+let currentStation=null, trains=[], currentRoute=null, emergency=false, wesel={}, nextTrainId=1, trackTops=[];
 
-    // ========== STATE ==========
-    let trains = [];
-    let selectedStation = 4;
-    let trainIdCounter = 0;
-    let logEntries = [];
-    let autoSpawnEnabled = true;
-    let lastSpawnMinute = -1;
-    let timeOffset = 0;
-    let stationSignals = {};
-    let stationWesel = {};
-    let hoveredStation = -1;
+function buildSelect(){
+  const grid=document.getElementById('stationGrid');
+  grid.innerHTML='';
+  Object.values(STATIONS).forEach(st=>{
+    const card=document.createElement('div');
+    card.className='station-card';
+    card.innerHTML=`<div class="badge-type \( {st.type.includes('Besar')?'besar':'sedang'}"> \){st.type}</div>
+      <div class="code">\( {st.code}</div><div class="name"> \){st.name}</div>
+      <div class="desc">${st.desc}</div>`;
+    card.onclick=()=>enterStation(st.code);
+    grid.appendChild(card);
+  });
+}
 
-    stasiunData.forEach(s => {
-        stationSignals[s.id] = 'green';
-        stationWesel[s.id] = 'lurus';
-    });
+function enterStation(code){
+  currentStation=STATIONS[code];
+  trains=[]; currentRoute=null; emergency=false; wesel={};
+  for(let i=1;i<=currentStation.tracks;i++) wesel[i]=false;
 
-    // ========== WAKTU WIB ==========
-    function getRealTime() {
-        const now = new Date();
-        const offset = 7;
-        const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
-        const wib = new Date(utc + (3600000 * offset));
-        return {
-            hours: wib.getHours(),
-            minutes: wib.getMinutes(),
-            seconds: wib.getSeconds(),
-            totalMinutes: wib.getHours() * 60 + wib.getMinutes(),
-            string: `${String(wib.getHours()).padStart(2,'0')}:${String(wib.getMinutes()).padStart(2,'0')}:${String(wib.getSeconds()).padStart(2,'0')}`,
-            timeString: `${String(wib.getHours()).padStart(2,'0')}:${String(wib.getMinutes()).padStart(2,'0')}`
-        };
+  document.getElementById('screen-select').style.display='none';
+  document.getElementById('screen-panel').style.display='block';
+  document.getElementById('stName').textContent=currentStation.name;
+  document.getElementById('stCode').textContent=`Kode: ${currentStation.code} • ${currentStation.tracks} jalur • DAOP 8`;
+  document.getElementById('layoutName').textContent=currentStation.code;
+
+  buildTrackLayout();
+  buildRouteButtons();
+  updateNeighbors();
+  updateSchedule();
+  updateKaTable();
+  updateStatusPills();
+  clearHighlights();
+  log(`Dinas dimulai di \( {currentStation.name} ( \){currentStation.tracks} jalur)`, 'info');
+  log('Klik sinyal untuk ubah warna manual. KA berhenti → sinyal masuk otomatis MERAH.', 'ok');
+}
+
+function backToSelect(){
+  document.getElementById('screen-panel').style.display='none';
+  document.getElementById('screen-select').style.display='flex';
+  document.getElementById('logBox').innerHTML='';
+}
+
+function buildTrackLayout(){
+  const canvas=document.getElementById('trackCanvas');
+  canvas.innerHTML='';
+  const n=currentStation.tracks;
+  const gap=Math.min(52,(360-100)/n);
+  trackTops=[];
+
+  const leftL=document.createElement('div');
+  leftL.className='st-label'; leftL.style.cssText='left:7px;top:7px;';
+  leftL.textContent=currentStation.leftDir; canvas.appendChild(leftL);
+
+  const rightL=document.createElement('div');
+  rightL.className='st-label'; rightL.style.cssText='right:7px;top:7px;';
+  rightL.textContent=currentStation.rightDir; canvas.appendChild(rightL);
+
+  const midL=document.createElement('div');
+  midL.className='st-label';
+  midL.style.cssText='left:50%;transform:translateX(-50%);bottom:8px;font-weight:600;color:var(--blue)';
+  midL.textContent=`${currentStation.code} — ${currentStation.name}`;
+  canvas.appendChild(midL);
+
+  for(let i=1;i<=n;i++){
+    const top=48+(i-1)*gap;
+    trackTops[i]=top;
+
+    const track=document.createElement('div');
+    track.className='track-line'; track.id=`track${i}`;
+    track.style.cssText=`left:4%;width:92%;top:${top}px;`;
+    canvas.appendChild(track);
+
+    const hl=document.createElement('div');
+    hl.className='route-highlight'; hl.id=`hl${i}`;
+    hl.style.cssText=`left:3.5%;width:93%;top:${top-2}px;`;
+    canvas.appendChild(hl);
+
+    // Sinyal Masuk (klikable)
+    const sigIn=document.createElement('div');
+    sigIn.className='signal-dot red'; sigIn.id=`sigIn${i}`;
+    sigIn.title=`Sinyal Masuk Jalur ${i} (klik untuk ubah)`;
+    sigIn.style.cssText=`left:5.2%;top:${top-5}px;`;
+    sigIn.onclick=()=>toggleSignal(`sigIn${i}`, i, 'in');
+    canvas.appendChild(sigIn);
+
+    // Sinyal Keluar (klikable)
+    const sigOut=document.createElement('div');
+    sigOut.className='signal-dot red'; sigOut.id=`sigOut${i}`;
+    sigOut.title=`Sinyal Keluar Jalur ${i} (klik untuk ubah)`;
+    sigOut.style.cssText=`left:90%;top:${top-5}px;`;
+    sigOut.onclick=()=>toggleSignal(`sigOut${i}`, i, 'out');
+    canvas.appendChild(sigOut);
+
+    if(i<n){
+      const w=document.createElement('div');
+      w.className='wesel-btn'; w.id=`w\( {i}`; w.textContent=`W \){i}`;
+      w.style.cssText=`left:22%;top:${top+9}px;`;
+      w.onclick=()=>toggleWesel(i);
+      canvas.appendChild(w);
     }
+  }
+}
 
-    function getGameTime() {
-        const real = getRealTime();
-        let total = real.totalMinutes + timeOffset;
-        if (total >= 1440) total -= 1440;
-        if (total < 0) total += 1440;
-        return total;
+function buildRouteButtons(){
+  const row=document.getElementById('routeButtons');
+  row.innerHTML='';
+  for(let i=1;i<=currentStation.tracks;i++){
+    const btn=document.createElement('button');
+    btn.className='act primary';
+    btn.textContent=`Set Rute ${i}`;
+    btn.onclick=()=>setRoute(i);
+    row.appendChild(btn);
+  }
+}
+
+/* ========== SINYAL KLIK MANUAL ========== */
+function toggleSignal(id, track, side){
+  if(emergency){ log('STOP DARURAT — sinyal terkunci merah!', 'err'); return; }
+  const el=document.getElementById(id);
+  if(!el) return;
+  let next;
+  if(el.classList.contains('red')) next='green';
+  else if(el.classList.contains('green')) next='yellow';
+  else next='red';
+  el.className='signal-dot '+next;
+  log(`Sinyal ${side==='in'?'Masuk':'Keluar'} Jalur ${track} diganti → ${next.toUpperCase()}`, 'info');
+
+  // Jika sinyal keluar jadi hijau, cek auto-depart
+  if(side==='out' && next==='green') checkAutoDepart(track);
+}
+
+function setSig(id, color){
+  const el=document.getElementById(id);
+  if(el) el.className='signal-dot '+color;
+}
+
+/* ========== RUTE ========== */
+function clearHighlights(){
+  for(let i=1;i<=(currentStation?.tracks||0);i++){
+    const hl=document.getElementById(`hl${i}`);
+    if(hl) hl.classList.remove('show');
+  }
+}
+
+function setRoute(track){
+  if(emergency){ log('STOP DARURAT aktif!', 'err'); return; }
+  for(let i=1;i<=currentStation.tracks;i++){
+    setSig(`sigIn\( {i}`,'red'); setSig(`sigOut \){i}`,'red');
+  }
+  clearHighlights();
+  currentRoute=track;
+  setSig(`sigIn${track}`,'green');
+  setSig(`sigOut${track}`,'green');
+  const hl=document.getElementById(`hl${track}`);
+  if(hl) hl.classList.add('show');
+  document.getElementById('pillRoute').textContent=`Rute: Jalur ${track}`;
+  document.getElementById('pillRoute').className='pill ok';
+  log(`Rute Jalur ${track} diset + border hijau. Sinyal HIJAU.`, 'ok');
+  checkAutoDepart(track);
+}
+
+function toggleWesel(id){
+  if(emergency) return;
+  wesel[id]=!wesel[id];
+  const el=document.getElementById('w'+id);
+  if(el) el.classList.toggle('belok', wesel[id]);
+  log(`Wesel W${id} → ${wesel[id]?'BELOK':'LURUS'}`, 'warn');
+}
+
+/* ========== KERETA ========== */
+function spawnIncoming(fromSched){
+  if(emergency){ log('STOP DARURAT — tidak bisa terima KA!', 'err'); return; }
+  if(!currentRoute){ log('Set rute dulu!', 'warn'); return; }
+  if(trains.some(t=>t.track===currentRoute && t.status!=='berangkat')){
+    log(`Jalur ${currentRoute} masih diduduki!`, 'err'); return;
+  }
+
+  let ka;
+  if(fromSched && currentStation.schedule.length){
+    const s=currentStation.schedule[Math.floor(Math.random()*currentStation.schedule.length)];
+    ka={name:s.name, num:s.time};
+  } else {
+    ka=KA_POOL[Math.floor(Math.random()*KA_POOL.length)];
+  }
+
+  const id='T'+(nextTrainId++);
+  const track=currentRoute;
+  const top=trackTops[track]-8;
+
+  const div=document.createElement('div');
+  div.className='train-box'; div.id=id;
+  div.style.left='3%'; div.style.top=top+'px';
+  div.textContent=shortName(ka.name);
+  div.onclick=()=>selectTrain(id);
+  document.getElementById('trackCanvas').appendChild(div);
+
+  trains.push({id, name:ka.name, num:ka.num, track, status:'masuk'});
+
+  setTimeout(()=>{ const el=document.getElementById(id); if(el) el.style.left='35%'; },40);
+
+  setTimeout(()=>{
+    const el=document.getElementById(id);
+    if(!el) return;
+    el.classList.add('stopped');
+    const t=trains.find(x=>x.id===id);
+    if(t) t.status='berhenti';
+    updateKaTable();
+
+    // 1. KA berhenti → sinyal masuk otomatis MERAH
+    setSig(`sigIn${track}`,'red');
+    log(`KA ${ka.name} berhenti di Jalur ${track} → Sinyal Masuk otomatis MERAH`, 'warn');
+
+    checkAutoDepart(track);
+  },1400);
+
+  updateKaTable(); updateStatusPills();
+  log(`KA ${ka.name} masuk emplasemen Jalur ${track}`, 'ok');
+}
+
+function spawnFromSchedule(){ spawnIncoming(true); }
+
+function shortName(n){ return n.split(' ').slice(0,2).join(' '); }
+function selectTrain(id){
+  document.querySelectorAll('.train-box').forEach(el=>el.classList.toggle('selected',el.id===id));
+}
+
+function checkAutoDepart(track){
+  if(emergency) return;
+  const sigOut=document.getElementById(`sigOut${track}`);
+  if(!sigOut || !sigOut.classList.contains('green')) return;
+  const t=trains.find(x=>x.track===track && x.status==='berhenti');
+  if(!t) return;
+  departTrain(t);
+}
+
+function departTrain(t){
+  t.status='berangkat';
+  const el=document.getElementById(t.id);
+  if(el){
+    el.classList.remove('stopped','selected');
+    el.classList.add('departing');
+    el.style.left='93%';
+  }
+  log(`Sinyal HIJAU → KA ${t.name} otomatis berangkat dari Jalur ${t.track}`, 'ok');
+
+  setTimeout(()=>{
+    if(el) el.remove();
+    trains=trains.filter(x=>x.id!==t.id);
+    updateKaTable(); updateStatusPills();
+
+    // Setelah keluar → sinyal keluar otomatis MERAH
+    setSig(`sigOut${t.track}`,'red');
+    if(currentRoute===t.track){
+      clearHighlights(); currentRoute=null;
+      document.getElementById('pillRoute').textContent='Rute: -';
+      document.getElementById('pillRoute').className='pill';
     }
+    log(`KA ${t.name} keluar area → Sinyal Keluar otomatis MERAH`, 'warn');
+  },1450);
+}
 
-    function formatTime(m) {
-        let h = Math.floor(m / 60) % 24;
-        let min = m % 60;
-        return `${String(h).padStart(2,'0')}:${String(min).padStart(2,'0')}`;
-    }
+function giveWarta(jenis){
+  if(emergency) return;
+  if(jenis==='aman'){
+    log('WARTA AMAN dikirim.', 'ok');
+    document.getElementById('pillBlok').textContent='Blok: AMAN';
+    document.getElementById('pillBlok').className='pill ok';
+  } else {
+    log('WARTA LEPAS dikirim.', 'ok');
+    document.getElementById('pillBlok').textContent='Blok: NORMAL';
+    document.getElementById('pillBlok').className='pill ok';
+  }
+}
 
-    // ========== DRAW MAP ==========
-    function drawMap() {
-        const canvas = document.getElementById('mapCanvas');
-        const rect = canvas.parentElement.getBoundingClientRect();
-        canvas.width = canvas.parentElement.clientWidth;
-        canvas.height = canvas.parentElement.clientHeight;
-        const ctx = canvas.getContext('2d');
-        const W = canvas.width, H = canvas.height;
+function emergencyStop(){
+  emergency=true;
+  for(let i=1;i<=currentStation.tracks;i++){
+    setSig(`sigIn\( {i}`,'red'); setSig(`sigOut \){i}`,'red');
+  }
+  clearHighlights();
+  document.querySelectorAll('.train-box').forEach(el=>el.classList.add('stopped'));
+  trains.forEach(t=>{ if(t.status!=='berangkat') t.status='berhenti'; });
+  document.getElementById('pillInterlock').textContent='Interlocking: STOP';
+  document.getElementById('pillInterlock').className='pill bad';
+  document.getElementById('pillBlok').textContent='Blok: DARURAT';
+  document.getElementById('pillBlok').className='pill bad';
+  document.getElementById('pillRoute').textContent='Rute: -';
+  document.getElementById('pillRoute').className='pill';
+  currentRoute=null;
+  updateKaTable();
+  log('!!! STOP DARURAT — Semua sinyal MERAH !!!', 'err');
+}
 
-        ctx.clearRect(0, 0, W, H);
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, W, H);
+function resetPanel(){
+  emergency=false; currentRoute=null;
+  trains.forEach(t=>{ const el=document.getElementById(t.id); if(el) el.remove(); });
+  trains=[];
+  for(let i=1;i<=currentStation.tracks;i++){
+    setSig(`sigIn\( {i}`,'red'); setSig(`sigOut \){i}`,'red');
+  }
+  clearHighlights();
+  Object.keys(wesel).forEach(k=>{
+    wesel[k]=false;
+    const el=document.getElementById('w'+k);
+    if(el) el.classList.remove('belok');
+  });
+  updateKaTable(); updateStatusPills();
+  document.getElementById('pillInterlock').textContent='Interlocking: AKTIF';
+  document.getElementById('pillInterlock').className='pill ok';
+  document.getElementById('pillBlok').textContent='Blok: NORMAL';
+  document.getElementById('pillBlok').className='pill ok';
+  document.getElementById('pillRoute').textContent='Rute: -';
+  document.getElementById('pillRoute').className='pill';
+  log('Panel di-reset.', 'ok');
+}
 
-        // Grid
-        ctx.strokeStyle = '#e5e5e5';
-        ctx.lineWidth = 0.5;
-        for (let i = 0; i < W; i += 30) { ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,H); ctx.stroke(); }
-        for (let i = 0; i < H; i += 30) { ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(W,i); ctx.stroke(); }
+function updateKaTable(){
+  const body=document.getElementById('kaBody');
+  if(!trains.length){
+    body.innerHTML='<tr><td colspan="3" style="color:var(--muted);text-align:center">Belum ada KA</td></tr>';
+    return;
+  }
+  body.innerHTML=trains.map(t=>`<tr>
+    <td>\( {t.name}<br><small style="color:var(--muted)"> \){t.num}</small></td>
+    <td>${t.track}</td>
+    <td><span class="tag \( {t.status==='berhenti'?'stop':t.status==='masuk'?'in':'out'}"> \){t.status}</span></td>
+  </tr>`).join('');
+}
 
-        // Draw jalur
-        jalur.forEach(([a,b]) => {
-            const p1 = stasiunData[a], p2 = stasiunData[b];
-            const x1 = p1.x*W, y1 = p1.y*H, x2 = p2.x*W, y2 = p2.y*H;
-            
-            ctx.shadowColor = 'rgba(0,0,0,0.08)';
-            ctx.shadowBlur = 8;
-            ctx.strokeStyle = '#444';
-            ctx.lineWidth = 3;
-            ctx.beginPath();
-            ctx.moveTo(x1, y1);
-            ctx.lineTo(x2, y2);
-            ctx.stroke();
+function updateNeighbors(){
+  document.getElementById('neighborList').innerHTML=currentStation.neighbors.map(n=>`
+    <div class="neighbor"><span>${n.code} — ${n.name}</span>
+    <span class="n-status \( {n.status}"> \){n.status.toUpperCase()}</span></div>`).join('');
+}
 
-            ctx.shadowBlur = 0;
-            ctx.strokeStyle = '#aaa';
-            ctx.lineWidth = 1.5;
-            ctx.beginPath();
-            ctx.moveTo(x1, y1);
-            ctx.lineTo(x2, y2);
-            ctx.stroke();
+function updateSchedule(){
+  document.getElementById('schedList').innerHTML=currentStation.schedule.map(s=>`
+    <div class="sched-item">
+      <span class="sched-time">${s.time}</span>
+      <span style="flex:1">${s.name}</span>
+      <span style="color:var(--muted);font-size:.7rem">${s.dir}</span>
+    </div>`).join('');
+}
 
-            ctx.strokeStyle = '#ddd';
-            ctx.lineWidth = 1;
-            ctx.setLineDash([3,5]);
-            const ang = Math.atan2(y2-y1, x2-x1);
-            const offX = Math.sin(ang)*4, offY = -Math.cos(ang)*4;
-            ctx.beginPath();
-            ctx.moveTo(x1+offX, y1+offY);
-            ctx.lineTo(x2+offX, y2+offY);
-            ctx.stroke();
-            ctx.setLineDash([]);
-        });
+function updateStatusPills(){
+  document.getElementById('pillKaCount').textContent=`KA: ${trains.length}`;
+}
 
-        // Draw stations
-        stasiunData.forEach((st, idx) => {
-            const x = st.x*W, y = st.y*H;
-            const isActive = (selectedStation === idx);
-            const isHover = (hoveredStation === idx);
-            const trainCount = trains.filter(t => t.stationIndex === idx).length;
-            const signal = stationSignals[idx] || 'green';
-            
-            // Glow
-            if (isActive || isHover) {
-                ctx.shadowColor = isActive ? 'rgba(0,0,0,0.15)' : 'rgba(0,0,0,0.05)';
-                ctx.shadowBlur = isActive ? 35 : 20;
-                ctx.beginPath();
-                ctx.arc(x, y, isActive ? 30 : 22, 0, Math.PI*2);
-                ctx.fillStyle = isActive ? 'rgba(0,0,0,0.05)' : 'rgba(0,0,0,0.02)';
-                ctx.fill();
-                ctx.shadowBlur = 0;
-            }
+function log(msg, type='ok'){
+  const box=document.getElementById('logBox');
+  const time=new Date().toLocaleTimeString('id-ID',{hour12:false});
+  const line=document.createElement('div');
+  line.className='log-line';
+  line.innerHTML=`<span class="t">[\( {time}]</span> <span class=" \){type}">${msg}</span>`;
+  box.prepend(line);
+}
 
-            // Outer ring
-            let ringColor = '#aaa', ringWidth = 1;
-            if (isActive) { ringColor = '#000'; ringWidth = 3; }
-            else if (st.type === 'utama') { ringColor = '#222'; ringWidth = 2; }
-            else if (st.type === 'besar') { ringColor = '#444'; ringWidth = 1.5; }
-            
-            ctx.strokeStyle = ringColor;
-            ctx.lineWidth = ringWidth;
-            ctx.beginPath();
-            ctx.arc(x, y, 14, 0, Math.PI*2);
-            ctx.stroke();
-
-            // Signal color ring
-            const signalColors = { green: '#28a745', yellow: '#ffaa00', red: '#dc3545', blue: '#17a2b8' };
-            ctx.strokeStyle = signalColors[signal] || '#28a745';
-            ctx.lineWidth = 3;
-            ctx.beginPath();
-            ctx.arc(x, y, 11, 0, Math.PI*2);
-            ctx.stroke();
-
-            // Inner dot
-            let color = '#ffffff';
-            if (isActive) color = '#000';
-            else if (trainCount > 0) color = '#666';
-            
-            ctx.shadowColor = isActive ? 'rgba(0,0,0,0.15)' : 'transparent';
-            ctx.shadowBlur = isActive ? 15 : 0;
-            ctx.fillStyle = color;
-            ctx.beginPath();
-            ctx.arc(x, y, 6, 0, Math.PI*2);
-            ctx.fill();
-
-            ctx.shadowBlur = 0;
-            ctx.fillStyle = '#999';
-            ctx.font = '8px monospace';
-            ctx.textAlign = 'center';
-            ctx.fillText(trainCount > 0 ? `🚆${trainCount}` : '', x, y + 28);
-
-            // Label
-            let fontSize = 9;
-            let colorText = '#555';
-            if (isActive) { fontSize = 10; colorText = '#000'; }
-            else if (st.type === 'utama') { fontSize = 10; colorText = '#222'; }
-            
-            ctx.fillStyle = colorText;
-            ctx.font = `${isActive ? 'bold ' : ''}${fontSize}px monospace`;
-            ctx.textAlign = 'center';
-            ctx.fillText(st.name, x, y - 20);
-
-            // Wesel indicator
-            const wesel = stationWesel[idx] || 'lurus';
-            const weselSymbols = { lurus: '⬆', belok: '↗', ganda: '↕' };
-            ctx.fillStyle = '#888';
-            ctx.font = '8px monospace';
-            ctx.fillText(weselSymbols[wesel], x + 18, y - 5);
-        });
-
-        // Legend
-        ctx.fillStyle = '#666';
-        ctx.font = '8px monospace';
-        ctx.textAlign = 'left';
-        ctx.fillStyle = '#222';
-        ctx.fillText('● KA', 10, 18);
-        ctx.fillStyle = '#17a2b8';
-        ctx.fillText('● Commuter', 10, 32);
-        ctx.fillStyle = '#000';
-        ctx.fillText('● PPKA Aktif', 10, 46);
-        ctx.fillStyle = '#888';
-        ctx.fillText('🟢 Hijau 🟡 Kuning 🔴 Merah 🔵 Commuter', 10, 62);
-        ctx.fillStyle = '#999';
-        ctx.fillText('⬆ Lurus  ↗ Belok  ↕ Ganda', 10, 76);
-        
-        ctx.fillStyle = '#d4880f';
-        ctx.font = 'bold 8px monospace';
-        ctx.fillText('📍 GRESIK — MALANG', W - 110, 16);
-        ctx.fillStyle = '#666';
-        ctx.font = '7px monospace';
-        ctx.fillText('DAOP 8 | GAPEKA 2026', W - 95, 30);
-    }
-
-    // ========== MAP CLICK & HOVER ==========
-    const mapElement = document.getElementById('railwayMap');
-    const tooltip = document.getElementById('tooltip');
-
-    mapElement.addEventListener('mousemove', function(e) {
-        const rect = this.getBoundingClientRect();
-        const x = (e.clientX - rect.left) / rect.width;
-        const y = (e.clientY - rect.top) / rect.height;
-        
-        let found = -1;
-        let minDist = 0.06;
-        stasiunData.forEach((st, idx) => {
-            const dx = x - st.x, dy = y - st.y;
-            const dist = Math.sqrt(dx*dx + dy*dy);
-            if (dist < minDist) { minDist = dist; found = idx; }
-        });
-        
-        if (found !== -1) {
-            hoveredStation = found;
-            const st = stasiunData[found];
-            tooltip.style.display = 'block';
-            tooltip.style.left = (e.clientX - rect.left + 15) + 'px';
-            tooltip.style.top = (e.clientY - rect.top - 10) + 'px';
-            const signal = stationSignals[found] || 'green';
-            const wesel = stationWesel[found] || 'lurus';
-            const trainCount = trains.filter(t => t.stationIndex === found).length;
-            tooltip.innerHTML = `
-                <strong>${st.name}</strong><br>
-                🚦 ${signal.toUpperCase()} | 🛤️ ${wesel.toUpperCase()}<br>
-                🚆 ${trainCount} kereta
-            `;
-            drawMap();
-        } else {
-            hoveredStation = -1;
-            tooltip.style.display = 'none';
-            drawMap();
-        }
-    });
-
-    mapElement.addEventListener('mouseleave', function() {
-        hoveredStation = -1;
-        tooltip.style.display = 'none';
-        drawMap();
-    });
-
-    mapElement.addEventListener('click', function(e) {
-        const rect = this.getBoundingClientRect();
-        const x = (e.clientX - rect.left) / rect.width;
-        const y = (e.clientY - rect.top) / rect.height;
-        
-        let found = -1;
-        let minDist = 0.06;
-        stasiunData.forEach((st, idx) => {
-            const dx = x - st.x, dy = y - st.y;
-            const dist = Math.sqrt(dx*dx + dy*dy);
-            if (dist < minDist) { minDist = dist; found = idx; }
-        });
-        
-        if (found !== -1) {
-            selectStation(found);
-            addLog(`📍 Pilih stasiun ${stasiunData[found].name} dari map`, 'info');
-        }
-    });
-
-    // ========== SELECT STATION ==========
-    function selectStation(idx) {
-        selectedStation = idx;
-        document.getElementById('activeStation').innerText = stasiunData[idx].name;
-        document.getElementById('stName').innerText = stasiunData[idx].name;
-        document.getElementById('stDetail').innerText = `${stasiunData[idx].daop} | PPKA Aktif`;
-        
-        const currentSignal = stationSignals[idx] || 'green';
-        document.querySelectorAll('.signal-btn').forEach(btn => {
-            btn.className = 'signal-btn';
-            if (btn.dataset.signal === currentSignal) {
-                btn.classList.add(`active-${currentSignal}`);
-            }
-        });
-
-        const currentWesel = stationWesel[idx] || 'lurus';
-        document.querySelectorAll('.wesel-btn').forEach(btn => {
-            btn.className = 'wesel-btn';
-            if (btn.dataset.wesel === currentWesel) {
-                btn.classList.add('active');
-            }
-        });
-        document.getElementById('weselStatus').textContent = currentWesel.toUpperCase();
-
-        renderStationTrains();
-        renderEstimation();
-        drawMap();
-    }
-
-    // ========== RENDER FUNCTIONS ==========
-    function renderStationTrains() {
-        const list = document.getElementById('trainList');
-        const trainsHere = trains.filter(t => t.stationIndex === selectedStation);
-        if (trainsHere.length === 0) {
-            list.innerHTML = `<div style="color:#999;font-size:11px;padding:8px 0;">Tidak ada kereta</div>`;
-            return;
-        }
-        let html = '';
-        trainsHere.forEach(t => {
-            let badgeClass = 'badge-standby', label = 'Standby';
-            if (t.isCommuter) { badgeClass = 'badge-commuter'; label = 'Commuter'; }
-            else if (t.status === 'arrive') { badgeClass = 'badge-arrive'; label = 'Arrive'; }
-            else if (t.status === 'depart') { badgeClass = 'badge-depart'; label = 'Depart'; }
-            html += `
-                <div class="train-item">
-                    <span>${t.isCommuter ? '🚃' : '🚆'} ${t.name}</span>
-                    <span class="badge ${badgeClass}">${label}</span>
-                    <span class="schedule-info">📥${t.arriveTime?formatTime(t.arriveTime):'-'} 📤${t.departTime?formatTime(t.departTime):'-'}</span>
-                </div>
-            `;
-        });
-        list.innerHTML = html;
-    }
-
-    function renderEstimation() {
-        const container = document.getElementById('estimationContent');
-        const trainsHere = trains.filter(t => t.stationIndex === selectedStation);
-        if (trainsHere.length === 0) {
-            container.innerHTML = '<span style="color:#999;">Tidak ada jadwal</span>';
-            return;
-        }
-        let html = '';
-        trainsHere.forEach(t => {
-            const est = t.estimatedArrival !== undefined ? formatTime(t.estimatedArrival) : '-';
-            html += `
-                <div style="padding:2px 0;border-bottom:1px solid #eee;">
-                    ${t.isCommuter ? '🚃' : '🚆'} ${t.name} → ${t.estimatedStation || 'Tujuan'} 🎯${est}
-                </div>
-            `;
-        });
-        container.innerHTML = html;
-    }
-
-    function updateStatus() {
-        document.getElementById('totalTrains').innerText = trains.length;
-        document.getElementById('totalCommuter').innerText = trains.filter(t => t.isCommuter).length;
-        const real = getRealTime();
-        document.getElementById('realTime').textContent = real.string;
-        document.getElementById('gameTime').innerHTML = formatTime(getGameTime());
-        renderStationTrains();
-        renderEstimation();
-        drawMap();
-    }
-
-    function addLog(msg, type = '') {
-        const real = getRealTime();
-        let cls = type ? `log-${type}` : '';
-        logEntries.push(`<div class="log-entry"><span class="log-time">[${real.string}]</span> <span class="${cls}">${msg}</span></div>`);
-        if (logEntries.length > 50) logEntries.shift();
-        document.getElementById('logArea').innerHTML = logEntries.join('');
-        document.getElementById('logArea').scrollTop = document.getElementById('logArea').scrollHeight;
-    }
-
-    // ========== SINYAL & WESEL ==========
-    function setSignal(signal) {
-        stationSignals[selectedStation] = signal;
-        document.querySelectorAll('.signal-btn').forEach(btn => {
-            btn.className = 'signal-btn';
-            if (btn.dataset.signal === signal) btn.classList.add(`active-${signal}`);
-        });
-        const names = { green:'🟢 HIJAU', yellow:'🟡 KUNING', red:'🔴 MERAH', blue:'🔵 COMMUTER' };
-        addLog(`🚦 Sinyal ${stasiunData[selectedStation].name} → ${names[signal]}`, 'info');
-        drawMap();
-    }
-
-    function setWesel(wesel) {
-        stationWesel[selectedStation] = wesel;
-        document.querySelectorAll('.wesel-btn').forEach(btn => {
-            btn.className = 'wesel-btn';
-            if (btn.dataset.wesel === wesel) btn.classList.add('active');
-        });
-        document.getElementById('weselStatus').textContent = wesel.toUpperCase();
-        const names = { lurus:'⬆️ LURUS', belok:'↗️ BELOK', ganda:'↕️ GANDA' };
-        addLog(`🛤️ Wesel ${stasiunData[selectedStation].name} → ${names[wesel]}`, 'info');
-        drawMap();
-    }
-
-    // ========== PPKA CONTROLS ==========
-    function aturKeberangkatan() {
-        const gameTime = getGameTime();
-        const trainsHere = trains.filter(t => t.stationIndex === selectedStation && t.status === 'arrive');
-        if (trainsHere.length === 0) {
-            addLog('⚠️ Tidak ada kereta siap berangkat', 'warning');
-            return;
-        }
-        trainsHere.forEach(t => {
-            t.status = 'depart';
-            t.departTime = gameTime;
-            const travel = t.isCommuter ? 3 + Math.floor(Math.random()*4) : 8 + Math.floor(Math.random()*8);
-            t.estimatedArrival = gameTime + travel;
-            const nextIdx = t.isCommuter && t.commuterRoute ? 
-                t.commuterRoute[(t.commuterRoute.indexOf(stasiunData[t.stationIndex].name) + 1) % t.commuterRoute.length] :
-                (t.destination !== undefined ? t.destination : (t.stationIndex + 1) % stasiunData.length);
-            t.estimatedStation = stasiunData[nextIdx]?.name || 'Tujuan';
-        });
-        addLog(`🚆 ${trainsHere.length} kereta diberangkatkan dari ${stasiunData[selectedStation].name}`, 'success');
-        updateStatus();
-    }
-
-    function ubahStatusAll() {
-        const gameTime = getGameTime();
-        const trainsHere = trains.filter(t => t.stationIndex === selectedStation);
-        if (trainsHere.length === 0) {
-            addLog('⚠️ Tidak ada kereta', 'warning');
-            return;
-        }
-        trainsHere.forEach(t => {
-            const statuses = ['arrive','depart','standby'];
-            t.status = statuses[Math.floor(Math.random() * statuses.length)];
-            if (t.status === 'arrive') t.arriveTime = gameTime;
-            if (t.status === 'depart') t.departTime = gameTime + 3;
-        });
-        addLog(`🔄 Status ${trainsHere.length} kereta diubah`, 'ka');
-        updateStatus();
-    }
-
-    function hapusKeretaAll() {
-        const before = trains.length;
-        trains = trains.filter(t => t.stationIndex !== selectedStation);
-        const removed = before - trains.length;
-        if (removed === 0) { addLog('⚠️ Tidak ada kereta', 'warning'); return; }
-        addLog(`🗑️ ${removed} kereta dihapus dari ${stasiunData[selectedStation].name}`, 'danger');
-        updateStatus();
-    }
-
-    function spawnManual() {
-        const gameTime = getGameTime();
-        const isCommuter = Math.random() > 0.5;
-        if (isCommuter) {
-            const com = gapeka2026.commuter[Math.floor(Math.random() * gapeka2026.commuter.length)];
-            const nextIdx = com[4].length > 1 ? com[4][1] : com[4][0];
-            trains.push({
-                id: trainIdCounter++,
-                name: com[0] + '-M' + String(Math.floor(Math.random()*90)+10),
-                stationIndex: selectedStation,
-                status: 'arrive',
-                isCommuter: true,
-                commuterRoute: com[4],
-                arriveTime: gameTime,
-                departTime: gameTime + 3,
-                estimatedArrival: gameTime + 8,
-                estimatedStation: stasiunData[nextIdx].name
-            });
-            addLog(`🚃 ${com[0]} (manual) tiba di ${stasiunData[selectedStation].name}`, 'commuter');
-        } else {
-            const ka = gapeka2026.ka[Math.floor(Math.random() * gapeka2026.ka.length)];
-            trains.push({
-                id: trainIdCounter++,
-                name: ka[0] + '-M' + String(Math.floor(Math.random()*900)+100),
-                stationIndex: selectedStation,
-                status: 'arrive',
-                isCommuter: false,
-                destination: ka[4][1],
-                arriveTime: gameTime,
-                departTime: gameTime + 5,
-                estimatedArrival: gameTime + 15,
-                estimatedStation: stasiunData[ka[4][1]].name
-            });
-            addLog(`🚆 ${ka[0]} (manual) tiba di ${stasiunData[selectedStation].name}`, 'ka');
-        }
-        updateStatus();
-    }
-
-    function spawnDariGapeka() {
-        if (!autoSpawnEnabled) return;
-        const gameTime = getGameTime();
-        const currentMinute = Math.floor(gameTime);
-        if (currentMinute === lastSpawnMinute) return;
-        lastSpawnMinute = currentMinute;
-
-        gapeka2026.ka.forEach(ka => {
-            const startTime = ka[2] * 60;
-            const interval = ka[3];
-            const elapsed = (currentMinute - startTime + 1440) % 1440;
-            if (elapsed % interval === 0 || elapsed % interval === 1) {
-                const exists = trains.some(t => t.name.startsWith(ka[0]) && 
-                    t.stationIndex === ka[4][0] && Math.abs(t.scheduledTime - gameTime) < 2);
-                if (!exists) {
-                    const stIdx = ka[4][0], destIdx = ka[4][1];
-                    trains.push({
-                        id: trainIdCounter++,
-                        name: ka[0] + '-' + String(Math.floor(Math.random()*900)+100),
-                        stationIndex: stIdx,
-                        status: 'arrive',
-                        isCommuter: false,
-                        destination: destIdx,
-                        arriveTime: gameTime,
-                        departTime: gameTime + 5 + Math.floor(Math.random()*5),
-                        estimatedArrival: gameTime + 10 + Math.floor(Math.random()*10),
-                        estimatedStation: stasiunData[destIdx].name
-                    });
-                    addLog(`🚆 ${ka[0]} tiba di ${stasiunData[stIdx].name}`, 'ka');
-                }
-            }
-        });
-
-        gapeka2026.commuter.forEach(com => {
-            const startTime = com[2] * 60;
-            const interval = com[3];
-            const elapsed = (currentMinute - startTime + 1440) % 1440;
-            if (elapsed % interval === 0 || elapsed % interval === 1) {
-                const exists = trains.some(t => t.name.startsWith(com[0]) && 
-                    t.stationIndex === com[4][0] && Math.abs(t.scheduledTime - gameTime) < 2);
-                if (!exists) {
-                    const stIdx = com[4][0];
-                    const nextIdx = com[4].length > 1 ? com[4][1] : com[4][0];
-                    trains.push({
-                        id: trainIdCounter++,
-                        name: com[0] + '-' + String(Math.floor(Math.random()*90)+10),
-                        stationIndex: stIdx,
-                        status: 'arrive',
-                        isCommuter: true,
-                        commuterRoute: com[4],
-                        arriveTime: gameTime,
-                        departTime: gameTime + 3 + Math.floor(Math.random()*3),
-                        estimatedArrival: gameTime + 5 + Math.floor(Math.random()*5),
-                        estimatedStation: stasiunData[nextIdx].name
-                    });
-                    addLog(`🚃 ${com[0]} tiba di ${stasiunData[stIdx].name}`, 'commuter');
-                }
-            }
-        });
-        updateStatus();
-    }
-
-    function gerakkanKereta() {
-        if (trains.length === 0) return;
-        const gameTime = getGameTime();
-
-        trains.forEach(t => {
-            if (t.status === 'arrive' && t.departTime !== undefined && gameTime >= t.departTime) {
-                t.status = 'depart';
-                addLog(`🚂 ${t.name} berangkat dari ${stasiunData[t.stationIndex].name}`, 'ka');
-            }
-
-            if (t.status === 'depart' && t.departTime !== undefined && gameTime >= t.departTime + 2) {
-                let newIdx;
-                if (t.isCommuter && t.commuterRoute) {
-                    let current = stasiunData[t.stationIndex].name;
-                    let idx = t.commuterRoute.indexOf(current);
-                    newIdx = (idx !== -1 && idx < t.commuterRoute.length - 1) ? 
-                        stasiunData.findIndex(s => s.name === t.commuterRoute[idx + 1]) : 
-                        stasiunData.findIndex(s => s.name === t.commuterRoute[0]);
-                    if (newIdx === -1) newIdx = (t.stationIndex + 1) % stasiunData.length;
-                } else if (t.destination !== undefined) {
-                    newIdx = t.stationIndex < t.destination ? t.stationIndex + 1 : 
-                             t.stationIndex > t.destination ? t.stationIndex - 1 : 
-                             (t.stationIndex + 1) % stasiunData.length;
-                } else {
-                    newIdx = (t.stationIndex + 1) % stasiunData.length;
-                }
-
-                t.stationIndex = newIdx;
-                t.status = 'arrive';
-                t.arriveTime = gameTime;
-                const travel = t.isCommuter ? 3 + Math.floor(Math.random()*3) : 5 + Math.floor(Math.random()*5);
-                t.departTime = gameTime + travel;
-                t.estimatedArrival = gameTime + travel + 3;
-                t.estimatedStation = stasiunData[(newIdx + 1) % stasiunData.length]?.name || 'Tujuan';
-                addLog(`🚂 ${t.name} tiba di ${stasiunData[newIdx].name}`, 'ka');
-            }
-        });
-        updateStatus();
-    }
-
-    function toggleAutoSpawn() {
-        autoSpawnEnabled = !autoSpawnEnabled;
-        const btn = document.querySelector('.btn-commuter');
-        btn.textContent = autoSpawnEnabled ? '⏸️ AUTO' : '▶️ AUTO';
-        btn.style.borderColor = autoSpawnEnabled ? '#17a2b8' : '#dc3545';
-        btn.style.color = autoSpawnEnabled ? '#17a2b8' : '#dc3545';
-        addLog(autoSpawnEnabled ? '🔄 Auto spawn ON' : '⏹️ Auto spawn OFF', 'warning');
-    }
-
-    function resetSimulasi() {
-        trains = [];
-        trainIdCounter = 0;
-        const real = getRealTime();
-        logEntries = [`<div class="log-entry"><span class="log-time">[${real.string}]</span> PPKA Map siap</div>`];
-        addLog('💥 Simulasi di-reset!', 'danger');
-        updateStatus();
-    }
-
-    // ========== INIT ==========
-    function init() {
-        selectStation(4);
-        
-        setInterval(() => {
-            const real = getRealTime();
-            document.getElementById('realTime').textContent = real.string;
-            document.getElementById('gameTime').innerHTML = formatTime(getGameTime());
-        }, 1000);
-
-        setInterval(() => spawnDariGapeka(), 10000);
-        setInterval(() => gerakkanKereta(), 15000);
-        setInterval(() => updateStatus(), 5000);
-        
-        setTimeout(() => spawnDariGapeka(), 2000);
-        addLog('🕐 Klik stasiun di map untuk kontrol PPKA!', 'info');
-        
-        // Resize handler
-        window.addEventListener('resize', () => drawMap());
-    }
-
-    init();
+function tick(){
+  document.getElementById('clock').textContent=new Date().toLocaleTimeString('id-ID',{hour12:false});
+}
+setInterval(tick,1000); tick();
+buildSelect();
 </script>
 </body>
 </html>
