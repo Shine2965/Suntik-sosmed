@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cek Saldo Fayupedia</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      color: #e8e8e8;
+    }
+    .card {
+      background: rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 20px;
+      padding: 36px 32px;
+      width: 100%;
+      max-width: 420px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+    }
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      text-align: center;
+      margin-bottom: 8px;
+      color: #fff;
+    }
+    .subtitle {
+      text-align: center;
+      font-size: 0.875rem;
+      color: #a0a0b0;
+      margin-bottom: 28px;
+    }
+    .info {
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 12px;
+      padding: 14px 16px;
+      margin-bottom: 24px;
+      font-size: 0.85rem;
+    }
+    .info div {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+    .info div:last-child {
+      margin-bottom: 0;
+    }
+    .info .label {
+      color: #a0a0b0;
+    }
+    .info .value {
+      font-family: monospace;
+      color: #7dd3fc;
+    }
+    button {
+      width: 100%;
+      padding: 14px;
+      border: none;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #3b82f6, #2563eb);
+      color: white;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.15s, box-shadow 0.15s, opacity 0.15s;
+    }
+    button:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 8px 20px rgba(37, 99, 235, 0.4);
+    }
+    button:active:not(:disabled) {
+      transform: translateY(0);
+    }
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    .result {
+      margin-top: 24px;
+      padding: 20px;
+      border-radius: 14px;
+      text-align: center;
+      display: none;
+    }
+    .result.success {
+      display: block;
+      background: rgba(34, 197, 94, 0.15);
+      border: 1px solid rgba(34, 197, 94, 0.35);
+    }
+    .result.error {
+      display: block;
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid rgba(239, 68, 68, 0.35);
+    }
+    .result .label {
+      font-size: 0.8rem;
+      color: #a0a0b0;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .result .balance {
+      font-size: 1.75rem;
+      font-weight: 700;
+      color: #4ade80;
+    }
+    .result .msg {
+      font-size: 0.95rem;
+      color: #f87171;
+    }
+    .spinner {
+      display: inline-block;
+      width: 18px;
+      height: 18px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      margin-right: 8px;
+      vertical-align: middle;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Cek Saldo</h1>
+    <p class="subtitle">Fayupedia API</p>
+
+    <div class="info">
+      <div>
+        <span class="label">API ID</span>
+        <span class="value">5522</span>
+      </div>
+      <div>
+        <span class="label">Endpoint</span>
+        <span class="value">/api/balance</span>
+      </div>
+    </div>
+
+    <button id="btnCek" onclick="cekSaldo()">
+      Cek Saldo Sekarang
+    </button>
+
+    <div id="result" class="result"></div>
+  </div>
+
+  <script>
+    const API_URL = 'https://fayupedia.id/api/balance';
+    const API_ID = 5522;
+    const API_KEY = '6mnjom-ing8mx-a4csgp-6bwv4c-4zdv1l';
+
+    function formatRupiah(angka) {
+      return new Intl.NumberFormat('id-ID', {
+        style: 'currency',
+        currency: 'IDR',
+        minimumFractionDigits: 0
+      }).format(angka);
+    }
+
+    async function cekSaldo() {
+      const btn = document.getElementById('btnCek');
+      const result = document.getElementById('result');
+
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span> Memeriksa...';
+      result.className = 'result';
+      result.style.display = 'none';
+
+      try {
+        const formData = new FormData();
+        formData.append('api_id', API_ID);
+        formData.append('api_key', API_KEY);
+
+        // Alternatif: kirim sebagai JSON jika API mendukung
+        // const body = JSON.stringify({ api_id: API_ID, api_key: API_KEY });
+
+        const response = await fetch(API_URL, {
+          method: 'POST',
+          body: formData
+          // headers: { 'Content-Type': 'application/json' },
+          // body: body
+        });
+
+        const data = await response.json();
+
+        if (data.status === true) {
+          result.className = 'result success';
+          result.innerHTML = `
+            <div class="label">Saldo Anda</div>
+            <div class="balance">${formatRupiah(data.balance)}</div>
+            <div style="margin-top:8px;font-size:0.8rem;color:#86efac;">${data.msg || 'OK'}</div>
+          `;
+        } else {
+          result.className = 'result error';
+          result.innerHTML = `
+            <div class="label">Gagal</div>
+            <div class="msg">${data.msg || 'Terjadi kesalahan'}</div>
+          `;
+        }
+      } catch (err) {
+        result.className = 'result error';
+        result.innerHTML = `
+          <div class="label">Error</div>
+          <div class="msg">${err.message || 'Gagal menghubungi server'}</div>
+        `;
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = 'Cek Saldo Sekarang';
+      }
+    }
+  </script>
+</body>
+</html>
