@@ -3,711 +3,557 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Simulasi PPKA DAOP 8 | Realistik</title>
+<title>PPKA Simulator DAOP 8 | Wesel Garis Putus-Putus</title>
 <style>
   :root {
-    --bg:#0b0e14; --panel:#131820; --panel2:#1a2230; --border:#2a3444;
-    --green:#3dd68c; --red:#ff5c5c; --yellow:#f0b429; --blue:#4dabf7;
-    --text:#e6edf3; --muted:#8b9bb4;
+    --bg:#0f1419; --panel:#1a2332; --track:#1a1a1a; --hl:#48bb78;
+    --red:#e53e3e; --green:#38a169; --yellow:#d69e2e; --blue:#4299e1;
+    --text:#e2e8f0; --muted:#a0aec0;
   }
   *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+  body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);height:100vh;overflow:hidden;display:flex;flex-direction:column}
 
-  #screen-select{min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:28px 14px 50px}
-  .logo-area{text-align:center;margin-bottom:24px}
-  .logo-area h1{font-size:1.7rem;background:linear-gradient(90deg,var(--blue),var(--green));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-  .logo-area p{color:var(--muted);font-size:.92rem;margin-top:6px}
-  .station-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;max-width:980px;width:100%}
-  .station-card{background:var(--panel);border:1px solid var(--border);border-radius:11px;padding:15px;cursor:pointer;transition:.2s;position:relative}
-  .station-card:hover{border-color:var(--blue);transform:translateY(-3px);box-shadow:0 8px 20px rgba(31,111,235,.18)}
-  .station-card .code{font-size:1.45rem;font-weight:700;color:var(--blue)}
-  .station-card .name{font-size:.98rem;margin:3px 0}
-  .station-card .desc{font-size:.74rem;color:var(--muted);line-height:1.35}
-  .badge-type{position:absolute;top:9px;right:9px;font-size:.6rem;padding:2px 7px;border-radius:10px;background:var(--panel2);border:1px solid var(--border)}
-  .badge-type.besar{color:var(--green);border-color:var(--green)}
-  .badge-type.sedang{color:var(--yellow);border-color:var(--yellow)}
+  .topbar{display:flex;align-items:center;justify-content:space-between;padding:8px 14px;background:#151c27;border-bottom:1px solid #2d3748;flex-shrink:0;z-index:100}
+  .topbar-left{display:flex;align-items:center;gap:12px}
+  .time-box{background:#1a2332;border:1px solid #2d3748;border-radius:20px;padding:4px 12px;font-family:Consolas,monospace;font-size:.95rem;display:flex;gap:8px;align-items:center}
+  .station-select{background:#1a2332;border:1px solid #2d3748;color:var(--text);padding:5px 10px;border-radius:6px;font-size:.85rem}
 
-  #screen-panel{display:none}
-  .topbar{display:flex;justify-content:space-between;align-items:center;background:var(--panel);border-bottom:1px solid var(--border);padding:9px 14px;flex-wrap:wrap;gap:8px}
-  .topbar-left h2{font-size:1.08rem;color:var(--blue)}
-  .topbar-left span{font-size:.76rem;color:var(--muted)}
-  .topbar-right{display:flex;align-items:center;gap:11px}
-  .clock{font-family:Consolas,monospace;font-size:1.25rem;color:var(--green);letter-spacing:1px}
-  .btn-back{background:transparent;border:1px solid var(--border);color:var(--muted);padding:5px 11px;border-radius:6px;cursor:pointer;font-size:.78rem}
-  .btn-back:hover{border-color:var(--blue);color:var(--blue)}
+  .diagram-wrap{flex:1;overflow:auto;position:relative;background:linear-gradient(rgba(45,55,72,.18) 1px,transparent 1px),linear-gradient(90deg,rgba(45,55,72,.18) 1px,transparent 1px);background-size:28px 28px}
+  .diagram{position:relative;width:1100px;height:400px;margin:45px auto 25px}
 
-  .workspace{display:grid;grid-template-columns:1fr 330px;height:calc(100vh - 52px)}
-  @media(max-width:960px){.workspace{grid-template-columns:1fr;height:auto}}
-  .left-col{padding:11px;overflow-y:auto}
-  .right-col{background:var(--panel);border-left:1px solid var(--border);padding:11px;overflow-y:auto;display:flex;flex-direction:column;gap:11px}
+  /* Jalur utama */
+  .track{position:absolute;height:5px;background:#1a1a1a;border-radius:2px;z-index:2;transition:.2s}
+  .track.hl{background:#2f855a;box-shadow:0 0 0 3px #48bb78,0 0 10px rgba(72,187,120,.4)}
 
-  .panel-box{background:var(--panel2);border:1px solid var(--border);border-radius:9px;padding:11px}
-  .panel-title{font-size:.68rem;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:9px;display:flex;justify-content:space-between;align-items:center}
+  /* Wesel = garis putus-putus */
+  .wesel-line{
+    position:absolute;height:0;
+    border-top:3px dashed #718096;
+    transform-origin:left center;
+    z-index:3;cursor:pointer;
+    transition:border-color .2s, border-style .2s;
+  }
+  .wesel-line:hover{border-color:var(--blue)}
+  .wesel-line.active{
+    border-top:3px solid var(--hl);
+    box-shadow:0 0 8px rgba(72,187,120,.5);
+  }
 
-  .track-canvas{position:relative;height:360px;background:#080b10;border-radius:8px;border:1px solid var(--border);overflow:hidden;margin-bottom:11px}
-  .track-line{position:absolute;height:5px;background:#3a4555;border-radius:3px;z-index:1}
-  .route-highlight{position:absolute;height:9px;border:3px solid var(--green);border-radius:5px;box-shadow:0 0 11px rgba(61,214,140,.5);z-index:2;pointer-events:none;opacity:0;transition:opacity .25s}
-  .route-highlight.show{opacity:1}
+  /* Label wesel kecil */
+  .wesel-label{
+    position:absolute;font-size:.58rem;font-weight:700;color:#a0aec0;
+    background:rgba(26,35,50,.85);padding:1px 4px;border-radius:3px;
+    z-index:6;pointer-events:none;
+  }
 
-  .signal-dot{position:absolute;width:15px;height:15px;border-radius:50%;border:2px solid #111;box-shadow:0 0 7px currentColor;z-index:5;cursor:pointer;transition:transform .12s}
-  .signal-dot:hover{transform:scale(1.25)}
-  .signal-dot.red{background:var(--red);color:var(--red)}
-  .signal-dot.green{background:var(--green);color:var(--green)}
-  .signal-dot.yellow{background:var(--yellow);color:var(--yellow)}
+  .signal{position:absolute;width:14px;height:32px;background:#1a202c;border:1px solid #4a5568;border-radius:3px;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:10}
+  .signal:hover{border-color:var(--blue)}
+  .sig-light{width:8px;height:8px;border-radius:50%;background:#4a5568}
+  .sig-light.red{background:var(--red);box-shadow:0 0 6px var(--red)}
+  .sig-light.green{background:var(--green);box-shadow:0 0 6px var(--green)}
+  .sig-light.yellow{background:var(--yellow);box-shadow:0 0 6px var(--yellow)}
 
-  .wesel-btn{position:absolute;width:22px;height:22px;background:#1e2836;border:2px solid var(--blue);border-radius:4px;font-size:8px;font-weight:700;color:var(--blue);display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:6}
-  .wesel-btn.belok{background:var(--blue);color:#000}
+  .label{position:absolute;font-size:.7rem;color:#a0aec0;z-index:5}
+  .label.num{font-weight:700;color:#cbd5e0;font-size:.85rem}
+  .dir-label{position:absolute;font-size:.72rem;font-weight:600;color:var(--blue);background:rgba(26,35,50,.9);padding:3px 8px;border-radius:4px;z-index:5}
 
-  .st-label{position:absolute;font-size:.66rem;color:var(--muted);background:rgba(0,0,0,.55);padding:2px 6px;border-radius:3px;z-index:3}
+  .train{position:absolute;height:16px;min-width:85px;padding:0 6px;background:linear-gradient(90deg,#2b6cb0,#4299e1);border-radius:3px;font-size:.62rem;font-weight:600;color:#fff;display:flex;align-items:center;justify-content:center;z-index:20;transition:left 2s linear;box-shadow:0 2px 8px rgba(0,0,0,.4);white-space:nowrap;cursor:pointer}
+  .train.stopped{background:linear-gradient(90deg,#c53030,#e53e3e)}
+  .train.departing{background:linear-gradient(90deg,#276749,#38a169)}
+  .train.selected{outline:2px solid var(--yellow)}
 
-  .train-box{position:absolute;height:21px;min-width:100px;padding:0 7px;background:linear-gradient(90deg,#1a56db,#3b82f6);border-radius:4px;font-size:.63rem;font-weight:600;color:#fff;display:flex;align-items:center;justify-content:center;white-space:nowrap;z-index:7;transition:left 1.25s cubic-bezier(.25,.8,.25,1);box-shadow:0 0 11px rgba(59,130,246,.4);cursor:pointer}
-  .train-box.stopped{background:linear-gradient(90deg,#b91c1c,#ef4444)}
-  .train-box.departing{background:linear-gradient(90deg,#047857,#10b981)}
-  .train-box.selected{outline:2px solid var(--yellow)}
+  .notif-area{position:absolute;top:10px;left:50%;transform:translateX(-50%);width:420px;max-width:94%;z-index:200;display:flex;flex-direction:column;gap:8px}
+  .notif{background:#1a2332;border:1px solid #4a5568;border-left:4px solid var(--yellow);border-radius:8px;padding:11px 13px;box-shadow:0 6px 20px rgba(0,0,0,.4)}
+  .notif.from-left{border-left-color:var(--blue)}
+  .notif.from-right{border-left-color:var(--green)}
+  .notif-title{font-size:.75rem;color:var(--muted);margin-bottom:3px}
+  .notif-body{font-size:.88rem;font-weight:600;margin-bottom:8px}
+  .notif-actions{display:flex;gap:8px}
+  .notif-btn{flex:1;padding:6px;border:none;border-radius:5px;font-size:.78rem;cursor:pointer;font-weight:600}
+  .notif-btn.izin{background:#276749;color:#fff}
+  .notif-btn.tolak{background:#742a2a;color:#fff}
 
-  .btn-row{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:9px}
-  button.act{background:#1e2836;border:1px solid var(--border);color:var(--text);padding:7px 11px;border-radius:6px;cursor:pointer;font-size:.78rem;transition:.15s}
-  button.act:hover{border-color:var(--blue);background:#243044}
-  button.act.primary{background:#0d5c2e;border-color:#16a34a}
-  button.act.primary:hover{background:#15803d}
-  button.act.danger{background:#7f1d1d;border-color:#dc2626}
-  button.act.danger:hover{background:#991b1b}
-  button.act.warn{background:#713f12;border-color:#d97706}
-  button.act:disabled{opacity:.35;cursor:not-allowed}
+  .sop-panel{position:absolute;right:12px;top:55px;width:220px;background:rgba(26,35,50,.97);border:1px solid #2d3748;border-radius:10px;padding:12px;z-index:80;display:none}
+  .sop-panel.show{display:block}
+  .sop-panel h4{font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px}
+  .sop-train{font-size:.88rem;font-weight:600;margin-bottom:10px;color:var(--blue)}
+  .sop-step{display:flex;align-items:center;gap:8px;padding:7px 9px;margin-bottom:5px;background:#151c27;border-radius:6px;border:1px solid #2d3748;font-size:.78rem;cursor:pointer}
+  .sop-step.done{border-color:var(--green);background:#1a2e1a}
+  .sop-step.locked{opacity:.4;cursor:not-allowed}
+  .sop-step .num{width:20px;height:20px;border-radius:50%;background:#2d3748;display:flex;align-items:center;justify-content:center;font-size:.68rem;font-weight:700}
+  .sop-step.done .num{background:var(--green);color:#000}
+  .sop-hint{font-size:.68rem;color:var(--muted);margin-top:8px}
 
-  .status-row{display:flex;flex-wrap:wrap;gap:7px;margin-top:7px}
-  .pill{font-size:.7rem;padding:3px 9px;border-radius:18px;background:#1e2836;border:1px solid var(--border)}
-  .pill.ok{border-color:var(--green);color:var(--green)}
-  .pill.bad{border-color:var(--red);color:var(--red)}
-  .pill.warn{border-color:var(--yellow);color:var(--yellow)}
+  .route-info{position:absolute;top:12px;left:12px;background:rgba(26,35,50,.95);border:1px solid #2d3748;border-radius:8px;padding:8px 12px;font-size:.75rem;z-index:50;max-width:240px}
+  .route-info b{color:var(--green)}
 
-  .ka-table{width:100%;font-size:.76rem;border-collapse:collapse}
-  .ka-table th{text-align:left;color:var(--muted);font-weight:500;padding:3px 5px;border-bottom:1px solid var(--border)}
-  .ka-table td{padding:5px;border-bottom:1px solid #1e2836}
-  .tag{font-size:.62rem;padding:1px 5px;border-radius:4px;background:#1e2836}
-  .tag.in{color:var(--blue)}.tag.out{color:var(--green)}.tag.stop{color:var(--yellow)}
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:300;display:none;align-items:center;justify-content:center}
+  .modal-overlay.show{display:flex}
+  .modal{background:#1a2332;border:1px solid #2d3748;border-radius:12px;width:340px;max-width:95%;max-height:65vh;overflow:hidden}
+  .modal-header{padding:11px 14px;border-bottom:1px solid #2d3748;display:flex;justify-content:space-between;align-items:center}
+  .modal-close{background:none;border:none;color:var(--muted);font-size:1.2rem;cursor:pointer}
+  .modal-body{padding:12px 14px;overflow-y:auto;max-height:50vh}
+  .sched-item{display:flex;justify-content:space-between;gap:6px;padding:7px 0;border-bottom:1px solid #2d3748;font-size:.82rem}
+  .sched-item .time{color:var(--blue);font-family:Consolas,monospace}
 
-  .log-box{flex:1;min-height:150px;max-height:220px;overflow-y:auto;background:#080b10;border-radius:6px;padding:7px;font-family:Consolas,monospace;font-size:.7rem}
-  .log-line{margin-bottom:2px;line-height:1.3}
-  .log-line .t{color:var(--muted)}
-  .log-line .ok{color:var(--green)}.log-line .warn{color:var(--yellow)}.log-line .err{color:var(--red)}.log-line .info{color:var(--blue)}
+  .log-mini{position:absolute;bottom:10px;left:10px;width:270px;max-height:110px;overflow-y:auto;background:rgba(26,35,50,.93);border:1px solid #2d3748;border-radius:8px;padding:7px;font-family:Consolas,monospace;font-size:.62rem;z-index:50}
+  .log-mini div{margin-bottom:2px}
+  .log-mini .t{color:var(--muted)}
+  .log-mini .ok{color:var(--green)}
+  .log-mini .warn{color:var(--yellow)}
+  .log-mini .err{color:var(--red)}
+  .log-mini .info{color:var(--blue)}
 
-  .sched-item{font-size:.74rem;padding:4px 0;border-bottom:1px solid #1e2836;display:flex;justify-content:space-between;gap:6px}
-  .sched-item:last-child{border-bottom:none}
-  .sched-time{color:var(--blue);font-family:Consolas,monospace;min-width:42px}
-  .neighbor{display:flex;justify-content:space-between;font-size:.76rem;padding:4px 0;border-bottom:1px solid #1e2836}
-  .neighbor:last-child{border-bottom:none}
-  .n-status.aman{color:var(--green)}.n-status.sibuk{color:var(--yellow)}.n-status.blok{color:var(--red)}
+  .bottombar{display:flex;align-items:center;justify-content:space-between;padding:9px 14px;background:#151c27;border-top:1px solid #2d3748;flex-shrink:0;z-index:100}
+  .neighbor-btn{background:#1a2332;border:1px solid #2d3748;border-radius:18px;padding:7px 14px;font-size:.78rem;display:flex;align-items:center;gap:7px;min-width:130px}
+  .neighbor-btn .arrow{color:var(--muted);font-size:.68rem}
+  .ctrl-buttons{display:flex;gap:9px}
+  .ctrl-btn{width:54px;height:54px;border-radius:50%;border:none;background:#1a2332;color:var(--text);font-size:.6rem;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer}
+  .ctrl-btn:hover{background:#2d3748}
+  .ctrl-btn .icon{font-size:1.1rem;margin-bottom:1px}
+  .ctrl-btn.active{background:#2b6cb0}
 </style>
 </head>
 <body>
 
-<div id="screen-select">
-  <div class="logo-area">
-    <h1>SIMULASI PPKA DAOP 8</h1>
-    <p>Jalur & jadwal mendekati nyata • Sinyal bisa ditekan manual • Auto merah saat KA berhenti</p>
+<div class="topbar">
+  <div class="topbar-left">
+    <div class="time-box"><span id="clock">04:00:00</span><span style="color:var(--yellow)">☀ 28°C</span></div>
+    <select class="station-select" onchange="changeStation(this.value)">
+      <option value="SGU">SGU — Surabaya Gubeng</option>
+      <option value="SBI">SBI — Surabaya Pasarturi</option>
+      <option value="WO">WO — Wonokromo</option>
+      <option value="ML">ML — Malang</option>
+    </select>
   </div>
-  <div class="station-grid" id="stationGrid"></div>
 </div>
 
-<div id="screen-panel">
-  <div class="topbar">
-    <div class="topbar-left">
-      <h2 id="stName">—</h2>
-      <span id="stCode">—</span>
-    </div>
-    <div class="topbar-right">
-      <div class="clock" id="clock">00:00:00</div>
-      <button class="btn-back" onclick="backToSelect()">← Ganti Stasiun</button>
-    </div>
+<div class="diagram-wrap">
+  <div class="route-info" id="routeInfo">Sistem siap.<br>Jalur dipilih otomatis. Atur wesel (garis putus-putus).</div>
+  <div class="notif-area" id="notifArea"></div>
+  <div class="diagram" id="diagram"></div>
+
+  <div class="sop-panel" id="sopPanel">
+    <h4>SOP Keberangkatan</h4>
+    <div class="sop-train" id="sopTrainName">—</div>
+    <div class="sop-step locked" id="sop1" onclick="doSOP(1)"><div class="num">1</div> Penutupan Pintu</div>
+    <div class="sop-step locked" id="sop2" onclick="doSOP(2)"><div class="num">2</div> Warta</div>
+    <div class="sop-step locked" id="sop3" onclick="doSOP(3)"><div class="num">3</div> S41</div>
+    <div class="sop-step locked" id="sop4" onclick="doSOP(4)"><div class="num">4</div> S35</div>
+    <div class="sop-hint" id="sopHint">Klik kereta yang berhenti.</div>
   </div>
 
-  <div class="workspace">
-    <div class="left-col">
-      <div class="panel-box">
-        <div class="panel-title">
-          <span>Emplasemen (klik sinyal untuk ubah warna)</span>
-          <span id="layoutName" style="color:var(--blue)"></span>
-        </div>
-        <div class="track-canvas" id="trackCanvas"></div>
+  <div class="log-mini" id="logBox"></div>
+</div>
 
-        <div class="btn-row" id="routeButtons"></div>
-        <div class="btn-row">
-          <button class="act primary" onclick="spawnIncoming()">Datangkan KA (Manual)</button>
-          <button class="act" onclick="spawnFromSchedule()">Datangkan sesuai Jadwal</button>
-          <button class="act warn" onclick="giveWarta('aman')">Warta Aman</button>
-          <button class="act" onclick="giveWarta('lepas')">Warta Lepas</button>
-          <button class="act danger" onclick="emergencyStop()">STOP DARURAT</button>
-          <button class="act" onclick="resetPanel()">Reset</button>
-        </div>
-        <div class="status-row">
-          <span class="pill ok" id="pillInterlock">Interlocking: AKTIF</span>
-          <span class="pill ok" id="pillBlok">Blok: NORMAL</span>
-          <span class="pill" id="pillRoute">Rute: -</span>
-          <span class="pill" id="pillKaCount">KA: 0</span>
-        </div>
-      </div>
-    </div>
-
-    <div class="right-col">
-      <div class="panel-box">
-        <div class="panel-title">Kereta di Emplasemen</div>
-        <div style="max-height:130px;overflow-y:auto">
-          <table class="ka-table">
-            <thead><tr><th>KA</th><th>Jalur</th><th>Status</th></tr></thead>
-            <tbody id="kaBody"><tr><td colspan="3" style="color:var(--muted);text-align:center">Belum ada KA</td></tr></tbody>
-          </table>
-        </div>
-      </div>
-
-      <div class="panel-box">
-        <div class="panel-title">Jadwal Pendekatan (Gapeka-like)</div>
-        <div id="schedList" style="max-height:130px;overflow-y:auto"></div>
-      </div>
-
-      <div class="panel-box">
-        <div class="panel-title">Stasiun Tetangga</div>
-        <div id="neighborList"></div>
-      </div>
-
-      <div class="panel-box" style="flex:1;display:flex;flex-direction:column">
-        <div class="panel-title">Log PPKA</div>
-        <div class="log-box" id="logBox"></div>
-      </div>
-    </div>
+<div class="modal-overlay" id="jadwalModal">
+  <div class="modal">
+    <div class="modal-header"><h3>📅 Jadwal</h3><button class="modal-close" onclick="closeJadwal()">×</button></div>
+    <div class="modal-body" id="schedList"></div>
   </div>
+</div>
+
+<div class="bottombar">
+  <div class="neighbor-btn"><span>📞</span><div><div id="leftName">Surabaya Kota</div><div class="arrow" id="leftDir">← UTARA</div></div></div>
+  <div class="ctrl-buttons">
+    <button class="ctrl-btn active" onclick="setMode(this)"><span class="icon">🎛</span>KONTROL</button>
+    <button class="ctrl-btn" onclick="setMode(this)"><span class="icon">🔔</span>GENTA</button>
+    <button class="ctrl-btn" onclick="openJadwal()"><span class="icon">📅</span>JADWAL</button>
+    <button class="ctrl-btn" onclick="setMode(this)"><span class="icon">⚠</span>INSIDEN</button>
+    <button class="ctrl-btn" onclick="giveWarta()"><span class="icon">📖</span>WARTA</button>
+  </div>
+  <div class="neighbor-btn" style="justify-content:flex-end"><div style="text-align:right"><div id="rightName">Wonokromo</div><div class="arrow" id="rightDir">SELATAN →</div></div><span>📞</span></div>
 </div>
 
 <script>
-/* ========== DATA STASIUN (jumlah jalur mendekati nyata) ========== */
 const STATIONS = {
-  SGU: {
-    code:"SGU", name:"Surabaya Gubeng", type:"Besar A",
-    desc:"6 jalur. Arah selatan (Wonokromo/Malang) & utara (Kota/Pasarturi).",
-    tracks:6,
-    leftDir:"← Utara (Kota / Pasarturi / Sidotopo)",
-    rightDir:"Selatan (Wonokromo / Sidoarjo / Malang) →",
-    neighbors:[
-      {code:"WO",name:"Wonokromo",status:"aman"},
-      {code:"SB",name:"Surabaya Kota",status:"sibuk"},
-      {code:"SDA",name:"Sidoarjo",status:"aman"}
-    ],
+  SGU:{name:"Surabaya Gubeng",left:{name:"Surabaya Kota",dir:"← UTARA"},right:{name:"Wonokromo",dir:"SELATAN →"},
     schedule:[
-      {time:"04:23", name:"Jayabaya", dir:"Malang", type:"in"},
-      {time:"06:30", name:"Gaya Baru Malam Selatan", dir:"Jakarta", type:"out"},
-      {time:"08:39", name:"Jayabaya", dir:"Malang", type:"out"},
-      {time:"09:35", name:"Arjuno Ekspres", dir:"Malang", type:"out"},
-      {time:"10:47", name:"Sancaka", dir:"Yogyakarta", type:"in"},
-      {time:"15:43", name:"Jayabaya", dir:"Pasarsenen", type:"out"},
-      {time:"18:10", name:"Mutiara Selatan", dir:"Bandung", type:"out"},
-      {time:"19:24", name:"Pandalungan", dir:"Gambir", type:"out"}
-    ]
-  },
-  SBI: {
-    code:"SBI", name:"Surabaya Pasarturi", type:"Besar A",
-    desc:"8 jalur (disederhanakan 5). Lintas utara Jawa.",
-    tracks:5,
-    leftDir:"← Utara (Lamongan / Bojonegoro / Semarang)",
-    rightDir:"Selatan (Kota / Gubeng) →",
-    neighbors:[
-      {code:"LMG",name:"Lamongan",status:"aman"},
-      {code:"SB",name:"Surabaya Kota",status:"aman"},
-      {code:"TES",name:"Tandes",status:"sibuk"}
-    ],
+      {time:"04:05",name:"Jayabaya",from:"Surabaya Kota",dir:"left"},
+      {time:"04:20",name:"CL Dhoho",from:"Wonokromo",dir:"right"},
+      {time:"04:45",name:"Gaya Baru MS",from:"Wonokromo",dir:"right"},
+      {time:"05:10",name:"Sancaka",from:"Surabaya Kota",dir:"left"},
+      {time:"05:35",name:"Arjuno Ekspres",from:"Wonokromo",dir:"right"},
+      {time:"06:00",name:"Mutiara Selatan",from:"Wonokromo",dir:"right"}
+    ]},
+  SBI:{name:"Surabaya Pasarturi",left:{name:"Lamongan",dir:"← UTARA"},right:{name:"Surabaya Gubeng",dir:"SELATAN →"},
     schedule:[
-      {time:"04:04", name:"Jayabaya", dir:"Malang", type:"out"},
-      {time:"05:15", name:"Sembrani", dir:"Gambir", type:"out"},
-      {time:"07:40", name:"Argo Bromo Anggrek", dir:"Gambir", type:"out"},
-      {time:"08:18", name:"Jayabaya", dir:"Malang", type:"out"},
-      {time:"14:20", name:"Gumarang", dir:"Pasarsenen", type:"in"},
-      {time:"16:05", name:"Airlangga", dir:"Pasarsenen", type:"out"},
-      {time:"20:10", name:"Harina", dir:"Bandung", type:"out"}
-    ]
-  },
-  SB: {
-    code:"SB", name:"Surabaya Kota (Semut)", type:"Besar B",
-    desc:"Emplasemen barat 4 jalur + simpan. Hub lokal.",
-    tracks:4,
-    leftDir:"← Sidotopo / Pasarturi",
-    rightDir:"Gubeng / Wonokromo →",
-    neighbors:[
-      {code:"SGU",name:"Gubeng",status:"sibuk"},
-      {code:"SBI",name:"Pasarturi",status:"aman"},
-      {code:"SDT",name:"Sidotopo",status:"aman"}
-    ],
+      {time:"04:05",name:"Jayabaya",from:"Surabaya Gubeng",dir:"right"},
+      {time:"04:25",name:"Sembrani",from:"Lamongan",dir:"left"},
+      {time:"04:50",name:"Argo Bromo",from:"Lamongan",dir:"left"},
+      {time:"05:20",name:"Airlangga",from:"Lamongan",dir:"left"},
+      {time:"05:50",name:"Gumarang",from:"Surabaya Gubeng",dir:"right"}
+    ]},
+  WO:{name:"Wonokromo",left:{name:"Gubeng",dir:"← UTARA"},right:{name:"Sidoarjo",dir:"SELATAN →"},
     schedule:[
-      {time:"05:50", name:"CL Dhoho", dir:"Malang", type:"out"},
-      {time:"06:20", name:"CL Penataran", dir:"Blitar", type:"out"},
-      {time:"07:15", name:"CL Jenggala", dir:"Sidoarjo", type:"out"},
-      {time:"12:30", name:"CL Supas", dir:"Pasuruan", type:"out"},
-      {time:"17:00", name:"CL Dhoho", dir:"Kertosono", type:"in"}
-    ]
-  },
-  WO: {
-    code:"WO", name:"Wonokromo", type:"Besar C",
-    desc:"5 jalur. Persimpangan penting lintas selatan & timur.",
-    tracks:5,
-    leftDir:"← Gubeng / Kota",
-    rightDir:"Sidoarjo / Mojokerto / Malang →",
-    neighbors:[
-      {code:"SGU",name:"Gubeng",status:"aman"},
-      {code:"SDA",name:"Sidoarjo",status:"aman"},
-      {code:"MR",name:"Mojokerto",status:"sibuk"}
-    ],
+      {time:"04:10",name:"CL Penataran",from:"Gubeng",dir:"left"},
+      {time:"04:40",name:"Pasundan",from:"Gubeng",dir:"left"},
+      {time:"05:15",name:"Sri Tanjung",from:"Sidoarjo",dir:"right"},
+      {time:"05:45",name:"Logawa",from:"Gubeng",dir:"left"}
+    ]},
+  ML:{name:"Malang",left:{name:"Lawang",dir:"← UTARA"},right:{name:"Kepanjen",dir:"SELATAN →"},
     schedule:[
-      {time:"05:10", name:"CL Penataran", dir:"Malang", type:"in"},
-      {time:"06:45", name:"Pasundan", dir:"Bandung", type:"in"},
-      {time:"09:20", name:"Sri Tanjung", dir:"Ketapang", type:"out"},
-      {time:"11:05", name:"Logawa", dir:"Purwokerto", type:"in"},
-      {time:"16:40", name:"Probowangi", dir:"Ketapang", type:"out"}
-    ]
-  },
-  SDA: {
-    code:"SDA", name:"Sidoarjo", type:"Sedang",
-    desc:"4 jalur. Lintas selatan menuju Bangil–Malang.",
-    tracks:4,
-    leftDir:"← Wonokromo / Surabaya",
-    rightDir:"Bangil / Malang / Probolinggo →",
-    neighbors:[
-      {code:"WO",name:"Wonokromo",status:"aman"},
-      {code:"BG",name:"Bangil",status:"sibuk"},
-      {code:"MR",name:"Mojokerto",status:"aman"}
-    ],
-    schedule:[
-      {time:"05:40", name:"Jayabaya", dir:"Malang", type:"in"},
-      {time:"07:25", name:"CL Supas", dir:"Pasuruan", type:"out"},
-      {time:"10:15", name:"Ranggajati", dir:"Jember", type:"in"},
-      {time:"14:50", name:"Mutiara Timur", dir:"Ketapang", type:"out"}
-    ]
-  },
-  ML: {
-    code:"ML", name:"Malang", type:"Besar A",
-    desc:"Stasiun utama Malang Raya (\~5 jalur efektif).",
-    tracks:5,
-    leftDir:"← Lawang / Surabaya",
-    rightDir:"Kepanjen / Blitar →",
-    neighbors:[
-      {code:"LW",name:"Lawang",status:"aman"},
-      {code:"KPJ",name:"Kepanjen",status:"aman"},
-      {code:"BL",name:"Blitar",status:"sibuk"}
-    ],
-    schedule:[
-      {time:"05:30", name:"Arjuno Ekspres", dir:"Surabaya", type:"out"},
-      {time:"06:20", name:"Jayabaya", dir:"Surabaya", type:"in"},
-      {time:"11:37", name:"Arjuno Ekspres", dir:"Surabaya", type:"in"},
-      {time:"13:45", name:"Jayabaya", dir:"Pasarsenen", type:"out"},
-      {time:"16:10", name:"Gajayana", dir:"Gambir", type:"out"}
-    ]
-  },
-  LMG: {
-    code:"LMG", name:"Lamongan", type:"Sedang",
-    desc:"Lintas utara menuju Bojonegoro–Cepu.",
-    tracks:3,
-    leftDir:"← Pasarturi / Surabaya",
-    rightDir:"Babat / Bojonegoro →",
-    neighbors:[
-      {code:"SBI",name:"Pasarturi",status:"aman"},
-      {code:"BBT",name:"Babat",status:"aman"},
-      {code:"BJ",name:"Bojonegoro",status:"sibuk"}
-    ],
-    schedule:[
-      {time:"06:50", name:"CL Arjonegoro", dir:"Bojonegoro", type:"out"},
-      {time:"09:10", name:"Airlangga", dir:"Pasarsenen", type:"in"},
-      {time:"15:30", name:"Kertajaya", dir:"Pasarsenen", type:"out"}
-    ]
-  },
-  MR: {
-    code:"MR", name:"Mojokerto", type:"Sedang",
-    desc:"Persilangan lintas selatan & barat.",
-    tracks:4,
-    leftDir:"← Wonokromo / Surabaya",
-    rightDir:"Kertosono / Madiun →",
-    neighbors:[
-      {code:"WO",name:"Wonokromo",status:"aman"},
-      {code:"SDA",name:"Sidoarjo",status:"aman"},
-      {code:"KTS",name:"Kertosono",status:"sibuk"}
-    ],
-    schedule:[
-      {time:"06:15", name:"CL Dhoho", dir:"Kertosono", type:"out"},
-      {time:"08:55", name:"Sancaka", dir:"Yogyakarta", type:"in"},
-      {time:"12:40", name:"Pasundan", dir:"Bandung", type:"out"},
-      {time:"17:20", name:"Mutiara Selatan", dir:"Bandung", type:"in"}
-    ]
-  }
+      {time:"04:10",name:"Arjuno Ekspres",from:"Kepanjen",dir:"right"},
+      {time:"04:35",name:"Jayabaya",from:"Lawang",dir:"left"},
+      {time:"05:10",name:"Gajayana",from:"Kepanjen",dir:"right"},
+      {time:"05:40",name:"Jayabaya",from:"Kepanjen",dir:"right"}
+    ]}
 };
 
-const KA_POOL = [
-  {name:"Argo Bromo Anggrek",num:"1/2"},{name:"Argo Semeru",num:"9/10"},
-  {name:"Bima",num:"5/6"},{name:"Turangga",num:"65/66"},{name:"Sancaka",num:"81/82"},
-  {name:"Gajayana",num:"55/56"},{name:"Jayabaya",num:"107/108"},{name:"Mutiara Timur",num:"181/182"},
-  {name:"Probowangi",num:"287/288"},{name:"Airlangga",num:"271/272"},{name:"Sritanjung",num:"177/178"},
-  {name:"Commuter Supas",num:"Lokal"},{name:"Commuter Jenggala",num:"Lokal"},{name:"KA Barang",num:"BB"}
-];
+let current="SGU", trains=[], signals={}, weselState={}, pending=[], nextId=1;
+let simMinutes=4*60, spawned=new Set(), selectedTrain=null, sopStep=0, assignedTrack=0;
 
-let currentStation=null, trains=[], currentRoute=null, emergency=false, wesel={}, nextTrainId=1, trackTops=[];
+const SY=75, GAP=55, LEFT=80, MID_L=290, MID_R=780, RIGHT=1000;
 
-function buildSelect(){
-  const grid=document.getElementById('stationGrid');
-  grid.innerHTML='';
-  Object.values(STATIONS).forEach(st=>{
-    const card=document.createElement('div');
-    card.className='station-card';
-    card.innerHTML=`<div class="badge-type \( {st.type.includes('Besar')?'besar':'sedang'}"> \){st.type}</div>
-      <div class="code">\( {st.code}</div><div class="name"> \){st.name}</div>
-      <div class="desc">${st.desc}</div>`;
-    card.onclick=()=>enterStation(st.code);
-    grid.appendChild(card);
-  });
+function changeStation(code){
+  current=code; trains=[]; signals={}; weselState={}; pending=[]; spawned.clear();
+  selectedTrain=null; sopStep=0; assignedTrack=0;
+  document.getElementById("diagram").innerHTML="";
+  document.getElementById("notifArea").innerHTML="";
+  document.getElementById("sopPanel").classList.remove("show");
+  document.getElementById("routeInfo").innerHTML="Sistem siap.<br>Jalur dipilih otomatis. Atur wesel (garis putus-putus).";
+  buildDiagram(); updateNeighbors();
+  log("Pindah ke stasiun "+STATIONS[code].name,"info");
 }
 
-function enterStation(code){
-  currentStation=STATIONS[code];
-  trains=[]; currentRoute=null; emergency=false; wesel={};
-  for(let i=1;i<=currentStation.tracks;i++) wesel[i]=false;
+function buildDiagram(){
+  const d=document.getElementById("diagram");
+  const st=STATIONS[current];
 
-  document.getElementById('screen-select').style.display='none';
-  document.getElementById('screen-panel').style.display='block';
-  document.getElementById('stName').textContent=currentStation.name;
-  document.getElementById('stCode').textContent=`Kode: ${currentStation.code} • ${currentStation.tracks} jalur • DAOP 8`;
-  document.getElementById('layoutName').textContent=currentStation.code;
+  d.innerHTML=`
+    <div class="dir-label" style="left:10px;top:10px">\( {st.left.name}<br><small> \){st.left.dir}</small></div>
+    <div class="dir-label" style="right:10px;top:10px;text-align:right">\( {st.right.name}<br><small> \){st.right.dir}</small></div>
+  `;
 
-  buildTrackLayout();
-  buildRouteButtons();
-  updateNeighbors();
-  updateSchedule();
-  updateKaTable();
-  updateStatusPills();
-  clearHighlights();
-  log(`Dinas dimulai di \( {currentStation.name} ( \){currentStation.tracks} jalur)`, 'info');
-  log('Klik sinyal untuk ubah warna manual. KA berhenti → sinyal masuk otomatis MERAH.', 'ok');
-}
+  // 4 jalur utama
+  for(let i=0;i<4;i++){
+    const y=SY+i*GAP;
+    const roman=["I","II","III","IV"][i];
 
-function backToSelect(){
-  document.getElementById('screen-panel').style.display='none';
-  document.getElementById('screen-select').style.display='flex';
-  document.getElementById('logBox').innerHTML='';
-}
+    addTrack(d, LEFT, y, MID_L-LEFT-25, "appL"+(i+1));
+    addTrack(d, MID_L, y, MID_R-MID_L, "track"+(i+1));
+    addTrack(d, MID_R+25, y, RIGHT-MID_R-25, "appR"+(i+1));
 
-function buildTrackLayout(){
-  const canvas=document.getElementById('trackCanvas');
-  canvas.innerHTML='';
-  const n=currentStation.tracks;
-  const gap=Math.min(52,(360-100)/n);
-  trackTops=[];
+    const lbl=document.createElement("div");
+    lbl.className="label num";
+    lbl.style.cssText=`left:\( {MID_L+(MID_R-MID_L)/2-8}px;top: \){y-16}px`;
+    lbl.textContent="Jalur "+roman;
+    d.appendChild(lbl);
 
-  const leftL=document.createElement('div');
-  leftL.className='st-label'; leftL.style.cssText='left:7px;top:7px;';
-  leftL.textContent=currentStation.leftDir; canvas.appendChild(leftL);
-
-  const rightL=document.createElement('div');
-  rightL.className='st-label'; rightL.style.cssText='right:7px;top:7px;';
-  rightL.textContent=currentStation.rightDir; canvas.appendChild(rightL);
-
-  const midL=document.createElement('div');
-  midL.className='st-label';
-  midL.style.cssText='left:50%;transform:translateX(-50%);bottom:8px;font-weight:600;color:var(--blue)';
-  midL.textContent=`${currentStation.code} — ${currentStation.name}`;
-  canvas.appendChild(midL);
-
-  for(let i=1;i<=n;i++){
-    const top=48+(i-1)*gap;
-    trackTops[i]=top;
-
-    const track=document.createElement('div');
-    track.className='track-line'; track.id=`track${i}`;
-    track.style.cssText=`left:4%;width:92%;top:${top}px;`;
-    canvas.appendChild(track);
-
-    const hl=document.createElement('div');
-    hl.className='route-highlight'; hl.id=`hl${i}`;
-    hl.style.cssText=`left:3.5%;width:93%;top:${top-2}px;`;
-    canvas.appendChild(hl);
-
-    // Sinyal Masuk (klikable)
-    const sigIn=document.createElement('div');
-    sigIn.className='signal-dot red'; sigIn.id=`sigIn${i}`;
-    sigIn.title=`Sinyal Masuk Jalur ${i} (klik untuk ubah)`;
-    sigIn.style.cssText=`left:5.2%;top:${top-5}px;`;
-    sigIn.onclick=()=>toggleSignal(`sigIn${i}`, i, 'in');
-    canvas.appendChild(sigIn);
-
-    // Sinyal Keluar (klikable)
-    const sigOut=document.createElement('div');
-    sigOut.className='signal-dot red'; sigOut.id=`sigOut${i}`;
-    sigOut.title=`Sinyal Keluar Jalur ${i} (klik untuk ubah)`;
-    sigOut.style.cssText=`left:90%;top:${top-5}px;`;
-    sigOut.onclick=()=>toggleSignal(`sigOut${i}`, i, 'out');
-    canvas.appendChild(sigOut);
-
-    if(i<n){
-      const w=document.createElement('div');
-      w.className='wesel-btn'; w.id=`w\( {i}`; w.textContent=`W \){i}`;
-      w.style.cssText=`left:22%;top:${top+9}px;`;
-      w.onclick=()=>toggleWesel(i);
-      canvas.appendChild(w);
-    }
+    createSignal(d, "sigIn"+(i+1), MID_L+25, y-14, i+1, "in");
+    createSignal(d, "sigOut"+(i+1), MID_R-45, y-14, i+1, "out");
   }
+
+  // ===== WESEL KIRI (garis putus-putus) =====
+  // W1: Jalur I ↔ II
+  createWesel(d, "W1", MID_L-75, SY, MID_L-15, SY+GAP, "I↔II");
+  createWesel(d, "W1b", MID_L-75, SY+GAP, MID_L-15, SY, "II↔I");
+  // W2: Jalur II ↔ III
+  createWesel(d, "W2", MID_L-75, SY+GAP, MID_L-15, SY+2*GAP, "II↔III");
+  createWesel(d, "W2b", MID_L-75, SY+2*GAP, MID_L-15, SY+GAP, "III↔II");
+  // W3: Jalur III ↔ IV
+  createWesel(d, "W3", MID_L-75, SY+2*GAP, MID_L-15, SY+3*GAP, "III↔IV");
+  createWesel(d, "W3b", MID_L-75, SY+3*GAP, MID_L-15, SY+2*GAP, "IV↔III");
+
+  // ===== WESEL KANAN =====
+  createWesel(d, "W4", MID_R+15, SY, MID_R+75, SY+GAP, "I↔II");
+  createWesel(d, "W4b", MID_R+15, SY+GAP, MID_R+75, SY, "II↔I");
+  createWesel(d, "W5", MID_R+15, SY+GAP, MID_R+75, SY+2*GAP, "II↔III");
+  createWesel(d, "W5b", MID_R+15, SY+2*GAP, MID_R+75, SY+GAP, "III↔II");
+  createWesel(d, "W6", MID_R+15, SY+2*GAP, MID_R+75, SY+3*GAP, "III↔IV");
+  createWesel(d, "W6b", MID_R+15, SY+3*GAP, MID_R+75, SY+2*GAP, "IV↔III");
 }
 
-function buildRouteButtons(){
-  const row=document.getElementById('routeButtons');
-  row.innerHTML='';
-  for(let i=1;i<=currentStation.tracks;i++){
-    const btn=document.createElement('button');
-    btn.className='act primary';
-    btn.textContent=`Set Rute ${i}`;
-    btn.onclick=()=>setRoute(i);
-    row.appendChild(btn);
-  }
+function addTrack(parent, x, y, w, id){
+  const el=document.createElement("div");
+  el.className="track"; el.id=id;
+  el.style.cssText=`left:\( {x}px;top: \){y}px;width:${w}px`;
+  parent.appendChild(el);
 }
 
-/* ========== SINYAL KLIK MANUAL ========== */
-function toggleSignal(id, track, side){
-  if(emergency){ log('STOP DARURAT — sinyal terkunci merah!', 'err'); return; }
-  const el=document.getElementById(id);
-  if(!el) return;
-  let next;
-  if(el.classList.contains('red')) next='green';
-  else if(el.classList.contains('green')) next='yellow';
-  else next='red';
-  el.className='signal-dot '+next;
-  log(`Sinyal ${side==='in'?'Masuk':'Keluar'} Jalur ${track} diganti → ${next.toUpperCase()}`, 'info');
+function createWesel(parent, id, x1, y1, x2, y2, label){
+  const el=document.createElement("div");
+  el.className="wesel-line";
+  el.id=id;
+  const len=Math.hypot(x2-x1, y2-y1);
+  const ang=Math.atan2(y2-y1, x2-x1)*180/Math.PI;
+  el.style.cssText=`left:\( {x1}px;top: \){y1}px;width:\( {len}px;transform:rotate( \){ang}deg)`;
+  el.title="Wesel "+id+" ("+label+") — klik untuk aktif/nonaktif";
+  el.onclick=()=>toggleWesel(id);
+  parent.appendChild(el);
+  weselState[id]=false;
 
-  // Jika sinyal keluar jadi hijau, cek auto-depart
-  if(side==='out' && next==='green') checkAutoDepart(track);
-}
-
-function setSig(id, color){
-  const el=document.getElementById(id);
-  if(el) el.className='signal-dot '+color;
-}
-
-/* ========== RUTE ========== */
-function clearHighlights(){
-  for(let i=1;i<=(currentStation?.tracks||0);i++){
-    const hl=document.getElementById(`hl${i}`);
-    if(hl) hl.classList.remove('show');
-  }
-}
-
-function setRoute(track){
-  if(emergency){ log('STOP DARURAT aktif!', 'err'); return; }
-  for(let i=1;i<=currentStation.tracks;i++){
-    setSig(`sigIn\( {i}`,'red'); setSig(`sigOut \){i}`,'red');
-  }
-  clearHighlights();
-  currentRoute=track;
-  setSig(`sigIn${track}`,'green');
-  setSig(`sigOut${track}`,'green');
-  const hl=document.getElementById(`hl${track}`);
-  if(hl) hl.classList.add('show');
-  document.getElementById('pillRoute').textContent=`Rute: Jalur ${track}`;
-  document.getElementById('pillRoute').className='pill ok';
-  log(`Rute Jalur ${track} diset + border hijau. Sinyal HIJAU.`, 'ok');
-  checkAutoDepart(track);
+  // Label kecil di tengah garis
+  const midX=(x1+x2)/2 - 10;
+  const midY=(y1+y2)/2 - 8;
+  const lbl=document.createElement("div");
+  lbl.className="wesel-label";
+  lbl.id="lbl-"+id;
+  lbl.style.cssText=`left:\( {midX}px;top: \){midY}px`;
+  lbl.textContent=id;
+  parent.appendChild(lbl);
 }
 
 function toggleWesel(id){
-  if(emergency) return;
-  wesel[id]=!wesel[id];
-  const el=document.getElementById('w'+id);
-  if(el) el.classList.toggle('belok', wesel[id]);
-  log(`Wesel W${id} → ${wesel[id]?'BELOK':'LURUS'}`, 'warn');
+  weselState[id]=!weselState[id];
+  const el=document.getElementById(id);
+  if(el) el.classList.toggle("active", weselState[id]);
+  log("Wesel "+id+" → "+(weselState[id]?"AKTIF (rute terbuka)":"NONAKTIF (putus-putus)"),"info");
 }
 
-/* ========== KERETA ========== */
-function spawnIncoming(fromSched){
-  if(emergency){ log('STOP DARURAT — tidak bisa terima KA!', 'err'); return; }
-  if(!currentRoute){ log('Set rute dulu!', 'warn'); return; }
-  if(trains.some(t=>t.track===currentRoute && t.status!=='berangkat')){
-    log(`Jalur ${currentRoute} masih diduduki!`, 'err'); return;
+function createSignal(parent, id, x, y, track, side){
+  const sig=document.createElement("div");
+  sig.className="signal"; sig.id=id;
+  sig.style.cssText=`left:\( {x}px;top: \){y}px`;
+  const roman=["I","II","III","IV"][track-1];
+  sig.title=(side==="in"?"Sinyal Masuk":"Sinyal Keluar")+" Jalur "+roman;
+  sig.innerHTML=`<div class="sig-light red" id="${id}-l"></div>`;
+  sig.onclick=()=>toggleSignal(id, track, side);
+  parent.appendChild(sig);
+  signals[id]="red";
+}
+
+function toggleSignal(id, track, side){
+  const light=document.getElementById(id+"-l");
+  if(!light) return;
+  let next=signals[id]==="red"?"green":(signals[id]==="green"?"yellow":"red");
+  signals[id]=next;
+  light.className="sig-light "+next;
+  const roman=["I","II","III","IV"][track-1];
+  log((side==="in"?"Sinyal Masuk":"Sinyal Keluar")+" Jalur "+roman+" → "+next.toUpperCase(),"info");
+
+  if(side==="in" && next==="green"){
+    if(assignedTrack && assignedTrack!==track){
+      log("Sistem assign ke Jalur "+["I","II","III","IV"][assignedTrack-1],"warn");
+    }
+    tryEnter(track);
   }
+  if(side==="out" && next==="green") tryDepart(track);
+  if(side==="in" && next==="red") clearHighlight();
+}
 
-  let ka;
-  if(fromSched && currentStation.schedule.length){
-    const s=currentStation.schedule[Math.floor(Math.random()*currentStation.schedule.length)];
-    ka={name:s.name, num:s.time};
-  } else {
-    ka=KA_POOL[Math.floor(Math.random()*KA_POOL.length)];
-  }
+function setSignal(id, color){
+  signals[id]=color;
+  const light=document.getElementById(id+"-l");
+  if(light) light.className="sig-light "+color;
+}
 
-  const id='T'+(nextTrainId++);
-  const track=currentRoute;
-  const top=trackTops[track]-8;
-
-  const div=document.createElement('div');
-  div.className='train-box'; div.id=id;
-  div.style.left='3%'; div.style.top=top+'px';
-  div.textContent=shortName(ka.name);
-  div.onclick=()=>selectTrain(id);
-  document.getElementById('trackCanvas').appendChild(div);
-
-  trains.push({id, name:ka.name, num:ka.num, track, status:'masuk'});
-
-  setTimeout(()=>{ const el=document.getElementById(id); if(el) el.style.left='35%'; },40);
-
-  setTimeout(()=>{
+function highlight(track){
+  clearHighlight();
+  ["track"+track,"appL"+track,"appR"+track].forEach(id=>{
     const el=document.getElementById(id);
-    if(!el) return;
-    el.classList.add('stopped');
-    const t=trains.find(x=>x.id===id);
-    if(t) t.status='berhenti';
-    updateKaTable();
-
-    // 1. KA berhenti → sinyal masuk otomatis MERAH
-    setSig(`sigIn${track}`,'red');
-    log(`KA ${ka.name} berhenti di Jalur ${track} → Sinyal Masuk otomatis MERAH`, 'warn');
-
-    checkAutoDepart(track);
-  },1400);
-
-  updateKaTable(); updateStatusPills();
-  log(`KA ${ka.name} masuk emplasemen Jalur ${track}`, 'ok');
+    if(el) el.classList.add("hl");
+  });
+}
+function clearHighlight(){
+  document.querySelectorAll(".track.hl").forEach(el=>el.classList.remove("hl"));
 }
 
-function spawnFromSchedule(){ spawnIncoming(true); }
+function findFreeTrack(){
+  for(let i=1;i<=4;i++){
+    if(!trains.some(t=>t.track===i && t.status!=="departed")) return i;
+  }
+  return 0;
+}
 
-function shortName(n){ return n.split(' ').slice(0,2).join(' '); }
+function requestPermission(s){
+  const id="req"+Date.now();
+  const fromLeft=s.dir==="left";
+  pending.push({id,name:s.name,from:s.from,fromLeft,allowed:false,track:0});
+
+  const n=document.createElement("div");
+  n.className="notif "+(fromLeft?"from-left":"from-right");
+  n.id=id;
+  n.innerHTML=`
+    <div class="notif-title">📡 Laporan dari arah ${s.from}</div>
+    <div class="notif-body">KA <b>${s.name}</b> meminta izin masuk</div>
+    <div class="notif-actions">
+      <button class="notif-btn izin" onclick="izinkan('${id}')">✓ Izinkan</button>
+      <button class="notif-btn tolak" onclick="tolak('${id}')">✗ Tolak</button>
+    </div>`;
+  document.getElementById("notifArea").appendChild(n);
+  log("Laporan: KA "+s.name+" dari arah "+s.from,"warn");
+}
+
+function izinkan(reqId){
+  const item=pending.find(p=>p.id===reqId);
+  if(!item) return;
+  const track=findFreeTrack();
+  if(!track){ log("Semua jalur penuh","err"); return; }
+
+  item.allowed=true;
+  item.track=track;
+  assignedTrack=track;
+  document.getElementById(reqId)?.remove();
+
+  highlight(track);
+  const roman=["I","II","III","IV"][track-1];
+  document.getElementById("routeInfo").innerHTML=
+    `Sistem assign: <b>Jalur ${roman}</b><br>
+     1. Klik garis putus-putus (wesel) agar AKTIF<br>
+     2. Set Sinyal Masuk Jalur ${roman} → HIJAU`;
+
+  log("Sistem assign KA "+item.name+" ke Jalur "+roman,"ok");
+  log("Atur wesel lalu set Sinyal Masuk Jalur "+roman+" HIJAU","info");
+}
+
+function tolak(reqId){
+  pending=pending.filter(p=>p.id!==reqId);
+  document.getElementById(reqId)?.remove();
+  log("Izin ditolak","err");
+}
+
+function tryEnter(track){
+  const item=pending.find(p=>p.allowed && p.track===track);
+  if(!item || signals["sigIn"+track]!=="green") return;
+  pending=pending.filter(p=>p.id!==item.id);
+  assignedTrack=0;
+  spawnTrain(item.name, track, item.fromLeft);
+}
+
+function spawnTrain(name, track, fromLeft){
+  const id="T"+nextId++;
+  const y=SY+(track-1)*GAP-5;
+  const roman=["I","II","III","IV"][track-1];
+  const el=document.createElement("div");
+  el.className="train"; el.id=id;
+  el.style.left=(fromLeft?LEFT+10:RIGHT-90)+"px";
+  el.style.top=y+"px";
+  el.textContent=name.split(" ").slice(0,2).join(" ");
+  el.onclick=()=>selectTrain(id);
+  document.getElementById("diagram").appendChild(el);
+  trains.push({id,name,track,status:"moving",fromLeft,sop:0});
+
+  setTimeout(()=>{ const t=document.getElementById(id); if(t) t.style.left=(fromLeft?430:550)+"px"; },40);
+  setTimeout(()=>{
+    const t=document.getElementById(id);
+    if(!t) return;
+    t.classList.add("stopped");
+    const tr=trains.find(x=>x.id===id);
+    if(tr) tr.status="stopped";
+    setSignal("sigIn"+track,"red");
+    document.getElementById("routeInfo").innerHTML="KA berhenti di Jalur "+roman+".<br>Lakukan SOP, lalu set Sinyal Keluar HIJAU.";
+    log("KA "+name+" berhenti di Jalur "+roman+" → Sinyal Masuk MERAH","warn");
+  },2200);
+  log("KA "+name+" masuk Jalur "+roman,"ok");
+}
+
 function selectTrain(id){
-  document.querySelectorAll('.train-box').forEach(el=>el.classList.toggle('selected',el.id===id));
+  const t=trains.find(x=>x.id===id);
+  if(!t||t.status!=="stopped") return;
+  selectedTrain=t; sopStep=t.sop||0;
+  document.querySelectorAll(".train").forEach(e=>e.classList.remove("selected"));
+  document.getElementById(id)?.classList.add("selected");
+  showSOP();
+}
+function showSOP(){
+  document.getElementById("sopPanel").classList.add("show");
+  const roman=["I","II","III","IV"][selectedTrain.track-1];
+  document.getElementById("sopTrainName").textContent=selectedTrain.name+" (Jalur "+roman+")";
+  for(let i=1;i<=4;i++){
+    const el=document.getElementById("sop"+i);
+    el.classList.remove("done","locked");
+    if(i<=sopStep) el.classList.add("done");
+    else if(i>sopStep+1) el.classList.add("locked");
+  }
+  const hints=["Klik 1: Penutupan Pintu","Klik 2: Warta","Klik 3: S41","Klik 4: S35","SOP selesai. Set Sinyal Keluar HIJAU."];
+  document.getElementById("sopHint").textContent=hints[Math.min(sopStep,4)];
+}
+function doSOP(step){
+  if(!selectedTrain||selectedTrain.status!=="stopped") return;
+  if(step!==sopStep+1){ log("Ikuti urutan SOP!","err"); return; }
+  sopStep=step; selectedTrain.sop=step;
+  const names=["","Penutupan Pintu","Warta","S41","S35"];
+  log("SOP "+step+": "+names[step],"ok");
+  showSOP();
 }
 
-function checkAutoDepart(track){
-  if(emergency) return;
-  const sigOut=document.getElementById(`sigOut${track}`);
-  if(!sigOut || !sigOut.classList.contains('green')) return;
-  const t=trains.find(x=>x.track===track && x.status==='berhenti');
+function tryDepart(track){
+  const t=trains.find(x=>x.track===track&&x.status==="stopped");
   if(!t) return;
-  departTrain(t);
-}
+  if((t.sop||0)<4){
+    log("SOP belum lengkap!","err");
+    selectedTrain=t; showSOP(); return;
+  }
+  if(signals["sigOut"+track]!=="green") return;
 
-function departTrain(t){
-  t.status='berangkat';
+  t.status="departing";
   const el=document.getElementById(t.id);
   if(el){
-    el.classList.remove('stopped','selected');
-    el.classList.add('departing');
-    el.style.left='93%';
+    el.classList.remove("stopped","selected");
+    el.classList.add("departing");
+    el.style.left=(t.fromLeft?RIGHT-20:LEFT+10)+"px";
   }
-  log(`Sinyal HIJAU → KA ${t.name} otomatis berangkat dari Jalur ${t.track}`, 'ok');
+  const roman=["I","II","III","IV"][track-1];
+  log("S35 + Sinyal Keluar HIJAU → KA "+t.name+" berangkat dari Jalur "+roman,"ok");
+  document.getElementById("sopPanel").classList.remove("show");
+  selectedTrain=null; sopStep=0;
 
   setTimeout(()=>{
-    if(el) el.remove();
+    el?.remove();
     trains=trains.filter(x=>x.id!==t.id);
-    updateKaTable(); updateStatusPills();
+    setSignal("sigOut"+track,"red");
+    clearHighlight();
+    document.getElementById("routeInfo").innerHTML="Sistem siap.<br>Jalur dipilih otomatis. Atur wesel (garis putus-putus).";
+    log("KA "+t.name+" keluar stasiun → Sinyal Keluar MERAH","warn");
+  },2300);
+}
 
-    // Setelah keluar → sinyal keluar otomatis MERAH
-    setSig(`sigOut${t.track}`,'red');
-    if(currentRoute===t.track){
-      clearHighlights(); currentRoute=null;
-      document.getElementById('pillRoute').textContent='Rute: -';
-      document.getElementById('pillRoute').className='pill';
+function checkSchedule(){
+  const st=STATIONS[current];
+  const h=Math.floor(simMinutes/60)%24, m=simMinutes%60;
+  const now=String(h).padStart(2,"0")+":"+String(m).padStart(2,"0");
+  st.schedule.forEach(s=>{
+    const key=s.time+"|"+s.name;
+    if(s.time===now&&!spawned.has(key)){
+      spawned.add(key);
+      requestPermission(s);
     }
-    log(`KA ${t.name} keluar area → Sinyal Keluar otomatis MERAH`, 'warn');
-  },1450);
-}
-
-function giveWarta(jenis){
-  if(emergency) return;
-  if(jenis==='aman'){
-    log('WARTA AMAN dikirim.', 'ok');
-    document.getElementById('pillBlok').textContent='Blok: AMAN';
-    document.getElementById('pillBlok').className='pill ok';
-  } else {
-    log('WARTA LEPAS dikirim.', 'ok');
-    document.getElementById('pillBlok').textContent='Blok: NORMAL';
-    document.getElementById('pillBlok').className='pill ok';
-  }
-}
-
-function emergencyStop(){
-  emergency=true;
-  for(let i=1;i<=currentStation.tracks;i++){
-    setSig(`sigIn\( {i}`,'red'); setSig(`sigOut \){i}`,'red');
-  }
-  clearHighlights();
-  document.querySelectorAll('.train-box').forEach(el=>el.classList.add('stopped'));
-  trains.forEach(t=>{ if(t.status!=='berangkat') t.status='berhenti'; });
-  document.getElementById('pillInterlock').textContent='Interlocking: STOP';
-  document.getElementById('pillInterlock').className='pill bad';
-  document.getElementById('pillBlok').textContent='Blok: DARURAT';
-  document.getElementById('pillBlok').className='pill bad';
-  document.getElementById('pillRoute').textContent='Rute: -';
-  document.getElementById('pillRoute').className='pill';
-  currentRoute=null;
-  updateKaTable();
-  log('!!! STOP DARURAT — Semua sinyal MERAH !!!', 'err');
-}
-
-function resetPanel(){
-  emergency=false; currentRoute=null;
-  trains.forEach(t=>{ const el=document.getElementById(t.id); if(el) el.remove(); });
-  trains=[];
-  for(let i=1;i<=currentStation.tracks;i++){
-    setSig(`sigIn\( {i}`,'red'); setSig(`sigOut \){i}`,'red');
-  }
-  clearHighlights();
-  Object.keys(wesel).forEach(k=>{
-    wesel[k]=false;
-    const el=document.getElementById('w'+k);
-    if(el) el.classList.remove('belok');
   });
-  updateKaTable(); updateStatusPills();
-  document.getElementById('pillInterlock').textContent='Interlocking: AKTIF';
-  document.getElementById('pillInterlock').className='pill ok';
-  document.getElementById('pillBlok').textContent='Blok: NORMAL';
-  document.getElementById('pillBlok').className='pill ok';
-  document.getElementById('pillRoute').textContent='Rute: -';
-  document.getElementById('pillRoute').className='pill';
-  log('Panel di-reset.', 'ok');
 }
 
-function updateKaTable(){
-  const body=document.getElementById('kaBody');
-  if(!trains.length){
-    body.innerHTML='<tr><td colspan="3" style="color:var(--muted);text-align:center">Belum ada KA</td></tr>';
-    return;
-  }
-  body.innerHTML=trains.map(t=>`<tr>
-    <td>\( {t.name}<br><small style="color:var(--muted)"> \){t.num}</small></td>
-    <td>${t.track}</td>
-    <td><span class="tag \( {t.status==='berhenti'?'stop':t.status==='masuk'?'in':'out'}"> \){t.status}</span></td>
-  </tr>`).join('');
+function openJadwal(){
+  const st=STATIONS[current];
+  document.getElementById("schedList").innerHTML=st.schedule.map(s=>
+    `<div class="sched-item"><span class="time">\( {s.time}</span><span> \){s.name}</span>
+     <span style="color:var(--muted);font-size:.72rem">dari ${s.from}</span></div>`
+  ).join("");
+  document.getElementById("jadwalModal").classList.add("show");
 }
+function closeJadwal(){ document.getElementById("jadwalModal").classList.remove("show"); }
+document.getElementById("jadwalModal").onclick=e=>{ if(e.target.id==="jadwalModal") closeJadwal(); };
 
+function giveWarta(){ log("WARTA dikirim","ok"); }
+function setMode(btn){
+  document.querySelectorAll(".ctrl-btn").forEach(b=>b.classList.remove("active"));
+  btn.classList.add("active");
+}
 function updateNeighbors(){
-  document.getElementById('neighborList').innerHTML=currentStation.neighbors.map(n=>`
-    <div class="neighbor"><span>${n.code} — ${n.name}</span>
-    <span class="n-status \( {n.status}"> \){n.status.toUpperCase()}</span></div>`).join('');
+  const st=STATIONS[current];
+  document.getElementById("leftName").textContent=st.left.name;
+  document.getElementById("leftDir").textContent=st.left.dir;
+  document.getElementById("rightName").textContent=st.right.name;
+  document.getElementById("rightDir").textContent=st.right.dir;
+}
+function log(msg,type){
+  const box=document.getElementById("logBox");
+  const t=document.getElementById("clock").textContent;
+  const d=document.createElement("div");
+  d.innerHTML=`<span class="t">[\( {t}]</span> <span class=" \){type}">${msg}</span>`;
+  box.prepend(d);
 }
 
-function updateSchedule(){
-  document.getElementById('schedList').innerHTML=currentStation.schedule.map(s=>`
-    <div class="sched-item">
-      <span class="sched-time">${s.time}</span>
-      <span style="flex:1">${s.name}</span>
-      <span style="color:var(--muted);font-size:.7rem">${s.dir}</span>
-    </div>`).join('');
-}
+setInterval(()=>{
+  simMinutes++;
+  if(simMinutes>=24*60){ simMinutes=4*60; spawned.clear(); }
+  const h=Math.floor(simMinutes/60)%24, m=simMinutes%60;
+  document.getElementById("clock").textContent=String(h).padStart(2,"0")+":"+String(m).padStart(2,"0")+":00";
+  checkSchedule();
+},2500);
 
-function updateStatusPills(){
-  document.getElementById('pillKaCount').textContent=`KA: ${trains.length}`;
-}
-
-function log(msg, type='ok'){
-  const box=document.getElementById('logBox');
-  const time=new Date().toLocaleTimeString('id-ID',{hour12:false});
-  const line=document.createElement('div');
-  line.className='log-line';
-  line.innerHTML=`<span class="t">[\( {time}]</span> <span class=" \){type}">${msg}</span>`;
-  box.prepend(line);
-}
-
-function tick(){
-  document.getElementById('clock').textContent=new Date().toLocaleTimeString('id-ID',{hour12:false});
-}
-setInterval(tick,1000); tick();
-buildSelect();
+buildDiagram(); updateNeighbors();
+log("Wesel = garis putus-putus. Klik untuk AKTIF (solid hijau).","info");
+log("Penamaan: Jalur I-IV | Sinyal Masuk/Keluar | Wesel W1-W6","ok");
 </script>
 </body>
 </html>
