@@ -1,559 +1,720 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PPKA Simulator DAOP 8 | Wesel Garis Putus-Putus</title>
-<style>
-  :root {
-    --bg:#0f1419; --panel:#1a2332; --track:#1a1a1a; --hl:#48bb78;
-    --red:#e53e3e; --green:#38a169; --yellow:#d69e2e; --blue:#4299e1;
-    --text:#e2e8f0; --muted:#a0aec0;
-  }
-  *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);height:100vh;overflow:hidden;display:flex;flex-direction:column}
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.5, user-scalable=yes">
+  <title>PPKA Simulator · DAOP 8</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      font-family: 'Segoe UI', Roboto, system-ui, sans-serif;
+    }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: #1a2a2f;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 12px;
+    }
+    .simulator-card {
+      max-width: 820px;
+      width: 100%;
+      background: #1f3a3f;
+      background-image: radial-gradient(circle at 20% 30%, #2b4d54 0%, #102529 100%);
+      border-radius: 40px 40px 28px 28px;
+      padding: 20px 18px 28px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.7), inset 0 1px 2px rgba(255,255,240,0.08);
+      border: 1px solid #3d6a73;
+      transition: all 0.2s;
+    }
 
-  .topbar{display:flex;align-items:center;justify-content:space-between;padding:8px 14px;background:#151c27;border-bottom:1px solid #2d3748;flex-shrink:0;z-index:100}
-  .topbar-left{display:flex;align-items:center;gap:12px}
-  .time-box{background:#1a2332;border:1px solid #2d3748;border-radius:20px;padding:4px 12px;font-family:Consolas,monospace;font-size:.95rem;display:flex;gap:8px;align-items:center}
-  .station-select{background:#1a2332;border:1px solid #2d3748;color:var(--text);padding:5px 10px;border-radius:6px;font-size:.85rem}
+    /* HEADER */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: #cfecf0;
+      padding: 0 4px 10px 4px;
+      border-bottom: 1px solid #3a636b;
+      flex-wrap: wrap;
+    }
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .badge-daop {
+      background: #c9a84b;
+      color: #1e2f33;
+      font-weight: 700;
+      font-size: 0.7rem;
+      padding: 3px 10px;
+      border-radius: 30px;
+      letter-spacing: 0.5px;
+    }
+    .header-time {
+      font-size: 1.5rem;
+      font-weight: 600;
+      letter-spacing: 1px;
+      color: #ddf4f7;
+      background: #0b2024;
+      padding: 0 14px;
+      border-radius: 40px;
+      border: 1px solid #3f7a82;
+      backdrop-filter: blur(2px);
+    }
+    .temp {
+      font-size: 0.9rem;
+      color: #b3d9df;
+      margin-left: 4px;
+    }
 
-  .diagram-wrap{flex:1;overflow:auto;position:relative;background:linear-gradient(rgba(45,55,72,.18) 1px,transparent 1px),linear-gradient(90deg,rgba(45,55,72,.18) 1px,transparent 1px);background-size:28px 28px}
-  .diagram{position:relative;width:1100px;height:400px;margin:45px auto 25px}
+    /* STATION SELECTOR */
+    .station-selector {
+      background: #0d262b;
+      margin: 12px 0 8px 0;
+      padding: 8px 16px;
+      border-radius: 60px;
+      border: 1px solid #34636b;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .station-selector label {
+      color: #b5d6dc;
+      font-weight: 500;
+      font-size: 0.85rem;
+    }
+    .station-selector select {
+      background: #0b2024;
+      color: #ddf4f7;
+      border: 1px solid #3f7a82;
+      border-radius: 40px;
+      padding: 6px 16px;
+      font-weight: 600;
+      font-size: 0.9rem;
+      outline: none;
+      cursor: pointer;
+    }
+    .station-selector select option {
+      background: #1a3a3f;
+    }
 
-  /* Jalur utama */
-  .track{position:absolute;height:5px;background:#1a1a1a;border-radius:2px;z-index:2;transition:.2s}
-  .track.hl{background:#2f855a;box-shadow:0 0 0 3px #48bb78,0 0 10px rgba(72,187,120,.4)}
+    /* STASIUN */
+    .station-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #0d262b;
+      margin: 8px 0 6px 0;
+      padding: 8px 14px;
+      border-radius: 60px;
+      border: 1px solid #34636b;
+      color: #ddf4f7;
+      flex-wrap: wrap;
+    }
+    .station-name {
+      font-weight: 600;
+      font-size: 1.1rem;
+      letter-spacing: 0.5px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .station-name small {
+      font-weight: 300;
+      font-size: 0.65rem;
+      background: #284e54;
+      padding: 2px 12px;
+      border-radius: 30px;
+      color: #bddce1;
+    }
+    .telepon {
+      background: #0b1d20;
+      padding: 4px 14px;
+      border-radius: 30px;
+      border: 1px solid #4c7f88;
+      font-size: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .telepon .dot {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      background: #4fc3a0;
+      border-radius: 50%;
+      box-shadow: 0 0 6px #4fc3a0;
+    }
 
-  /* Wesel = garis putus-putus */
-  .wesel-line{
-    position:absolute;height:0;
-    border-top:3px dashed #718096;
-    transform-origin:left center;
-    z-index:3;cursor:pointer;
-    transition:border-color .2s, border-style .2s;
-  }
-  .wesel-line:hover{border-color:var(--blue)}
-  .wesel-line.active{
-    border-top:3px solid var(--hl);
-    box-shadow:0 0 8px rgba(72,187,120,.5);
-  }
+    /* MENU */
+    .menu-grid {
+      display: flex;
+      justify-content: space-around;
+      background: #0a2025;
+      padding: 10px 4px;
+      border-radius: 60px;
+      margin: 12px 0 16px 0;
+      border: 1px solid #3d6e76;
+      flex-wrap: wrap;
+    }
+    .menu-item {
+      color: #b5d6dc;
+      font-weight: 500;
+      font-size: 0.85rem;
+      padding: 6px 14px;
+      border-radius: 40px;
+      cursor: pointer;
+      transition: 0.1s;
+      border: none;
+      background: transparent;
+    }
+    .menu-item.active {
+      background: #c9a84b;
+      color: #10252a;
+      font-weight: 600;
+      box-shadow: 0 0 10px #dbb85c;
+    }
+    .menu-item:hover {
+      background: #2f5a62;
+      color: white;
+    }
 
-  /* Label wesel kecil */
-  .wesel-label{
-    position:absolute;font-size:.58rem;font-weight:700;color:#a0aec0;
-    background:rgba(26,35,50,.85);padding:1px 4px;border-radius:3px;
-    z-index:6;pointer-events:none;
-  }
+    /* TRACK */
+    .track-container {
+      background: #0b2227;
+      padding: 22px 12px 18px 12px;
+      border-radius: 60px 60px 32px 32px;
+      border: 2px solid #2f5d65;
+      box-shadow: inset 0 0 20px #030b0d;
+      margin-bottom: 14px;
+    }
+    .track-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+    .track-line {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .track-label {
+      color: #99c2c9;
+      font-size: 0.65rem;
+      font-weight: 500;
+      width: 40px;
+      text-align: right;
+      letter-spacing: 0.5px;
+    }
+    .wesel-group {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      flex-wrap: wrap;
+      background: #0f2a30;
+      padding: 6px 12px;
+      border-radius: 50px;
+      border: 1px solid #316069;
+    }
+    .wesel-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      cursor: pointer;
+      transition: 0.1s;
+      padding: 0 4px;
+    }
+    .wesel-item .wesel-line {
+      width: 40px;
+      height: 6px;
+      background: #4b7e87;
+      border-radius: 10px;
+      transition: 0.12s;
+      margin: 2px 0;
+      border: 1px dashed #87b9c2;
+      background: #2f5b63;
+    }
+    .wesel-item .wesel-line.active {
+      background: #f5d742;
+      border: 2px solid #f5e56b;
+      box-shadow: 0 0 14px #f5d742;
+      border-style: solid;
+    }
+    .wesel-item .wesel-label {
+      font-size: 0.5rem;
+      color: #afd3da;
+      margin-top: 2px;
+      background: #1a3b42;
+      padding: 0 6px;
+      border-radius: 20px;
+    }
 
-  .signal{position:absolute;width:14px;height:32px;background:#1a202c;border:1px solid #4a5568;border-radius:3px;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:10}
-  .signal:hover{border-color:var(--blue)}
-  .sig-light{width:8px;height:8px;border-radius:50%;background:#4a5568}
-  .sig-light.red{background:var(--red);box-shadow:0 0 6px var(--red)}
-  .sig-light.green{background:var(--green);box-shadow:0 0 6px var(--green)}
-  .sig-light.yellow{background:var(--yellow);box-shadow:0 0 6px var(--yellow)}
+    /* SINYAL */
+    .signal-area {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+      gap: 20px 30px;
+      margin: 14px 0 4px 0;
+      background: #0b2227;
+      padding: 14px 8px;
+      border-radius: 60px;
+      border-top: 2px solid #2b5a62;
+    }
+    .signal-box {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: #0b1e22;
+      padding: 6px 16px 6px 12px;
+      border-radius: 40px;
+      border: 1px solid #3b6b73;
+    }
+    .signal-lamp {
+      display: flex;
+      gap: 10px;
+    }
+    .lamp {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: #2b4d4f;
+      border: 2px solid #1b3a3d;
+      transition: 0.15s;
+      box-shadow: inset 0 0 6px #030b0b;
+    }
+    .lamp.red-on { background: #e34a4a; border-color: #ff8a8a; box-shadow: 0 0 18px #e34a4a; }
+    .lamp.green-on { background: #3dd68c; border-color: #7bffb0; box-shadow: 0 0 18px #3dd68c; }
+    .lamp.yellow-on { background: #f5c542; border-color: #ffe074; box-shadow: 0 0 18px #f5c542; }
+    .signal-label {
+      color: #b5d6dc;
+      font-size: 0.7rem;
+      font-weight: 500;
+    }
+    .signal-btn {
+      background: #204d55;
+      border: none;
+      border-radius: 30px;
+      color: white;
+      padding: 4px 14px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: 0.1s;
+      border: 1px solid #3f828d;
+    }
+    .signal-btn:active { background: #c9a84b; color: #0b1e22; }
 
-  .label{position:absolute;font-size:.7rem;color:#a0aec0;z-index:5}
-  .label.num{font-weight:700;color:#cbd5e0;font-size:.85rem}
-  .dir-label{position:absolute;font-size:.72rem;font-weight:600;color:var(--blue);background:rgba(26,35,50,.9);padding:3px 8px;border-radius:4px;z-index:5}
+    /* JADWAL & NOTIF */
+    .action-bar {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 12px;
+      margin: 12px 0 8px 0;
+    }
+    .action-btn {
+      background: #1f4a52;
+      border: 1px solid #3f828d;
+      color: white;
+      padding: 8px 20px;
+      border-radius: 40px;
+      font-weight: 600;
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: 0.1s;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+    }
+    .action-btn:hover { background: #2f6370; }
+    .action-btn:active { background: #c9a84b; color: #0b1e22; }
 
-  .train{position:absolute;height:16px;min-width:85px;padding:0 6px;background:linear-gradient(90deg,#2b6cb0,#4299e1);border-radius:3px;font-size:.62rem;font-weight:600;color:#fff;display:flex;align-items:center;justify-content:center;z-index:20;transition:left 2s linear;box-shadow:0 2px 8px rgba(0,0,0,.4);white-space:nowrap;cursor:pointer}
-  .train.stopped{background:linear-gradient(90deg,#c53030,#e53e3e)}
-  .train.departing{background:linear-gradient(90deg,#276749,#38a169)}
-  .train.selected{outline:2px solid var(--yellow)}
+    .notification-box {
+      background: #0b2024;
+      border-left: 5px solid #f5c542;
+      padding: 12px 16px;
+      border-radius: 30px;
+      margin: 12px 0 6px 0;
+      color: #ddf4f7;
+      font-size: 0.9rem;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      border: 1px solid #3f7a82;
+      min-height: 60px;
+    }
+    .notification-box .notif-icon {
+      font-size: 1.6rem;
+    }
+    .notification-box .notif-text {
+      flex: 1;
+    }
+    .notification-box .notif-btn {
+      background: #3d7a7a;
+      border: none;
+      color: white;
+      padding: 6px 18px;
+      border-radius: 40px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: 0.1s;
+    }
+    .notification-box .notif-btn:hover { background: #5a9c9c; }
+    .notification-box .notif-btn:active { background: #c9a84b; color: #0b1e22; }
 
-  .notif-area{position:absolute;top:10px;left:50%;transform:translateX(-50%);width:420px;max-width:94%;z-index:200;display:flex;flex-direction:column;gap:8px}
-  .notif{background:#1a2332;border:1px solid #4a5568;border-left:4px solid var(--yellow);border-radius:8px;padding:11px 13px;box-shadow:0 6px 20px rgba(0,0,0,.4)}
-  .notif.from-left{border-left-color:var(--blue)}
-  .notif.from-right{border-left-color:var(--green)}
-  .notif-title{font-size:.75rem;color:var(--muted);margin-bottom:3px}
-  .notif-body{font-size:.88rem;font-weight:600;margin-bottom:8px}
-  .notif-actions{display:flex;gap:8px}
-  .notif-btn{flex:1;padding:6px;border:none;border-radius:5px;font-size:.78rem;cursor:pointer;font-weight:600}
-  .notif-btn.izin{background:#276749;color:#fff}
-  .notif-btn.tolak{background:#742a2a;color:#fff}
+    /* JADWAL MODAL */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.7);
+      backdrop-filter: blur(4px);
+      justify-content: center;
+      align-items: center;
+      z-index: 999;
+    }
+    .modal-overlay.show { display: flex; }
+    .modal-card {
+      background: #1f3a3f;
+      max-width: 500px;
+      width: 90%;
+      border-radius: 40px;
+      padding: 24px 20px;
+      border: 2px solid #c9a84b;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.8);
+      color: #ddf4f7;
+    }
+    .modal-card h2 {
+      text-align: center;
+      color: #f5d742;
+      margin-top: 0;
+      border-bottom: 1px solid #3f7a82;
+      padding-bottom: 10px;
+    }
+    .modal-card ul {
+      list-style: none;
+      padding: 0;
+    }
+    .modal-card li {
+      padding: 8px 12px;
+      border-bottom: 1px solid #2b545c;
+      display: flex;
+      justify-content: space-between;
+    }
+    .modal-card .close-modal {
+      background: #c9a84b;
+      border: none;
+      color: #1a2a2f;
+      font-weight: 700;
+      padding: 10px 24px;
+      border-radius: 40px;
+      font-size: 1rem;
+      cursor: pointer;
+      display: block;
+      margin: 16px auto 0;
+    }
 
-  .sop-panel{position:absolute;right:12px;top:55px;width:220px;background:rgba(26,35,50,.97);border:1px solid #2d3748;border-radius:10px;padding:12px;z-index:80;display:none}
-  .sop-panel.show{display:block}
-  .sop-panel h4{font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px}
-  .sop-train{font-size:.88rem;font-weight:600;margin-bottom:10px;color:var(--blue)}
-  .sop-step{display:flex;align-items:center;gap:8px;padding:7px 9px;margin-bottom:5px;background:#151c27;border-radius:6px;border:1px solid #2d3748;font-size:.78rem;cursor:pointer}
-  .sop-step.done{border-color:var(--green);background:#1a2e1a}
-  .sop-step.locked{opacity:.4;cursor:not-allowed}
-  .sop-step .num{width:20px;height:20px;border-radius:50%;background:#2d3748;display:flex;align-items:center;justify-content:center;font-size:.68rem;font-weight:700}
-  .sop-step.done .num{background:var(--green);color:#000}
-  .sop-hint{font-size:.68rem;color:var(--muted);margin-top:8px}
-
-  .route-info{position:absolute;top:12px;left:12px;background:rgba(26,35,50,.95);border:1px solid #2d3748;border-radius:8px;padding:8px 12px;font-size:.75rem;z-index:50;max-width:240px}
-  .route-info b{color:var(--green)}
-
-  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:300;display:none;align-items:center;justify-content:center}
-  .modal-overlay.show{display:flex}
-  .modal{background:#1a2332;border:1px solid #2d3748;border-radius:12px;width:340px;max-width:95%;max-height:65vh;overflow:hidden}
-  .modal-header{padding:11px 14px;border-bottom:1px solid #2d3748;display:flex;justify-content:space-between;align-items:center}
-  .modal-close{background:none;border:none;color:var(--muted);font-size:1.2rem;cursor:pointer}
-  .modal-body{padding:12px 14px;overflow-y:auto;max-height:50vh}
-  .sched-item{display:flex;justify-content:space-between;gap:6px;padding:7px 0;border-bottom:1px solid #2d3748;font-size:.82rem}
-  .sched-item .time{color:var(--blue);font-family:Consolas,monospace}
-
-  .log-mini{position:absolute;bottom:10px;left:10px;width:270px;max-height:110px;overflow-y:auto;background:rgba(26,35,50,.93);border:1px solid #2d3748;border-radius:8px;padding:7px;font-family:Consolas,monospace;font-size:.62rem;z-index:50}
-  .log-mini div{margin-bottom:2px}
-  .log-mini .t{color:var(--muted)}
-  .log-mini .ok{color:var(--green)}
-  .log-mini .warn{color:var(--yellow)}
-  .log-mini .err{color:var(--red)}
-  .log-mini .info{color:var(--blue)}
-
-  .bottombar{display:flex;align-items:center;justify-content:space-between;padding:9px 14px;background:#151c27;border-top:1px solid #2d3748;flex-shrink:0;z-index:100}
-  .neighbor-btn{background:#1a2332;border:1px solid #2d3748;border-radius:18px;padding:7px 14px;font-size:.78rem;display:flex;align-items:center;gap:7px;min-width:130px}
-  .neighbor-btn .arrow{color:var(--muted);font-size:.68rem}
-  .ctrl-buttons{display:flex;gap:9px}
-  .ctrl-btn{width:54px;height:54px;border-radius:50%;border:none;background:#1a2332;color:var(--text);font-size:.6rem;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer}
-  .ctrl-btn:hover{background:#2d3748}
-  .ctrl-btn .icon{font-size:1.1rem;margin-bottom:1px}
-  .ctrl-btn.active{background:#2b6cb0}
-</style>
+    .footer-info {
+      display: flex;
+      justify-content: space-between;
+      color: #7daab2;
+      font-size: 0.7rem;
+      padding: 8px 10px 0 10px;
+      border-top: 1px solid #2b545c;
+      margin-top: 16px;
+      flex-wrap: wrap;
+    }
+    .footer-info span {
+      background: #0f2a30;
+      padding: 4px 14px;
+      border-radius: 40px;
+    }
+    @media (max-width: 560px) {
+      .track-line { justify-content: flex-start; }
+      .wesel-group { flex-wrap: wrap; }
+    }
+  </style>
 </head>
 <body>
+<div class="simulator-card">
 
-<div class="topbar">
-  <div class="topbar-left">
-    <div class="time-box"><span id="clock">04:00:00</span><span style="color:var(--yellow)">☀ 28°C</span></div>
-    <select class="station-select" onchange="changeStation(this.value)">
-      <option value="SGU">SGU — Surabaya Gubeng</option>
-      <option value="SBI">SBI — Surabaya Pasarturi</option>
-      <option value="WO">WO — Wonokromo</option>
-      <option value="ML">ML — Malang</option>
+  <!-- HEADER -->
+  <div class="header">
+    <div class="header-left">
+      <span style="font-weight:600; font-size:1.2rem;">🚂 PPKA</span>
+      <span class="badge-daop">DAOP 8 · Surabaya</span>
+    </div>
+    <div style="display:flex; align-items:center; gap:6px;">
+      <span class="header-time" id="jamDisplay">22:00:00</span>
+      <span class="temp">28°C</span>
+    </div>
+  </div>
+
+  <!-- PILIH STASIUN TUGAS -->
+  <div class="station-selector">
+    <label for="stasiunTugas">📍 Bertugas di:</label>
+    <select id="stasiunTugas">
+      <option value="Pasar Turi" selected>Pasar Turi</option>
+      <option value="Gubeng">Gubeng</option>
+      <option value="Sidoarjo">Sidoarjo</option>
+      <option value="Mojokerto">Mojokerto</option>
     </select>
+    <span style="color:#8dbac3; font-size:0.7rem;">(stasiun tugas aktif)</span>
+  </div>
+
+  <!-- STASIUN -->
+  <div class="station-row">
+    <div class="station-name"> Jakarta Kota <small>GMR</small> </div>
+    <div class="telepon"><span class="dot"></span> Telepon Standby</div>
+  </div>
+  <div class="station-row" style="margin-top:-4px;">
+    <div class="station-name"> Manggurai <small>DAOP 8</small> </div>
+    <div class="telepon"><span class="dot"></span> Telepon Standby</div>
+  </div>
+  <div class="station-row" style="margin-top:-4px;">
+    <div class="station-name"> Selatan <small>DAOP 8</small> </div>
+    <div class="telepon"><span class="dot"></span> Telepon Standby</div>
+  </div>
+
+  <!-- MENU KONTROL -->
+  <div class="menu-grid">
+    <button class="menu-item active">KONTROL</button>
+    <button class="menu-item" id="btnGenta">GENTA</button>
+    <button class="menu-item" id="btnJadwal">JADWAL</button>
+    <button class="menu-item" id="btnInsiden">INSIDEN</button>
+    <button class="menu-item" id="btnWarta">WARTA</button>
+  </div>
+
+  <!-- TRACK -->
+  <div class="track-container">
+    <div class="track-grid">
+      <div class="track-line">
+        <span class="track-label">Jalur 1</span>
+        <div class="wesel-group">
+          <div class="wesel-item" data-wesel="A1"><div class="wesel-line" id="weselA1"></div><span class="wesel-label">A1</span></div>
+          <div class="wesel-item" data-wesel="A2"><div class="wesel-line" id="weselA2"></div><span class="wesel-label">A2</span></div>
+        </div>
+        <span style="color:#769ca3; font-size:0.6rem; margin-left:6px;">↔ wesel</span>
+      </div>
+      <div class="track-line">
+        <span class="track-label">Jalur 2</span>
+        <div class="wesel-group">
+          <div class="wesel-item" data-wesel="B1"><div class="wesel-line" id="weselB1"></div><span class="wesel-label">B1</span></div>
+          <div class="wesel-item" data-wesel="B2"><div class="wesel-line" id="weselB2"></div><span class="wesel-label">B2</span></div>
+        </div>
+        <span style="color:#769ca3; font-size:0.6rem; margin-left:6px;">↔ wesel</span>
+      </div>
+      <div class="track-line">
+        <span class="track-label">Jalur 3</span>
+        <div class="wesel-group">
+          <div class="wesel-item" data-wesel="C1"><div class="wesel-line" id="weselC1"></div><span class="wesel-label">C1</span></div>
+          <div class="wesel-item" data-wesel="C2"><div class="wesel-line" id="weselC2"></div><span class="wesel-label">C2</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SINYAL -->
+    <div class="signal-area">
+      <div class="signal-box">
+        <div class="signal-lamp">
+          <div class="lamp" id="sinyalMerah"></div>
+          <div class="lamp" id="sinyalKuning"></div>
+          <div class="lamp" id="sinyalHijau"></div>
+        </div>
+        <span class="signal-label">SINYAL</span>
+        <button class="signal-btn" id="toggleSinyal">Ubah</button>
+      </div>
+      <div style="color:#a4ced6; font-size:0.7rem; background:#0a1e22; padding:2px 18px; border-radius:30px; border:1px solid #35636b;">
+        ⚡ PPKA atur wesel & sinyal
+      </div>
+    </div>
+  </div>
+
+  <!-- ACTION: JADWAL & IZIN MASUK -->
+  <div class="action-bar">
+    <button class="action-btn" id="btnLihatJadwal">📋 Lihat Jadwal</button>
+    <button class="action-btn" id="btnMintaIzin">🚆 Minta Izin Masuk</button>
+  </div>
+
+  <!-- NOTIFIKASI IZIN MASUK -->
+  <div class="notification-box" id="notifBox">
+    <span class="notif-icon">📢</span>
+    <span class="notif-text" id="notifText">Belum ada permintaan izin masuk.</span>
+    <button class="notif-btn" id="notifSetuju" style="display:none;">✅ Setuju</button>
+    <button class="notif-btn" id="notifTolak" style="display:none;">❌ Tolak</button>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="footer-info">
+    <span>🚆 DAOP 8 · Surabaya</span>
+    <span>📟 1000707357</span>
+    <span id="statusWesel">wesel: semua lurus</span>
   </div>
 </div>
 
-<div class="diagram-wrap">
-  <div class="route-info" id="routeInfo">Sistem siap.<br>Jalur dipilih otomatis. Atur wesel (garis putus-putus).</div>
-  <div class="notif-area" id="notifArea"></div>
-  <div class="diagram" id="diagram"></div>
-
-  <div class="sop-panel" id="sopPanel">
-    <h4>SOP Keberangkatan</h4>
-    <div class="sop-train" id="sopTrainName">—</div>
-    <div class="sop-step locked" id="sop1" onclick="doSOP(1)"><div class="num">1</div> Penutupan Pintu</div>
-    <div class="sop-step locked" id="sop2" onclick="doSOP(2)"><div class="num">2</div> Warta</div>
-    <div class="sop-step locked" id="sop3" onclick="doSOP(3)"><div class="num">3</div> S41</div>
-    <div class="sop-step locked" id="sop4" onclick="doSOP(4)"><div class="num">4</div> S35</div>
-    <div class="sop-hint" id="sopHint">Klik kereta yang berhenti.</div>
+<!-- MODAL JADWAL -->
+<div class="modal-overlay" id="modalJadwal">
+  <div class="modal-card">
+    <h2>📅 Jadwal Kereta DAOP 8</h2>
+    <ul id="daftarJadwal">
+      <li><span>KA Jayabaya</span><span>Gubeng → Pasar Turi</span><span>10:30</span></li>
+      <li><span>KA Argo Bromo</span><span>Gubeng → Surabaya Kota</span><span>11:15</span></li>
+      <li><span>KA Sancaka</span><span>Pasar Turi → Sidoarjo</span><span>12:00</span></li>
+      <li><span>KA Mutiara Selatan</span><span>Sidoarjo → Mojokerto</span><span>13:20</span></li>
+      <li><span>KA Jayakarta</span><span>Pasar Turi → Gubeng</span><span>14:45</span></li>
+    </ul>
+    <button class="close-modal" id="tutupJadwal">Tutup</button>
   </div>
-
-  <div class="log-mini" id="logBox"></div>
-</div>
-
-<div class="modal-overlay" id="jadwalModal">
-  <div class="modal">
-    <div class="modal-header"><h3>📅 Jadwal</h3><button class="modal-close" onclick="closeJadwal()">×</button></div>
-    <div class="modal-body" id="schedList"></div>
-  </div>
-</div>
-
-<div class="bottombar">
-  <div class="neighbor-btn"><span>📞</span><div><div id="leftName">Surabaya Kota</div><div class="arrow" id="leftDir">← UTARA</div></div></div>
-  <div class="ctrl-buttons">
-    <button class="ctrl-btn active" onclick="setMode(this)"><span class="icon">🎛</span>KONTROL</button>
-    <button class="ctrl-btn" onclick="setMode(this)"><span class="icon">🔔</span>GENTA</button>
-    <button class="ctrl-btn" onclick="openJadwal()"><span class="icon">📅</span>JADWAL</button>
-    <button class="ctrl-btn" onclick="setMode(this)"><span class="icon">⚠</span>INSIDEN</button>
-    <button class="ctrl-btn" onclick="giveWarta()"><span class="icon">📖</span>WARTA</button>
-  </div>
-  <div class="neighbor-btn" style="justify-content:flex-end"><div style="text-align:right"><div id="rightName">Wonokromo</div><div class="arrow" id="rightDir">SELATAN →</div></div><span>📞</span></div>
 </div>
 
 <script>
-const STATIONS = {
-  SGU:{name:"Surabaya Gubeng",left:{name:"Surabaya Kota",dir:"← UTARA"},right:{name:"Wonokromo",dir:"SELATAN →"},
-    schedule:[
-      {time:"04:05",name:"Jayabaya",from:"Surabaya Kota",dir:"left"},
-      {time:"04:20",name:"CL Dhoho",from:"Wonokromo",dir:"right"},
-      {time:"04:45",name:"Gaya Baru MS",from:"Wonokromo",dir:"right"},
-      {time:"05:10",name:"Sancaka",from:"Surabaya Kota",dir:"left"},
-      {time:"05:35",name:"Arjuno Ekspres",from:"Wonokromo",dir:"right"},
-      {time:"06:00",name:"Mutiara Selatan",from:"Wonokromo",dir:"right"}
-    ]},
-  SBI:{name:"Surabaya Pasarturi",left:{name:"Lamongan",dir:"← UTARA"},right:{name:"Surabaya Gubeng",dir:"SELATAN →"},
-    schedule:[
-      {time:"04:05",name:"Jayabaya",from:"Surabaya Gubeng",dir:"right"},
-      {time:"04:25",name:"Sembrani",from:"Lamongan",dir:"left"},
-      {time:"04:50",name:"Argo Bromo",from:"Lamongan",dir:"left"},
-      {time:"05:20",name:"Airlangga",from:"Lamongan",dir:"left"},
-      {time:"05:50",name:"Gumarang",from:"Surabaya Gubeng",dir:"right"}
-    ]},
-  WO:{name:"Wonokromo",left:{name:"Gubeng",dir:"← UTARA"},right:{name:"Sidoarjo",dir:"SELATAN →"},
-    schedule:[
-      {time:"04:10",name:"CL Penataran",from:"Gubeng",dir:"left"},
-      {time:"04:40",name:"Pasundan",from:"Gubeng",dir:"left"},
-      {time:"05:15",name:"Sri Tanjung",from:"Sidoarjo",dir:"right"},
-      {time:"05:45",name:"Logawa",from:"Gubeng",dir:"left"}
-    ]},
-  ML:{name:"Malang",left:{name:"Lawang",dir:"← UTARA"},right:{name:"Kepanjen",dir:"SELATAN →"},
-    schedule:[
-      {time:"04:10",name:"Arjuno Ekspres",from:"Kepanjen",dir:"right"},
-      {time:"04:35",name:"Jayabaya",from:"Lawang",dir:"left"},
-      {time:"05:10",name:"Gajayana",from:"Kepanjen",dir:"right"},
-      {time:"05:40",name:"Jayabaya",from:"Kepanjen",dir:"right"}
-    ]}
-};
+  (function() {
+    // ----- WESEL (toggle) -----
+    const weselMap = {
+      A1: document.getElementById('weselA1'), A2: document.getElementById('weselA2'),
+      B1: document.getElementById('weselB1'), B2: document.getElementById('weselB2'),
+      C1: document.getElementById('weselC1'), C2: document.getElementById('weselC2')
+    };
+    const weselState = { A1:false, A2:false, B1:false, B2:false, C1:false, C2:false };
 
-let current="SGU", trains=[], signals={}, weselState={}, pending=[], nextId=1;
-let simMinutes=4*60, spawned=new Set(), selectedTrain=null, sopStep=0, assignedTrack=0;
-
-const SY=75, GAP=55, LEFT=80, MID_L=290, MID_R=780, RIGHT=1000;
-
-function changeStation(code){
-  current=code; trains=[]; signals={}; weselState={}; pending=[]; spawned.clear();
-  selectedTrain=null; sopStep=0; assignedTrack=0;
-  document.getElementById("diagram").innerHTML="";
-  document.getElementById("notifArea").innerHTML="";
-  document.getElementById("sopPanel").classList.remove("show");
-  document.getElementById("routeInfo").innerHTML="Sistem siap.<br>Jalur dipilih otomatis. Atur wesel (garis putus-putus).";
-  buildDiagram(); updateNeighbors();
-  log("Pindah ke stasiun "+STATIONS[code].name,"info");
-}
-
-function buildDiagram(){
-  const d=document.getElementById("diagram");
-  const st=STATIONS[current];
-
-  d.innerHTML=`
-    <div class="dir-label" style="left:10px;top:10px">\( {st.left.name}<br><small> \){st.left.dir}</small></div>
-    <div class="dir-label" style="right:10px;top:10px;text-align:right">\( {st.right.name}<br><small> \){st.right.dir}</small></div>
-  `;
-
-  // 4 jalur utama
-  for(let i=0;i<4;i++){
-    const y=SY+i*GAP;
-    const roman=["I","II","III","IV"][i];
-
-    addTrack(d, LEFT, y, MID_L-LEFT-25, "appL"+(i+1));
-    addTrack(d, MID_L, y, MID_R-MID_L, "track"+(i+1));
-    addTrack(d, MID_R+25, y, RIGHT-MID_R-25, "appR"+(i+1));
-
-    const lbl=document.createElement("div");
-    lbl.className="label num";
-    lbl.style.cssText=`left:\( {MID_L+(MID_R-MID_L)/2-8}px;top: \){y-16}px`;
-    lbl.textContent="Jalur "+roman;
-    d.appendChild(lbl);
-
-    createSignal(d, "sigIn"+(i+1), MID_L+25, y-14, i+1, "in");
-    createSignal(d, "sigOut"+(i+1), MID_R-45, y-14, i+1, "out");
-  }
-
-  // ===== WESEL KIRI (garis putus-putus) =====
-  // W1: Jalur I ↔ II
-  createWesel(d, "W1", MID_L-75, SY, MID_L-15, SY+GAP, "I↔II");
-  createWesel(d, "W1b", MID_L-75, SY+GAP, MID_L-15, SY, "II↔I");
-  // W2: Jalur II ↔ III
-  createWesel(d, "W2", MID_L-75, SY+GAP, MID_L-15, SY+2*GAP, "II↔III");
-  createWesel(d, "W2b", MID_L-75, SY+2*GAP, MID_L-15, SY+GAP, "III↔II");
-  // W3: Jalur III ↔ IV
-  createWesel(d, "W3", MID_L-75, SY+2*GAP, MID_L-15, SY+3*GAP, "III↔IV");
-  createWesel(d, "W3b", MID_L-75, SY+3*GAP, MID_L-15, SY+2*GAP, "IV↔III");
-
-  // ===== WESEL KANAN =====
-  createWesel(d, "W4", MID_R+15, SY, MID_R+75, SY+GAP, "I↔II");
-  createWesel(d, "W4b", MID_R+15, SY+GAP, MID_R+75, SY, "II↔I");
-  createWesel(d, "W5", MID_R+15, SY+GAP, MID_R+75, SY+2*GAP, "II↔III");
-  createWesel(d, "W5b", MID_R+15, SY+2*GAP, MID_R+75, SY+GAP, "III↔II");
-  createWesel(d, "W6", MID_R+15, SY+2*GAP, MID_R+75, SY+3*GAP, "III↔IV");
-  createWesel(d, "W6b", MID_R+15, SY+3*GAP, MID_R+75, SY+2*GAP, "IV↔III");
-}
-
-function addTrack(parent, x, y, w, id){
-  const el=document.createElement("div");
-  el.className="track"; el.id=id;
-  el.style.cssText=`left:\( {x}px;top: \){y}px;width:${w}px`;
-  parent.appendChild(el);
-}
-
-function createWesel(parent, id, x1, y1, x2, y2, label){
-  const el=document.createElement("div");
-  el.className="wesel-line";
-  el.id=id;
-  const len=Math.hypot(x2-x1, y2-y1);
-  const ang=Math.atan2(y2-y1, x2-x1)*180/Math.PI;
-  el.style.cssText=`left:\( {x1}px;top: \){y1}px;width:\( {len}px;transform:rotate( \){ang}deg)`;
-  el.title="Wesel "+id+" ("+label+") — klik untuk aktif/nonaktif";
-  el.onclick=()=>toggleWesel(id);
-  parent.appendChild(el);
-  weselState[id]=false;
-
-  // Label kecil di tengah garis
-  const midX=(x1+x2)/2 - 10;
-  const midY=(y1+y2)/2 - 8;
-  const lbl=document.createElement("div");
-  lbl.className="wesel-label";
-  lbl.id="lbl-"+id;
-  lbl.style.cssText=`left:\( {midX}px;top: \){midY}px`;
-  lbl.textContent=id;
-  parent.appendChild(lbl);
-}
-
-function toggleWesel(id){
-  weselState[id]=!weselState[id];
-  const el=document.getElementById(id);
-  if(el) el.classList.toggle("active", weselState[id]);
-  log("Wesel "+id+" → "+(weselState[id]?"AKTIF (rute terbuka)":"NONAKTIF (putus-putus)"),"info");
-}
-
-function createSignal(parent, id, x, y, track, side){
-  const sig=document.createElement("div");
-  sig.className="signal"; sig.id=id;
-  sig.style.cssText=`left:\( {x}px;top: \){y}px`;
-  const roman=["I","II","III","IV"][track-1];
-  sig.title=(side==="in"?"Sinyal Masuk":"Sinyal Keluar")+" Jalur "+roman;
-  sig.innerHTML=`<div class="sig-light red" id="${id}-l"></div>`;
-  sig.onclick=()=>toggleSignal(id, track, side);
-  parent.appendChild(sig);
-  signals[id]="red";
-}
-
-function toggleSignal(id, track, side){
-  const light=document.getElementById(id+"-l");
-  if(!light) return;
-  let next=signals[id]==="red"?"green":(signals[id]==="green"?"yellow":"red");
-  signals[id]=next;
-  light.className="sig-light "+next;
-  const roman=["I","II","III","IV"][track-1];
-  log((side==="in"?"Sinyal Masuk":"Sinyal Keluar")+" Jalur "+roman+" → "+next.toUpperCase(),"info");
-
-  if(side==="in" && next==="green"){
-    if(assignedTrack && assignedTrack!==track){
-      log("Sistem assign ke Jalur "+["I","II","III","IV"][assignedTrack-1],"warn");
+    function renderWesel() {
+      for (let [id, el] of Object.entries(weselMap)) {
+        if (!el) continue;
+        el.classList.toggle('active', weselState[id]);
+      }
+      const activeList = Object.keys(weselState).filter(k => weselState[k]);
+      document.getElementById('statusWesel').textContent = 
+        activeList.length ? 'wesel aktif: ' + activeList.join(' · ') : 'wesel: semua lurus';
     }
-    tryEnter(track);
-  }
-  if(side==="out" && next==="green") tryDepart(track);
-  if(side==="in" && next==="red") clearHighlight();
-}
+    document.querySelectorAll('.wesel-item').forEach(item => {
+      item.addEventListener('click', function() {
+        const key = this.dataset.wesel;
+        if (key && weselState.hasOwnProperty(key)) {
+          weselState[key] = !weselState[key];
+          renderWesel();
+        }
+      });
+    });
+    renderWesel();
 
-function setSignal(id, color){
-  signals[id]=color;
-  const light=document.getElementById(id+"-l");
-  if(light) light.className="sig-light "+color;
-}
-
-function highlight(track){
-  clearHighlight();
-  ["track"+track,"appL"+track,"appR"+track].forEach(id=>{
-    const el=document.getElementById(id);
-    if(el) el.classList.add("hl");
-  });
-}
-function clearHighlight(){
-  document.querySelectorAll(".track.hl").forEach(el=>el.classList.remove("hl"));
-}
-
-function findFreeTrack(){
-  for(let i=1;i<=4;i++){
-    if(!trains.some(t=>t.track===i && t.status!=="departed")) return i;
-  }
-  return 0;
-}
-
-function requestPermission(s){
-  const id="req"+Date.now();
-  const fromLeft=s.dir==="left";
-  pending.push({id,name:s.name,from:s.from,fromLeft,allowed:false,track:0});
-
-  const n=document.createElement("div");
-  n.className="notif "+(fromLeft?"from-left":"from-right");
-  n.id=id;
-  n.innerHTML=`
-    <div class="notif-title">📡 Laporan dari arah ${s.from}</div>
-    <div class="notif-body">KA <b>${s.name}</b> meminta izin masuk</div>
-    <div class="notif-actions">
-      <button class="notif-btn izin" onclick="izinkan('${id}')">✓ Izinkan</button>
-      <button class="notif-btn tolak" onclick="tolak('${id}')">✗ Tolak</button>
-    </div>`;
-  document.getElementById("notifArea").appendChild(n);
-  log("Laporan: KA "+s.name+" dari arah "+s.from,"warn");
-}
-
-function izinkan(reqId){
-  const item=pending.find(p=>p.id===reqId);
-  if(!item) return;
-  const track=findFreeTrack();
-  if(!track){ log("Semua jalur penuh","err"); return; }
-
-  item.allowed=true;
-  item.track=track;
-  assignedTrack=track;
-  document.getElementById(reqId)?.remove();
-
-  highlight(track);
-  const roman=["I","II","III","IV"][track-1];
-  document.getElementById("routeInfo").innerHTML=
-    `Sistem assign: <b>Jalur ${roman}</b><br>
-     1. Klik garis putus-putus (wesel) agar AKTIF<br>
-     2. Set Sinyal Masuk Jalur ${roman} → HIJAU`;
-
-  log("Sistem assign KA "+item.name+" ke Jalur "+roman,"ok");
-  log("Atur wesel lalu set Sinyal Masuk Jalur "+roman+" HIJAU","info");
-}
-
-function tolak(reqId){
-  pending=pending.filter(p=>p.id!==reqId);
-  document.getElementById(reqId)?.remove();
-  log("Izin ditolak","err");
-}
-
-function tryEnter(track){
-  const item=pending.find(p=>p.allowed && p.track===track);
-  if(!item || signals["sigIn"+track]!=="green") return;
-  pending=pending.filter(p=>p.id!==item.id);
-  assignedTrack=0;
-  spawnTrain(item.name, track, item.fromLeft);
-}
-
-function spawnTrain(name, track, fromLeft){
-  const id="T"+nextId++;
-  const y=SY+(track-1)*GAP-5;
-  const roman=["I","II","III","IV"][track-1];
-  const el=document.createElement("div");
-  el.className="train"; el.id=id;
-  el.style.left=(fromLeft?LEFT+10:RIGHT-90)+"px";
-  el.style.top=y+"px";
-  el.textContent=name.split(" ").slice(0,2).join(" ");
-  el.onclick=()=>selectTrain(id);
-  document.getElementById("diagram").appendChild(el);
-  trains.push({id,name,track,status:"moving",fromLeft,sop:0});
-
-  setTimeout(()=>{ const t=document.getElementById(id); if(t) t.style.left=(fromLeft?430:550)+"px"; },40);
-  setTimeout(()=>{
-    const t=document.getElementById(id);
-    if(!t) return;
-    t.classList.add("stopped");
-    const tr=trains.find(x=>x.id===id);
-    if(tr) tr.status="stopped";
-    setSignal("sigIn"+track,"red");
-    document.getElementById("routeInfo").innerHTML="KA berhenti di Jalur "+roman+".<br>Lakukan SOP, lalu set Sinyal Keluar HIJAU.";
-    log("KA "+name+" berhenti di Jalur "+roman+" → Sinyal Masuk MERAH","warn");
-  },2200);
-  log("KA "+name+" masuk Jalur "+roman,"ok");
-}
-
-function selectTrain(id){
-  const t=trains.find(x=>x.id===id);
-  if(!t||t.status!=="stopped") return;
-  selectedTrain=t; sopStep=t.sop||0;
-  document.querySelectorAll(".train").forEach(e=>e.classList.remove("selected"));
-  document.getElementById(id)?.classList.add("selected");
-  showSOP();
-}
-function showSOP(){
-  document.getElementById("sopPanel").classList.add("show");
-  const roman=["I","II","III","IV"][selectedTrain.track-1];
-  document.getElementById("sopTrainName").textContent=selectedTrain.name+" (Jalur "+roman+")";
-  for(let i=1;i<=4;i++){
-    const el=document.getElementById("sop"+i);
-    el.classList.remove("done","locked");
-    if(i<=sopStep) el.classList.add("done");
-    else if(i>sopStep+1) el.classList.add("locked");
-  }
-  const hints=["Klik 1: Penutupan Pintu","Klik 2: Warta","Klik 3: S41","Klik 4: S35","SOP selesai. Set Sinyal Keluar HIJAU."];
-  document.getElementById("sopHint").textContent=hints[Math.min(sopStep,4)];
-}
-function doSOP(step){
-  if(!selectedTrain||selectedTrain.status!=="stopped") return;
-  if(step!==sopStep+1){ log("Ikuti urutan SOP!","err"); return; }
-  sopStep=step; selectedTrain.sop=step;
-  const names=["","Penutupan Pintu","Warta","S41","S35"];
-  log("SOP "+step+": "+names[step],"ok");
-  showSOP();
-}
-
-function tryDepart(track){
-  const t=trains.find(x=>x.track===track&&x.status==="stopped");
-  if(!t) return;
-  if((t.sop||0)<4){
-    log("SOP belum lengkap!","err");
-    selectedTrain=t; showSOP(); return;
-  }
-  if(signals["sigOut"+track]!=="green") return;
-
-  t.status="departing";
-  const el=document.getElementById(t.id);
-  if(el){
-    el.classList.remove("stopped","selected");
-    el.classList.add("departing");
-    el.style.left=(t.fromLeft?RIGHT-20:LEFT+10)+"px";
-  }
-  const roman=["I","II","III","IV"][track-1];
-  log("S35 + Sinyal Keluar HIJAU → KA "+t.name+" berangkat dari Jalur "+roman,"ok");
-  document.getElementById("sopPanel").classList.remove("show");
-  selectedTrain=null; sopStep=0;
-
-  setTimeout(()=>{
-    el?.remove();
-    trains=trains.filter(x=>x.id!==t.id);
-    setSignal("sigOut"+track,"red");
-    clearHighlight();
-    document.getElementById("routeInfo").innerHTML="Sistem siap.<br>Jalur dipilih otomatis. Atur wesel (garis putus-putus).";
-    log("KA "+t.name+" keluar stasiun → Sinyal Keluar MERAH","warn");
-  },2300);
-}
-
-function checkSchedule(){
-  const st=STATIONS[current];
-  const h=Math.floor(simMinutes/60)%24, m=simMinutes%60;
-  const now=String(h).padStart(2,"0")+":"+String(m).padStart(2,"0");
-  st.schedule.forEach(s=>{
-    const key=s.time+"|"+s.name;
-    if(s.time===now&&!spawned.has(key)){
-      spawned.add(key);
-      requestPermission(s);
+    // ----- SINYAL -----
+    const lampMerah = document.getElementById('sinyalMerah');
+    const lampKuning = document.getElementById('sinyalKuning');
+    const lampHijau = document.getElementById('sinyalHijau');
+    let sinyalState = 0;
+    function updateSinyal() {
+      lampMerah.className = 'lamp';
+      lampKuning.className = 'lamp';
+      lampHijau.className = 'lamp';
+      if (sinyalState === 0) lampMerah.classList.add('red-on');
+      else if (sinyalState === 1) lampKuning.classList.add('yellow-on');
+      else if (sinyalState === 2) lampHijau.classList.add('green-on');
     }
-  });
-}
+    document.getElementById('toggleSinyal').addEventListener('click', function() {
+      sinyalState = (sinyalState + 1) % 3;
+      updateSinyal();
+    });
+    updateSinyal();
 
-function openJadwal(){
-  const st=STATIONS[current];
-  document.getElementById("schedList").innerHTML=st.schedule.map(s=>
-    `<div class="sched-item"><span class="time">\( {s.time}</span><span> \){s.name}</span>
-     <span style="color:var(--muted);font-size:.72rem">dari ${s.from}</span></div>`
-  ).join("");
-  document.getElementById("jadwalModal").classList.add("show");
-}
-function closeJadwal(){ document.getElementById("jadwalModal").classList.remove("show"); }
-document.getElementById("jadwalModal").onclick=e=>{ if(e.target.id==="jadwalModal") closeJadwal(); };
+    // ----- JAM -----
+    function updateJam() {
+      const now = new Date();
+      document.getElementById('jamDisplay').textContent = 
+        String(now.getHours()).padStart(2,'0')+':'+
+        String(now.getMinutes()).padStart(2,'0')+':'+
+        String(now.getSeconds()).padStart(2,'0');
+    }
+    updateJam();
+    setInterval(updateJam, 1000);
 
-function giveWarta(){ log("WARTA dikirim","ok"); }
-function setMode(btn){
-  document.querySelectorAll(".ctrl-btn").forEach(b=>b.classList.remove("active"));
-  btn.classList.add("active");
-}
-function updateNeighbors(){
-  const st=STATIONS[current];
-  document.getElementById("leftName").textContent=st.left.name;
-  document.getElementById("leftDir").textContent=st.left.dir;
-  document.getElementById("rightName").textContent=st.right.name;
-  document.getElementById("rightDir").textContent=st.right.dir;
-}
-function log(msg,type){
-  const box=document.getElementById("logBox");
-  const t=document.getElementById("clock").textContent;
-  const d=document.createElement("div");
-  d.innerHTML=`<span class="t">[\( {t}]</span> <span class=" \){type}">${msg}</span>`;
-  box.prepend(d);
-}
+    // ----- JADWAL MODAL -----
+    const modalJadwal = document.getElementById('modalJadwal');
+    document.getElementById('btnJadwal').addEventListener('click', () => modalJadwal.classList.add('show'));
+    document.getElementById('btnLihatJadwal').addEventListener('click', () => modalJadwal.classList.add('show'));
+    document.getElementById('tutupJadwal').addEventListener('click', () => modalJadwal.classList.remove('show'));
+    modalJadwal.addEventListener('click', (e) => { if (e.target === modalJadwal) modalJadwal.classList.remove('show'); });
 
-setInterval(()=>{
-  simMinutes++;
-  if(simMinutes>=24*60){ simMinutes=4*60; spawned.clear(); }
-  const h=Math.floor(simMinutes/60)%24, m=simMinutes%60;
-  document.getElementById("clock").textContent=String(h).padStart(2,"0")+":"+String(m).padStart(2,"0")+":00";
-  checkSchedule();
-},2500);
+    // ----- NOTIFIKASI IZIN MASUK (dengan pilihan stasiun tugas) -----
+    const notifText = document.getElementById('notifText');
+    const notifSetuju = document.getElementById('notifSetuju');
+    const notifTolak = document.getElementById('notifTolak');
+    const notifBox = document.getElementById('notifBox');
 
-buildDiagram(); updateNeighbors();
-log("Wesel = garis putus-putus. Klik untuk AKTIF (solid hijau).","info");
-log("Penamaan: Jalur I-IV | Sinyal Masuk/Keluar | Wesel W1-W6","ok");
+    // daftar kereta & asal
+    const keretaList = [
+      { nama: 'KA Jayabaya', asal: 'Gubeng', tujuan: 'Pasar Turi' },
+      { nama: 'KA Argo Bromo', asal: 'Gubeng', tujuan: 'Surabaya Kota' },
+      { nama: 'KA Sancaka', asal: 'Pasar Turi', tujuan: 'Sidoarjo' },
+      { nama: 'KA Mutiara Selatan', asal: 'Sidoarjo', tujuan: 'Mojokerto' },
+      { nama: 'KA Jayakarta', asal: 'Pasar Turi', tujuan: 'Gubeng' }
+    ];
+
+    let notifAktif = false;
+    let keretaTerpilih = null;
+
+    function tampilkanNotifikasi(kereta, stasiunTugas) {
+      notifText.textContent = `🚆 ${kereta.nama} dari ${kereta.asal} meminta izin masuk stasiun ${stasiunTugas}`;
+      notifSetuju.style.display = 'inline-block';
+      notifTolak.style.display = 'inline-block';
+      notifAktif = true;
+      keretaTerpilih = kereta;
+    }
+
+    function resetNotifikasi() {
+      notifText.textContent = 'Belum ada permintaan izin masuk.';
+      notifSetuju.style.display = 'none';
+      notifTolak.style.display = 'none';
+      notifAktif = false;
+      keretaTerpilih = null;
+    }
+
+    // event tombol minta izin
+    document.getElementById('btnMintaIzin').addEventListener('click', function() {
+      const stasiunTugas = document.getElementById('stasiunTugas').value;
+      // pilih kereta acak dari daftar
+      const randomKereta = keretaList[Math.floor(Math.random() * keretaList.length)];
+      tampilkanNotifikasi(randomKereta, stasiunTugas);
+    });
+
+    // setuju / tolak
+    notifSetuju.addEventListener('click', function() {
+      if (notifAktif && keretaTerpilih) {
+        alert(`✅ Izin masuk DIBERIKAN untuk ${keretaTerpilih.nama} dari ${keretaTerpilih.asal}.`);
+        resetNotifikasi();
+      }
+    });
+    notifTolak.addEventListener('click', function() {
+      if (notifAktif && keretaTerpilih) {
+        alert(`❌ Izin masuk DITOLAK untuk ${keretaTerpilih.nama} dari ${keretaTerpilih.asal}.`);
+        resetNotifikasi();
+      }
+    });
+
+    // tombol menu dummy
+    document.getElementById('btnGenta').addEventListener('click', () => alert('🔔 GENTA: Sinyal peringatan dibunyikan.'));
+    document.getElementById('btnInsiden').addEventListener('click', () => alert('⚠️ Laporan insiden: tidak ada insiden terbaru.'));
+    document.getElementById('btnWarta').addEventListener('click', () => alert('📰 Warta: Semua jalur berjalan normal.'));
+
+    // stasiun tugas berubah -> update notif jika sedang aktif
+    document.getElementById('stasiunTugas').addEventListener('change', function() {
+      if (notifAktif && keretaTerpilih) {
+        const stasiunBaru = this.value;
+        notifText.textContent = `🚆 ${keretaTerpilih.nama} dari ${keretaTerpilih.asal} meminta izin masuk stasiun ${stasiunBaru}`;
+      }
+    });
+
+    console.log('PPKA Simulator DAOP 8 siap. Klik wesel, atur sinyal, lihat jadwal, dan beri izin kereta.');
+  })();
 </script>
 </body>
 </html>
