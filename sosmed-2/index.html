@@ -478,23 +478,84 @@ textarea {
   background: var(--glass);
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
+  transition: border-color var(--transition), background var(--transition);
+}
+
+.terms-container.terms-ok {
+  border-color: rgba(52, 211, 153, 0.35);
+  background: rgba(52, 211, 153, 0.06);
 }
 
 .terms-header {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  align-items: flex-start;
+  gap: 12px;
   cursor: pointer;
   user-select: none;
 }
 
-.terms-header input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
-  accent-color: var(--accent2);
-  cursor: pointer;
+/* Custom checkbox (checklist) */
+.terms-check {
+  position: relative;
   flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  margin-top: 1px;
+}
+
+.terms-check input[type="checkbox"] {
+  position: absolute;
+  opacity: 0;
+  width: 100%;
+  height: 100%;
   margin: 0;
+  cursor: pointer;
+  z-index: 2;
+}
+
+.terms-check-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  border: 2px solid rgba(255, 255, 255, 0.28);
+  background: rgba(11, 18, 32, 0.6);
+  transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
+  pointer-events: none;
+}
+
+.terms-check-box svg {
+  width: 14px;
+  height: 14px;
+  opacity: 0;
+  transform: scale(0.5);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.terms-check input:checked + .terms-check-box {
+  border-color: var(--success);
+  background: var(--success);
+  box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.2);
+}
+
+.terms-check input:checked + .terms-check-box svg {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.terms-check input:focus-visible + .terms-check-box {
+  box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.25);
+}
+
+.terms-header:hover .terms-check-box {
+  border-color: rgba(255, 255, 255, 0.45);
+}
+
+.terms-check input:checked ~ .terms-check-box,
+.terms-header:hover .terms-check input:checked + .terms-check-box {
+  border-color: var(--success);
 }
 
 .terms-header label {
@@ -505,7 +566,8 @@ textarea {
   text-transform: none;
   letter-spacing: 0;
   cursor: pointer;
-  line-height: 1.4;
+  line-height: 1.45;
+  flex: 1;
 }
 
 .terms-link {
@@ -548,6 +610,7 @@ textarea {
   text-decoration: underline;
   width: auto;
   box-shadow: none;
+  font-family: inherit;
 }
 
 .terms-toggle:hover { color: white; }
@@ -1072,8 +1135,15 @@ button.primary:disabled {
 
   <!-- SYARAT & KETENTUAN -->
   <div class="terms-container" id="termsContainer">
-    <div class="terms-header">
-      <input type="checkbox" id="termsCheckbox" checked>
+    <div class="terms-header" id="termsHeader">
+      <div class="terms-check">
+        <input type="checkbox" id="termsCheckbox" aria-describedby="termsError">
+        <span class="terms-check-box" aria-hidden="true">
+          <svg viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M2.5 7.2L5.5 10.2L11.5 3.8" stroke="#0b1220" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </span>
+      </div>
       <label for="termsCheckbox">
         Saya menyetujui
         <span class="terms-link" id="termsLink">Syarat &amp; Ketentuan</span>
@@ -1084,7 +1154,7 @@ button.primary:disabled {
       <div class="terms-content-inner" id="termsContentInner">
         <div style="text-align:center;color:#64748b;padding:16px;">⏳ Memuat syarat &amp; ketentuan...</div>
       </div>
-      <button class="terms-toggle" id="termsToggleBtn" type="button">📖 Sembunyikan</button>
+      <button class="terms-toggle" id="termsToggleBtn" type="button">📖 Baca Syarat &amp; Ketentuan</button>
     </div>
     <div class="terms-error" id="termsError">⚠️ Anda harus menyetujui syarat &amp; ketentuan terlebih dahulu!</div>
   </div>
@@ -1171,9 +1241,19 @@ button.primary:disabled {
 
   termsToggleBtn.addEventListener('click', toggleTerms);
 
-  termsCheckbox.addEventListener('change', function () {
-    if (this.checked) {
+  function updateTermsUI() {
+    const container = document.getElementById('termsContainer');
+    if (termsCheckbox.checked) {
       termsError.classList.remove('show');
+      container.classList.add('terms-ok');
+    } else {
+      container.classList.remove('terms-ok');
+    }
+  }
+
+  termsCheckbox.addEventListener('change', function () {
+    updateTermsUI();
+    if (this.checked) {
       if (!termsContent.classList.contains('open') && !isTermsLoaded) {
         loadTerms();
         termsContent.classList.add('open');
@@ -1181,6 +1261,9 @@ button.primary:disabled {
       }
     }
   });
+
+  // Init state
+  updateTermsUI();
 
   // ===== DATA LAYANAN =====
   const SERVICES_ENDPOINT = '/api/fayupedia-services';
