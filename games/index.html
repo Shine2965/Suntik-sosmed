@@ -1,720 +1,1114 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.5, user-scalable=yes">
-  <title>PPKA Simulator · DAOP 8</title>
-  <style>
-    * {
-      box-sizing: border-box;
-      font-family: 'Segoe UI', Roboto, system-ui, sans-serif;
-    }
-    body {
-      margin: 0;
-      min-height: 100vh;
-      background: #1a2a2f;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      padding: 12px;
-    }
-    .simulator-card {
-      max-width: 820px;
-      width: 100%;
-      background: #1f3a3f;
-      background-image: radial-gradient(circle at 20% 30%, #2b4d54 0%, #102529 100%);
-      border-radius: 40px 40px 28px 28px;
-      padding: 20px 18px 28px;
-      box-shadow: 0 20px 40px rgba(0,0,0,0.7), inset 0 1px 2px rgba(255,255,240,0.08);
-      border: 1px solid #3d6a73;
-      transition: all 0.2s;
-    }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PPKA Simulator Indonesia – DAOP 8 Surabaya</title>
+    <style>
+        /* ===== RESET & BASE ===== */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-    /* HEADER */
-    .header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      color: #cfecf0;
-      padding: 0 4px 10px 4px;
-      border-bottom: 1px solid #3a636b;
-      flex-wrap: wrap;
-    }
-    .header-left {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
-    .badge-daop {
-      background: #c9a84b;
-      color: #1e2f33;
-      font-weight: 700;
-      font-size: 0.7rem;
-      padding: 3px 10px;
-      border-radius: 30px;
-      letter-spacing: 0.5px;
-    }
-    .header-time {
-      font-size: 1.5rem;
-      font-weight: 600;
-      letter-spacing: 1px;
-      color: #ddf4f7;
-      background: #0b2024;
-      padding: 0 14px;
-      border-radius: 40px;
-      border: 1px solid #3f7a82;
-      backdrop-filter: blur(2px);
-    }
-    .temp {
-      font-size: 0.9rem;
-      color: #b3d9df;
-      margin-left: 4px;
-    }
+        body {
+            font-family: 'Segoe UI', 'Roboto', monospace;
+            background: #0a0e14;
+            color: #e0e8f0;
+            overflow-x: hidden;
+            min-height: 100vh;
+        }
 
-    /* STATION SELECTOR */
-    .station-selector {
-      background: #0d262b;
-      margin: 12px 0 8px 0;
-      padding: 8px 16px;
-      border-radius: 60px;
-      border: 1px solid #34636b;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      flex-wrap: wrap;
-      justify-content: center;
-    }
-    .station-selector label {
-      color: #b5d6dc;
-      font-weight: 500;
-      font-size: 0.85rem;
-    }
-    .station-selector select {
-      background: #0b2024;
-      color: #ddf4f7;
-      border: 1px solid #3f7a82;
-      border-radius: 40px;
-      padding: 6px 16px;
-      font-weight: 600;
-      font-size: 0.9rem;
-      outline: none;
-      cursor: pointer;
-    }
-    .station-selector select option {
-      background: #1a3a3f;
-    }
+        /* ===== SCROLLBAR ===== */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1a1f26;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #2a7a3a;
+            border-radius: 8px;
+        }
 
-    /* STASIUN */
-    .station-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      background: #0d262b;
-      margin: 8px 0 6px 0;
-      padding: 8px 14px;
-      border-radius: 60px;
-      border: 1px solid #34636b;
-      color: #ddf4f7;
-      flex-wrap: wrap;
-    }
-    .station-name {
-      font-weight: 600;
-      font-size: 1.1rem;
-      letter-spacing: 0.5px;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-    .station-name small {
-      font-weight: 300;
-      font-size: 0.65rem;
-      background: #284e54;
-      padding: 2px 12px;
-      border-radius: 30px;
-      color: #bddce1;
-    }
-    .telepon {
-      background: #0b1d20;
-      padding: 4px 14px;
-      border-radius: 30px;
-      border: 1px solid #4c7f88;
-      font-size: 0.75rem;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-    .telepon .dot {
-      display: inline-block;
-      width: 10px;
-      height: 10px;
-      background: #4fc3a0;
-      border-radius: 50%;
-      box-shadow: 0 0 6px #4fc3a0;
-    }
+        /* ===== LAYOUT UTAMA ===== */
+        #app {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
 
-    /* MENU */
-    .menu-grid {
-      display: flex;
-      justify-content: space-around;
-      background: #0a2025;
-      padding: 10px 4px;
-      border-radius: 60px;
-      margin: 12px 0 16px 0;
-      border: 1px solid #3d6e76;
-      flex-wrap: wrap;
-    }
-    .menu-item {
-      color: #b5d6dc;
-      font-weight: 500;
-      font-size: 0.85rem;
-      padding: 6px 14px;
-      border-radius: 40px;
-      cursor: pointer;
-      transition: 0.1s;
-      border: none;
-      background: transparent;
-    }
-    .menu-item.active {
-      background: #c9a84b;
-      color: #10252a;
-      font-weight: 600;
-      box-shadow: 0 0 10px #dbb85c;
-    }
-    .menu-item:hover {
-      background: #2f5a62;
-      color: white;
-    }
+        /* ===== HEADER ===== */
+        .header {
+            background: linear-gradient(135deg, #0f151c 0%, #1a232e 100%);
+            border-bottom: 2px solid #2a7a3a;
+            padding: 12px 24px;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 20px rgba(42, 122, 58, 0.15);
+            z-index: 100;
+        }
 
-    /* TRACK */
-    .track-container {
-      background: #0b2227;
-      padding: 22px 12px 18px 12px;
-      border-radius: 60px 60px 32px 32px;
-      border: 2px solid #2f5d65;
-      box-shadow: inset 0 0 20px #030b0d;
-      margin-bottom: 14px;
-    }
-    .track-grid {
-      display: flex;
-      flex-direction: column;
-      gap: 18px;
-    }
-    .track-line {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      flex-wrap: wrap;
-      justify-content: center;
-    }
-    .track-label {
-      color: #99c2c9;
-      font-size: 0.65rem;
-      font-weight: 500;
-      width: 40px;
-      text-align: right;
-      letter-spacing: 0.5px;
-    }
-    .wesel-group {
-      display: flex;
-      align-items: center;
-      gap: 3px;
-      flex-wrap: wrap;
-      background: #0f2a30;
-      padding: 6px 12px;
-      border-radius: 50px;
-      border: 1px solid #316069;
-    }
-    .wesel-item {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      cursor: pointer;
-      transition: 0.1s;
-      padding: 0 4px;
-    }
-    .wesel-item .wesel-line {
-      width: 40px;
-      height: 6px;
-      background: #4b7e87;
-      border-radius: 10px;
-      transition: 0.12s;
-      margin: 2px 0;
-      border: 1px dashed #87b9c2;
-      background: #2f5b63;
-    }
-    .wesel-item .wesel-line.active {
-      background: #f5d742;
-      border: 2px solid #f5e56b;
-      box-shadow: 0 0 14px #f5d742;
-      border-style: solid;
-    }
-    .wesel-item .wesel-label {
-      font-size: 0.5rem;
-      color: #afd3da;
-      margin-top: 2px;
-      background: #1a3b42;
-      padding: 0 6px;
-      border-radius: 20px;
-    }
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 18px;
+        }
 
-    /* SINYAL */
-    .signal-area {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      justify-content: center;
-      gap: 20px 30px;
-      margin: 14px 0 4px 0;
-      background: #0b2227;
-      padding: 14px 8px;
-      border-radius: 60px;
-      border-top: 2px solid #2b5a62;
-    }
-    .signal-box {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      background: #0b1e22;
-      padding: 6px 16px 6px 12px;
-      border-radius: 40px;
-      border: 1px solid #3b6b73;
-    }
-    .signal-lamp {
-      display: flex;
-      gap: 10px;
-    }
-    .lamp {
-      width: 22px;
-      height: 22px;
-      border-radius: 50%;
-      background: #2b4d4f;
-      border: 2px solid #1b3a3d;
-      transition: 0.15s;
-      box-shadow: inset 0 0 6px #030b0b;
-    }
-    .lamp.red-on { background: #e34a4a; border-color: #ff8a8a; box-shadow: 0 0 18px #e34a4a; }
-    .lamp.green-on { background: #3dd68c; border-color: #7bffb0; box-shadow: 0 0 18px #3dd68c; }
-    .lamp.yellow-on { background: #f5c542; border-color: #ffe074; box-shadow: 0 0 18px #f5c542; }
-    .signal-label {
-      color: #b5d6dc;
-      font-size: 0.7rem;
-      font-weight: 500;
-    }
-    .signal-btn {
-      background: #204d55;
-      border: none;
-      border-radius: 30px;
-      color: white;
-      padding: 4px 14px;
-      font-size: 0.7rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: 0.1s;
-      border: 1px solid #3f828d;
-    }
-    .signal-btn:active { background: #c9a84b; color: #0b1e22; }
+        .logo {
+            font-size: 20px;
+            font-weight: 700;
+            color: #4ade80;
+            letter-spacing: 1px;
+            text-shadow: 0 0 20px rgba(74, 222, 128, 0.15);
+        }
+        .logo small {
+            font-weight: 400;
+            font-size: 13px;
+            color: #94a3b8;
+            letter-spacing: 0;
+        }
 
-    /* JADWAL & NOTIF */
-    .action-bar {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      gap: 12px;
-      margin: 12px 0 8px 0;
-    }
-    .action-btn {
-      background: #1f4a52;
-      border: 1px solid #3f828d;
-      color: white;
-      padding: 8px 20px;
-      border-radius: 40px;
-      font-weight: 600;
-      font-size: 0.8rem;
-      cursor: pointer;
-      transition: 0.1s;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.4);
-    }
-    .action-btn:hover { background: #2f6370; }
-    .action-btn:active { background: #c9a84b; color: #0b1e22; }
+        .header-status {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px 28px;
+            font-size: 13px;
+            color: #94a3b8;
+        }
+        .header-status span {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .header-status .label {
+            color: #64748b;
+        }
+        .header-status .value {
+            color: #e2e8f0;
+            font-weight: 600;
+        }
+        .header-status .value.warning {
+            color: #fbbf24;
+        }
+        .header-status .value.danger {
+            color: #f87171;
+        }
+        .header-status .value.success {
+            color: #4ade80;
+        }
 
-    .notification-box {
-      background: #0b2024;
-      border-left: 5px solid #f5c542;
-      padding: 12px 16px;
-      border-radius: 30px;
-      margin: 12px 0 6px 0;
-      color: #ddf4f7;
-      font-size: 0.9rem;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      flex-wrap: wrap;
-      border: 1px solid #3f7a82;
-      min-height: 60px;
-    }
-    .notification-box .notif-icon {
-      font-size: 1.6rem;
-    }
-    .notification-box .notif-text {
-      flex: 1;
-    }
-    .notification-box .notif-btn {
-      background: #3d7a7a;
-      border: none;
-      color: white;
-      padding: 6px 18px;
-      border-radius: 40px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: 0.1s;
-    }
-    .notification-box .notif-btn:hover { background: #5a9c9c; }
-    .notification-box .notif-btn:active { background: #c9a84b; color: #0b1e22; }
+        .header-time {
+            font-size: 18px;
+            font-weight: 600;
+            color: #4ade80;
+            font-variant-numeric: tabular-nums;
+            text-shadow: 0 0 30px rgba(74, 222, 128, 0.08);
+            background: #0f151c;
+            padding: 6px 16px;
+            border-radius: 8px;
+            border: 1px solid #2a3a3a;
+            letter-spacing: 0.5px;
+            text-align: right;
+        }
+        .header-time .date {
+            font-size: 12px;
+            font-weight: 400;
+            color: #94a3b8;
+            display: block;
+            text-align: right;
+        }
 
-    /* JADWAL MODAL */
-    .modal-overlay {
-      display: none;
-      position: fixed;
-      top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(0,0,0,0.7);
-      backdrop-filter: blur(4px);
-      justify-content: center;
-      align-items: center;
-      z-index: 999;
-    }
-    .modal-overlay.show { display: flex; }
-    .modal-card {
-      background: #1f3a3f;
-      max-width: 500px;
-      width: 90%;
-      border-radius: 40px;
-      padding: 24px 20px;
-      border: 2px solid #c9a84b;
-      box-shadow: 0 20px 40px rgba(0,0,0,0.8);
-      color: #ddf4f7;
-    }
-    .modal-card h2 {
-      text-align: center;
-      color: #f5d742;
-      margin-top: 0;
-      border-bottom: 1px solid #3f7a82;
-      padding-bottom: 10px;
-    }
-    .modal-card ul {
-      list-style: none;
-      padding: 0;
-    }
-    .modal-card li {
-      padding: 8px 12px;
-      border-bottom: 1px solid #2b545c;
-      display: flex;
-      justify-content: space-between;
-    }
-    .modal-card .close-modal {
-      background: #c9a84b;
-      border: none;
-      color: #1a2a2f;
-      font-weight: 700;
-      padding: 10px 24px;
-      border-radius: 40px;
-      font-size: 1rem;
-      cursor: pointer;
-      display: block;
-      margin: 16px auto 0;
-    }
+        /* ===== KONTROL SPEED ===== */
+        .speed-control {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: #0f151c;
+            padding: 4px 10px;
+            border-radius: 20px;
+            border: 1px solid #2a3a3a;
+        }
+        .speed-control button {
+            background: none;
+            border: none;
+            color: #94a3b8;
+            padding: 2px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            transition: all 0.15s;
+        }
+        .speed-control button:hover {
+            background: #2a3a3a;
+            color: #e2e8f0;
+        }
+        .speed-control button.active {
+            background: #2a7a3a;
+            color: #fff;
+            box-shadow: 0 0 15px rgba(42, 122, 58, 0.3);
+        }
+        .speed-control .label-speed {
+            color: #64748b;
+            font-size: 11px;
+            margin-right: 4px;
+        }
 
-    .footer-info {
-      display: flex;
-      justify-content: space-between;
-      color: #7daab2;
-      font-size: 0.7rem;
-      padding: 8px 10px 0 10px;
-      border-top: 1px solid #2b545c;
-      margin-top: 16px;
-      flex-wrap: wrap;
-    }
-    .footer-info span {
-      background: #0f2a30;
-      padding: 4px 14px;
-      border-radius: 40px;
-    }
-    @media (max-width: 560px) {
-      .track-line { justify-content: flex-start; }
-      .wesel-group { flex-wrap: wrap; }
-    }
-  </style>
+        /* ===== MAIN PANEL ===== */
+        .main-panel {
+            display: flex;
+            flex: 1;
+            gap: 0;
+            height: calc(100vh - 80px);
+        }
+
+        /* ===== SIDEBAR KIRI (STASIUN) ===== */
+        .sidebar-left {
+            width: 260px;
+            min-width: 260px;
+            background: #11181f;
+            border-right: 1px solid #1a2a2a;
+            padding: 16px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .sidebar-left h3 {
+            font-size: 13px;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 4px;
+            border-bottom: 1px solid #1a2a2a;
+            padding-bottom: 6px;
+        }
+
+        .station-select {
+            width: 100%;
+            padding: 8px 12px;
+            background: #0f151c;
+            border: 1px solid #2a3a3a;
+            border-radius: 6px;
+            color: #e2e8f0;
+            font-size: 14px;
+            outline: none;
+            cursor: pointer;
+        }
+        .station-select:focus {
+            border-color: #4ade80;
+        }
+
+        .difficulty-select {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+        .difficulty-select button {
+            flex: 1;
+            min-width: 50px;
+            padding: 6px 8px;
+            background: #0f151c;
+            border: 1px solid #2a3a3a;
+            border-radius: 6px;
+            color: #94a3b8;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .difficulty-select button:hover {
+            background: #1a2a2a;
+            color: #e2e8f0;
+        }
+        .difficulty-select button.active {
+            background: #2a7a3a;
+            border-color: #4ade80;
+            color: #fff;
+        }
+
+        .train-list {
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-top: 4px;
+        }
+        .train-item {
+            background: #0f151c;
+            border-left: 3px solid #2a7a3a;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.15s;
+            font-size: 13px;
+        }
+        .train-item:hover {
+            background: #1a232e;
+            border-left-color: #4ade80;
+        }
+        .train-item .train-number {
+            font-weight: 700;
+            color: #4ade80;
+        }
+        .train-item .train-name {
+            color: #94a3b8;
+            font-size: 12px;
+        }
+        .train-item .train-status {
+            font-size: 11px;
+            color: #fbbf24;
+            margin-top: 2px;
+        }
+        .train-item .train-status.arrived {
+            color: #4ade80;
+        }
+        .train-item .train-status.departed {
+            color: #94a3b8;
+        }
+        .train-item .train-status.delayed {
+            color: #f87171;
+        }
+
+        /* ===== VIEWPORT (Canvas) ===== */
+        .viewport {
+            flex: 1;
+            background: #0a0e14;
+            position: relative;
+            overflow: hidden;
+        }
+        #trackCanvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+            background: #0a0e14;
+        }
+
+        /* ===== NOTIFICATION CENTER ===== */
+        .notification-center {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 380px;
+            max-height: 320px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            pointer-events: none;
+            z-index: 999;
+        }
+        .notification {
+            background: #11181f;
+            border-left: 4px solid #4ade80;
+            padding: 12px 16px;
+            border-radius: 6px;
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.7);
+            pointer-events: auto;
+            animation: slideIn 0.3s ease-out;
+            font-size: 13px;
+            border: 1px solid #1a2a2a;
+        }
+        .notification.info {
+            border-left-color: #3b82f6;
+        }
+        .notification.warning {
+            border-left-color: #fbbf24;
+        }
+        .notification.danger {
+            border-left-color: #f87171;
+        }
+        .notification .notif-time {
+            color: #64748b;
+            font-size: 11px;
+            display: block;
+            margin-top: 4px;
+        }
+        .notification .notif-title {
+            font-weight: 600;
+            color: #e2e8f0;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(40px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        /* ===== RESPONSIVE ===== */
+        @media (max-width: 1024px) {
+            .sidebar-left {
+                width: 200px;
+                min-width: 200px;
+            }
+            .header-time {
+                font-size: 14px;
+            }
+            .notification-center {
+                width: 300px;
+                bottom: 10px;
+                right: 10px;
+            }
+        }
+        @media (max-width: 768px) {
+            .main-panel {
+                flex-direction: column;
+                height: auto;
+            }
+            .sidebar-left {
+                width: 100%;
+                min-width: unset;
+                max-height: 300px;
+                border-right: none;
+                border-bottom: 1px solid #1a2a2a;
+            }
+            .viewport {
+                height: 500px;
+            }
+            .header {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 8px;
+            }
+            .header-left {
+                flex-wrap: wrap;
+            }
+            .header-status {
+                font-size: 12px;
+                gap: 8px 16px;
+            }
+            .notification-center {
+                width: 90%;
+                right: 5%;
+                bottom: 10px;
+                max-height: 200px;
+            }
+        }
+
+        /* ===== TOOLTIP ===== */
+        .tooltip {
+            position: absolute;
+            background: #11181f;
+            border: 1px solid #2a7a3a;
+            padding: 8px 14px;
+            border-radius: 6px;
+            font-size: 12px;
+            color: #e2e8f0;
+            pointer-events: none;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.8);
+            z-index: 50;
+            display: none;
+            max-width: 220px;
+        }
+        .tooltip .tt-label {
+            color: #94a3b8;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .tooltip .tt-value {
+            font-weight: 600;
+        }
+    </style>
 </head>
 <body>
-<div class="simulator-card">
+    <div id="app">
+        <!-- HEADER -->
+        <header class="header">
+            <div class="header-left">
+                <div class="logo">
+                    PPKA SIMULATOR <small>INDONESIA</small>
+                </div>
+                <div class="header-status">
+                    <span><span class="label">DAOP</span> <span class="value" id="daopDisplay">8 SURABAYA</span></span>
+                    <span><span class="label">STASIUN</span> <span class="value" id="stationDisplay">Surabaya Gubeng</span></span>
+                    <span><span class="label">MODE</span> <span class="value" id="modeDisplay">NORMAL</span></span>
+                    <span><span class="label">STATUS</span> <span class="value success" id="systemStatus">NORMAL</span></span>
+                </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+                <div class="speed-control">
+                    <span class="label-speed">SPEED</span>
+                    <button data-speed="1" class="active">1×</button>
+                    <button data-speed="2">2×</button>
+                    <button data-speed="5">5×</button>
+                    <button data-speed="10">10×</button>
+                    <button data-speed="30">30×</button>
+                </div>
+                <div class="header-time" id="clockDisplay">
+                    <span id="timeStr">23:14:35</span>
+                    <span class="date" id="dateStr">Senin, 31 Agustus 2026</span>
+                </div>
+            </div>
+        </header>
 
-  <!-- HEADER -->
-  <div class="header">
-    <div class="header-left">
-      <span style="font-weight:600; font-size:1.2rem;">🚂 PPKA</span>
-      <span class="badge-daop">DAOP 8 · Surabaya</span>
-    </div>
-    <div style="display:flex; align-items:center; gap:6px;">
-      <span class="header-time" id="jamDisplay">22:00:00</span>
-      <span class="temp">28°C</span>
-    </div>
-  </div>
+        <!-- MAIN -->
+        <div class="main-panel">
+            <!-- SIDEBAR KIRI -->
+            <aside class="sidebar-left">
+                <div>
+                    <h3>📍 Pilih Stasiun</h3>
+                    <select class="station-select" id="stationSelect">
+                        <option value="Surabaya Gubeng">Surabaya Gubeng</option>
+                        <option value="Surabaya Pasarturi">Surabaya Pasarturi</option>
+                        <option value="Malang">Malang</option>
+                        <option value="Sidoarjo">Sidoarjo</option>
+                        <option value="Mojokerto">Mojokerto</option>
+                        <option value="Jombang">Jombang</option>
+                        <option value="Bojonegoro">Bojonegoro</option>
+                    </select>
+                </div>
+                <div>
+                    <h3>🎯 Tingkat Kesulitan</h3>
+                    <div class="difficulty-select" id="difficultyGroup">
+                        <button data-diff="easy" class="active">EASY</button>
+                        <button data-diff="normal">NORMAL</button>
+                        <button data-diff="hard">HARD</button>
+                        <button data-diff="expert">EXPERT</button>
+                    </div>
+                </div>
+                <div style="flex:1;min-height:0;">
+                    <h3>🚆 Kereta Aktif</h3>
+                    <div class="train-list" id="trainList">
+                        <!-- diisi JS -->
+                    </div>
+                </div>
+                <div style="font-size:12px;color:#64748b;border-top:1px solid #1a2a2a;padding-top:8px;">
+                    <span>SKOR: <strong id="scoreDisplay" style="color:#4ade80;">0</strong></span>
+                    <span style="margin-left:12px;">Tepat: <span id="onTimeCount" style="color:#4ade80;">0</span></span>
+                    <span style="margin-left:12px;">Terlambat: <span id="delayedCount" style="color:#f87171;">0</span></span>
+                </div>
+            </aside>
 
-  <!-- PILIH STASIUN TUGAS -->
-  <div class="station-selector">
-    <label for="stasiunTugas">📍 Bertugas di:</label>
-    <select id="stasiunTugas">
-      <option value="Pasar Turi" selected>Pasar Turi</option>
-      <option value="Gubeng">Gubeng</option>
-      <option value="Sidoarjo">Sidoarjo</option>
-      <option value="Mojokerto">Mojokerto</option>
-    </select>
-    <span style="color:#8dbac3; font-size:0.7rem;">(stasiun tugas aktif)</span>
-  </div>
-
-  <!-- STASIUN -->
-  <div class="station-row">
-    <div class="station-name"> Jakarta Kota <small>GMR</small> </div>
-    <div class="telepon"><span class="dot"></span> Telepon Standby</div>
-  </div>
-  <div class="station-row" style="margin-top:-4px;">
-    <div class="station-name"> Manggurai <small>DAOP 8</small> </div>
-    <div class="telepon"><span class="dot"></span> Telepon Standby</div>
-  </div>
-  <div class="station-row" style="margin-top:-4px;">
-    <div class="station-name"> Selatan <small>DAOP 8</small> </div>
-    <div class="telepon"><span class="dot"></span> Telepon Standby</div>
-  </div>
-
-  <!-- MENU KONTROL -->
-  <div class="menu-grid">
-    <button class="menu-item active">KONTROL</button>
-    <button class="menu-item" id="btnGenta">GENTA</button>
-    <button class="menu-item" id="btnJadwal">JADWAL</button>
-    <button class="menu-item" id="btnInsiden">INSIDEN</button>
-    <button class="menu-item" id="btnWarta">WARTA</button>
-  </div>
-
-  <!-- TRACK -->
-  <div class="track-container">
-    <div class="track-grid">
-      <div class="track-line">
-        <span class="track-label">Jalur 1</span>
-        <div class="wesel-group">
-          <div class="wesel-item" data-wesel="A1"><div class="wesel-line" id="weselA1"></div><span class="wesel-label">A1</span></div>
-          <div class="wesel-item" data-wesel="A2"><div class="wesel-line" id="weselA2"></div><span class="wesel-label">A2</span></div>
+            <!-- CANVAS -->
+            <div class="viewport" id="viewport">
+                <canvas id="trackCanvas"></canvas>
+                <div class="tooltip" id="tooltip"></div>
+            </div>
         </div>
-        <span style="color:#769ca3; font-size:0.6rem; margin-left:6px;">↔ wesel</span>
-      </div>
-      <div class="track-line">
-        <span class="track-label">Jalur 2</span>
-        <div class="wesel-group">
-          <div class="wesel-item" data-wesel="B1"><div class="wesel-line" id="weselB1"></div><span class="wesel-label">B1</span></div>
-          <div class="wesel-item" data-wesel="B2"><div class="wesel-line" id="weselB2"></div><span class="wesel-label">B2</span></div>
-        </div>
-        <span style="color:#769ca3; font-size:0.6rem; margin-left:6px;">↔ wesel</span>
-      </div>
-      <div class="track-line">
-        <span class="track-label">Jalur 3</span>
-        <div class="wesel-group">
-          <div class="wesel-item" data-wesel="C1"><div class="wesel-line" id="weselC1"></div><span class="wesel-label">C1</span></div>
-          <div class="wesel-item" data-wesel="C2"><div class="wesel-line" id="weselC2"></div><span class="wesel-label">C2</span></div>
-        </div>
-      </div>
     </div>
 
-    <!-- SINYAL -->
-    <div class="signal-area">
-      <div class="signal-box">
-        <div class="signal-lamp">
-          <div class="lamp" id="sinyalMerah"></div>
-          <div class="lamp" id="sinyalKuning"></div>
-          <div class="lamp" id="sinyalHijau"></div>
-        </div>
-        <span class="signal-label">SINYAL</span>
-        <button class="signal-btn" id="toggleSinyal">Ubah</button>
-      </div>
-      <div style="color:#a4ced6; font-size:0.7rem; background:#0a1e22; padding:2px 18px; border-radius:30px; border:1px solid #35636b;">
-        ⚡ PPKA atur wesel & sinyal
-      </div>
-    </div>
-  </div>
+    <!-- NOTIFICATION CENTER -->
+    <div class="notification-center" id="notificationCenter"></div>
 
-  <!-- ACTION: JADWAL & IZIN MASUK -->
-  <div class="action-bar">
-    <button class="action-btn" id="btnLihatJadwal">📋 Lihat Jadwal</button>
-    <button class="action-btn" id="btnMintaIzin">🚆 Minta Izin Masuk</button>
-  </div>
+    <script>
+        // ============================================================
+        // DATA JSON (embedded)
+        // ============================================================
+        const STATIONS_DATA = {
+            "Surabaya Gubeng": {
+                tracks: [
+                    { id: "T1", name: "Jalur 1", x: 150, y: 120 },
+                    { id: "T2", name: "Jalur 2", x: 150, y: 180 },
+                    { id: "T3", name: "Jalur 3", x: 150, y: 240 },
+                    { id: "T4", name: "Jalur 4", x: 150, y: 300 },
+                ],
+                switches: [
+                    { id: "W1", x: 380, y: 180, state: "normal" },
+                    { id: "W2", x: 380, y: 240, state: "normal" },
+                ],
+                signals: [
+                    { id: "S_IN", x: 80, y: 180, type: "masuk", state: "red" },
+                    { id: "S_OUT1", x: 580, y: 120, type: "keluar", state: "red" },
+                    { id: "S_OUT2", x: 580, y: 180, type: "keluar", state: "red" },
+                ]
+            },
+            "Surabaya Pasarturi": {
+                tracks: [
+                    { id: "T1", name: "Jalur 1", x: 150, y: 140 },
+                    { id: "T2", name: "Jalur 2", x: 150, y: 220 },
+                    { id: "T3", name: "Jalur 3", x: 150, y: 300 },
+                ],
+                switches: [
+                    { id: "W1", x: 380, y: 220, state: "normal" },
+                ],
+                signals: [
+                    { id: "S_IN", x: 80, y: 220, type: "masuk", state: "red" },
+                    { id: "S_OUT1", x: 580, y: 140, type: "keluar", state: "red" },
+                ]
+            },
+            "Malang": {
+                tracks: [
+                    { id: "T1", name: "Jalur 1", x: 150, y: 140 },
+                    { id: "T2", name: "Jalur 2", x: 150, y: 220 },
+                ],
+                switches: [],
+                signals: [
+                    { id: "S_IN", x: 80, y: 180, type: "masuk", state: "red" },
+                    { id: "S_OUT1", x: 580, y: 140, type: "keluar", state: "red" },
+                ]
+            },
+            "Sidoarjo": {
+                tracks: [
+                    { id: "T1", name: "Jalur 1", x: 150, y: 140 },
+                    { id: "T2", name: "Jalur 2", x: 150, y: 220 },
+                    { id: "T3", name: "Jalur 3", x: 150, y: 300 },
+                ],
+                switches: [
+                    { id: "W1", x: 380, y: 220, state: "normal" },
+                ],
+                signals: [
+                    { id: "S_IN", x: 80, y: 220, type: "masuk", state: "red" },
+                    { id: "S_OUT1", x: 580, y: 140, type: "keluar", state: "red" },
+                ]
+            },
+            "Mojokerto": {
+                tracks: [
+                    { id: "T1", name: "Jalur 1", x: 150, y: 160 },
+                    { id: "T2", name: "Jalur 2", x: 150, y: 240 },
+                ],
+                switches: [],
+                signals: [
+                    { id: "S_IN", x: 80, y: 200, type: "masuk", state: "red" },
+                    { id: "S_OUT1", x: 580, y: 160, type: "keluar", state: "red" },
+                ]
+            },
+            "Jombang": {
+                tracks: [
+                    { id: "T1", name: "Jalur 1", x: 150, y: 150 },
+                    { id: "T2", name: "Jalur 2", x: 150, y: 230 },
+                    { id: "T3", name: "Jalur 3", x: 150, y: 310 },
+                ],
+                switches: [
+                    { id: "W1", x: 380, y: 230, state: "normal" },
+                ],
+                signals: [
+                    { id: "S_IN", x: 80, y: 230, type: "masuk", state: "red" },
+                    { id: "S_OUT1", x: 580, y: 150, type: "keluar", state: "red" },
+                ]
+            },
+            "Bojonegoro": {
+                tracks: [
+                    { id: "T1", name: "Jalur 1", x: 150, y: 160 },
+                    { id: "T2", name: "Jalur 2", x: 150, y: 240 },
+                ],
+                switches: [],
+                signals: [
+                    { id: "S_IN", x: 80, y: 200, type: "masuk", state: "red" },
+                    { id: "S_OUT1", x: 580, y: 160, type: "keluar", state: "red" },
+                ]
+            }
+        };
 
-  <!-- NOTIFIKASI IZIN MASUK -->
-  <div class="notification-box" id="notifBox">
-    <span class="notif-icon">📢</span>
-    <span class="notif-text" id="notifText">Belum ada permintaan izin masuk.</span>
-    <button class="notif-btn" id="notifSetuju" style="display:none;">✅ Setuju</button>
-    <button class="notif-btn" id="notifTolak" style="display:none;">❌ Tolak</button>
-  </div>
+        // DATA KERETA (jadwal)
+        const TRAINS_DATA = [{
+            number: "KA123",
+            name: "Argo Bromo Anggrek",
+            origin: "Surabaya Pasarturi",
+            destination: "Surabaya Gubeng",
+            station: "Surabaya Gubeng",
+            arrival: "23:20",
+            departure: "23:25",
+            platform: "Jalur 2",
+            status: "menunggu"
+        }, {
+            number: "KA456",
+            name: "Mutiara Selatan",
+            origin: "Malang",
+            destination: "Surabaya Gubeng",
+            station: "Surabaya Gubeng",
+            arrival: "23:40",
+            departure: "23:45",
+            platform: "Jalur 1",
+            status: "menunggu"
+        }, {
+            number: "KA789",
+            name: "Local Surabaya",
+            origin: "Sidoarjo",
+            destination: "Surabaya Gubeng",
+            station: "Surabaya Gubeng",
+            arrival: "23:55",
+            departure: "00:05",
+            platform: "Jalur 3",
+            status: "menunggu"
+        }, {
+            number: "KA101",
+            name: "Gajayana",
+            origin: "Malang",
+            destination: "Surabaya Pasarturi",
+            station: "Surabaya Pasarturi",
+            arrival: "00:10",
+            departure: "00:15",
+            platform: "Jalur 1",
+            status: "menunggu"
+        }, {
+            number: "KA202",
+            name: "Brawijaya",
+            origin: "Surabaya Gubeng",
+            destination: "Malang",
+            station: "Malang",
+            arrival: "00:30",
+            departure: "00:35",
+            platform: "Jalur 2",
+            status: "menunggu"
+        }];
 
-  <!-- FOOTER -->
-  <div class="footer-info">
-    <span>🚆 DAOP 8 · Surabaya</span>
-    <span>📟 1000707357</span>
-    <span id="statusWesel">wesel: semua lurus</span>
-  </div>
-</div>
+        // ============================================================
+        // STATE GLOBAL
+        // ============================================================
+        const state = {
+            station: 'Surabaya Gubeng',
+            difficulty: 'easy',
+            speed: 1,
+            score: 0,
+            onTime: 0,
+            delayed: 0,
+            trains: [],
+            timeOffset: 0, // ms
+            lastTimestamp: Date.now(),
+            selectedTrain: null,
+            routeLocked: false,
+            switchStates: {},
+            signalStates: {},
+            trainPositions: {},
+        };
 
-<!-- MODAL JADWAL -->
-<div class="modal-overlay" id="modalJadwal">
-  <div class="modal-card">
-    <h2>📅 Jadwal Kereta DAOP 8</h2>
-    <ul id="daftarJadwal">
-      <li><span>KA Jayabaya</span><span>Gubeng → Pasar Turi</span><span>10:30</span></li>
-      <li><span>KA Argo Bromo</span><span>Gubeng → Surabaya Kota</span><span>11:15</span></li>
-      <li><span>KA Sancaka</span><span>Pasar Turi → Sidoarjo</span><span>12:00</span></li>
-      <li><span>KA Mutiara Selatan</span><span>Sidoarjo → Mojokerto</span><span>13:20</span></li>
-      <li><span>KA Jayakarta</span><span>Pasar Turi → Gubeng</span><span>14:45</span></li>
-    </ul>
-    <button class="close-modal" id="tutupJadwal">Tutup</button>
-  </div>
-</div>
+        // ============================================================
+        // DOM REFS
+        // ============================================================
+        const canvas = document.getElementById('trackCanvas');
+        const ctx = canvas.getContext('2d');
+        const viewport = document.getElementById('viewport');
+        const stationSelect = document.getElementById('stationSelect');
+        const trainListEl = document.getElementById('trainList');
+        const clockDisplay = document.getElementById('clockDisplay');
+        const timeStr = document.getElementById('timeStr');
+        const dateStr = document.getElementById('dateStr');
+        const notificationCenter = document.getElementById('notificationCenter');
+        const tooltip = document.getElementById('tooltip');
+        const scoreDisplay = document.getElementById('scoreDisplay');
+        const onTimeCount = document.getElementById('onTimeCount');
+        const delayedCount = document.getElementById('delayedCount');
+        const stationDisplay = document.getElementById('stationDisplay');
+        const modeDisplay = document.getElementById('modeDisplay');
 
-<script>
-  (function() {
-    // ----- WESEL (toggle) -----
-    const weselMap = {
-      A1: document.getElementById('weselA1'), A2: document.getElementById('weselA2'),
-      B1: document.getElementById('weselB1'), B2: document.getElementById('weselB2'),
-      C1: document.getElementById('weselC1'), C2: document.getElementById('weselC2')
-    };
-    const weselState = { A1:false, A2:false, B1:false, B2:false, C1:false, C2:false };
-
-    function renderWesel() {
-      for (let [id, el] of Object.entries(weselMap)) {
-        if (!el) continue;
-        el.classList.toggle('active', weselState[id]);
-      }
-      const activeList = Object.keys(weselState).filter(k => weselState[k]);
-      document.getElementById('statusWesel').textContent = 
-        activeList.length ? 'wesel aktif: ' + activeList.join(' · ') : 'wesel: semua lurus';
-    }
-    document.querySelectorAll('.wesel-item').forEach(item => {
-      item.addEventListener('click', function() {
-        const key = this.dataset.wesel;
-        if (key && weselState.hasOwnProperty(key)) {
-          weselState[key] = !weselState[key];
-          renderWesel();
+        // ============================================================
+        // FUNGSI UTILITY
+        // ============================================================
+        function formatTime(d) {
+            const pad = n => String(n).padStart(2, '0');
+            return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
         }
-      });
-    });
-    renderWesel();
 
-    // ----- SINYAL -----
-    const lampMerah = document.getElementById('sinyalMerah');
-    const lampKuning = document.getElementById('sinyalKuning');
-    const lampHijau = document.getElementById('sinyalHijau');
-    let sinyalState = 0;
-    function updateSinyal() {
-      lampMerah.className = 'lamp';
-      lampKuning.className = 'lamp';
-      lampHijau.className = 'lamp';
-      if (sinyalState === 0) lampMerah.classList.add('red-on');
-      else if (sinyalState === 1) lampKuning.classList.add('yellow-on');
-      else if (sinyalState === 2) lampHijau.classList.add('green-on');
-    }
-    document.getElementById('toggleSinyal').addEventListener('click', function() {
-      sinyalState = (sinyalState + 1) % 3;
-      updateSinyal();
-    });
-    updateSinyal();
+        function formatDate(d) {
+            const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+            const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober',
+                'November', 'Desember'
+            ];
+            return `${days[d.getDay()]}, ${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+        }
 
-    // ----- JAM -----
-    function updateJam() {
-      const now = new Date();
-      document.getElementById('jamDisplay').textContent = 
-        String(now.getHours()).padStart(2,'0')+':'+
-        String(now.getMinutes()).padStart(2,'0')+':'+
-        String(now.getSeconds()).padStart(2,'0');
-    }
-    updateJam();
-    setInterval(updateJam, 1000);
+        function getCurrentTime() {
+            const now = new Date();
+            return new Date(now.getTime() + state.timeOffset);
+        }
 
-    // ----- JADWAL MODAL -----
-    const modalJadwal = document.getElementById('modalJadwal');
-    document.getElementById('btnJadwal').addEventListener('click', () => modalJadwal.classList.add('show'));
-    document.getElementById('btnLihatJadwal').addEventListener('click', () => modalJadwal.classList.add('show'));
-    document.getElementById('tutupJadwal').addEventListener('click', () => modalJadwal.classList.remove('show'));
-    modalJadwal.addEventListener('click', (e) => { if (e.target === modalJadwal) modalJadwal.classList.remove('show'); });
+        function parseTime(str) {
+            const [h, m] = str.split(':').map(Number);
+            return { h, m };
+        }
 
-    // ----- NOTIFIKASI IZIN MASUK (dengan pilihan stasiun tugas) -----
-    const notifText = document.getElementById('notifText');
-    const notifSetuju = document.getElementById('notifSetuju');
-    const notifTolak = document.getElementById('notifTolak');
-    const notifBox = document.getElementById('notifBox');
+        function timeToMinutes(str) {
+            const { h, m } = parseTime(str);
+            return h * 60 + m;
+        }
 
-    // daftar kereta & asal
-    const keretaList = [
-      { nama: 'KA Jayabaya', asal: 'Gubeng', tujuan: 'Pasar Turi' },
-      { nama: 'KA Argo Bromo', asal: 'Gubeng', tujuan: 'Surabaya Kota' },
-      { nama: 'KA Sancaka', asal: 'Pasar Turi', tujuan: 'Sidoarjo' },
-      { nama: 'KA Mutiara Selatan', asal: 'Sidoarjo', tujuan: 'Mojokerto' },
-      { nama: 'KA Jayakarta', asal: 'Pasar Turi', tujuan: 'Gubeng' }
-    ];
+        function getTrainStatus(train, now) {
+            const nowMin = now.getHours() * 60 + now.getMinutes();
+            const arrMin = timeToMinutes(train.arrival);
+            const depMin = timeToMinutes(train.departure);
 
-    let notifAktif = false;
-    let keretaTerpilih = null;
+            // sederhana
+            if (nowMin < arrMin - 5) return { text: 'Menunggu', cls: '', eta: arrMin - nowMin };
+            if (nowMin < arrMin) return { text: 'Mendekati', cls: 'warning', eta: arrMin - nowMin };
+            if (nowMin < depMin) return { text: 'Berhenti', cls: 'arrived', eta: depMin - nowMin };
+            if (nowMin < depMin + 2) return { text: 'Berangkat', cls: 'departed', eta: 0 };
+            return { text: 'Selesai', cls: 'departed', eta: 0 };
+        }
 
-    function tampilkanNotifikasi(kereta, stasiunTugas) {
-      notifText.textContent = `🚆 ${kereta.nama} dari ${kereta.asal} meminta izin masuk stasiun ${stasiunTugas}`;
-      notifSetuju.style.display = 'inline-block';
-      notifTolak.style.display = 'inline-block';
-      notifAktif = true;
-      keretaTerpilih = kereta;
-    }
+        function addNotification(message, type = 'info', title = '') {
+            const el = document.createElement('div');
+            el.className = `notification ${type}`;
+            const now = getCurrentTime();
+            el.innerHTML = `
+                ${title ? `<div class="notif-title">${title}</div>` : ''}
+                ${message}
+                <span class="notif-time">${formatTime(now)} WIB</span>
+            `;
+            notificationCenter.prepend(el);
+            if (notificationCenter.children.length > 20) {
+                notificationCenter.lastChild.remove();
+            }
+        }
 
-    function resetNotifikasi() {
-      notifText.textContent = 'Belum ada permintaan izin masuk.';
-      notifSetuju.style.display = 'none';
-      notifTolak.style.display = 'none';
-      notifAktif = false;
-      keretaTerpilih = null;
-    }
+        // ============================================================
+        // SIMULATOR CORE
+        // ============================================================
+        function updateTrains() {
+            const now = getCurrentTime();
+            const station = state.station;
 
-    // event tombol minta izin
-    document.getElementById('btnMintaIzin').addEventListener('click', function() {
-      const stasiunTugas = document.getElementById('stasiunTugas').value;
-      // pilih kereta acak dari daftar
-      const randomKereta = keretaList[Math.floor(Math.random() * keretaList.length)];
-      tampilkanNotifikasi(randomKereta, stasiunTugas);
-    });
+            // filter kereta untuk stasiun aktif
+            state.trains = TRAINS_DATA.filter(t => t.station === station).map(t => {
+                const status = getTrainStatus(t, now);
+                return { ...t, statusText: status.text, statusCls: status.cls, eta: status.eta };
+            });
 
-    // setuju / tolak
-    notifSetuju.addEventListener('click', function() {
-      if (notifAktif && keretaTerpilih) {
-        alert(`✅ Izin masuk DIBERIKAN untuk ${keretaTerpilih.nama} dari ${keretaTerpilih.asal}.`);
-        resetNotifikasi();
-      }
-    });
-    notifTolak.addEventListener('click', function() {
-      if (notifAktif && keretaTerpilih) {
-        alert(`❌ Izin masuk DITOLAK untuk ${keretaTerpilih.nama} dari ${keretaTerpilih.asal}.`);
-        resetNotifikasi();
-      }
-    });
+            // update UI
+            renderTrainList();
+            updateScore();
+        }
 
-    // tombol menu dummy
-    document.getElementById('btnGenta').addEventListener('click', () => alert('🔔 GENTA: Sinyal peringatan dibunyikan.'));
-    document.getElementById('btnInsiden').addEventListener('click', () => alert('⚠️ Laporan insiden: tidak ada insiden terbaru.'));
-    document.getElementById('btnWarta').addEventListener('click', () => alert('📰 Warta: Semua jalur berjalan normal.'));
+        function renderTrainList() {
+            trainListEl.innerHTML = '';
+            state.trains.forEach(train => {
+                const div = document.createElement('div');
+                div.className = 'train-item';
+                div.innerHTML = `
+                    <div class="train-number">${train.number}</div>
+                    <div class="train-name">${train.name}</div>
+                    <div class="train-status ${train.statusCls}">${train.statusText} ${train.eta > 0 ? `ETA: ${train.eta}m` : ''}</div>
+                `;
+                div.addEventListener('click', () => {
+                    state.selectedTrain = train;
+                    addNotification(`Detail ${train.number}: ${train.name} | ${train.origin} → ${train.destination} | Jalur ${train.platform}`, 'info', '📋 Informasi Kereta');
+                });
+                trainListEl.appendChild(div);
+            });
+        }
 
-    // stasiun tugas berubah -> update notif jika sedang aktif
-    document.getElementById('stasiunTugas').addEventListener('change', function() {
-      if (notifAktif && keretaTerpilih) {
-        const stasiunBaru = this.value;
-        notifText.textContent = `🚆 ${keretaTerpilih.nama} dari ${keretaTerpilih.asal} meminta izin masuk stasiun ${stasiunBaru}`;
-      }
-    });
+        function updateScore() {
+            // sederhana: hitung dari status
+            let onTime = state.trains.filter(t => t.statusCls === 'arrived' || t.statusCls === 'departed').length;
+            let delayed = state.trains.filter(t => t.statusCls === 'warning' && t.eta > 10).length;
+            state.onTime = onTime;
+            state.delayed = delayed;
+            state.score = onTime * 100 - delayed * 50;
 
-    console.log('PPKA Simulator DAOP 8 siap. Klik wesel, atur sinyal, lihat jadwal, dan beri izin kereta.');
-  })();
-</script>
+            scoreDisplay.textContent = state.score;
+            onTimeCount.textContent = state.onTime;
+            delayedCount.textContent = state.delayed;
+        }
+
+        // ============================================================
+        // RENDER CANVAS (Layout jalur)
+        // ============================================================
+        function renderCanvas() {
+            const rect = viewport.getBoundingClientRect();
+            canvas.width = rect.width || 800;
+            canvas.height = rect.height || 500;
+            const W = canvas.width,
+                H = canvas.height;
+
+            ctx.clearRect(0, 0, W, H);
+
+            const stationData = STATIONS_DATA[state.station] || STATIONS_DATA['Surabaya Gubeng'];
+            const tracks = stationData.tracks || [];
+            const switches = stationData.switches || [];
+            const signals = stationData.signals || [];
+
+            // --- Gambar rel ---
+            tracks.forEach((track, idx) => {
+                const y = track.y || (100 + idx * 60);
+                const x1 = 60,
+                    x2 = W - 60;
+
+                // status jalur (simulasi)
+                let color = '#2a3a3a';
+                if (idx === 0) color = '#4ade80'; // jalur 1 hijau
+                else if (idx === 1) color = '#fbbf24'; // jalur 2 kuning
+                else color = '#2a3a3a';
+
+                ctx.beginPath();
+                ctx.moveTo(x1, y);
+                ctx.lineTo(x2, y);
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 4;
+                ctx.stroke();
+
+                // label
+                ctx.fillStyle = '#64748b';
+                ctx.font = '11px monospace';
+                ctx.fillText(track.name, x1 - 50, y + 4);
+            });
+
+            // --- Gambar wesel ---
+            switches.forEach(sw => {
+                const x = sw.x || 380;
+                const y = sw.y || 180;
+                const state = state.switchStates[sw.id] || sw.state || 'normal';
+                const isDiverging = state === 'diverging';
+
+                ctx.beginPath();
+                ctx.arc(x, y, 14, 0, Math.PI * 2);
+                ctx.fillStyle = isDiverging ? '#fbbf24' : '#4ade80';
+                ctx.fill();
+                ctx.strokeStyle = '#0a0e14';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                ctx.fillStyle = '#e2e8f0';
+                ctx.font = '9px monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText(sw.id, x, y + 4);
+
+                // garis wesel
+                if (isDiverging) {
+                    ctx.beginPath();
+                    ctx.moveTo(x - 20, y - 20);
+                    ctx.lineTo(x + 20, y + 20);
+                    ctx.strokeStyle = '#fbbf24';
+                    ctx.lineWidth = 3;
+                    ctx.stroke();
+                } else {
+                    ctx.beginPath();
+                    ctx.moveTo(x - 20, y);
+                    ctx.lineTo(x + 20, y);
+                    ctx.strokeStyle = '#4ade80';
+                    ctx.lineWidth = 3;
+                    ctx.stroke();
+                }
+
+                // interaktivitas
+                const rect2 = { x: x - 20, y: y - 20, w: 40, h: 40 };
+                // simpan untuk click detection
+                if (!canvas._switches) canvas._switches = [];
+                canvas._switches.push({ id: sw.id, rect: rect2, state: state });
+            });
+
+            // --- Gambar sinyal ---
+            signals.forEach(sig => {
+                const x = sig.x || 80;
+                const y = sig.y || 180;
+                const state = state.signalStates[sig.id] || sig.state || 'red';
+
+                const colors = { red: '#f87171', yellow: '#fbbf24', green: '#4ade80' };
+                const color = colors[state] || '#f87171';
+
+                ctx.beginPath();
+                ctx.arc(x, y, 10, 0, Math.PI * 2);
+                ctx.fillStyle = color;
+                ctx.fill();
+                ctx.shadowColor = color;
+                ctx.shadowBlur = 20;
+                ctx.fill();
+                ctx.shadowBlur = 0;
+
+                ctx.fillStyle = '#e2e8f0';
+                ctx.font = '8px monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText(sig.id, x, y + 20);
+                ctx.fillText(sig.type, x, y + 30);
+            });
+
+            // --- Gambar kereta (simulasi posisi) ---
+            state.trains.forEach((train, idx) => {
+                if (train.statusText === 'Selesai' || train.statusText === 'Menunggu') return;
+                const progress = Math.min(1, Math.max(0, (Date.now() % 5000) / 5000));
+                const xPos = 100 + progress * (W - 200);
+                const yPos = 180 + (idx % 3) * 50;
+
+                ctx.beginPath();
+                ctx.rect(xPos - 15, yPos - 8, 30, 16);
+                ctx.fillStyle = '#f87171';
+                ctx.fill();
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+
+                ctx.fillStyle = '#fff';
+                ctx.font = '8px monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText(train.number, xPos, yPos + 4);
+            });
+
+            // update signal states berdasarkan logika sederhana
+            // jika ada kereta mendekati, sinyal hijau
+            const hasApproaching = state.trains.some(t => t.statusText === 'Mendekati');
+            signals.forEach(sig => {
+                if (sig.type === 'masuk') {
+                    state.signalStates[sig.id] = hasApproaching ? 'green' : 'red';
+                }
+            });
+        }
+
+        // ============================================================
+        // INTERAKSI CANVAS (Klik wesel)
+        // ============================================================
+        canvas.addEventListener('click', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            const mx = (e.clientX - rect.left) * scaleX;
+            const my = (e.clientY - rect.top) * scaleY;
+
+            if (!canvas._switches) return;
+            for (const sw of canvas._switches) {
+                const r = sw.rect;
+                if (mx >= r.x && mx <= r.x + r.w && my >= r.y && my <= r.y + r.h) {
+                    // toggle wesel
+                    const newState = sw.state === 'normal' ? 'diverging' : 'normal';
+                    state.switchStates[sw.id] = newState;
+                    addNotification(`Wesel ${sw.id} diubah menjadi ${newState.toUpperCase()}`, 'info', '🔄 Wesel');
+                    renderCanvas();
+                    return;
+                }
+            }
+        });
+
+        // ============================================================
+        // SPEED CONTROL
+        // ============================================================
+        document.querySelectorAll('.speed-control button').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.speed-control button').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                state.speed = parseInt(btn.dataset.speed);
+                addNotification(`Kecepatan simulasi: ${state.speed}×`, 'info', '⏱️ Speed');
+            });
+        });
+
+        // ============================================================
+        // DIFFICULTY
+        // ============================================================
+        document.querySelectorAll('#difficultyGroup button').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('#difficultyGroup button').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                state.difficulty = btn.dataset.diff;
+                modeDisplay.textContent = btn.dataset.diff.toUpperCase();
+                addNotification(`Mode kesulitan: ${btn.dataset.diff.toUpperCase()}`, 'info', '🎯 Difficulty');
+            });
+        });
+
+        // ============================================================
+        // STATION SELECT
+        // ============================================================
+        stationSelect.addEventListener('change', () => {
+            state.station = stationSelect.value;
+            stationDisplay.textContent = state.station;
+            addNotification(`Berpindah ke stasiun ${state.station}`, 'info', '📍 Stasiun');
+            // reset sinyal & wesel
+            state.switchStates = {};
+            state.signalStates = {};
+            updateTrains();
+            renderCanvas();
+        });
+
+        // ============================================================
+        // CLOCK UPDATE
+        // ============================================================
+        function updateClock() {
+            const now = getCurrentTime();
+            timeStr.textContent = formatTime(now) + ' WIB';
+            dateStr.textContent = formatDate(now);
+        }
+
+        // ============================================================
+        // LOOP UTAMA
+        // ============================================================
+        let lastUpdate = Date.now();
+
+        function gameLoop() {
+            const now = Date.now();
+            const delta = (now - lastUpdate) * state.speed;
+            lastUpdate = now;
+
+            // update time offset untuk simulasi
+            state.timeOffset += delta;
+
+            // update clock setiap 100ms
+            updateClock();
+
+            // update trains setiap 2 detik
+            if (now % 2000 < 50) {
+                updateTrains();
+                // notifikasi jika ada kereta mendekati
+                const approaching = state.trains.filter(t => t.statusText === 'Mendekati' && t.eta <= 3);
+                approaching.forEach(t => {
+                    addNotification(`${t.number} ${t.name} akan memasuki stasiun dalam ${t.eta} menit. Siapkan jalur ${t.platform}.`, 'warning', '🚆 Kereta Mendekati');
+                });
+            }
+
+            // render canvas setiap 100ms
+            if (now % 100 < 20) {
+                renderCanvas();
+            }
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // ============================================================
+        // RESIZE
+        // ============================================================
+        window.addEventListener('resize', () => {
+            renderCanvas();
+        });
+
+        // ============================================================
+        // INIT
+        // ============================================================
+        function init() {
+            // set default
+            stationSelect.value = state.station;
+            stationDisplay.textContent = state.station;
+            modeDisplay.textContent = state.difficulty.toUpperCase();
+
+            // load data
+            updateTrains();
+            renderCanvas();
+
+            // notifikasi awal
+            addNotification('Selamat datang di PPKA Simulator Indonesia – DAOP 8 Surabaya', 'info', '🚀 Sistem Siap');
+            addNotification(`Stasiun ${state.station} aktif. Mode: ${state.difficulty.toUpperCase()}`, 'info', '📋 Status');
+
+            // mulai loop
+            lastUpdate = Date.now();
+            gameLoop();
+
+            // update clock immediately
+            updateClock();
+        }
+
+        // jalankan
+        init();
+
+        // ============================================================
+        // SIMULASI KERETA OTOMATIS (scheduler sederhana)
+        // ============================================================
+        // Tambahkan kereta baru setiap 30 detik (simulasi)
+        setInterval(() => {
+            const now = getCurrentTime();
+            const hour = now.getHours();
+            const min = now.getMinutes();
+
+            // cek jadwal: jika waktu mendekati arrival, ubah status
+            TRAINS_DATA.forEach(train => {
+                const arrMin = timeToMinutes(train.arrival);
+                const nowMin = hour * 60 + min;
+                if (nowMin >= arrMin - 2 && nowMin < arrMin) {
+                    // kirim notifikasi
+                    if (train.station === state.station) {
+                        addNotification(`${train.number} ${train.name} segera tiba. Jalur ${train.platform}`, 'warning', '🚆 Jadwal');
+                    }
+                }
+            });
+        }, 10000);
+
+        console.log('PPKA Simulator Indonesia – DAOP 8 Surabaya');
+        console.log('Sistem siap digunakan. Selamat bersimulasi!');
+    </script>
 </body>
 </html>
