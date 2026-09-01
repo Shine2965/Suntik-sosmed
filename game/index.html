@@ -1,107 +1,714 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Shine Shop</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.5, user-scalable=yes">
+    <title>PPKA Simulator · DAOP 8</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Roboto, system-ui, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            min-height: 100vh;
+            background: #0f1e22;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 16px;
+        }
+        .simulator-card {
+            max-width: 760px;
+            width: 100%;
+            background: #1a353b;
+            background-image: radial-gradient(circle at 20% 30%, #264f56 0%, #0f262b 100%);
+            border-radius: 44px 44px 32px 32px;
+            padding: 22px 20px 28px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.75), inset 0 1px 2px rgba(255,255,240,0.06);
+            border: 1px solid #3d6a73;
+        }
 
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+        /* HEADER */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: #d0edf0;
+            padding: 0 2px 12px 2px;
+            border-bottom: 1px solid #3a636b;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .badge-daop {
+            background: #c9a84b;
+            color: #1a2f33;
+            font-weight: 700;
+            font-size: 0.7rem;
+            padding: 4px 14px;
+            border-radius: 30px;
+            letter-spacing: 0.5px;
+        }
+        .header-time {
+            font-size: 1.6rem;
+            font-weight: 600;
+            letter-spacing: 1px;
+            color: #e8fafc;
+            background: #0b2024;
+            padding: 0 18px;
+            border-radius: 40px;
+            border: 1px solid #3f7a82;
+        }
+        .temp {
+            font-size: 0.9rem;
+            color: #b3d9df;
+            margin-left: 4px;
+        }
+        .battery {
+            color: #8bbec6;
+            font-size: 0.85rem;
+            background: #0b2024;
+            padding: 2px 12px;
+            border-radius: 30px;
+            border: 1px solid #3a6b73;
+        }
 
-<style>
-*{
-  box-sizing:border-box;
-  margin:0;
-  padding:0;
-}
+        /* STATION ROWS */
+        .station-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #0d262b;
+            margin: 8px 0 6px 0;
+            padding: 8px 16px;
+            border-radius: 60px;
+            border: 1px solid #34636b;
+            color: #ddf4f7;
+            flex-wrap: wrap;
+        }
+        .station-name {
+            font-weight: 600;
+            font-size: 1.1rem;
+            letter-spacing: 0.3px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .station-name small {
+            font-weight: 300;
+            font-size: 0.65rem;
+            background: #284e54;
+            padding: 2px 12px;
+            border-radius: 30px;
+            color: #bddce1;
+        }
+        .telepon {
+            background: #0b1d20;
+            padding: 4px 16px;
+            border-radius: 30px;
+            border: 1px solid #4c7f88;
+            font-size: 0.75rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .telepon .dot {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            background: #4fc3a0;
+            border-radius: 50%;
+            box-shadow: 0 0 8px #4fc3a0;
+        }
 
-body{
-  font-family:'Poppins',sans-serif;
-  min-height:100vh;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  background:
-    linear-gradient(rgba(0,0,0,0.75),rgba(0,0,0,0.75)),
-    url('/home/logo.png') center/cover no-repeat fixed;
-  color:white;
-}
+        /* MENU */
+        .menu-grid {
+            display: flex;
+            justify-content: space-around;
+            background: #0a2025;
+            padding: 10px 6px;
+            border-radius: 60px;
+            margin: 14px 0 18px 0;
+            border: 1px solid #3d6e76;
+            flex-wrap: wrap;
+        }
+        .menu-item {
+            color: #b5d6dc;
+            font-weight: 600;
+            font-size: 0.85rem;
+            padding: 6px 16px;
+            border-radius: 40px;
+            cursor: default;
+            letter-spacing: 0.3px;
+        }
+        .menu-item.active {
+            background: #c9a84b;
+            color: #10252a;
+            font-weight: 700;
+            box-shadow: 0 0 14px #dbb85c;
+        }
 
-/* CONTAINER */
-.container{
-  width:90%;
-  max-width:480px;
-  background:rgba(255,255,255,0.05);
-  backdrop-filter:blur(10px);
-  border-radius:18px;
-  padding:35px 25px;
-  text-align:center;
-  border:1px solid rgba(255,255,255,0.1);
-}
+        /* TRACK AREA - model jalur seperti gambar */
+        .track-container {
+            background: #0b2227;
+            padding: 24px 14px 20px 14px;
+            border-radius: 60px 60px 32px 32px;
+            border: 2px solid #2f5d65;
+            box-shadow: inset 0 0 24px #030b0d;
+            margin-bottom: 16px;
+        }
 
-/* TITLE */
-h1{
-  font-size:22px;
-  font-weight:600;
-  margin-bottom:30px;
-  letter-spacing:1px;
-}
+        .track-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
 
-/* BUTTON */
-.nav-btn{
-  width:100%;
-  padding:14px;
-  margin:10px 0;
-  border-radius:12px;
-  border:1px solid rgba(255,255,255,0.15);
-  background:rgba(255,255,255,0.08);
-  color:white;
-  font-size:14px;
-  font-weight:500;
-  cursor:pointer;
-  transition:0.25s;
-}
+        .track-line {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
 
-.nav-btn:hover{
-  background:rgba(255,255,255,0.18);
-}
+        .track-label {
+            color: #99c2c9;
+            font-size: 0.65rem;
+            font-weight: 600;
+            width: 44px;
+            text-align: right;
+            letter-spacing: 0.5px;
+        }
 
-/* FOOTER */
-.footer{
-  margin-top:25px;
-  font-size:12px;
-  opacity:0.6;
-}
-</style>
-  <!-- Script Google AdSense -->
-<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9912622413153708"
-crossorigin="anonymous"></script>
-  
+        .wesel-group {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            flex-wrap: wrap;
+            background: #0f2a30;
+            padding: 8px 16px;
+            border-radius: 50px;
+            border: 1px solid #316069;
+        }
+
+        .wesel-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            cursor: pointer;
+            transition: 0.1s;
+            padding: 0 4px;
+        }
+        .wesel-item .wesel-line {
+            width: 44px;
+            height: 7px;
+            background: #3d6e76;
+            border-radius: 10px;
+            transition: 0.12s;
+            margin: 2px 0;
+            border: 1.5px dashed #87b9c2;
+            background: #2f5b63;
+        }
+        .wesel-item .wesel-line.active {
+            background: #f5d742;
+            border: 2.5px solid #f5e56b;
+            box-shadow: 0 0 18px #f5d742;
+            border-style: solid;
+        }
+        .wesel-item .wesel-label {
+            font-size: 0.5rem;
+            color: #afd3da;
+            margin-top: 3px;
+            background: #1a3b42;
+            padding: 0 8px;
+            border-radius: 20px;
+            font-weight: 600;
+        }
+
+        /* SINYAL */
+        .signal-area {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            gap: 24px 36px;
+            margin: 18px 0 4px 0;
+            background: #0b2227;
+            padding: 16px 12px;
+            border-radius: 60px;
+            border-top: 2px solid #2b5a62;
+        }
+
+        .signal-box {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            background: #0b1e22;
+            padding: 8px 20px 8px 14px;
+            border-radius: 40px;
+            border: 1px solid #3b6b73;
+        }
+        .signal-lamp {
+            display: flex;
+            gap: 12px;
+        }
+        .lamp {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: #2b4d4f;
+            border: 2px solid #1b3a3d;
+            transition: 0.15s;
+            box-shadow: inset 0 0 8px #030b0b;
+        }
+        .lamp.red-on {
+            background: #e34a4a;
+            border-color: #ff8a8a;
+            box-shadow: 0 0 22px #e34a4a;
+        }
+        .lamp.green-on {
+            background: #3dd68c;
+            border-color: #7bffb0;
+            box-shadow: 0 0 22px #3dd68c;
+        }
+        .lamp.yellow-on {
+            background: #f5c542;
+            border-color: #ffe074;
+            box-shadow: 0 0 22px #f5c542;
+        }
+        .signal-label {
+            color: #b5d6dc;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .signal-btn {
+            background: #204d55;
+            border: none;
+            border-radius: 30px;
+            color: white;
+            padding: 5px 16px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: 0.1s;
+            border: 1px solid #3f828d;
+        }
+        .signal-btn:active {
+            background: #c9a84b;
+            color: #0b1e22;
+        }
+
+        /* NOTIF & JADWAL */
+        .action-bar {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 14px;
+            margin: 14px 0 10px 0;
+        }
+        .action-btn {
+            background: #1f4a52;
+            border: 1px solid #3f828d;
+            color: white;
+            padding: 8px 24px;
+            border-radius: 40px;
+            font-weight: 700;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: 0.1s;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+        }
+        .action-btn:hover { background: #2f6370; }
+        .action-btn:active { background: #c9a84b; color: #0b1e22; }
+
+        .notification-box {
+            background: #0b2024;
+            border-left: 5px solid #f5c542;
+            padding: 14px 18px;
+            border-radius: 30px;
+            margin: 10px 0 6px 0;
+            color: #ddf4f7;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            flex-wrap: wrap;
+            border: 1px solid #3f7a82;
+            min-height: 64px;
+        }
+        .notification-box .notif-icon {
+            font-size: 1.8rem;
+        }
+        .notification-box .notif-text {
+            flex: 1;
+        }
+        .notification-box .notif-btn {
+            background: #3d7a7a;
+            border: none;
+            color: white;
+            padding: 6px 20px;
+            border-radius: 40px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: 0.1s;
+        }
+        .notification-box .notif-btn:hover { background: #5a9c9c; }
+        .notification-box .notif-btn:active { background: #c9a84b; color: #0b1e22; }
+
+        .footer-info {
+            display: flex;
+            justify-content: space-between;
+            color: #7daab2;
+            font-size: 0.7rem;
+            padding: 10px 8px 0 8px;
+            border-top: 1px solid #2b545c;
+            margin-top: 16px;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+        .footer-info span {
+            background: #0f2a30;
+            padding: 4px 16px;
+            border-radius: 40px;
+        }
+
+        /* MODAL */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7);
+            backdrop-filter: blur(4px);
+            justify-content: center;
+            align-items: center;
+            z-index: 999;
+        }
+        .modal-overlay.show { display: flex; }
+        .modal-card {
+            background: #1f3a3f;
+            max-width: 480px;
+            width: 92%;
+            border-radius: 40px;
+            padding: 24px 20px;
+            border: 2px solid #c9a84b;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.8);
+            color: #ddf4f7;
+        }
+        .modal-card h2 {
+            text-align: center;
+            color: #f5d742;
+            margin-top: 0;
+            border-bottom: 1px solid #3f7a82;
+            padding-bottom: 12px;
+        }
+        .modal-card ul {
+            list-style: none;
+            padding: 0;
+        }
+        .modal-card li {
+            padding: 10px 12px;
+            border-bottom: 1px solid #2b545c;
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.9rem;
+        }
+        .modal-card .close-modal {
+            background: #c9a84b;
+            border: none;
+            color: #1a2a2f;
+            font-weight: 700;
+            padding: 10px 28px;
+            border-radius: 40px;
+            font-size: 1rem;
+            cursor: pointer;
+            display: block;
+            margin: 18px auto 0;
+        }
+
+        @media (max-width: 560px) {
+            .track-line { justify-content: flex-start; }
+            .wesel-group { flex-wrap: wrap; }
+            .header-time { font-size: 1.2rem; padding: 0 12px; }
+        }
+    </style>
 </head>
-
 <body>
+<div class="simulator-card">
 
-<div class="container">
+    <!-- HEADER -->
+    <div class="header">
+        <div class="header-left">
+            <span style="font-weight:700; font-size:1.2rem;">🚂 PPKA</span>
+            <span class="badge-daop">DAOP 8 · Surabaya</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+            <span class="header-time" id="jamDisplay">22:00:00</span>
+            <span class="temp">28°C</span>
+            <span class="battery">🔋 100%</span>
+        </div>
+    </div>
 
-<h1>Shine Shop Menu Global</h1>
+    <!-- STASIUN (seperti gambar) -->
+    <div class="station-row">
+        <div class="station-name">Jakarta Kota <small>GMR</small></div>
+        <div class="telepon"><span class="dot"></span> Telepon Standby</div>
+    </div>
 
-<button class="nav-btn" onclick="location.href='/robux/'">
-🛒 Roblox
-</button>
+    <!-- MENU -->
+    <div class="menu-grid">
+        <span class="menu-item active">KONTROL</span>
+        <span class="menu-item" id="btnGenta">GENTA</span>
+        <span class="menu-item" id="btnJadwal">JADWAL</span>
+        <span class="menu-item" id="btnInsiden">INSIDEN</span>
+        <span class="menu-item" id="btnWarta">WARTA</span>
+    </div>
 
-<button class="nav-btn" onclick="location.href='/anom/'">
-🛒 Mobile Legends
-</button>
+    <!-- STASIUN LAIN -->
+    <div class="station-row" style="margin-top:-2px;">
+        <div class="station-name">Manggurai <small>DAOP 8</small></div>
+        <div class="telepon"><span class="dot"></span> Telepon Standby</div>
+    </div>
+    <div class="station-row" style="margin-top:-2px;">
+        <div class="station-name">Selatan <small>DAOP 8</small></div>
+        <div class="telepon"><span class="dot"></span> Telepon Standby</div>
+    </div>
 
-  <button class="nav-btn" onclick="location.href='/anom/'"> 
-    Free Fire
-  </button>
-  
-  
-<div class="footer">
-©Shine Shop - 2023
+    <!-- TRACK - model jalur seperti gambar, dengan wesel -->
+    <div class="track-container">
+        <div class="track-grid">
+            <!-- Jalur 1 -->
+            <div class="track-line">
+                <span class="track-label">Jalur 1</span>
+                <div class="wesel-group">
+                    <div class="wesel-item" data-wesel="A1">
+                        <div class="wesel-line" id="weselA1"></div>
+                        <span class="wesel-label">A1</span>
+                    </div>
+                    <div class="wesel-item" data-wesel="A2">
+                        <div class="wesel-line" id="weselA2"></div>
+                        <span class="wesel-label">A2</span>
+                    </div>
+                </div>
+                <span style="color:#769ca3; font-size:0.6rem; margin-left:4px;">↔ wesel</span>
+            </div>
+            <!-- Jalur 2 -->
+            <div class="track-line">
+                <span class="track-label">Jalur 2</span>
+                <div class="wesel-group">
+                    <div class="wesel-item" data-wesel="B1">
+                        <div class="wesel-line" id="weselB1"></div>
+                        <span class="wesel-label">B1</span>
+                    </div>
+                    <div class="wesel-item" data-wesel="B2">
+                        <div class="wesel-line" id="weselB2"></div>
+                        <span class="wesel-label">B2</span>
+                    </div>
+                </div>
+                <span style="color:#769ca3; font-size:0.6rem; margin-left:4px;">↔ wesel</span>
+            </div>
+            <!-- Jalur 3 -->
+            <div class="track-line">
+                <span class="track-label">Jalur 3</span>
+                <div class="wesel-group">
+                    <div class="wesel-item" data-wesel="C1">
+                        <div class="wesel-line" id="weselC1"></div>
+                        <span class="wesel-label">C1</span>
+                    </div>
+                    <div class="wesel-item" data-wesel="C2">
+                        <div class="wesel-line" id="weselC2"></div>
+                        <span class="wesel-label">C2</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SINYAL -->
+        <div class="signal-area">
+            <div class="signal-box">
+                <div class="signal-lamp">
+                    <div class="lamp" id="sinyalMerah"></div>
+                    <div class="lamp" id="sinyalKuning"></div>
+                    <div class="lamp" id="sinyalHijau"></div>
+                </div>
+                <span class="signal-label">SINYAL</span>
+                <button class="signal-btn" id="toggleSinyal">Ubah</button>
+            </div>
+            <div style="color:#a4ced6; font-size:0.7rem; background:#0a1e22; padding:4px 20px; border-radius:30px; border:1px solid #35636b;">
+                ⚡ PPKA atur wesel & sinyal
+            </div>
+        </div>
+    </div>
+
+    <!-- ACTION: JADWAL & IZIN MASUK -->
+    <div class="action-bar">
+        <button class="action-btn" id="btnLihatJadwal">📋 Jadwal</button>
+        <button class="action-btn" id="btnMintaIzin">🚆 Izin Masuk</button>
+    </div>
+
+    <!-- NOTIFIKASI -->
+    <div class="notification-box" id="notifBox">
+        <span class="notif-icon">📢</span>
+        <span class="notif-text" id="notifText">Belum ada permintaan izin masuk.</span>
+        <button class="notif-btn" id="notifSetuju" style="display:none;">✅ Setuju</button>
+        <button class="notif-btn" id="notifTolak" style="display:none;">❌ Tolak</button>
+    </div>
+
+    <!-- FOOTER -->
+    <div class="footer-info">
+        <span>🚆 DAOP 8 · Surabaya</span>
+        <span>📟 1000707357</span>
+        <span id="statusWesel">wesel: semua lurus</span>
+    </div>
 </div>
 
+<!-- MODAL JADWAL -->
+<div class="modal-overlay" id="modalJadwal">
+    <div class="modal-card">
+        <h2>📅 Jadwal Kereta DAOP 8</h2>
+        <ul id="daftarJadwal">
+            <li><span>KA Jayabaya</span><span>Gubeng → Pasar Turi</span><span>10:30</span></li>
+            <li><span>KA Argo Bromo</span><span>Gubeng → Surabaya Kota</span><span>11:15</span></li>
+            <li><span>KA Sancaka</span><span>Pasar Turi → Sidoarjo</span><span>12:00</span></li>
+            <li><span>KA Mutiara Selatan</span><span>Sidoarjo → Mojokerto</span><span>13:20</span></li>
+            <li><span>KA Jayakarta</span><span>Pasar Turi → Gubeng</span><span>14:45</span></li>
+        </ul>
+        <button class="close-modal" id="tutupJadwal">Tutup</button>
+    </div>
+</div>
 
+<script>
+    (function() {
+        // ----- WESEL (toggle) -----
+        const weselMap = {
+            A1: document.getElementById('weselA1'), A2: document.getElementById('weselA2'),
+            B1: document.getElementById('weselB1'), B2: document.getElementById('weselB2'),
+            C1: document.getElementById('weselC1'), C2: document.getElementById('weselC2')
+        };
+        const weselState = { A1:false, A2:false, B1:false, B2:false, C1:false, C2:false };
+
+        function renderWesel() {
+            for (let [id, el] of Object.entries(weselMap)) {
+                if (!el) continue;
+                el.classList.toggle('active', weselState[id]);
+            }
+            const activeList = Object.keys(weselState).filter(k => weselState[k]);
+            document.getElementById('statusWesel').textContent = 
+                activeList.length ? 'wesel aktif: ' + activeList.join(' · ') : 'wesel: semua lurus';
+        }
+
+        document.querySelectorAll('.wesel-item').forEach(item => {
+            item.addEventListener('click', function() {
+                const key = this.dataset.wesel;
+                if (key && weselState.hasOwnProperty(key)) {
+                    weselState[key] = !weselState[key];
+                    renderWesel();
+                }
+            });
+        });
+        renderWesel();
+
+        // ----- SINYAL -----
+        const lampMerah = document.getElementById('sinyalMerah');
+        const lampKuning = document.getElementById('sinyalKuning');
+        const lampHijau = document.getElementById('sinyalHijau');
+        let sinyalState = 0;
+        function updateSinyal() {
+            lampMerah.className = 'lamp';
+            lampKuning.className = 'lamp';
+            lampHijau.className = 'lamp';
+            if (sinyalState === 0) lampMerah.classList.add('red-on');
+            else if (sinyalState === 1) lampKuning.classList.add('yellow-on');
+            else if (sinyalState === 2) lampHijau.classList.add('green-on');
+        }
+        document.getElementById('toggleSinyal').addEventListener('click', function() {
+            sinyalState = (sinyalState + 1) % 3;
+            updateSinyal();
+        });
+        updateSinyal();
+
+        // ----- JAM -----
+        function updateJam() {
+            const now = new Date();
+            document.getElementById('jamDisplay').textContent = 
+                String(now.getHours()).padStart(2,'0')+':'+
+                String(now.getMinutes()).padStart(2,'0')+':'+
+                String(now.getSeconds()).padStart(2,'0');
+        }
+        updateJam();
+        setInterval(updateJam, 1000);
+
+        // ----- JADWAL MODAL -----
+        const modalJadwal = document.getElementById('modalJadwal');
+        document.getElementById('btnJadwal').addEventListener('click', () => modalJadwal.classList.add('show'));
+        document.getElementById('btnLihatJadwal').addEventListener('click', () => modalJadwal.classList.add('show'));
+        document.getElementById('tutupJadwal').addEventListener('click', () => modalJadwal.classList.remove('show'));
+        modalJadwal.addEventListener('click', (e) => { if (e.target === modalJadwal) modalJadwal.classList.remove('show'); });
+
+        // ----- NOTIFIKASI IZIN MASUK -----
+        const notifText = document.getElementById('notifText');
+        const notifSetuju = document.getElementById('notifSetuju');
+        const notifTolak = document.getElementById('notifTolak');
+
+        const keretaList = [
+            { nama: 'KA Jayabaya', asal: 'Gubeng', tujuan: 'Pasar Turi' },
+            { nama: 'KA Argo Bromo', asal: 'Gubeng', tujuan: 'Surabaya Kota' },
+            { nama: 'KA Sancaka', asal: 'Pasar Turi', tujuan: 'Sidoarjo' },
+            { nama: 'KA Mutiara Selatan', asal: 'Sidoarjo', tujuan: 'Mojokerto' },
+            { nama: 'KA Jayakarta', asal: 'Pasar Turi', tujuan: 'Gubeng' }
+        ];
+
+        let notifAktif = false;
+        let keretaTerpilih = null;
+
+        function tampilkanNotifikasi(kereta) {
+            notifText.textContent = `🚆 ${kereta.nama} dari ${kereta.asal} meminta izin masuk stasiun ${kereta.tujuan}`;
+            notifSetuju.style.display = 'inline-block';
+            notifTolak.style.display = 'inline-block';
+            notifAktif = true;
+            keretaTerpilih = kereta;
+        }
+
+        function resetNotifikasi() {
+            notifText.textContent = 'Belum ada permintaan izin masuk.';
+            notifSetuju.style.display = 'none';
+            notifTolak.style.display = 'none';
+            notifAktif = false;
+            keretaTerpilih = null;
+        }
+
+        document.getElementById('btnMintaIzin').addEventListener('click', function() {
+            const randomKereta = keretaList[Math.floor(Math.random() * keretaList.length)];
+            tampilkanNotifikasi(randomKereta);
+        });
+
+        notifSetuju.addEventListener('click', function() {
+            if (notifAktif && keretaTerpilih) {
+                alert(`✅ Izin masuk DIBERIKAN untuk ${keretaTerpilih.nama} dari ${keretaTerpilih.asal}.`);
+                resetNotifikasi();
+            }
+        });
+        notifTolak.addEventListener('click', function() {
+            if (notifAktif && keretaTerpilih) {
+                alert(`❌ Izin masuk DITOLAK untuk ${keretaTerpilih.nama} dari ${keretaTerpilih.asal}.`);
+                resetNotifikasi();
+            }
+        });
+
+        // ----- MENU DUMMY -----
+        document.getElementById('btnGenta').addEventListener('click', () => alert('🔔 GENTA: Sinyal peringatan dibunyikan.'));
+        document.getElementById('btnInsiden').addEventListener('click', () => alert('⚠️ Laporan insiden: tidak ada insiden terbaru.'));
+        document.getElementById('btnWarta').addEventListener('click', () => alert('📰 Warta: Semua jalur berjalan normal.'));
+
+        console.log('PPKA Simulator DAOP 8 siap. Model jalur sesuai gambar.');
+    })();
+</script>
 </body>
 </html>
-
