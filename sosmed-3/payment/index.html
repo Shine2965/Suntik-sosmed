@@ -1291,17 +1291,31 @@ window.copyOrderId = function(orderId) {
 // ================= SEND ORDER NOTIFICATION TO DISCORD =================
 async function sendOrderNotificationToDiscord(result) {
   try {
-    const orderId = result.order || '-';
-    const msg = result.msg || `Pesanan dengan id #${orderId} berhasil dibuat.`;
-    const commentInfo = comment ? `\n📝 **Komentar:** ${comment}` : '';
-    
-    const message = `📦 **ORDER FAYUPEDIA BERHASIL**
+
+    const orderId =
+      result.order ||
+      result.order_id ||
+      result.id ||
+      '-';
+
+    const msg =
+      result.msg ||
+      result.message ||
+      `Pesanan dengan ID #${orderId} berhasil dibuat.`;
+
+    const additionalInfo =
+      comment
+        ? `\n📝 **Additional:** ${comment}`
+        : '';
+
+    const message =
+`📦 **ORDER ORDERSOSMED BERHASIL**
 ━━━━━━━━━━━━━━━━━━━━━
 🆔 **ID Transaksi:** ${trx}
 📋 **Layanan:** ${layanan}
 🆔 **Service ID:** ${serviceId}
 🎯 **Target:** ${target}
-🔢 **Jumlah:** ${quantity}${commentInfo}
+🔢 **Jumlah:** ${quantity}${additionalInfo}
 📊 **Status:** ✅ SUCCESS
 🆔 **Order ID:** ${orderId}
 📝 **Pesan:** ${msg}
@@ -1311,27 +1325,47 @@ async function sendOrderNotificationToDiscord(result) {
 
     await fetch(discordWebhook, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content: message })
+
+      headers: {
+        'Content-Type': 'application/json'
+      },
+
+      body: JSON.stringify({
+        content: message
+      })
     });
-    console.log('✅ Notifikasi order ke Discord terkirim');
+
+    console.log(
+      '✅ Notifikasi order Ordersosmed ke Discord terkirim'
+    );
+
   } catch (err) {
-    console.error('❌ Gagal kirim notifikasi order ke Discord:', err);
+
+    console.error(
+      '❌ Gagal kirim notifikasi order:',
+      err
+    );
+
   }
 }
-
 // ================= SEND ORDER ERROR TO DISCORD =================
 async function sendOrderErrorToDiscord(errorMsg) {
+
   try {
-    const commentInfo = comment ? `\n📝 **Komentar:** ${comment}` : '';
-    
-    const message = `❌ **ORDER FAYUPEDIA GAGAL**
+
+    const additionalInfo =
+      comment
+        ? `\n📝 **Additional:** ${comment}`
+        : '';
+
+    const message =
+`❌ **ORDER ORDERSOSMED GAGAL**
 ━━━━━━━━━━━━━━━━━━━━━
 🆔 **ID Transaksi:** ${trx}
 📋 **Layanan:** ${layanan}
 🆔 **Service ID:** ${serviceId}
 🎯 **Target:** ${target}
-🔢 **Jumlah:** ${quantity}${commentInfo}
+🔢 **Jumlah:** ${quantity}${additionalInfo}
 📊 **Status:** ❌ FAILED
 📝 **Error:** ${errorMsg}
 📅 **Waktu:** ${formatWIB(new Date())}
@@ -1340,15 +1374,26 @@ async function sendOrderErrorToDiscord(errorMsg) {
 
     await fetch(discordWebhook, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content: message })
+
+      headers: {
+        'Content-Type':
+          'application/json'
+      },
+
+      body: JSON.stringify({
+        content: message
+      })
     });
-    console.log('✅ Notifikasi error order ke Discord terkirim');
+
   } catch (err) {
-    console.error('❌ Gagal kirim notifikasi error ke Discord:', err);
+
+    console.error(
+      '❌ Gagal kirim error order:',
+      err
+    );
+
   }
 }
-
 // ================= SEND TO DISCORD (PAYMENT) =================
 async function sendToDiscord(gmail, userID) {
   if (isDiscordAlreadySent()) {
@@ -1523,11 +1568,11 @@ async function checkPaymentStatus() {
       
       const sent = await sendToDiscord(gmail, userID);
       
-      if (sent) {
-        await sendOrderToFayupedia();
-        saveTransactionLockLocal();
-        console.log('🔒 Transaksi locked');
-      }
+             if (sent) {
+  await sendOrderToOrdersosmed();
+  saveTransactionLockLocal();
+  console.log('🔒 Transaksi locked');
+}
       
       confirmBtn.disabled = true;
       confirmBtn.textContent = '✅ Pembayaran Terverifikasi';
