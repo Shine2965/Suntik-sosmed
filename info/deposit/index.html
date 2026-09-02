@@ -106,6 +106,13 @@
             cursor: not-allowed;
             transform: none;
         }
+        .btn-success {
+            background: #00ffaa;
+            color: #0a0a0a;
+        }
+        .btn-success:hover {
+            background: #00dd99;
+        }
         .btn-back {
             background: #444;
             color: #fff;
@@ -213,8 +220,18 @@
             font-size: 10px;
             margin-top: 4px;
         }
+        .qris-wrapper .qris-unique {
+            color: #ffaa00;
+            font-size: 14px;
+            font-weight: 700;
+            margin-top: 4px;
+            background: #ffaa0015;
+            padding: 2px 14px;
+            border-radius: 6px;
+            border: 1px solid #ffaa0033;
+        }
 
-        /* Detail Transaksi */
+        /* Detail Box */
         .detail-box {
             background: #0d0d0d;
             border-radius: 12px;
@@ -246,57 +263,8 @@
         .detail-box .row .value.yellow {
             color: #ffaa00;
         }
-
-        /* File Upload */
-        .file-upload-area {
-            border: 2px dashed #00ffaa33;
-            border-radius: 12px;
-            padding: 24px;
-            text-align: center;
-            cursor: pointer;
-            transition: 0.3s;
-            margin-top: 8px;
-        }
-        .file-upload-area:hover {
-            border-color: #00ffaa66;
-            background: rgba(0,255,170,0.03);
-        }
-        .file-upload-area .icon {
-            font-size: 36px;
-            display: block;
-            margin-bottom: 8px;
-        }
-        .file-upload-area .text {
-            color: #888;
-            font-size: 13px;
-        }
-        .file-upload-area .text strong {
-            color: #00ffaa;
-        }
-        .file-upload-area .file-name {
-            color: #00ffaa;
-            font-size: 13px;
-            margin-top: 6px;
-            display: none;
-        }
-        .file-upload-area.has-file {
-            border-color: #00ffaa66;
-            background: rgba(0,255,170,0.05);
-        }
-        .file-upload-area.has-file .file-name {
-            display: block;
-        }
-        #fileInput {
-            display: none;
-        }
-
-        .preview-image {
-            max-width: 100%;
-            max-height: 150px;
-            border-radius: 8px;
-            margin-top: 8px;
-            display: none;
-            border: 1px solid #00ffaa33;
+        .detail-box .row .value.red {
+            color: #ff4444;
         }
 
         .qris-placeholder {
@@ -314,9 +282,66 @@
             display: block;
             margin-bottom: 10px;
         }
-        .qris-placeholder .highlight {
-            color: #ffaa00;
+
+        /* Payment Status */
+        .payment-status {
+            margin-top: 12px;
+            padding: 12px 16px;
+            border-radius: 12px;
+            text-align: center;
+            font-size: 13px;
             font-weight: 600;
+            display: none;
+        }
+        .payment-status.loading {
+            display: block;
+            background: rgba(255,170,0,0.15);
+            color: #ffaa00;
+            border: 1px solid rgba(255,170,0,0.3);
+        }
+        .payment-status.success {
+            display: block;
+            background: rgba(34,197,94,0.15);
+            color: #22c55e;
+            border: 1px solid rgba(34,197,94,0.3);
+        }
+        .payment-status.failed {
+            display: block;
+            background: rgba(239,68,68,0.15);
+            color: #ef4444;
+            border: 1px solid rgba(239,68,68,0.3);
+        }
+
+        /* Status box */
+        .status-box {
+            margin-top: 12px;
+            padding: 14px 16px;
+            border-radius: 12px;
+            background: #0d0d0d;
+            border: 1px solid #00ffaa15;
+            display: none;
+        }
+        .status-box.show {
+            display: block;
+        }
+        .status-box .status-label {
+            color: #888;
+            font-size: 12px;
+        }
+        .status-box .status-value {
+            color: #00ffaa;
+            font-size: 14px;
+            font-weight: 600;
+            margin-top: 2px;
+        }
+        .status-box .status-value.pending {
+            color: #ffaa00;
+        }
+        .status-box .status-value.success {
+            color: #00ffaa;
+        }
+        .status-box .status-value.failed {
+            color: #ff4444;
         }
 
         @media (max-width: 600px) {
@@ -338,7 +363,7 @@
 </head>
 <body>
     <div class="container">
-        <!-- ===== HEADER ===== -->
+        <!-- HEADER -->
         <div class="card">
             <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;">
                 <div>
@@ -356,10 +381,10 @@
             <div class="env-status" id="envStatus">🔌 Memuat data user...</div>
         </div>
 
-        <!-- ===== FORM DEPOSIT ===== -->
+        <!-- FORM DEPOSIT -->
         <div class="card" id="depositCard">
             <h2>📝 Form Deposit</h2>
-            <div class="sub">Minimal deposit <span style="color:#ffaa00;">Rp 1.000</span> (biaya admin 1%)</div>
+            <div class="sub">Minimal deposit <span style="color:#ffaa00;">Rp 1.000</span> (biaya admin 1% + kode unik 1-100)</div>
 
             <div class="form-group">
                 <label>💰 Jumlah Deposit <span class="required">*</span></label>
@@ -376,70 +401,82 @@
                     <span class="value yellow" id="displayFee">Rp 0</span>
                 </div>
                 <div class="row">
+                    <span class="label">🔑 Kode Unik</span>
+                    <span class="value yellow" id="displayUnique">0</span>
+                </div>
+                <div class="row">
                     <span class="label">Total Bayar</span>
                     <span class="value green" id="displayTotal">Rp 0</span>
                 </div>
             </div>
 
-            <!-- ===== QRIS DINAMIS ===== -->
+            <!-- QRIS DINAMIS -->
             <div id="qrisContainer">
-                <!-- QRIS Placeholder (muncul sebelum input) -->
                 <div class="qris-placeholder" id="qrisPlaceholder">
                     <span class="icon">📱</span>
                     <span>Masukkan nominal deposit terlebih dahulu<br>untuk menampilkan QRIS</span>
                 </div>
 
-                <!-- QRIS Wrapper (muncul setelah input valid) -->
                 <div class="qris-wrapper" id="qrisWrapper">
                     <div id="qrisCanvasContainer"></div>
                     <div class="qris-label">📱 Scan QRIS untuk membayar</div>
                     <div class="qris-amount" id="qrisAmount">Rp 0</div>
-                    <div class="qris-note">QRIS dengan nominal otomatis</div>
+                    <div class="qris-unique" id="qrisUnique">🔑 Kode Unik: 0</div>
+                    <div class="qris-note">QRIS dengan nominal otomatis + kode unik</div>
                 </div>
             </div>
 
-            <!-- Upload Bukti -->
-            <div class="form-group">
-                <label>📎 Upload Bukti Transfer <span class="required">*</span></label>
-                <div class="file-upload-area" id="uploadArea" onclick="document.getElementById('fileInput').click()">
-                    <span class="icon">📤</span>
-                    <div class="text">Klik atau seret file untuk upload<br><strong>Format: JPG, PNG, PDF</strong></div>
-                    <div class="file-name" id="fileName">📄 file.jpg</div>
-                    <img class="preview-image" id="previewImage" alt="Preview Bukti">
-                </div>
-                <input type="file" id="fileInput" accept="image/*,application/pdf" onchange="handleFileSelect(event)">
+            <!-- PAYMENT STATUS -->
+            <div id="paymentStatus" class="payment-status"></div>
+
+            <!-- STATUS DEPOSIT -->
+            <div class="status-box" id="statusBox">
+                <div class="status-label">📊 Status Deposit</div>
+                <div class="status-value pending" id="statusValue">⏳ Menunggu pembayaran...</div>
+                <div style="font-size:11px;color:#666;margin-top:4px;" id="statusDetail">-</div>
             </div>
 
-            <button class="btn btn-primary" id="submitBtn" onclick="submitDeposit()">
-                ✅ Kirim Deposit
+            <button class="btn btn-primary" id="submitBtn" onclick="startDeposit()">
+                💳 Bayar dengan QRIS
+            </button>
+
+            <button class="btn btn-success" id="checkBtn" style="margin-top:8px;display:none;" onclick="checkPayment()">
+                🔄 Cek Status Pembayaran
             </button>
         </div>
 
         <div class="text-muted" style="text-align:center;margin-top:20px;">
             © Shine Shop · Deposit System
         </div>
-        <div class="security-badge">🔒 Data aman & terenkripsi</div>
+        <div class="security-badge">🔒 Data aman & terenkripsi · Auto-verifikasi via QIOSPAY</div>
     </div>
 
     <script>
         // ============================================================
         // 🔒 KONFIGURASI
         // ============================================================
-        const LOGIN_URL = '/info/index.html';
-        const DASHBOARD_URL = '/info/dashboard/index.html';
         const DISCORD_WEBHOOK = 'https://discord.com/api/webhooks/1482244989021851748/oq__kcKXWHJILOG96lbfFxfZKoKCLEqkLJrlSS_rTQ6YEhgSTnFL_Guu8ZulERNEmCZV';
         const QRIS_BASE = '00020101021126670016COM.NOBUBANK.WWW01189360050300000907180214260818000016290303UMI51440014ID.CO.QRIS.WWW0215ID10265728797100303UMI5204481253033605802ID5918SHINE SHOP ID CELL6008SURABAYA61056011162070703A016304743A';
         const ADMIN_FEE = 0.01; // 1%
         const MIN_DEPOSIT = 1000;
         const SESSION_TIMEOUT = 36000000;
 
-        let selectedFile = null;
-        let currentTotal = 0;
+        // QIOSPAY CONFIG
+        let QIOSPAY_API_KEY = '';
+        const MERCHANT_CODE = 'QP052692';
+
+        let selectedAmount = 0;
+        let uniqueCode = 0;
+        let totalBayar = 0;
+        let transactionId = '';
+        let isProcessing = false;
+        let isVerified = false;
+        let verificationInterval = null;
         let qrisGenerated = false;
         let qrisCanvas = null;
 
         // ============================================================
-        // 🔒 CRC16 FUNCTION (untuk menghitung checksum QRIS)
+        // 🔒 CRC16 & QRIS BUILDER
         // ============================================================
         function crc16(data) {
             let crc = 0xFFFF;
@@ -457,11 +494,7 @@
             return crc.toString(16).toUpperCase().padStart(4, '0');
         }
 
-        // ============================================================
-        // 🔒 BUILD QRIS STRING DENGAN NOMINAL
-        // ============================================================
         function buildQRISString(amount) {
-            // Format: 54 + length + amount
             const amountStr = String(Math.round(amount));
             const tag54 = '54' + String(amountStr.length).padStart(2, '0') + amountStr;
             const data = QRIS_BASE + tag54 + '6304';
@@ -470,19 +503,12 @@
         }
 
         // ============================================================
-        // 🔒 GENERATE QRIS DINAMIS
+        // 🔒 GENERATE QRIS
         // ============================================================
         function generateQRIS(amount) {
             const container = document.getElementById('qrisCanvasContainer');
-            
-            // Hapus canvas lama jika ada
             container.innerHTML = '';
-            
-            // Buat QRIS string dengan nominal
-            const qrisString = buildQRISString(amount);
-            console.log('📱 QRIS String:', qrisString);
-            
-            // Buat canvas baru
+
             const canvas = document.createElement('canvas');
             canvas.id = 'qrisCanvas';
             canvas.width = 220;
@@ -491,24 +517,20 @@
             canvas.style.height = 'auto';
             container.appendChild(canvas);
 
-            // Generate QR Code
+            const qrisString = buildQRISString(amount);
+            console.log('📱 QRIS String:', qrisString);
+
             QRCode.toCanvas(canvas, qrisString, {
                 width: 220,
                 margin: 2,
-                color: {
-                    dark: '#000000',
-                    light: '#ffffff'
-                }
+                color: { dark: '#000000', light: '#ffffff' }
             }, function(error) {
                 if (error) {
                     console.error('QRIS Error:', error);
-                    container.innerHTML = `
-                        <span style="color:#ff6666;font-size:13px;">❌ Gagal generate QRIS</span>
-                        <div style="font-size:10px;color:#888;word-break:break-all;margin-top:4px;">Error: ${error.message}</div>
-                    `;
+                    container.innerHTML = `<span style="color:#ff6666;font-size:13px;">❌ Gagal generate QRIS</span>`;
                     qrisGenerated = false;
                 } else {
-                    console.log('✅ QRIS Dinamis berhasil digenerate untuk nominal Rp ' + amount.toLocaleString('id-ID'));
+                    console.log('✅ QRIS Dinamis berhasil digenerate untuk Rp ' + amount.toLocaleString('id-ID'));
                     qrisGenerated = true;
                     qrisCanvas = canvas;
                 }
@@ -516,7 +538,7 @@
         }
 
         // ============================================================
-        // 🔒 CEK SESSION
+        // 🔒 SESSION
         // ============================================================
         function checkSession() {
             const loggedIn = localStorage.getItem('logged_in');
@@ -525,37 +547,31 @@
             const now = Date.now();
 
             if (loggedIn !== 'true' || !sessionToken) {
-                window.location.href = LOGIN_URL;
+                window.location.href = '/info/index.html';
                 return false;
             }
 
             if (now - sessionCreated > SESSION_TIMEOUT) {
-                console.log('⏰ Session expired');
-                window.location.href = LOGIN_URL;
+                window.location.href = '/info/index.html';
                 return false;
             }
 
             return true;
         }
 
-        if (!checkSession()) {
-            throw new Error('Redirect ke login');
-        }
+        if (!checkSession()) throw new Error('Redirect');
 
         // ============================================================
-        // 🔒 GET USER DATA
+        // 🔒 USER DATA
         // ============================================================
         function getUserData() {
             return {
                 email: localStorage.getItem('user_email') || '',
                 role: localStorage.getItem('user_role') || 'user',
-                saldo: localStorage.getItem('user_saldo') || '0'
+                saldo: parseInt(localStorage.getItem('user_saldo') || '0')
             };
         }
 
-        // ============================================================
-        // 🔒 TAMPILKAN USER
-        // ============================================================
         function displayUser() {
             const user = getUserData();
             document.getElementById('userEmailDisplay').textContent = user.email || 'Belum login';
@@ -569,69 +585,70 @@
                 roleHtml = `<span class="role-badge user">👤 User</span>`;
             }
             document.getElementById('userRoleDisplay').innerHTML = roleHtml;
-
             document.getElementById('envStatus').textContent = `✅ User terverifikasi`;
             document.getElementById('envStatus').style.color = '#00ffaa';
         }
 
         // ============================================================
-        // 🔒 TAMPILKAN QRIS (jika nominal valid)
+        // 🔒 FETCH QIOSPAY CONFIG
         // ============================================================
-        function showQRIS(amount) {
-            const placeholder = document.getElementById('qrisPlaceholder');
-            const wrapper = document.getElementById('qrisWrapper');
-            const qrisAmount = document.getElementById('qrisAmount');
-
-            if (amount >= MIN_DEPOSIT) {
-                // Sembunyikan placeholder, tampilkan QRIS
-                placeholder.style.display = 'none';
-                wrapper.classList.add('show');
-                
-                // Update jumlah di QRIS
-                qrisAmount.textContent = `Rp ${amount.toLocaleString('id-ID')}`;
-                
-                // Generate QRIS dinamis
-                generateQRIS(amount);
-            } else {
-                // Tampilkan placeholder, sembunyikan QRIS
-                placeholder.style.display = 'block';
-                wrapper.classList.remove('show');
-                qrisGenerated = false;
+        async function fetchQiospayConfig() {
+            try {
+                const res = await fetch('/api/qris-config');
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.qiospay_api_key) {
+                        QIOSPAY_API_KEY = data.qiospay_api_key;
+                        console.log('✅ QIOSPAY API Key loaded');
+                        return true;
+                    }
+                }
+            } catch (e) {
+                console.warn('⚠️ Gagal fetch config:', e);
             }
+            return false;
         }
 
         // ============================================================
-        // 🔒 HITUNG TOTAL
+        // 🔒 GENERATE UNIQUE CODE (1-100)
+        // ============================================================
+        function generateUniqueCode() {
+            return Math.floor(Math.random() * 100) + 1;
+        }
+
+        // ============================================================
+        // 🔒 CALCULATE TOTAL
         // ============================================================
         function calculateTotal() {
             const amount = parseInt(document.getElementById('depositAmount').value) || 0;
-            
+
             if (amount < MIN_DEPOSIT && amount > 0) {
                 document.getElementById('depositAmount').style.borderColor = '#ff4444';
                 document.getElementById('displayAmount').textContent = `Rp ${amount.toLocaleString('id-ID')}`;
                 document.getElementById('displayFee').textContent = `Rp 0`;
+                document.getElementById('displayUnique').textContent = `0`;
                 document.getElementById('displayTotal').textContent = `⚠️ Minimal Rp ${MIN_DEPOSIT.toLocaleString('id-ID')}`;
                 document.getElementById('displayTotal').style.color = '#ff4444';
-                currentTotal = 0;
-                
-                // Sembunyikan QRIS jika nominal kurang dari minimal
+                selectedAmount = 0;
                 showQRIS(0);
                 return;
             }
 
             document.getElementById('depositAmount').style.borderColor = '';
-            
+
             const fee = Math.round(amount * ADMIN_FEE);
-            const total = amount + fee;
+            uniqueCode = generateUniqueCode();
+            const total = amount + fee + uniqueCode;
 
             document.getElementById('displayAmount').textContent = `Rp ${amount.toLocaleString('id-ID')}`;
             document.getElementById('displayFee').textContent = `Rp ${fee.toLocaleString('id-ID')}`;
+            document.getElementById('displayUnique').textContent = uniqueCode;
             document.getElementById('displayTotal').textContent = `Rp ${total.toLocaleString('id-ID')}`;
             document.getElementById('displayTotal').style.color = '#00ffaa';
-            
-            currentTotal = total;
 
-            // Tampilkan QRIS jika nominal valid
+            selectedAmount = amount;
+            totalBayar = total;
+
             if (amount >= MIN_DEPOSIT) {
                 showQRIS(total);
             } else {
@@ -640,58 +657,164 @@
         }
 
         // ============================================================
-        // 🔒 HANDLE FILE SELECT
+        // 🔒 SHOW QRIS
         // ============================================================
-        function handleFileSelect(event) {
-            const file = event.target.files[0];
-            if (!file) return;
+        function showQRIS(amount) {
+            const placeholder = document.getElementById('qrisPlaceholder');
+            const wrapper = document.getElementById('qrisWrapper');
+            const qrisAmount = document.getElementById('qrisAmount');
+            const qrisUnique = document.getElementById('qrisUnique');
 
-            // Validasi ukuran file (max 5MB)
-            if (file.size > 5 * 1024 * 1024) {
-                Swal.fire({
-                    title: '❌ File Terlalu Besar',
-                    text: 'Maksimal ukuran file adalah 5MB.',
-                    icon: 'error',
-                    confirmButtonColor: '#ff4444'
-                });
-                event.target.value = '';
-                return;
-            }
-
-            selectedFile = file;
-
-            const uploadArea = document.getElementById('uploadArea');
-            const fileName = document.getElementById('fileName');
-            const previewImage = document.getElementById('previewImage');
-
-            uploadArea.classList.add('has-file');
-            fileName.textContent = `📄 ${file.name}`;
-            fileName.style.display = 'block';
-
-            // Preview gambar
-            if (file.type.startsWith('image/')) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    previewImage.src = e.target.result;
-                    previewImage.style.display = 'block';
-                };
-                reader.readAsDataURL(file);
+            if (amount >= MIN_DEPOSIT) {
+                placeholder.style.display = 'none';
+                wrapper.classList.add('show');
+                qrisAmount.textContent = `Rp ${amount.toLocaleString('id-ID')}`;
+                qrisUnique.textContent = `🔑 Kode Unik: ${uniqueCode}`;
+                generateQRIS(amount);
             } else {
-                previewImage.style.display = 'none';
+                placeholder.style.display = 'block';
+                wrapper.classList.remove('show');
+                qrisGenerated = false;
             }
-
-            console.log('📎 File selected:', file.name);
         }
 
         // ============================================================
-        // 🔒 SUBMIT DEPOSIT
+        // 🔒 CHECK PAYMENT VIA QIOSPAY
         // ============================================================
-        async function submitDeposit() {
-            const submitBtn = document.getElementById('submitBtn');
-            const user = getUserData();
+        async function checkPayment() {
+            const statusEl = document.getElementById('paymentStatus');
+            const checkBtn = document.getElementById('checkBtn');
+
+            if (isVerified) {
+                statusEl.className = 'payment-status success';
+                statusEl.textContent = '✅ Pembayaran sudah terverifikasi! Saldo bertambah.';
+                statusEl.style.display = 'block';
+                return;
+            }
+
+            if (!QIOSPAY_API_KEY) {
+                await fetchQiospayConfig();
+                if (!QIOSPAY_API_KEY) {
+                    statusEl.className = 'payment-status failed';
+                    statusEl.textContent = '❌ Gagal mengambil konfigurasi API';
+                    statusEl.style.display = 'block';
+                    return;
+                }
+            }
+
+            statusEl.className = 'payment-status loading';
+            statusEl.textContent = '⏳ Mengecek pembayaran...';
+            statusEl.style.display = 'block';
+            checkBtn.disabled = true;
+            checkBtn.textContent = '⏳ Mengecek...';
+
+            try {
+                const url = `https://qiospay.id/api/mutasi/qris/${MERCHANT_CODE}/${QIOSPAY_API_KEY}?t=${Date.now()}`;
+                console.log('📡 Fetching mutasi dari QIOSPAY...');
+
+                const res = await fetch(url);
+                if (!res.ok) throw new Error('Gagal mengambil data mutasi: ' + res.status);
+
+                const data = await res.json();
+                console.log('📊 Data Mutasi QIOSPAY:', data);
+
+                let foundTransaction = null;
+
+                if (data.status === 'success' && data.data) {
+                    const transactions = Array.isArray(data.data) ? data.data : [data.data];
+
+                    for (const t of transactions) {
+                        let rawAmount = String(t.amount || '');
+                        let cleanAmount = rawAmount.replace(/[^0-9]/g, '');
+                        let amountNumber = parseInt(cleanAmount) || 0;
+
+                        if (amountNumber === totalBayar) {
+                            foundTransaction = t;
+                            console.log('✅ Transaksi ditemukan (exact match):', t);
+                            break;
+                        }
+                        if (Math.round(amountNumber) === totalBayar) {
+                            foundTransaction = t;
+                            console.log('✅ Transaksi ditemukan (round match):', t);
+                            break;
+                        }
+                    }
+                }
+
+                if (foundTransaction) {
+                    isVerified = true;
+                    statusEl.className = 'payment-status success';
+                    statusEl.textContent = `✅ Pembayaran Rp ${totalBayar.toLocaleString('id-ID')} terverifikasi!`;
+
+                    // Tambah saldo user
+                    const user = getUserData();
+                    const newSaldo = user.saldo + selectedAmount;
+                    localStorage.setItem('user_saldo', String(newSaldo));
+
+                    document.getElementById('statusBox').classList.add('show');
+                    document.getElementById('statusValue').textContent = '✅ Deposit BERHASIL! Saldo bertambah.';
+                    document.getElementById('statusValue').className = 'status-value success';
+                    document.getElementById('statusDetail').textContent = `💰 Saldo baru: Rp ${newSaldo.toLocaleString('id-ID')}`;
+
+                    // Kirim ke Discord
+                    await sendDiscordNotification(user.email, selectedAmount, totalBayar, uniqueCode, transactionId);
+
+                    checkBtn.disabled = true;
+                    checkBtn.textContent = '✅ Terverifikasi';
+                    document.getElementById('submitBtn').disabled = true;
+
+                    if (verificationInterval) {
+                        clearInterval(verificationInterval);
+                        verificationInterval = null;
+                    }
+
+                    Swal.fire({
+                        title: '✅ Deposit Berhasil!',
+                        html: `
+                            <div style="text-align:left;color:#ccc;font-size:14px;">
+                                <b>💰 Deposit:</b> Rp ${selectedAmount.toLocaleString('id-ID')}<br>
+                                <b>💵 Total Bayar:</b> Rp ${totalBayar.toLocaleString('id-ID')}<br>
+                                <b>🆔 ID:</b> ${transactionId}<br>
+                                <b>💎 Saldo Baru:</b> <span style="color:#00ffaa;">Rp ${newSaldo.toLocaleString('id-ID')}</span>
+                            </div>
+                        `,
+                        icon: 'success',
+                        confirmButtonColor: '#00ffaa'
+                    });
+
+                } else {
+                    statusEl.className = 'payment-status loading';
+                    statusEl.textContent = `⏳ Belum ada pembayaran Rp ${totalBayar.toLocaleString('id-ID')} terdeteksi. Tunggu atau scan ulang QRIS.`;
+                    checkBtn.disabled = false;
+                    checkBtn.textContent = '🔄 Cek Status Pembayaran';
+                }
+
+            } catch (err) {
+                console.error('Error cek payment:', err);
+                statusEl.className = 'payment-status failed';
+                statusEl.textContent = '❌ Gagal mengecek pembayaran: ' + err.message;
+                checkBtn.disabled = false;
+                checkBtn.textContent = '🔄 Cek Status Pembayaran';
+            }
+        }
+
+        // ============================================================
+        // 🔒 START DEPOSIT
+        // ============================================================
+        async function startDeposit() {
+            if (isProcessing) return;
+            if (isVerified) {
+                Swal.fire({
+                    title: '✅ Sudah Terverifikasi',
+                    text: 'Deposit ini sudah berhasil diverifikasi.',
+                    icon: 'info',
+                    confirmButtonColor: '#00ffaa'
+                });
+                return;
+            }
+
             const amount = parseInt(document.getElementById('depositAmount').value) || 0;
 
-            // Validasi
             if (amount < MIN_DEPOSIT) {
                 Swal.fire({
                     title: '⚠️ Minimal Deposit',
@@ -703,31 +826,20 @@
                 return;
             }
 
-            if (!selectedFile) {
-                Swal.fire({
-                    title: '⚠️ Upload Bukti',
-                    text: 'Silakan upload bukti transfer terlebih dahulu.',
-                    icon: 'warning',
-                    confirmButtonColor: '#ffaa00'
-                });
-                return;
-            }
-
             // Konfirmasi
             const confirmResult = await Swal.fire({
-                title: '📤 Konfirmasi Deposit',
+                title: '💳 Konfirmasi Pembayaran',
                 html: `
                     <div style="text-align:left;color:#ccc;font-size:14px;">
-                        <b>👤 User:</b> ${user.email}<br>
                         <b>💰 Deposit:</b> Rp ${amount.toLocaleString('id-ID')}<br>
-                        <b>📊 Biaya Admin:</b> Rp ${Math.round(amount * ADMIN_FEE).toLocaleString('id-ID')}<br>
-                        <b>💵 Total Bayar:</b> <span style="color:#00ffaa;">Rp ${currentTotal.toLocaleString('id-ID')}</span><br>
-                        <b>📎 Bukti:</b> ${selectedFile.name}
+                        <b>📊 Admin 1%:</b> Rp ${Math.round(amount * ADMIN_FEE).toLocaleString('id-ID')}<br>
+                        <b>🔑 Kode Unik:</b> ${uniqueCode}<br>
+                        <b>💵 Total Bayar:</b> <span style="color:#00ffaa;">Rp ${totalBayar.toLocaleString('id-ID')}</span>
                     </div>
                 `,
                 icon: 'question',
                 showCancelButton: true,
-                confirmButtonText: '✅ Ya, Kirim!',
+                confirmButtonText: '✅ Ya, Lanjutkan!',
                 cancelButtonText: '❌ Batal',
                 confirmButtonColor: '#00ffaa',
                 cancelButtonColor: '#666'
@@ -735,111 +847,63 @@
 
             if (!confirmResult.isConfirmed) return;
 
+            isProcessing = true;
+            const submitBtn = document.getElementById('submitBtn');
             submitBtn.disabled = true;
-            submitBtn.textContent = '⏳ Mengirim...';
+            submitBtn.textContent = '⏳ Menunggu pembayaran...';
 
+            transactionId = 'DEP-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).substring(2, 6).toUpperCase();
+
+            document.getElementById('statusBox').classList.add('show');
+            document.getElementById('statusValue').textContent = `⏳ Menunggu pembayaran Rp ${totalBayar.toLocaleString('id-ID')}`;
+            document.getElementById('statusValue').className = 'status-value pending';
+            document.getElementById('statusDetail').textContent = `🆔 ID: ${transactionId} | Scan QRIS & bayar tepat sesuai nominal`;
+
+            document.getElementById('checkBtn').style.display = 'block';
+
+            // Kirim notifikasi ke Discord
+            await sendDiscordNotification(getUserData().email, amount, totalBayar, uniqueCode, transactionId, 'pending');
+
+            // Mulai auto-verifikasi
+            if (verificationInterval) clearInterval(verificationInterval);
+            await checkPayment();
+            verificationInterval = setInterval(checkPayment, 10000);
+
+            isProcessing = false;
+        }
+
+        // ============================================================
+        // 🔒 SEND DISCORD NOTIFICATION
+        // ============================================================
+        async function sendDiscordNotification(email, amount, total, unique, trxId, status = 'pending') {
             try {
-                // Generate transaction ID
-                const trxID = 'DEP-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).substring(2, 6).toUpperCase();
-
-                // Kirim ke Discord
-                const textMessage = `
-📢 **DEPOSIT SALDO BARU**
+                const user = getUserData();
+                const message = `
+📢 **DEPOSIT SALDO**
 ━━━━━━━━━━━━━━━━━━━━━
-🆔 **ID Transaksi:** ${trxID}
-👤 **User:** ${user.email}
+🆔 **ID Transaksi:** ${trxId}
+👤 **User:** ${email}
 🔑 **Role:** ${user.role}
 💰 **Deposit:** Rp ${amount.toLocaleString('id-ID')}
-📊 **Biaya Admin (1%):** Rp ${Math.round(amount * ADMIN_FEE).toLocaleString('id-ID')}
-💵 **Total Bayar:** Rp ${currentTotal.toLocaleString('id-ID')}
-📅 **Tanggal:** ${new Date().toLocaleString('id-ID')}
+📊 **Admin 1%:** Rp ${Math.round(amount * ADMIN_FEE).toLocaleString('id-ID')}
+🔑 **Kode Unik:** ${unique}
+💵 **Total Bayar:** Rp ${total.toLocaleString('id-ID')}
+📊 **Status:** ${status === 'pending' ? '⏳ MENUNGGU' : '✅ SUCCESS'}
+📅 **Waktu:** ${new Date().toLocaleString('id-ID')}
 ━━━━━━━━━━━━━━━━━━━━━
-📎 **Bukti transfer terlampir di bawah**
+${status === 'pending' ? '⏳ Menunggu pembayaran via QRIS' : '✅ Deposit berhasil diverifikasi!'}
                 `;
 
-                // Kirim teks ke Discord
-                const textRes = await fetch(DISCORD_WEBHOOK, {
+                await fetch(DISCORD_WEBHOOK, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        content: textMessage
-                    })
+                    body: JSON.stringify({ content: message })
                 });
 
-                if (!textRes.ok) {
-                    throw new Error('Gagal kirim pesan ke Discord');
-                }
-
-                // Kirim file ke Discord
-                const formData = new FormData();
-                formData.append('file', selectedFile);
-                formData.append('payload_json', JSON.stringify({
-                    content: `📸 Bukti deposit untuk ${user.email} - ${trxID}`
-                }));
-
-                const fileRes = await fetch(DISCORD_WEBHOOK, {
-                    method: 'POST',
-                    body: formData
-                });
-
-                if (!fileRes.ok) {
-                    throw new Error('Gagal upload bukti ke Discord');
-                }
-
-                // Simpan ke localStorage
-                const historyKey = 'deposit_history';
-                let history = JSON.parse(localStorage.getItem(historyKey) || '[]');
-                history.push({
-                    id: trxID,
-                    user: user.email,
-                    amount: amount,
-                    total: currentTotal,
-                    fee: Math.round(amount * ADMIN_FEE),
-                    status: 'pending',
-                    date: new Date().toISOString(),
-                    fileName: selectedFile.name
-                });
-                localStorage.setItem(historyKey, JSON.stringify(history));
-
-                Swal.fire({
-                    title: '✅ Deposit Berhasil Dikirim!',
-                    html: `
-                        Deposit Anda sedang diproses.<br>
-                        <span style="font-size:13px;color:#888;">ID Transaksi: ${trxID}</span><br>
-                        <span style="font-size:13px;color:#ffaa00;">Saldo akan ditambahkan setelah admin memverifikasi.</span>
-                    `,
-                    icon: 'success',
-                    confirmButtonColor: '#00ffaa'
-                });
-
-                // Reset form
-                document.getElementById('depositAmount').value = '';
-                document.getElementById('displayAmount').textContent = 'Rp 0';
-                document.getElementById('displayFee').textContent = 'Rp 0';
-                document.getElementById('displayTotal').textContent = 'Rp 0';
-                selectedFile = null;
-                document.getElementById('fileInput').value = '';
-                document.getElementById('uploadArea').classList.remove('has-file');
-                document.getElementById('fileName').style.display = 'none';
-                document.getElementById('previewImage').style.display = 'none';
-                document.getElementById('previewImage').src = '';
-                
-                // Sembunyikan QRIS
-                showQRIS(0);
-                calculateTotal();
-
+                console.log('📨 Discord notification sent');
             } catch (err) {
-                console.error('Error:', err);
-                Swal.fire({
-                    title: '❌ Gagal',
-                    text: err.message || 'Terjadi error saat mengirim deposit.',
-                    icon: 'error',
-                    confirmButtonColor: '#ff4444'
-                });
+                console.error('Gagal kirim Discord:', err);
             }
-
-            submitBtn.disabled = false;
-            submitBtn.textContent = '✅ Kirim Deposit';
         }
 
         // ============================================================
@@ -859,14 +923,52 @@
         // ============================================================
         document.addEventListener('DOMContentLoaded', function() {
             displayUser();
-            
-            // QRIS tidak digenerate otomatis, hanya saat input valid
-            // Sembunyikan QRIS dari awal
+            fetchQiospayConfig();
+
             document.getElementById('qrisWrapper').classList.remove('show');
+
+            // Cek apakah ada transaksi pending
+            const pendingTrx = localStorage.getItem('pending_deposit');
+            if (pendingTrx) {
+                try {
+                    const data = JSON.parse(pendingTrx);
+                    if (data.email === getUserData().email) {
+                        transactionId = data.trxId;
+                        selectedAmount = data.amount;
+                        totalBayar = data.total;
+                        uniqueCode = data.unique;
+                        document.getElementById('depositAmount').value = data.amount;
+                        calculateTotal();
+                        document.getElementById('statusBox').classList.add('show');
+                        document.getElementById('statusValue').textContent = `⏳ Menunggu pembayaran Rp ${totalBayar.toLocaleString('id-ID')}`;
+                        document.getElementById('statusValue').className = 'status-value pending';
+                        document.getElementById('statusDetail').textContent = `🆔 ID: ${transactionId} | Scan QRIS & bayar tepat sesuai nominal`;
+                        document.getElementById('checkBtn').style.display = 'block';
+                        if (verificationInterval) clearInterval(verificationInterval);
+                        verificationInterval = setInterval(checkPayment, 10000);
+                        checkPayment();
+                    }
+                } catch (e) {
+                    console.warn('Gagal restore pending:', e);
+                }
+            }
 
             console.log('💰 Halaman Deposit siap!');
             console.log('👤 User:', getUserData().email);
-            console.log('📱 QRIS Dinamis - akan muncul dengan nominal otomatis');
+            console.log('📱 QRIS Dinamis - auto-verifikasi via QIOSPAY');
+        });
+
+        // Simpan pending transaction
+        window.addEventListener('beforeunload', function() {
+            if (transactionId && !isVerified) {
+                localStorage.setItem('pending_deposit', JSON.stringify({
+                    trxId: transactionId,
+                    amount: selectedAmount,
+                    total: totalBayar,
+                    unique: uniqueCode,
+                    email: getUserData().email
+                }));
+            }
         });
     </script>
 </body>
