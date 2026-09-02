@@ -333,6 +333,75 @@ h1 {
   font-weight: 600;
 }
 
+/* ========== PENGUMUMAN BANNER ========== */
+.announcement-banner {
+  background: linear-gradient(135deg, rgba(255, 107, 157, 0.12), rgba(255, 64, 128, 0.08));
+  border: 1px solid rgba(255, 107, 157, 0.2);
+  border-radius: 14px;
+  padding: 14px 16px;
+  margin: 8px 0 14px 0;
+  text-align: left;
+  display: none;
+  animation: fadeSlide 0.6s ease both;
+}
+
+.announcement-banner.show {
+  display: block;
+}
+
+@keyframes fadeSlide {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.announcement-banner .banner-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #ff6b9d;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.announcement-banner .banner-title .icon {
+  font-size: 16px;
+}
+
+.announcement-banner .banner-content {
+  font-size: 13px;
+  color: #e8d5f0;
+  line-height: 1.7;
+}
+
+.announcement-banner .banner-content a {
+  color: #ff6b9d;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.announcement-banner .banner-content a:hover {
+  text-decoration: underline;
+}
+
+.announcement-banner .banner-close {
+  float: right;
+  background: none;
+  border: none;
+  color: #6b4a7a;
+  cursor: pointer;
+  font-size: 16px;
+  padding: 0 4px;
+  transition: 0.3s;
+}
+
+.announcement-banner .banner-close:hover {
+  color: #ff6b9d;
+  transform: rotate(90deg);
+}
+
 /* ========== GMAIL DISPLAY ========== */
 .gmail-display {
   background: rgba(255, 107, 157, 0.08);
@@ -653,6 +722,17 @@ h1 {
   
   <div class="divider"></div>
 
+  <!-- ===== PENGUMUMAN BANNER (dari pesan.json) ===== -->
+  <div class="announcement-banner" id="announcementBanner">
+    <div class="banner-title">
+      <span class="icon">📢</span> Pengumuman
+      <button class="banner-close" onclick="closeAnnouncement()">✕</button>
+    </div>
+    <div class="banner-content" id="announcementContent">
+      <!-- Diisi dari pesan.json -->
+    </div>
+  </div>
+
   <!-- ===== GMAIL DISPLAY ===== -->
   <div class="gmail-display" id="gmailDisplayContainer">
     <span class="gmail-label">📧 Gmail:</span>
@@ -808,6 +888,61 @@ function getStoredGmail() {
     console.error('❌ Error get Gmail:', e);
     return null;
   }
+}
+
+// ============================================================
+// 🔥 LOAD PENGUMUMAN DARI pesan.json
+// ============================================================
+async function loadAnnouncement() {
+  try {
+    const res = await fetch('/home2/pesan.json?t=' + Date.now());
+    if (!res.ok) {
+      console.log('ℹ️ Tidak ada pengumuman');
+      return;
+    }
+    
+    const data = await res.json();
+    
+    // Cek apakah ada pengumuman "all"
+    if (data && data.all) {
+      const banner = document.getElementById('announcementBanner');
+      const content = document.getElementById('announcementContent');
+      
+      // Parse HTML dari pesan.json
+      content.innerHTML = data.all;
+      
+      // Tampilkan banner
+      banner.classList.add('show');
+      console.log('📢 Pengumuman dimuat:', data.all);
+    }
+    
+    // Cek pesan khusus untuk userID
+    if (data && data[userID]) {
+      const banner = document.getElementById('announcementBanner');
+      const content = document.getElementById('announcementContent');
+      
+      // Kalo udah ada konten, tambahin
+      let currentContent = content.innerHTML;
+      if (currentContent) {
+        content.innerHTML = currentContent + '<hr style="border-color:rgba(255,107,157,0.1);margin:8px 0;">' + data[userID];
+      } else {
+        content.innerHTML = data[userID];
+      }
+      
+      banner.classList.add('show');
+      console.log('📢 Pesan khusus untuk user:', userID);
+    }
+    
+  } catch (e) {
+    console.log('ℹ️ Gagal memuat pengumuman:', e.message);
+  }
+}
+
+function closeAnnouncement() {
+  const banner = document.getElementById('announcementBanner');
+  banner.classList.remove('show');
+  // Simpan state ke localStorage biar gak muncul lagi di sesi ini
+  localStorage.setItem('announcement_closed', 'true');
 }
 
 // ============================================================
@@ -1169,58 +1304,7 @@ function showUserBubble() {
     bubble.classList.add('show');
     setTimeout(() => {
       bubble.classList.remove('show');
-      cekPesan();
     }, 5000);
-  }
-}
-
-// ---------- PESAN CHECK ----------
-async function cekPesan() {
-  try {
-    const res = await fetch('/home2/pesan.json?cache=' + Date.now());
-    const data = await res.json();
-    let alerts = [];
-    if (data[userID]) {
-      alerts.push({
-        title: '📩 Pesan Baru',
-        html: '<b>UserID:</b><br>' + userID + '<br><br><b>Pesan:</b><br>' + data[userID],
-        icon: 'info'
-      });
-    }
-    if (data['all']) {
-      alerts.push({
-        title: '📢 Pengumuman',
-        html: data['all'],
-        icon: 'warning'
-      });
-    }
-    if (data['all1']) {
-      alerts.push({
-        title: '📢 Pengumuman',
-        html: data['all1'],
-        icon: 'warning'
-      });
-    }
-    if (data['all2']) {
-      alerts.push({
-        title: '📢 Pengumuman',
-        html: data['all2'],
-        icon: 'warning'
-      });
-    }
-    for (const alert of alerts) {
-      await Swal.fire({
-        title: alert.title,
-        html: alert.html,
-        icon: alert.icon,
-        confirmButtonText: 'Tutup',
-        confirmButtonColor: '#ff6b9d',
-        background: '#1a0e2e',
-        color: '#fff'
-      });
-    }
-  } catch (e) {
-    console.log('Tidak ada pesan.');
   }
 }
 
@@ -1253,17 +1337,21 @@ setInterval(() => {
   }
 }, 5000);
 
-// ---------- INIT ----------
+// ============================================================
+// 🔥 INIT
+// ============================================================
 window.addEventListener('load', function() {
   setTimeout(() => {
     updateGmailDisplay();
     updateUserBubble();
     playAudio();
     
-    // TIDAK LANGSUNG MINTA GMAIL!
-    // HANYA UPDATE DISPLAY SAJA
+    // Load pengumuman dari pesan.json
+    loadAnnouncement();
+    
     console.log('🌸 Anime Shine Shop Active! ✨');
     console.log('📧 Gmail akan diminta saat tombol diklik');
+    console.log('📢 Pengumuman dari pesan.json dimuat otomatis');
   }, 100);
 });
 
@@ -1287,6 +1375,7 @@ console.log('🌸 Anime Shine Shop Active! ✨');
 console.log('📧 Gmail auto-sync dari localStorage (FIXED)');
 console.log('🔑 Lock localStorage diizinkan untuk update Gmail');
 console.log('🛑 Gmail TIDAK diminta otomatis saat load halaman');
+console.log('📢 Pengumuman dimuat dari /home2/pesan.json');
 </script>
 </body>
 </html>
