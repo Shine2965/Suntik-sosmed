@@ -383,26 +383,20 @@ p{
   color:#ef4444;
   border:1px solid rgba(239,68,68,0.3);
 }
-.payment-status.auto-check{
+.payment-status.monitoring{
+  display:block;
+  background:rgba(139,92,246,0.12);
+  color:#a78bfa;
+  border:1px solid rgba(139,92,246,0.2);
+  animation:pulse-monitor 2s ease-in-out infinite;
+}
+.payment-status.background{
   display:block;
   background:rgba(6,182,212,0.12);
   color:#06b6d4;
   border:1px solid rgba(6,182,212,0.2);
 }
-.payment-status.background{
-  display:block;
-  background:rgba(139,92,246,0.12);
-  color:#a78bfa;
-  border:1px solid rgba(139,92,246,0.2);
-}
-.payment-status.notification{
-  display:block;
-  background:rgba(251,191,36,0.15);
-  color:#fbbf24;
-  border:1px solid rgba(251,191,36,0.25);
-  animation:pulse-gold 1.5s ease-in-out infinite;
-}
-@keyframes pulse-gold{
+@keyframes pulse-monitor{
   0%,100%{opacity:1}
   50%{opacity:0.6}
 }
@@ -514,9 +508,9 @@ p{
   background:#64748b;
   animation:none;
 }
-.bg-indicator .dot.warning {
-  background:#fbbf24;
-  animation:pulse-dot 1s ease-in-out infinite;
+.bg-indicator .dot.monitor {
+  background:#8b5cf6;
+  animation:pulse-dot 1.5s ease-in-out infinite;
 }
 @keyframes pulse-dot{
   0%,100%{opacity:1;transform:scale(1)}
@@ -642,7 +636,7 @@ p{
   
   <button id="confirmBtn" class="btn">✅ Cek Status Pembayaran</button>
   
-  <div class="muted">🔄 Auto-cek background setiap 10 detik · Order hanya 1×</div>
+  <div class="muted">🔍 Auto-detect pembayaran · Order hanya 1×</div>
   
   <!-- ===== WIB REAL-TIME ===== -->
   <div class="wib-time-display">
@@ -655,7 +649,7 @@ p{
 
 <script>
 // ============================================================
-// 🔒 VOICE SYSTEM - TTS WITH NOMINAL
+// 🔒 VOICE SYSTEM
 // ============================================================
 
 class VoiceSystem {
@@ -663,8 +657,6 @@ class VoiceSystem {
     this.speechSynth = window.speechSynthesis;
     this.voicesLoaded = false;
     this.isEnabled = true;
-    this.isSpeaking = false;
-    this.queue = [];
     this.voiceReady = false;
     this.preloadVoices();
     this.updateStatus('Memuat suara...', 'inactive');
@@ -676,32 +668,26 @@ class VoiceSystem {
       this.updateStatus('❌ Tidak support', 'inactive');
       return;
     }
-    
     const voices = this.speechSynth.getVoices();
     if (voices.length > 0) {
       this.voicesLoaded = true;
       this.voiceReady = true;
-      console.log('🔊 Voices loaded:', voices.length);
       this.updateStatus('✅ Siap', 'active');
     }
-    
     this.speechSynth.onvoiceschanged = () => {
       const newVoices = this.speechSynth.getVoices();
       if (newVoices.length > 0) {
         this.voicesLoaded = true;
         this.voiceReady = true;
-        console.log('🔊 Voices loaded (onvoiceschanged):', newVoices.length);
         this.updateStatus('✅ Siap', 'active');
       }
     };
-    
     setTimeout(() => {
       if (!this.voicesLoaded) {
         const fallback = this.speechSynth.getVoices();
         if (fallback.length > 0) {
           this.voicesLoaded = true;
           this.voiceReady = true;
-          console.log('🔊 Voices loaded (fallback):', fallback.length);
           this.updateStatus('✅ Siap', 'active');
         }
       }
@@ -716,88 +702,41 @@ class VoiceSystem {
   }
   
   isSoundOn() {
-    try {
-      return document.getElementById('soundToggle').checked;
-    } catch {
-      return this.isEnabled;
-    }
+    try { return document.getElementById('soundToggle').checked; } 
+    catch { return this.isEnabled; }
   }
   
-  // 🔥 MAIN: Speak payment success with nominal
   speakPaymentSuccess(amount) {
-    if (!this.isSoundOn()) {
-      console.log('🔇 Suara dimatikan');
-      return;
-    }
-    
-    if (!this.speechSynth) {
-      console.warn('⚠️ SpeechSynthesis tidak support');
-      return;
-    }
-    
-    // Format nominal
+    if (!this.isSoundOn() || !this.speechSynth) return;
     const formatted = amount.toLocaleString('id-ID');
     const text = `Pembayaran berhasil diverifikasi sebesar Rp ${formatted}`;
-    
     this.speak(text);
     console.log(`💰 Voice: "${text}"`);
   }
   
-  // Speak order processing
   speakOrderProcessing() {
-    if (!this.isSoundOn()) return;
-    const text = 'Pesanan sedang diproses, mohon tunggu sebentar';
-    this.speak(text);
-    console.log(`📦 Voice: "${text}"`);
+    if (!this.isSoundOn() || !this.speechSynth) return;
+    this.speak('Pesanan sedang diproses, mohon tunggu sebentar');
   }
   
-  // Core speak function
   speak(text, callback) {
     if (!this.isSoundOn() || !this.speechSynth) {
       if (callback) callback();
       return;
     }
-    
     try {
-      // Cancel previous
       this.speechSynth.cancel();
-      
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.lang = 'id-ID';
       utterance.rate = 0.85;
       utterance.pitch = 1.0;
       utterance.volume = 1.0;
-      
-      // Cari voice Indonesia
       const voices = this.speechSynth.getVoices();
-      const indonesianVoice = voices.find(v => 
-        v.lang.startsWith('id') || v.lang === 'id-ID'
-      );
-      if (indonesianVoice) {
-        utterance.voice = indonesianVoice;
-        console.log('🔊 Voice Indonesia ditemukan');
-      } else {
-        console.log('🔊 Voice Indonesia tidak ditemukan, pake default');
-      }
-      
-      if (callback) {
-        utterance.onend = callback;
-        utterance.onerror = (e) => {
-          console.warn('⚠️ Speech error:', e);
-          if (callback) callback();
-        };
-      }
-      
+      const indonesianVoice = voices.find(v => v.lang.startsWith('id'));
+      if (indonesianVoice) utterance.voice = indonesianVoice;
+      if (callback) utterance.onend = callback;
       this.speechSynth.speak(utterance);
-      this.isSpeaking = true;
-      
-      // Reset flag after done
-      setTimeout(() => {
-        this.isSpeaking = false;
-      }, text.length * 60 + 500);
-      
       return true;
-      
     } catch (e) {
       console.error('❌ Speak error:', e);
       if (callback) callback();
@@ -805,36 +744,21 @@ class VoiceSystem {
     }
   }
   
-  // Test voice
-  testVoice() {
-    this.speak('Suara background aktif');
-  }
-  
-  // Wake up
+  testVoice() { this.speak('Suara background aktif'); }
   wakeUp() {
-    if (this.speechSynth && this.speechSynth.paused) {
-      this.speechSynth.resume();
-    }
-    if (!this.voicesLoaded) {
-      this.preloadVoices();
-    }
+    if (this.speechSynth && this.speechSynth.paused) this.speechSynth.resume();
+    if (!this.voicesLoaded) this.preloadVoices();
   }
 }
 
-// ============================================================
-// 🔒 INSTANCE VOICE
-// ============================================================
 const voice = new VoiceSystem();
 
-// Wake up on any user interaction
 document.addEventListener('click', function wakeVoice() {
   voice.wakeUp();
   document.removeEventListener('click', wakeVoice);
 }, { once: true });
 
-function testBackgroundSound() {
-  voice.testVoice();
-}
+function testBackgroundSound() { voice.testVoice(); }
 
 // ============================================================
 // 🔒 KONFIGURASI
@@ -850,7 +774,6 @@ let FAYUPEDIA_API_KEY = '';
 let QIOSPAY_API_KEY = '';
 const ADMIN_FEE_PERCENT = 2;
 const ADMIN_FEE_THRESHOLD = 500000;
-const AUTO_CHECK_INTERVAL = 60000;
 
 // ===== AMBIL PARAMETER DARI URL =====
 const p = new URLSearchParams(location.search);
@@ -1028,14 +951,13 @@ let state = {
   isPaymentVerified: false,
   transactionLocked: false,
   isProcessingPayment: false,
-  checkCount: 0,
   isBackground: false,
   qiospayApiKey: '',
   fayupediaApiKey: '',
   fayupediaApiId: 5522,
-  verificationInterval: null,
   isOrderSending: false,
-  orderSent: isOrderAlreadySent()
+  orderSent: isOrderAlreadySent(),
+  isMonitoring: false
 };
 
 // ============================================================
@@ -1101,11 +1023,11 @@ function updateBgIndicator(status, message) {
   const dot = document.getElementById('bgDot');
   const text = document.getElementById('bgStatus');
   dot.className = 'dot';
-  if (status === 'active') {
+  if (status === 'monitor') {
+    dot.classList.add('monitor');
+    text.textContent = message || 'Monitor aktif';
+  } else if (status === 'active') {
     dot.classList.add('active');
-    text.textContent = message || 'Monitor aktif di background';
-  } else if (status === 'warning') {
-    dot.classList.add('warning');
     text.textContent = message || 'Menunggu pembayaran...';
   } else {
     dot.classList.add('inactive');
@@ -1161,132 +1083,6 @@ async function sendPaymentToDiscord(gmail, userID) {
 }
 
 // ============================================================
-// 🔒 SEND ORDER TO FAYUPEDIA + NOTIF DISCORD
-// ============================================================
-async function sendOrderToFayupedia() {
-  if (isOrderAlreadySent()) {
-    console.log(`⏭️ ORDER LOCK: ${trx} sudah dikirim, skipping...`);
-    const orderStatus = document.getElementById('orderStatus');
-    orderStatus.className = 'order-status success';
-    orderStatus.innerHTML = `
-      ✅ Order sudah dikirim sebelumnya.
-      <div style="margin-top:6px;font-size:11px;color:#888;">ID: ${trx}</div>
-    `;
-    orderStatus.style.display = 'block';
-    return true;
-  }
-  
-  if (state.isOrderSending) {
-    console.log('⏳ Order sedang diproses...');
-    return false;
-  }
-  
-  if (!serviceId) {
-    document.getElementById('orderStatus').className = 'order-status failed';
-    document.getElementById('orderStatus').textContent = '❌ ID layanan tidak ditemukan';
-    document.getElementById('orderStatus').style.display = 'block';
-    return false;
-  }
-  
-  if (!target || target === '-') {
-    document.getElementById('orderStatus').className = 'order-status failed';
-    document.getElementById('orderStatus').textContent = '❌ Target tidak ditemukan';
-    document.getElementById('orderStatus').style.display = 'block';
-    return false;
-  }
-  
-  if (!quantity || quantity <= 0) {
-    document.getElementById('orderStatus').className = 'order-status failed';
-    document.getElementById('orderStatus').textContent = '❌ Jumlah tidak valid';
-    document.getElementById('orderStatus').style.display = 'block';
-    return false;
-  }
-  
-  if (!state.fayupediaApiKey) {
-    await fetchConfigFromEnv();
-    if (!state.fayupediaApiKey) {
-      document.getElementById('orderStatus').className = 'order-status failed';
-      document.getElementById('orderStatus').textContent = '❌ API Key tidak ditemukan';
-      document.getElementById('orderStatus').style.display = 'block';
-      return false;
-    }
-  }
-  
-  state.isOrderSending = true;
-  const orderStatus = document.getElementById('orderStatus');
-  orderStatus.className = 'order-status loading';
-  orderStatus.textContent = '⏳ Mengirim pesanan...';
-  orderStatus.style.display = 'block';
-  
-  // 🔊 Suara: Order diproses
-  voice.speakOrderProcessing();
-  
-  try {
-    const payload = {
-      api_id: state.fayupediaApiId,
-      api_key: state.fayupediaApiKey,
-      service: parseInt(serviceId),
-      target: target,
-      quantity: quantity
-    };
-    if (comment && comment.trim() !== '') {
-      payload.comments = comment.trim();
-    }
-    
-    console.log('📦 Sending order to Fayupedia...', payload);
-    
-    const res = await fetch(FAYUPEDIA_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    
-    const result = await res.json();
-    console.log('📦 Fayupedia Response:', result);
-    
-    if (result.status === true && result.order) {
-      const orderId = result.order;
-      const msg = result.msg || `Pesanan ID #${orderId} berhasil.`;
-      
-      markOrderSent();
-      state.orderSent = true;
-      
-      orderStatus.className = 'order-status success';
-      orderStatus.innerHTML = `
-        ✅ ${msg}
-        <div class="order-id-box">
-          🆔 ID: <strong>${orderId}</strong>
-          <button class="copy-btn" onclick="copyOrderId('${orderId}')">📋 Salin</button>
-        </div>
-        <div style="margin-top:6px;font-size:11px;color:#888;">✅ Order hanya dikirim 1×</div>
-      `;
-      
-      // 📨 Kirim notifikasi order ke Discord
-      await sendOrderNotificationToDiscord(result);
-      
-      state.isOrderSending = false;
-      return true;
-      
-    } else {
-      const errorMsg = result.msg || 'Gagal membuat pesanan.';
-      orderStatus.className = 'order-status failed';
-      orderStatus.textContent = `❌ ${errorMsg}`;
-      state.isOrderSending = false;
-      await sendOrderErrorToDiscord(errorMsg);
-      return false;
-    }
-    
-  } catch (err) {
-    console.error('❌ Order error:', err);
-    document.getElementById('orderStatus').className = 'order-status failed';
-    document.getElementById('orderStatus').textContent = `❌ Error: ${err.message}`;
-    state.isOrderSending = false;
-    await sendOrderErrorToDiscord(err.message);
-    return false;
-  }
-}
-
-// ============================================================
 // 🔒 SEND ORDER NOTIFICATION TO DISCORD
 // ============================================================
 async function sendOrderNotificationToDiscord(result) {
@@ -1323,7 +1119,6 @@ async function sendOrderNotificationToDiscord(result) {
 async function sendOrderErrorToDiscord(errorMsg) {
   try {
     const commentInfo = comment && comment.trim() !== '' ? `\n📝 **Komentar:** ${comment}` : '';
-    
     const message = `❌ **ORDER SHINE SHOP GAGAL**
 ━━━━━━━━━━━━━━━━━━━━━
 🆔 **ID Transaksi:** ${trx}
@@ -1349,6 +1144,104 @@ async function sendOrderErrorToDiscord(errorMsg) {
 }
 
 // ============================================================
+// 🔒 SEND ORDER TO FAYUPEDIA
+// ============================================================
+async function sendOrderToFayupedia() {
+  if (isOrderAlreadySent()) {
+    console.log(`⏭️ ORDER LOCK: ${trx} sudah dikirim`);
+    const orderStatus = document.getElementById('orderStatus');
+    orderStatus.className = 'order-status success';
+    orderStatus.innerHTML = `✅ Order sudah dikirim sebelumnya.<div style="margin-top:6px;font-size:11px;color:#888;">ID: ${trx}</div>`;
+    orderStatus.style.display = 'block';
+    return true;
+  }
+  
+  if (state.isOrderSending) return false;
+  
+  if (!serviceId || !target || target === '-' || !quantity || quantity <= 0) {
+    document.getElementById('orderStatus').className = 'order-status failed';
+    document.getElementById('orderStatus').textContent = '❌ Data pesanan tidak lengkap';
+    document.getElementById('orderStatus').style.display = 'block';
+    return false;
+  }
+  
+  if (!state.fayupediaApiKey) {
+    await fetchConfigFromEnv();
+    if (!state.fayupediaApiKey) {
+      document.getElementById('orderStatus').className = 'order-status failed';
+      document.getElementById('orderStatus').textContent = '❌ API Key tidak ditemukan';
+      document.getElementById('orderStatus').style.display = 'block';
+      return false;
+    }
+  }
+  
+  state.isOrderSending = true;
+  const orderStatus = document.getElementById('orderStatus');
+  orderStatus.className = 'order-status loading';
+  orderStatus.textContent = '⏳ Mengirim pesanan...';
+  orderStatus.style.display = 'block';
+  
+  voice.speakOrderProcessing();
+  
+  try {
+    const payload = {
+      api_id: state.fayupediaApiId,
+      api_key: state.fayupediaApiKey,
+      service: parseInt(serviceId),
+      target: target,
+      quantity: quantity
+    };
+    if (comment && comment.trim() !== '') payload.comments = comment.trim();
+    
+    const res = await fetch(FAYUPEDIA_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    
+    const result = await res.json();
+    
+    if (result.status === true && result.order) {
+      const orderId = result.order;
+      const msg = result.msg || `Pesanan ID #${orderId} berhasil.`;
+      
+      markOrderSent();
+      state.orderSent = true;
+      
+      orderStatus.className = 'order-status success';
+      orderStatus.innerHTML = `
+        ✅ ${msg}
+        <div class="order-id-box">
+          🆔 ID: <strong>${orderId}</strong>
+          <button class="copy-btn" onclick="copyOrderId('${orderId}')">📋 Salin</button>
+        </div>
+        <div style="margin-top:6px;font-size:11px;color:#888;">✅ Order hanya dikirim 1×</div>
+      `;
+      
+      await sendOrderNotificationToDiscord(result);
+      state.isOrderSending = false;
+      return true;
+      
+    } else {
+      const errorMsg = result.msg || 'Gagal membuat pesanan.';
+      orderStatus.className = 'order-status failed';
+      orderStatus.textContent = `❌ ${errorMsg}`;
+      state.isOrderSending = false;
+      await sendOrderErrorToDiscord(errorMsg);
+      return false;
+    }
+    
+  } catch (err) {
+    console.error('❌ Order error:', err);
+    document.getElementById('orderStatus').className = 'order-status failed';
+    document.getElementById('orderStatus').textContent = `❌ Error: ${err.message}`;
+    state.isOrderSending = false;
+    await sendOrderErrorToDiscord(err.message);
+    return false;
+  }
+}
+
+// ============================================================
 // 🔒 COPY ORDER ID
 // ============================================================
 window.copyOrderId = function(orderId) {
@@ -1366,22 +1259,22 @@ window.copyOrderId = function(orderId) {
 };
 
 // ============================================================
-// 🔒 CHECK PAYMENT - DENGAN SUARA NOMINAL
+// 🔒 CEK PAYMENT - 1× CEK LANGSUNG (REALTIME)
 // ============================================================
-async function checkPayment(autoTriggered = false) {
+async function checkPayment() {
   const statusEl = document.getElementById('paymentStatus');
   const confirmBtn = document.getElementById('confirmBtn');
   
   if (state.isPaymentVerified) {
     updatePaymentStatus('success', '✅ Pembayaran sudah terverifikasi!');
-    stopBackgroundCheck();
+    stopMonitoring();
     return;
   }
   
   if (checkTransactionLockLocal()) {
     state.isPaymentVerified = true;
     updatePaymentStatus('success', '✅ Transaksi sudah dikonfirmasi sebelumnya!');
-    stopBackgroundCheck();
+    stopMonitoring();
     return;
   }
   
@@ -1390,7 +1283,7 @@ async function checkPayment(autoTriggered = false) {
     updatePaymentStatus('success', '✅ Pembayaran sudah terverifikasi!');
     confirmBtn.disabled = true;
     confirmBtn.textContent = '✅ Pembayaran Terverifikasi';
-    stopBackgroundCheck();
+    stopMonitoring();
     return;
   }
   
@@ -1402,22 +1295,18 @@ async function checkPayment(autoTriggered = false) {
     }
   }
   
-  state.checkCount++;
   const totalBayar = state.finalTotal + state.uniqueCode + state.adminFee;
-  const statusClass = autoTriggered ? (state.isBackground ? 'background' : 'auto-check') : 'loading';
-  updatePaymentStatus(statusClass, 
-    autoTriggered 
-      ? `🔄 [BG #${state.checkCount}] Mengecek Rp ${totalBayar.toLocaleString('id-ID')}...` 
-      : `⏳ Mengecek pembayaran Rp ${totalBayar.toLocaleString('id-ID')}...`
-  );
+  updatePaymentStatus('monitoring', `🔍 Memeriksa pembayaran Rp ${totalBayar.toLocaleString('id-ID')}...`);
+  updateBgIndicator('monitor', 'Memeriksa pembayaran...');
   
   confirmBtn.disabled = true;
-  confirmBtn.textContent = '⏳ Mengecek...';
+  confirmBtn.textContent = '⏳ Memeriksa...';
   
   try {
     const gmail = getStoredGmail();
     const userID = await getUserID();
     
+    // Cek banned
     if (gmail && validateEmail(gmail)) {
       try {
         const res = await fetch(GMAIL_BAN_URL + '?t=' + Date.now(), { cache: "no-store" });
@@ -1431,7 +1320,7 @@ async function checkPayment(autoTriggered = false) {
               updatePaymentStatus('failed', '🚫 Akun Anda diblokir!');
               confirmBtn.disabled = false;
               confirmBtn.textContent = '✅ Cek Status Pembayaran';
-              stopBackgroundCheck();
+              stopMonitoring();
               return;
             }
           }
@@ -1439,6 +1328,7 @@ async function checkPayment(autoTriggered = false) {
       } catch (e) { console.warn('Ban check error:', e); }
     }
     
+    // Cek ke QIOSPAY
     const url = `https://qiospay.id/api/mutasi/qris/${MERCHANT_CODE}/${state.qiospayApiKey}?t=${Date.now()}`;
     const res = await fetch(url);
     
@@ -1461,15 +1351,17 @@ async function checkPayment(autoTriggered = false) {
     }
     
     if (foundTransaction) {
+      // ✅ PEMBAYARAN DITEMUKAN!
       state.isProcessingPayment = true;
       state.isPaymentVerified = true;
       
       updatePaymentStatus('success', `✅ Pembayaran Rp ${totalBayar.toLocaleString('id-ID')} terverifikasi!`);
+      updateBgIndicator('active', '✅ Pembayaran berhasil!');
       
-      // 🔊 SUARA: Pembayaran berhasil diverifikasi dengan nominal
+      // 🔊 SUARA dengan nominal
       voice.speakPaymentSuccess(totalBayar);
       
-      // 📨 Kirim notifikasi payment ke Discord
+      // Kirim ke Discord
       const sent = await sendPaymentToDiscord(gmail, userID);
       
       if (sent) {
@@ -1482,7 +1374,7 @@ async function checkPayment(autoTriggered = false) {
       
       confirmBtn.disabled = true;
       confirmBtn.textContent = '✅ Pembayaran Terverifikasi';
-      stopBackgroundCheck();
+      stopMonitoring();
       state.isProcessingPayment = false;
       
       if (!document.hidden) {
@@ -1495,75 +1387,61 @@ async function checkPayment(autoTriggered = false) {
       }
       
     } else {
-      if (autoTriggered) {
-        updatePaymentStatus('background', 
-          `⏳ Menunggu Rp ${totalBayar.toLocaleString('id-ID')} · [${state.checkCount}x cek]`
-        );
-        updateBgIndicator('warning', `Menunggu pembayaran · ${state.checkCount}x cek`);
-      } else {
-        updatePaymentStatus('loading', `⏳ Belum ada pembayaran terdeteksi.`);
-      }
+      // ❌ BELUM ADA PEMBAYARAN
+      updatePaymentStatus('monitoring', `⏳ Menunggu pembayaran Rp ${totalBayar.toLocaleString('id-ID')}...`);
+      updateBgIndicator('active', 'Menunggu pembayaran...');
       confirmBtn.disabled = false;
       confirmBtn.textContent = '✅ Cek Status Pembayaran';
+      
+      // Tetap monitoring (cek sekali lagi setelah beberapa detik)
+      setTimeout(() => {
+        if (!state.isPaymentVerified) {
+          checkPayment();
+        }
+      }, 5000);
     }
     
   } catch (err) {
     console.error('❌ Error check payment:', err);
-    if (autoTriggered) {
-      updatePaymentStatus('background', `⚠️ Error: ${err.message}`);
-    } else {
-      updatePaymentStatus('failed', `❌ Gagal mengecek: ${err.message}`);
-    }
+    updatePaymentStatus('failed', `❌ ${err.message}`);
     confirmBtn.disabled = false;
     confirmBtn.textContent = '✅ Cek Status Pembayaran';
     state.isProcessingPayment = false;
+    
+    // Retry setelah 5 detik
+    setTimeout(() => {
+      if (!state.isPaymentVerified) {
+        checkPayment();
+      }
+    }, 5000);
   }
 }
 
 // ============================================================
-// 🔒 BACKGROUND CHECK CONTROL
+// 🔒 MONITORING CONTROL
 // ============================================================
-function startBackgroundCheck() {
-  if (state.verificationInterval) return;
+let monitorTimeout = null;
+
+function startMonitoring() {
   if (state.isPaymentVerified) return;
+  if (state.isMonitoring) return;
   
-  console.log(`🔄 Memulai background check setiap ${AUTO_CHECK_INTERVAL/1000} detik...`);
-  updateBgIndicator('active', 'Monitor aktif di background');
+  state.isMonitoring = true;
+  console.log('🔍 Memulai monitoring pembayaran (realtime)');
+  updateBgIndicator('monitor', 'Memantau pembayaran...');
   
-  setTimeout(() => { checkPayment(true); }, 1500);
-  
-  state.verificationInterval = setInterval(() => {
-    if (state.isPaymentVerified) {
-      stopBackgroundCheck();
-      return;
-    }
-    checkPayment(true);
-  }, AUTO_CHECK_INTERVAL);
-  
-  document.addEventListener('visibilitychange', handleVisibilityChange);
+  // Cek pertama kali
+  checkPayment();
 }
 
-function stopBackgroundCheck() {
-  if (state.verificationInterval) {
-    clearInterval(state.verificationInterval);
-    state.verificationInterval = null;
-    console.log('🛑 Background check dihentikan');
+function stopMonitoring() {
+  state.isMonitoring = false;
+  if (monitorTimeout) {
+    clearTimeout(monitorTimeout);
+    monitorTimeout = null;
   }
-  document.removeEventListener('visibilitychange', handleVisibilityChange);
+  console.log('🛑 Monitoring berhenti');
   updateBgIndicator('inactive', 'Monitor berhenti');
-}
-
-function handleVisibilityChange() {
-  state.isBackground = document.hidden;
-  if (state.isBackground) {
-    updateBgIndicator('active', 'Monitor berjalan di background');
-  } else {
-    updateBgIndicator('active', 'Monitor aktif');
-    if (!state.isPaymentVerified) {
-      const total = state.finalTotal + state.uniqueCode + state.adminFee;
-      updatePaymentStatus('background', `🔄 Auto-check aktif · Menunggu Rp ${total.toLocaleString('id-ID')}`);
-    }
-  }
 }
 
 // ============================================================
@@ -1689,10 +1567,12 @@ async function init() {
     voice.isEnabled = this.checked;
   });
   
+  // Confirm button
   document.getElementById('confirmBtn').addEventListener('click', function() {
-    checkPayment(false);
+    checkPayment();
   });
   
+  // Apply voucher
   document.getElementById('applyVoucher').addEventListener('click', async function() {
     const code = document.getElementById('voucherInput').value.trim().toUpperCase();
     if (!code) return Swal.fire("Isi kode voucher", "", "warning");
@@ -1727,7 +1607,8 @@ async function init() {
     Swal.fire({ title: "✅ Berhasil!", html: `Voucher <b>${v.code}</b> digunakan!<br>Diskon: <b>Rp ${discount.toLocaleString("id-ID")}</b>`, icon: "success", confirmButtonColor: "#22c55e" });
   });
   
-  startBackgroundCheck();
+  // 🚀 START MONITORING - REALTIME TANPA INTERVAL
+  startMonitoring();
   
   function updateClock() {
     const el = document.getElementById('wibTimeDisplay');
@@ -1739,7 +1620,8 @@ async function init() {
   document.addEventListener('click', function wake() { voice.wakeUp(); }, { once: true });
   
   console.log(`💳 QRIS Payment siap! (${trx})`);
-  console.log(`🔊 Voice system aktif - akan menyebutkan nominal pembayaran`);
+  console.log(`🔍 Monitoring realtime (tanpa interval)`);
+  console.log(`🔊 Voice: akan menyebutkan nominal pembayaran`);
   console.log(`🔒 Order lock: ${isOrderAlreadySent() ? 'SUDAH DIKIRIM ✅' : 'BELUM DIKIRIM ⏳'}`);
 }
 
@@ -1752,7 +1634,8 @@ document.addEventListener("keydown", function(e){
   if(e.ctrlKey && e.key === "u") e.preventDefault();
 });
 
-console.log('🔊 Voice system: Pembayaran berhasil diverifikasi sebesar Rp XXX');
+console.log('🔍 Monitoring realtime: cek 1× + auto-retry jika gagal');
+console.log('🔊 Voice: Pembayaran berhasil diverifikasi sebesar Rp XXX');
 </script>
 </body>
 </html>
