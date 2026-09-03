@@ -422,6 +422,22 @@
             z-index: 10;
         }
 
+        /* SOUND TOGGLE */
+        .sound-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #888;
+            font-size: 12px;
+            margin-top: 8px;
+        }
+        .sound-toggle input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            accent-color: #00ffaa;
+            cursor: pointer;
+        }
+
         @media (max-width: 600px) {
             .card {
                 padding: 20px 16px;
@@ -466,6 +482,12 @@
                 <span style="margin-left:15px;">💰 Saldo: <span id="userSaldoDisplay" style="color:#00ffaa;">Rp 0</span></span>
             </div>
             <div class="env-status" id="envStatus">🔌 Memuat data user...</div>
+            
+            <!-- SOUND TOGGLE -->
+            <div class="sound-toggle">
+                <input type="checkbox" id="soundToggle" checked>
+                <label for="soundToggle">🔊 Suara Notifikasi</label>
+            </div>
         </div>
 
         <!-- FORM BUAT DEPOSIT -->
@@ -557,6 +579,74 @@
         let deposits = [];
         let verificationIntervals = {};
         let timerIntervals = {};
+
+        // ============================================================
+        // 🔒 SOUND NOTIFICATION - TEXT TO SPEECH
+        // ============================================================
+        function isSoundEnabled() {
+            try {
+                return document.getElementById('soundToggle').checked;
+            } catch {
+                return true;
+            }
+        }
+
+        function playPaymentSound(amount) {
+            if (!isSoundEnabled()) {
+                console.log('🔇 Suara dimatikan');
+                return;
+            }
+
+            try {
+                // Cek apakah browser support Speech Synthesis
+                if (!window.speechSynthesis) {
+                    console.warn('⚠️ Browser tidak support Speech Synthesis');
+                    return;
+                }
+
+                // Format nominal
+                const formattedAmount = amount.toLocaleString('id-ID');
+                const text = `Pembayaran berhasil sebesar Rp ${formattedAmount}`;
+
+                // Buat utterance
+                const utterance = new SpeechSynthesisUtterance(text);
+                
+                // Set bahasa Indonesia
+                utterance.lang = 'id-ID';
+                
+                // Kecepatan bicara (0.8 - 1.2)
+                utterance.rate = 0.9;
+                
+                // Pitch suara
+                utterance.pitch = 1.0;
+                
+                // Volume (0 - 1)
+                utterance.volume = 1.0;
+
+                // Cari voice bahasa Indonesia
+                const voices = window.speechSynthesis.getVoices();
+                const indonesianVoice = voices.find(v => v.lang.startsWith('id'));
+                if (indonesianVoice) {
+                    utterance.voice = indonesianVoice;
+                }
+
+                // Bicara
+                window.speechSynthesis.speak(utterance);
+                
+                console.log(`🔊 Suara: "${text}"`);
+
+            } catch (e) {
+                console.error('❌ Error play sound:', e);
+            }
+        }
+
+        // Preload voices (biar cepet pas dipanggil)
+        if (window.speechSynthesis) {
+            window.speechSynthesis.getVoices();
+            window.speechSynthesis.onvoiceschanged = () => {
+                window.speechSynthesis.getVoices();
+            };
+        }
 
         // ============================================================
         // 🔒 CRC16 & QRIS BUILDER
@@ -1130,6 +1220,9 @@
                     renderDeposits();
                     updateSummary();
 
+                    // 🔊 MAIN SOUND NOTIFICATION
+                    playPaymentSound(dep.amount);
+
                     await sendDiscordNotification(dep);
 
                     Swal.fire({
@@ -1312,6 +1405,9 @@
                         renderDeposits();
                         updateSummary();
 
+                        // 🔊 MAIN SOUND NOTIFICATION
+                        playPaymentSound(dep.amount);
+
                         await sendDiscordNotification(dep);
 
                         clearInterval(verificationIntervals[index]);
@@ -1446,9 +1542,18 @@
             fetchQiospayConfig();
             loadDeposits();
 
+            // Preload voices
+            if (window.speechSynthesis) {
+                window.speechSynthesis.getVoices();
+                window.speechSynthesis.onvoiceschanged = () => {
+                    window.speechSynthesis.getVoices();
+                };
+            }
+
             console.log('💰 Deposit Massal siap!');
             console.log('👤 User:', getUserData().email);
             console.log('⏳ Expired:', EXPIRY_MINUTES, 'menit');
+            console.log('🔊 Suara notifikasi aktif');
         });
 
         // Cleanup intervals on page unload
@@ -1458,6 +1563,10 @@
             }
             for (const key in timerIntervals) {
                 clearInterval(timerIntervals[key]);
+            }
+            // Stop semua suara saat keluar
+            if (window.speechSynthesis) {
+                window.speechSynthesis.cancel();
             }
         });
     </script>
