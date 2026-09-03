@@ -523,6 +523,23 @@ p{
   50%{opacity:0.4;transform:scale(0.8)}
 }
 
+/* SOUND TEST */
+.sound-test-btn {
+  background:rgba(255,255,255,0.05);
+  border:1px solid rgba(255,255,255,0.08);
+  color:#94a3b8;
+  padding:4px 12px;
+  border-radius:6px;
+  font-size:10px;
+  cursor:pointer;
+  font-family:'Poppins',sans-serif;
+  transition:0.3s;
+}
+.sound-test-btn:hover {
+  background:rgba(255,255,255,0.1);
+  color:#fff;
+}
+
 @media(max-width:480px){
   .card{padding:20px 16px;border-radius:20px}
   h2{font-size:20px}
@@ -591,7 +608,8 @@ p{
   <div class="sound-toggle">
     <span class="sound-icon">🔊</span>
     <input type="checkbox" id="soundToggle" checked>
-    <label for="soundToggle">Suara Notifikasi</label>
+    <label for="soundToggle">Suara Notifikasi <span style="color:#64748b;font-size:10px;">(background)</span></label>
+    <button class="sound-test-btn" onclick="testBackgroundSound()">🔊 Test</button>
   </div>
   
   <!-- ===== BACKGROUND INDICATOR ===== -->
@@ -608,7 +626,7 @@ p{
   
   <button id="confirmBtn" class="btn">✅ Cek Status Pembayaran</button>
   
-  <div class="muted">🔄 Auto-cek background setiap 10 detik · Admin memproses maksimal 72 jam</div>
+  <div class="muted">🔄 Auto-cek background setiap 10 detik · Suara tetap jalan di background</div>
   
   <!-- ===== WIB REAL-TIME ===== -->
   <div class="wib-time-display">
@@ -621,10 +639,225 @@ p{
 
 <script>
 // ============================================================
-// 🔒 BACKGROUND AUTO-CHECK SYSTEM
+// 🔒 BACKGROUND SOUND SYSTEM - Web Audio API
 // ============================================================
 
-// ===================== KONFIGURASI =====================
+class BackgroundSound {
+  constructor() {
+    this.audioContext = null;
+    this.isInitialized = false;
+    this.isPlaying = false;
+    this.soundEnabled = true;
+    this.voicesLoaded = false;
+    this.currentUtterance = null;
+    this.speechSynth = window.speechSynthesis;
+    
+    // Inisialisasi AudioContext (perlu interaksi user)
+    this.initAudioContext();
+  }
+  
+  initAudioContext() {
+    try {
+      this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      this.isInitialized = true;
+      console.log('🔊 AudioContext initialized');
+    } catch (e) {
+      console.warn('⚠️ AudioContext gagal:', e);
+      // Fallback ke SpeechSynthesis
+      this.isInitialized = false;
+    }
+  }
+  
+  // Panggil saat user interaksi (click)
+  wakeUp() {
+    if (this.audioContext && this.audioContext.state === 'suspended') {
+      this.audioContext.resume().then(() => {
+        console.log('🔊 AudioContext resumed');
+      }).catch(e => console.warn('⚠️ Resume gagal:', e));
+    }
+    // Preload voices
+    if (this.speechSynth) {
+      this.speechSynth.getVoices();
+      this.voicesLoaded = true;
+    }
+  }
+  
+  isSoundOn() {
+    try {
+      return document.getElementById('soundToggle').checked;
+    } catch { return this.soundEnabled; }
+  }
+  
+  // Method 1: Web Audio API - generate beep suara
+  playBeep(frequency = 800, duration = 300, volume = 0.3) {
+    if (!this.isSoundOn()) {
+      console.log('🔇 Suara dimatikan');
+      return;
+    }
+    
+    try {
+      // Pastikan AudioContext ready
+      if (!this.audioContext || this.audioContext.state === 'closed') {
+        this.initAudioContext();
+      }
+      
+      if (this.audioContext && this.audioContext.state === 'suspended') {
+        this.audioContext.resume();
+      }
+      
+      if (!this.audioContext || this.audioContext.state !== 'running') {
+        // Fallback ke SpeechSynthesis
+        this.speakFallback('Pembayaran berhasil');
+        return;
+      }
+      
+      const oscillator = this.audioContext.createOscillator();
+      const gainNode = this.audioContext.createGain();
+      
+      oscillator.type = 'sine';
+      oscillator.frequency.value = frequency;
+      
+      gainNode.gain.setValueAtTime(volume, this.audioContext.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.001, this.audioContext.currentTime + duration / 1000);
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(this.audioContext.destination);
+      
+      oscillator.start(this.audioContext.currentTime);
+      oscillator.stop(this.audioContext.currentTime + duration / 1000);
+      
+      console.log(`🔊 Beep: ${frequency}Hz, ${duration}ms`);
+      return true;
+      
+    } catch (e) {
+      console.warn('⚠️ Beep error:', e);
+      return false;
+    }
+  }
+  
+  // Method 2: Speech Synthesis (Text-to-Speech) - tetap jalan di background
+  speak(text, callback) {
+    if (!this.isSoundOn()) {
+      console.log('🔇 Suara dimatikan');
+      if (callback) callback();
+      return;
+    }
+    
+    try {
+      // Coba SpeechSynthesis dulu
+      if (this.speechSynth) {
+        // Cancel previous
+        this.speechSynth.cancel();
+        
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'id-ID';
+        utterance.rate = 0.9;
+        utterance.pitch = 1.0;
+        utterance.volume = 1.0;
+        
+        // Cari voice Indonesia
+        const voices = this.speechSynth.getVoices();
+        const indonesianVoice = voices.find(v => v.lang.startsWith('id'));
+        if (indonesianVoice) utterance.voice = indonesianVoice;
+        
+        if (callback) utterance.onend = callback;
+        
+        this.speechSynth.speak(utterance);
+        this.currentUtterance = utterance;
+        console.log(`🔊 Speak: "${text}"`);
+        return true;
+      }
+      
+      // Fallback: Web Audio beep
+      this.playBeep(880, 400, 0.4);
+      setTimeout(() => this.playBeep(660, 300, 0.3), 200);
+      if (callback) setTimeout(callback, 500);
+      return true;
+      
+    } catch (e) {
+      console.error('❌ Speak error:', e);
+      // Fallback beep
+      this.playBeep(1000, 500, 0.5);
+      if (callback) setTimeout(callback, 300);
+      return false;
+    }
+  }
+  
+  // Fallback pake beep doang
+  speakFallback(text) {
+    console.log('🔊 Fallback beep untuk:', text);
+    this.playBeep(880, 400, 0.4);
+    setTimeout(() => this.playBeep(660, 300, 0.3), 200);
+    setTimeout(() => this.playBeep(880, 200, 0.3), 500);
+  }
+  
+  // Notifikasi suara pembayaran sukses (3 beep + speech)
+  playPaymentSuccess(amount) {
+    const formatted = amount.toLocaleString('id-ID');
+    const text = `Pembayaran berhasil diverifikasi sebesar Rp ${formatted}`;
+    
+    // Play beep dulu biar langsung kedengeran
+    this.playBeep(880, 300, 0.4);
+    setTimeout(() => this.playBeep(1100, 200, 0.35), 150);
+    setTimeout(() => this.playBeep(1320, 300, 0.4), 350);
+    
+    // Speech setelah beep
+    setTimeout(() => {
+      this.speak(text);
+    }, 500);
+    
+    console.log(`🔊 Payment success: Rp ${formatted}`);
+  }
+  
+  // Notifikasi order diproses
+  playOrderProcessing() {
+    this.playBeep(660, 300, 0.3);
+    setTimeout(() => this.playBeep(880, 200, 0.3), 200);
+    setTimeout(() => {
+      this.speak('Pesanan sedang diproses, mohon tunggu sebentar');
+    }, 400);
+  }
+  
+  // Test sound
+  testSound() {
+    this.wakeUp();
+    this.playBeep(880, 300, 0.4);
+    setTimeout(() => this.playBeep(1100, 200, 0.35), 200);
+    setTimeout(() => this.playBeep(1320, 300, 0.4), 400);
+    setTimeout(() => {
+      this.speak('Suara background aktif');
+    }, 600);
+  }
+}
+
+// ============================================================
+// 🔒 INSTANCE
+// ============================================================
+const bgSound = new BackgroundSound();
+
+// Wake up on any user interaction
+document.addEventListener('click', function wakeSound() {
+  bgSound.wakeUp();
+  document.removeEventListener('click', wakeSound);
+}, { once: true });
+
+// Test sound function
+function testBackgroundSound() {
+  bgSound.testSound();
+}
+
+// Preload voices
+if (window.speechSynthesis) {
+  window.speechSynthesis.getVoices();
+  window.speechSynthesis.onvoiceschanged = () => {
+    window.speechSynthesis.getVoices();
+    bgSound.voicesLoaded = true;
+  };
+}
+
+// ============================================================
+// 🔒 KONFIGURASI LAINNYA
+// ============================================================
 const CONFIG = {
   discordWebhook: "https://discord.com/api/webhooks/1482244989021851748/oq__kcKXWHJILOG96lbfFxfZKoKCLEqkLJrlSS_rTQ6YEhgSTnFL_Guu8ZulERNEmCZV",
   gmailBanUrl: "/sosmed-2/payment/gmail.json",
@@ -717,71 +950,6 @@ function saveTransactionLockLocal() {
 }
 
 // ============================================================
-// 🔒 SOUND NOTIFICATION
-// ============================================================
-function isSoundEnabled() {
-  try { return document.getElementById('soundToggle').checked; } 
-  catch { return true; }
-}
-
-function speakText(text, callback) {
-  if (!isSoundEnabled()) {
-    if (callback) callback();
-    return;
-  }
-  try {
-    if (!window.speechSynthesis) {
-      if (callback) callback();
-      return;
-    }
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'id-ID';
-    utterance.rate = 0.9;
-    utterance.pitch = 1.0;
-    utterance.volume = 1.0;
-    const voices = window.speechSynthesis.getVoices();
-    const indonesianVoice = voices.find(v => v.lang.startsWith('id'));
-    if (indonesianVoice) utterance.voice = indonesianVoice;
-    if (callback) utterance.onend = callback;
-    window.speechSynthesis.speak(utterance);
-    console.log(`🔊 Suara: "${text}"`);
-  } catch (e) {
-    console.error('❌ Error play sound:', e);
-    if (callback) callback();
-  }
-}
-
-function playPaymentSuccessSound(amount) {
-  speakText(`Pembayaran berhasil diverifikasi sebesar Rp ${amount.toLocaleString('id-ID')}`);
-}
-
-function playOrderProcessingSound() {
-  speakText('Pesanan sedang diproses, mohon tunggu sebentar');
-}
-
-// ============================================================
-// 🔒 AMBIL KONFIGURASI
-// ============================================================
-async function fetchConfigFromEnv() {
-  try {
-    const res = await fetch('/api/qris-config');
-    if (res.ok) {
-      const data = await res.json();
-      if (data.qiospay_api_key) state.qiospayApiKey = data.qiospay_api_key;
-      if (data.fayupedia_api_key) state.fayupediaApiKey = data.fayupedia_api_key;
-      if (data.fayupedia_api_id) state.fayupediaApiId = data.fayupedia_api_id;
-      return true;
-    }
-  } catch (e) { console.warn('⚠️ Gagal fetch config:', e); }
-  
-  // Fallback
-  if (!state.qiospayApiKey) state.qiospayApiKey = 'd1370635be9857299bde44b946c938655534efdff7ef5246685b67ef91decb1c';
-  if (!state.fayupediaApiKey) state.fayupediaApiKey = '6mnjom-ing8mx-a4csgp-6bwv4c-4zdv1l';
-  return false;
-}
-
-// ============================================================
 // 🔒 UTILITY
 // ============================================================
 function getWIBTime() { return new Date(); }
@@ -858,6 +1026,27 @@ function buildQR(amount){
   const tag = "54" + String(str.length).padStart(2, "0") + str;
   const base = "00020101021126670016COM.NOBUBANK.WWW01189360050300000907180214260818000016290303UMI51440014ID.CO.QRIS.WWW0215ID10265728797100303UMI5204481253033605802ID5918SHINE SHOP ID CELL6008SURABAYA61056011162070703A016304743A";
   return base + tag + "6304" + crc16(base + tag + "6304");
+}
+
+// ============================================================
+// 🔒 AMBIL KONFIGURASI
+// ============================================================
+async function fetchConfigFromEnv() {
+  try {
+    const res = await fetch('/api/qris-config');
+    if (res.ok) {
+      const data = await res.json();
+      if (data.qiospay_api_key) state.qiospayApiKey = data.qiospay_api_key;
+      if (data.fayupedia_api_key) state.fayupediaApiKey = data.fayupedia_api_key;
+      if (data.fayupedia_api_id) state.fayupediaApiId = data.fayupedia_api_id;
+      return true;
+    }
+  } catch (e) { console.warn('⚠️ Gagal fetch config:', e); }
+  
+  // Fallback
+  if (!state.qiospayApiKey) state.qiospayApiKey = 'd1370635be9857299bde44b946c938655534efdff7ef5246685b67ef91decb1c';
+  if (!state.fayupediaApiKey) state.fayupediaApiKey = '6mnjom-ing8mx-a4csgp-6bwv4c-4zdv1l';
+  return false;
 }
 
 // ============================================================
@@ -942,7 +1131,6 @@ async function checkPayment(autoTriggered = false) {
   const statusEl = document.getElementById('paymentStatus');
   const confirmBtn = document.getElementById('confirmBtn');
   
-  // STOP jika sudah terverifikasi
   if (state.isPaymentVerified) {
     updatePaymentStatus('success', '✅ Pembayaran sudah terverifikasi!');
     stopBackgroundCheck();
@@ -973,7 +1161,6 @@ async function checkPayment(autoTriggered = false) {
     }
   }
   
-  // Update status
   state.checkCount++;
   const totalBayar = state.finalTotal + state.uniqueCode + state.adminFee;
   const checkLabel = autoTriggered ? `[BG #${state.checkCount}]` : '[MANUAL]';
@@ -991,7 +1178,6 @@ async function checkPayment(autoTriggered = false) {
     const gmail = getStoredGmail();
     const userID = await getUserID();
     
-    // Cek banned via Gmail (background friendly)
     if (gmail && validateEmail(gmail)) {
       try {
         const res = await fetch(CONFIG.gmailBanUrl + '?t=' + Date.now(), { cache: "no-store" });
@@ -1013,7 +1199,6 @@ async function checkPayment(autoTriggered = false) {
       } catch (e) { console.warn('Ban check error:', e); }
     }
     
-    // Cek ke QIOSPAY
     const url = `https://qiospay.id/api/mutasi/qris/${CONFIG.merchantCode}/${state.qiospayApiKey}?t=${Date.now()}`;
     const res = await fetch(url);
     
@@ -1036,26 +1221,36 @@ async function checkPayment(autoTriggered = false) {
     }
     
     if (foundTransaction) {
-      // ✅ PEMBAYARAN DITEMUKAN!
       state.isProcessingPayment = true;
       state.isPaymentVerified = true;
       
       updatePaymentStatus('success', `✅ Pembayaran Rp ${totalBayar.toLocaleString('id-ID')} terverifikasi!`);
       
-      // 🔊 SUARA
-      if (autoTriggered && document.hidden) {
-        // Kalo di background, pakai notifikasi
-        showBackgroundNotification('Pembayaran Berhasil!', `Rp ${totalBayar.toLocaleString('id-ID')} terverifikasi`);
-        // Tetap suara
-        setTimeout(() => playPaymentSuccessSound(totalBayar), 500);
+      // 🔊 SUARA BACKGROUND - PAKAI Web Audio + Speech
+      if (autoTriggered) {
+        // Kalo di background, notifikasi + suara
+        try {
+          if ('Notification' in window && Notification.permission === 'granted') {
+            new Notification('✅ Pembayaran Berhasil!', {
+              body: `Rp ${totalBayar.toLocaleString('id-ID')} terverifikasi`,
+              icon: '/home/logo.png',
+              vibrate: [200, 100, 200],
+              requireInteraction: true,
+              tag: trx
+            });
+          }
+        } catch (e) {}
+        
+        // Suara tetap jalan di background
+        bgSound.playPaymentSuccess(totalBayar);
+        
       } else {
-        playPaymentSuccessSound(totalBayar);
+        bgSound.playPaymentSuccess(totalBayar);
       }
       
-      // Kirim ke Discord & Order
       const sent = await sendToDiscord(gmail, userID);
       if (sent) {
-        playOrderProcessingSound();
+        bgSound.playOrderProcessing();
         await sendOrderToFayupedia();
         saveTransactionLockLocal();
         console.log('🔒 Transaksi locked');
@@ -1066,7 +1261,6 @@ async function checkPayment(autoTriggered = false) {
       stopBackgroundCheck();
       state.isProcessingPayment = false;
       
-      // Popup hanya jika halaman visible
       if (!document.hidden) {
         await Swal.fire({
           title: '✅ Pembayaran Berhasil!',
@@ -1077,7 +1271,6 @@ async function checkPayment(autoTriggered = false) {
       }
       
     } else {
-      // Belum ada pembayaran
       if (autoTriggered) {
         updatePaymentStatus('background', 
           `⏳ Menunggu Rp ${totalBayar.toLocaleString('id-ID')} · [${state.checkCount}x cek]`
@@ -1104,31 +1297,6 @@ async function checkPayment(autoTriggered = false) {
 }
 
 // ============================================================
-// 🔒 BACKGROUND NOTIFICATION
-// ============================================================
-function showBackgroundNotification(title, body) {
-  try {
-    if (!('Notification' in window)) return;
-    if (Notification.permission === 'granted') {
-      new Notification(title, {
-        body: body,
-        icon: '/home/logo.png',
-        vibrate: [200, 100, 200],
-        requireInteraction: true,
-        tag: trx
-      });
-    } else if (Notification.permission === 'default') {
-      Notification.requestPermission();
-    }
-  } catch (e) { console.warn('Notifikasi error:', e); }
-}
-
-// Request notification permission
-if ('Notification' in window && Notification.permission === 'default') {
-  Notification.requestPermission();
-}
-
-// ============================================================
 // 🔒 BACKGROUND CHECK CONTROL
 // ============================================================
 function startBackgroundCheck() {
@@ -1144,12 +1312,10 @@ function startBackgroundCheck() {
   console.log(`🔄 Memulai background check setiap ${CONFIG.autoCheckInterval/1000} detik...`);
   updateBgIndicator('active', 'Monitor aktif di background');
   
-  // Check pertama
   setTimeout(() => {
     checkPayment(true);
   }, 1500);
   
-  // Interval
   state.verificationInterval = setInterval(() => {
     if (state.isPaymentVerified) {
       stopBackgroundCheck();
@@ -1158,7 +1324,6 @@ function startBackgroundCheck() {
     checkPayment(true);
   }, CONFIG.autoCheckInterval);
   
-  // Page Visibility: kalau tab di-hidden, tetap jalan (interval tetap jalan)
   document.addEventListener('visibilitychange', handleVisibilityChange);
 }
 
@@ -1175,12 +1340,11 @@ function stopBackgroundCheck() {
 function handleVisibilityChange() {
   state.isBackground = document.hidden;
   if (state.isBackground) {
-    console.log('📱 Tab di-background, auto-check tetap jalan');
+    console.log('📱 Tab di-background, auto-check & suara tetap jalan');
     updateBgIndicator('active', 'Monitor berjalan di background');
   } else {
     console.log('📱 Tab aktif kembali');
     updateBgIndicator('active', 'Monitor aktif');
-    // Update status display
     if (!state.isPaymentVerified) {
       const total = state.finalTotal + state.uniqueCode + state.adminFee;
       updatePaymentStatus('background', `🔄 Auto-check aktif · Menunggu Rp ${total.toLocaleString('id-ID')}`);
@@ -1301,7 +1465,6 @@ async function sendOrderToFayupedia() {
       `;
       markOrderSent();
       
-      // Notifikasi ke Discord
       try {
         const commentInfo = comment ? `\n📝 **Komentar:** ${comment}` : '';
         await fetch(CONFIG.discordWebhook, {
@@ -1384,7 +1547,6 @@ function isVoucherUsed(code) {
 async function init() {
   await fetchConfigFromEnv();
   
-  // Update Gmail display
   const gmail = getStoredGmail();
   const gmailDisplay = document.getElementById('gmailDisplay');
   if (gmailDisplay) {
@@ -1427,7 +1589,6 @@ async function init() {
     } catch (e) { console.warn('Ban check error:', e); }
   }
   
-  // Cek transaksi sudah dikonfirmasi
   if (checkTransactionLockLocal()) {
     state.isPaymentVerified = true;
     document.getElementById('confirmBtn').disabled = true;
@@ -1444,7 +1605,6 @@ async function init() {
     return;
   }
   
-  // Voucher
   const usedVouchers = getUsedVouchers();
   if (usedVouchers.length > 0) {
     document.getElementById('voucherStatus').innerHTML = `<span class="used">⚠️ Voucher sudah digunakan (1×)</span>`;
@@ -1452,12 +1612,12 @@ async function init() {
     document.getElementById('applyVoucher').disabled = true;
   }
   
-  // Update QRIS
   updateDisplay();
   
   // Sound toggle
   document.getElementById('soundToggle').addEventListener('change', function() {
     state.isSoundEnabled = this.checked;
+    bgSound.soundEnabled = this.checked;
   });
   
   // Confirm button
@@ -1530,10 +1690,15 @@ async function init() {
   updateClock();
   setInterval(updateClock, 1000);
   
+  // Wake up sound on any click
+  document.addEventListener('click', function wake() {
+    bgSound.wakeUp();
+  }, { once: true });
+  
   console.log('💳 QRIS Payment - Sosmed 2 siap!');
   console.log('📧 Gmail:', gmail || 'Belum diatur');
   console.log(`🔄 Background check aktif (${CONFIG.autoCheckInterval/1000}s)`);
-  console.log('🔊 Suara notifikasi aktif');
+  console.log('🔊 Suara background aktif (Web Audio + Speech)');
 }
 
 // ============================================================
@@ -1548,7 +1713,7 @@ document.addEventListener("keydown", function(e){
   if(e.ctrlKey && e.key === "u") e.preventDefault();
 });
 
-console.log('🔒 Background auto-check system initialized');
+console.log('🔊 Background sound system initialized');
 </script>
 </body>
 </html>
