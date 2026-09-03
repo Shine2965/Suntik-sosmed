@@ -325,6 +325,7 @@
     // ============================================================
 
     const GMAIL_KEY = 'user_gmail';
+    const GMAIL_BAN_URL = '/sosmed-2/payment/gmail.json';
     let gmailPromptActive = false;
 
     // ---------- USER ID ----------
@@ -393,7 +394,26 @@
     }
 
     // ============================================================
-    // 🔥 CEK BAN BERDASARKAN GMAIL
+    // 🔥 GET WIB TIME (UNTUK CEK EXPIRED BAN)
+    // ============================================================
+    function getWIBTime() {
+        return new Date();
+    }
+
+    function parseBanUntil(untilStr) {
+        if (!untilStr) return null;
+        try {
+            // Coba parse ISO string
+            const date = new Date(untilStr);
+            if (!isNaN(date.getTime())) return date;
+            return null;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    // ============================================================
+    // 🔥 CEK BAN BERDASARKAN GMAIL DARI gmail.json
     // ============================================================
     async function checkGmailBan() {
         const gmail = getStoredGmail();
@@ -405,29 +425,40 @@
         }
 
         try {
-            const res = await fetch("/sosmed-2/payment/user.json?t=" + Date.now(), {
+            const res = await fetch(GMAIL_BAN_URL + '?t=' + Date.now(), {
                 cache: "no-store"
             });
 
             if (!res.ok) {
-                console.warn('⚠️ Gagal fetch user.json:', res.status);
+                console.warn('⚠️ Gagal fetch gmail.json:', res.status);
                 return false;
             }
 
             const list = await res.json();
 
             if (!Array.isArray(list)) {
-                console.warn('⚠️ user.json bukan array');
+                console.warn('⚠️ gmail.json bukan array');
                 return false;
             }
 
-            // Cari Gmail di list banned
+            // Cari Gmail di list banned (case insensitive)
             const banned = list.find(item =>
                 item.Gmail &&
                 item.Gmail.toLowerCase().trim() === gmail.toLowerCase().trim()
             );
 
             if (banned) {
+                // Cek apakah ban masih berlaku (belum expired)
+                const untilDate = parseBanUntil(banned["Dibanned sampai"]);
+                if (untilDate) {
+                    const now = getWIBTime();
+                    if (now > untilDate) {
+                        // Ban sudah expired, skip
+                        console.log('ℹ️ Ban sudah expired untuk:', gmail);
+                        return false;
+                    }
+                }
+
                 const reason = banned.Alasan || banned.reason || "Tidak ada keterangan";
                 const until = banned["Dibanned sampai"] || "-";
 
@@ -845,7 +876,7 @@
         // Update Gmail display
         updateGmailDisplay();
 
-        // Cek ban berdasarkan Gmail
+        // Cek ban berdasarkan Gmail dari gmail.json
         const isBanned = await checkGmailBan();
         if (isBanned) return;
 
@@ -856,7 +887,7 @@
         console.log('📧 Gmail:', getStoredGmail() || 'Belum diatur');
         console.log('🆔 User ID:', userID);
         console.log('📢 Pengumuman berdasarkan Gmail');
-        console.log('🚫 Ban berdasarkan Gmail');
+        console.log('🚫 Ban berdasarkan Gmail dari gmail.json');
     });
 
     // Event listener untuk tombol ubah Gmail
@@ -878,6 +909,7 @@
     });
 
     console.log('✅ Semua tombol telah di-handle dengan Gmail check + Ban check');
+    console.log(`📁 Ban source: ${GMAIL_BAN_URL}`);
     </script>
 
     <!-- SweetAlert2 untuk popup Gmail -->
