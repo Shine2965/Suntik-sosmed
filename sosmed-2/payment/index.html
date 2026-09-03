@@ -436,6 +436,38 @@ p{
   background:rgba(255,170,0,0.4);
 }
 
+/* SOUND TOGGLE */
+.sound-toggle {
+  display:flex;
+  align-items:center;
+  gap:8px;
+  color:#94a3b8;
+  font-size:12px;
+  margin-top:10px;
+  padding:8px 12px;
+  background:rgba(255,255,255,0.03);
+  border-radius:10px;
+  border:1px solid rgba(255,255,255,0.05);
+}
+.sound-toggle input[type="checkbox"] {
+  width:18px;
+  height:18px;
+  accent-color:#00c6ff;
+  cursor:pointer;
+  margin:0;
+  padding:0;
+  background:transparent;
+  border:none;
+}
+.sound-toggle label {
+  cursor:pointer;
+  font-weight:400;
+  color:#94a3b8;
+}
+.sound-toggle .sound-icon {
+  font-size:16px;
+}
+
 @media(max-width:480px){
   .card{padding:20px 16px;border-radius:20px}
   h2{font-size:20px}
@@ -500,6 +532,13 @@ p{
   <button id="applyVoucher" class="btn">🎫 Gunakan Voucher</button>
   <div class="voucher-status" id="voucherStatus"></div>
   
+  <!-- ===== SOUND TOGGLE ===== -->
+  <div class="sound-toggle">
+    <span class="sound-icon">🔊</span>
+    <input type="checkbox" id="soundToggle" checked>
+    <label for="soundToggle">Suara Notifikasi</label>
+  </div>
+  
   <!-- ===== PAYMENT STATUS ===== -->
   <div id="paymentStatus" class="payment-status"></div>
   
@@ -545,9 +584,77 @@ const total = Number(p.get("total") || 0);
 const target = p.get("target") || "-";
 const serviceId = p.get("id") || null;
 const quantity = parseInt(p.get("jumlah") || 0);
-const comment = p.get("comment") || null; // AMBIL PARAMETER COMMENT
+const comment = p.get("comment") || null;
 
-// ===== NOTIFIKASI DISCORD - CEK SUDAH TERKIRIM =====
+// ============================================================
+// 🔒 SOUND NOTIFICATION - TEXT TO SPEECH
+// ============================================================
+function isSoundEnabled() {
+  try {
+    return document.getElementById('soundToggle').checked;
+  } catch {
+    return true;
+  }
+}
+
+function speakText(text, callback) {
+  if (!isSoundEnabled()) {
+    console.log('🔇 Suara dimatikan');
+    if (callback) callback();
+    return;
+  }
+
+  try {
+    if (!window.speechSynthesis) {
+      console.warn('⚠️ Browser tidak support Speech Synthesis');
+      if (callback) callback();
+      return;
+    }
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'id-ID';
+    utterance.rate = 0.9;
+    utterance.pitch = 1.0;
+    utterance.volume = 1.0;
+
+    // Cari voice Indonesia
+    const voices = window.speechSynthesis.getVoices();
+    const indonesianVoice = voices.find(v => v.lang.startsWith('id'));
+    if (indonesianVoice) {
+      utterance.voice = indonesianVoice;
+    }
+
+    if (callback) {
+      utterance.onend = callback;
+    }
+
+    window.speechSynthesis.speak(utterance);
+    console.log(`🔊 Suara: "${text}"`);
+
+  } catch (e) {
+    console.error('❌ Error play sound:', e);
+    if (callback) callback();
+  }
+}
+
+function playPaymentSuccessSound(amount) {
+  const formatted = amount.toLocaleString('id-ID');
+  speakText(`Pembayaran berhasil diverifikasi sebesar Rp ${formatted}`);
+}
+
+function playOrderProcessingSound() {
+  speakText('Pesanan sedang diproses, mohon tunggu sebentar');
+}
+
+// Preload voices
+if (window.speechSynthesis) {
+  window.speechSynthesis.getVoices();
+  window.speechSynthesis.onvoiceschanged = () => {
+    window.speechSynthesis.getVoices();
+  };
+}
+
+// ===== NOTIFIKASI DISCORD =====
 function getDiscordSentKey() {
   return `discord_sent_${trx}`;
 }
@@ -606,13 +713,11 @@ async function fetchConfigFromEnv() {
     if (res.ok) {
       const data = await res.json();
       
-      // QIOSPAY API Key
       if (data.qiospay_api_key) {
         QIOSPAY_API_KEY = data.qiospay_api_key;
         console.log('✅ QIOSPAY API Key dari ENV');
       }
       
-      // FAYUPEDIA Config
       if (data.fayupedia_api_key) {
         FAYUPEDIA_API_KEY = data.fayupedia_api_key;
         console.log('✅ FAYUPEDIA API Key dari ENV');
@@ -668,7 +773,8 @@ let isSendingDiscord = false;
 let isSendingOrder = false;
 let orderResultData = null;
 let configLoaded = false;
-let currentTotalBayar = 0; // SIMPAN NOMINAL TERAKHIR UNTUK CEK QIOSPAY
+let currentTotalBayar = 0;
+let isProcessingPayment = false;
 
 // ================= KODE UNIK PERSISTEN =================
 function getUniqueCodeKey() {
@@ -860,7 +966,7 @@ async function checkAndHandleBan() {
   return false;
 }
 
-// ================= SEND ORDER TO FAYUPEDIA (DENGAN COMMENT) =================
+// ================= SEND ORDER TO FAYUPEDIA (DENGAN SUARA) =================
 async function sendOrderToFayupedia() {
   if (isOrderAlreadySent()) {
     console.log('⏭️ Order sudah dikirim ke Fayupedia, skipping...');
@@ -913,8 +1019,10 @@ async function sendOrderToFayupedia() {
   orderStatus.textContent = '⏳ Mengirim pesanan ke Shine Shop...';
   orderStatus.style.display = 'block';
   
+  // 🔊 SUARA: Pesanan sedang diproses
+  playOrderProcessingSound();
+  
   try {
-    // BUILD PAYLOAD DENGAN COMMENT JIKA ADA
     const payload = {
       api_id: FAYUPEDIA_API_ID,
       api_key: FAYUPEDIA_API_KEY,
@@ -923,7 +1031,6 @@ async function sendOrderToFayupedia() {
       quantity: quantity
     };
     
-    // TAMBAHKAN COMMENT JIKA ADA
     if (comment && comment.trim() !== '') {
       payload.comments = comment.trim();
       console.log('📝 Comment detected:', comment);
@@ -964,6 +1071,8 @@ async function sendOrderToFayupedia() {
       isSendingOrder = false;
       
       await sendOrderNotificationToDiscord(result);
+      
+      // 🔊 SUARA: Pesanan berhasil (tapi udah ada suara sebelumnya)
       
       await Swal.fire({
         title: '✅ Pesanan Berhasil!',
@@ -1163,11 +1272,12 @@ async function sendToDiscord(gmail, userID) {
   }
 }
 
-// ================= CHECK PAYMENT VIA QIOSPAY (FIXED + SYNC QRIS) =================
+// ================= CHECK PAYMENT VIA QIOSPAY =================
 async function checkPaymentStatus() {
   const statusEl = document.getElementById('paymentStatus');
   const confirmBtn = document.getElementById('confirmBtn');
   
+  if (isProcessingPayment) return;
   if (isPaymentVerified) {
     statusEl.className = 'payment-status success';
     statusEl.textContent = '✅ Pembayaran sudah terverifikasi!';
@@ -1222,12 +1332,10 @@ async function checkPaymentStatus() {
       return;
     }
     
-    // HITUNG ULANG NOMINAL YANG SAMA DENGAN QRIS
     const totalBayar = finalTotal + uniqueCode + adminFee;
-    currentTotalBayar = totalBayar; // SIMPAN UNTUK REFERENCE
+    currentTotalBayar = totalBayar;
     
     console.log('💰 Nominal yang dicek ke QIOSPAY:', totalBayar);
-    console.log('💰 Detail: finalTotal=' + finalTotal + ', uniqueCode=' + uniqueCode + ', adminFee=' + adminFee);
     
     const url = QIOSPAY_MUTASI_URL();
     console.log('📡 Fetching mutasi dari QIOSPAY...');
@@ -1251,7 +1359,6 @@ async function checkPaymentStatus() {
         let cleanAmount = rawAmount.replace(/[^0-9]/g, '');
         let amountNumber = parseInt(cleanAmount) || 0;
         
-        // CEK APAKAH SAMA DENGAN NOMINAL YANG DIHARAPKAN
         if (amountNumber === totalBayar) {
           foundTransaction = t;
           console.log('✅ Transaksi ditemukan (exact match):', t);
@@ -1267,13 +1374,18 @@ async function checkPaymentStatus() {
     }
     
     if (foundTransaction) {
+      isProcessingPayment = true;
       isPaymentVerified = true;
       statusEl.className = 'payment-status success';
       statusEl.textContent = `✅ Pembayaran Rp ${totalBayar.toLocaleString('id-ID')} terverifikasi!`;
       
+      // 🔊 SUARA 1: Pembayaran berhasil diverifikasi
+      playPaymentSuccessSound(totalBayar);
+      
       const sent = await sendToDiscord(gmail, userID);
       
       if (sent) {
+        // 🔊 SUARA 2: Pesanan sedang diproses (otomatis di dalam sendOrderToFayupedia)
         await sendOrderToFayupedia();
         saveTransactionLockLocal();
         console.log('🔒 Transaksi locked');
@@ -1286,6 +1398,8 @@ async function checkPaymentStatus() {
         clearInterval(verificationInterval);
         verificationInterval = null;
       }
+      
+      isProcessingPayment = false;
       
     } else {
       statusEl.className = 'payment-status loading';
@@ -1300,6 +1414,7 @@ async function checkPaymentStatus() {
     statusEl.textContent = '❌ Gagal mengecek pembayaran: ' + err.message;
     confirmBtn.disabled = false;
     confirmBtn.textContent = '✅ Cek Status Pembayaran';
+    isProcessingPayment = false;
   }
 }
 
@@ -1360,7 +1475,7 @@ function buildQR(a){
   return base+tag+"6304"+crc16(base+tag+"6304");
 }
 
-// ================= UPDATE DISPLAY (FIXED + SYNC) =================
+// ================= UPDATE DISPLAY =================
 function updateDisplay(){
   uniqueCode = generateUniqueCode();
   document.getElementById('uniqueCode').textContent = uniqueCode;
@@ -1368,7 +1483,7 @@ function updateDisplay(){
   adminFee = calculateAdminFee(originalTotal);
   
   const totalDenganUnik = finalTotal + uniqueCode + adminFee;
-  currentTotalBayar = totalDenganUnik; // SIMPAN UNTUK CEK QIOSPAY
+  currentTotalBayar = totalDenganUnik;
   
   let detailHtml = `
   <strong>ID Transaksi:</strong> ${trx}<br>
@@ -1399,7 +1514,6 @@ function updateDisplay(){
   
   document.getElementById('orderDetails').innerHTML = detailHtml;
   
-  // BUILD QRIS PAKAI NOMINAL YANG SAMA
   QRCode.toCanvas(document.getElementById('qrisCanvas'), buildQR(totalDenganUnik), { width:240 }, function(err){
     if(err) return console.error(err);
     const ctx = document.getElementById('qrisCanvas').getContext("2d");
@@ -1431,7 +1545,7 @@ async function loadVoucher(){
   }catch{return []}
 }
 
-// ================= APPLY VOUCHER (UPDATE QRIS & NOMINAL CEK) =================
+// ================= APPLY VOUCHER =================
 document.getElementById('applyVoucher').onclick = async function() {
   const code = document.getElementById('voucherInput').value.trim().toUpperCase();
   if(!code) return Swal.fire("Isi kode voucher","","warning");
@@ -1492,10 +1606,8 @@ document.getElementById('applyVoucher').onclick = async function() {
   this.disabled = true;
   this.style.opacity = '0.4';
   
-  // UPDATE QRIS & NOMINAL CEK OTOMATIS
   updateDisplay();
   
-  // UPDATE JUGA PAYMENT STATUS KALO SEDANG LOADING
   const statusEl = document.getElementById('paymentStatus');
   if (statusEl.className === 'payment-status loading') {
     statusEl.textContent = `⏳ Mengecek pembayaran Rp ${(finalTotal + uniqueCode + adminFee).toLocaleString('id-ID')}...`;
@@ -1555,7 +1667,6 @@ document.getElementById('confirmBtn').onclick = function() {
     document.getElementById('applyVoucher').style.opacity = '0.4';
   }
   
-  // LOG COMMENT JIKA ADA
   if (comment && comment.trim() !== '') {
     console.log('📝 Comment detected from URL:', comment);
   }
@@ -1607,6 +1718,7 @@ console.log('✅ Auto-verifikasi QRIS aktif (cek setiap 10 detik)');
 console.log('🔑 Kode unik PERSISTEN');
 console.log('📨 Notifikasi Discord hanya 1×');
 console.log('📦 Auto-order ke Fayupedia setelah pembayaran terverifikasi');
+console.log('🔊 Suara notifikasi aktif');
 console.log('📝 Comment:', comment || 'Tidak ada');
 console.log('🆔 Service ID:', serviceId || 'Tidak ada');
 console.log('🔢 Quantity:', quantity);
