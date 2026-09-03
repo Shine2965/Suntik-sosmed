@@ -383,6 +383,17 @@ p{
   color:#ef4444;
   border:1px solid rgba(239,68,68,0.3);
 }
+.payment-status.auto-check{
+  display:block;
+  background:rgba(6,182,212,0.12);
+  color:#06b6d4;
+  border:1px solid rgba(6,182,212,0.2);
+  animation:pulse-status 2s ease-in-out infinite;
+}
+@keyframes pulse-status{
+  0%,100%{opacity:1}
+  50%{opacity:0.6}
+}
 /* ===== ORDER STATUS ===== */
 .order-status{
   margin-top:8px;
@@ -547,7 +558,7 @@ p{
   
   <button id="confirmBtn" class="btn">✅ Cek Status Pembayaran</button>
   
-  <div class="muted">⏳ Admin memproses maksimal 72 jam</div>
+  <div class="muted">⏳ Auto-cek setiap 10 detik · Admin memproses maksimal 72 jam</div>
   
   <!-- ===== WIB REAL-TIME ===== -->
   <div class="wib-time-display">
@@ -575,6 +586,7 @@ let FAYUPEDIA_API_KEY = '';
 let QIOSPAY_API_KEY = '';
 const ADMIN_FEE_PERCENT = 2;
 const ADMIN_FEE_THRESHOLD = 500000;
+const AUTO_CHECK_INTERVAL = 10000; // 10 detik
 
 // ===== AMBIL PARAMETER DARI URL =====
 const p = new URLSearchParams(location.search);
@@ -589,6 +601,8 @@ const comment = p.get("comment") || null;
 // ============================================================
 // 🔒 SOUND NOTIFICATION - TEXT TO SPEECH
 // ============================================================
+let speechSynthesisReady = false;
+
 function isSoundEnabled() {
   try {
     return document.getElementById('soundToggle').checked;
@@ -611,13 +625,15 @@ function speakText(text, callback) {
       return;
     }
 
+    // Cancel previous speech to avoid overlapping
+    window.speechSynthesis.cancel();
+
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'id-ID';
     utterance.rate = 0.9;
     utterance.pitch = 1.0;
     utterance.volume = 1.0;
 
-    // Cari voice Indonesia
     const voices = window.speechSynthesis.getVoices();
     const indonesianVoice = voices.find(v => v.lang.startsWith('id'));
     if (indonesianVoice) {
@@ -646,12 +662,21 @@ function playOrderProcessingSound() {
   speakText('Pesanan sedang diproses, mohon tunggu sebentar');
 }
 
+function playPaymentDetectedSound() {
+  speakText('Pembayaran terdeteksi, sedang memverifikasi');
+}
+
 // Preload voices
 if (window.speechSynthesis) {
   window.speechSynthesis.getVoices();
   window.speechSynthesis.onvoiceschanged = () => {
     window.speechSynthesis.getVoices();
+    speechSynthesisReady = true;
   };
+  setTimeout(() => {
+    window.speechSynthesis.getVoices();
+    speechSynthesisReady = true;
+  }, 1000);
 }
 
 // ===== NOTIFIKASI DISCORD =====
@@ -775,6 +800,8 @@ let orderResultData = null;
 let configLoaded = false;
 let currentTotalBayar = 0;
 let isProcessingPayment = false;
+let autoCheckActive = false;
+let checkCount = 0;
 
 // ================= KODE UNIK PERSISTEN =================
 function getUniqueCodeKey() {
@@ -966,7 +993,7 @@ async function checkAndHandleBan() {
   return false;
 }
 
-// ================= SEND ORDER TO FAYUPEDIA (DENGAN SUARA) =================
+// ================= SEND ORDER TO FAYUPEDIA =================
 async function sendOrderToFayupedia() {
   if (isOrderAlreadySent()) {
     console.log('⏭️ Order sudah dikirim ke Fayupedia, skipping...');
@@ -1072,10 +1099,8 @@ async function sendOrderToFayupedia() {
       
       await sendOrderNotificationToDiscord(result);
       
-      // 🔊 SUARA: Pesanan berhasil (tapi udah ada suara sebelumnya)
-      
       await Swal.fire({
-        title: '✅ Pesanan Berhasil!',
+        title: '✅ Pesanan Berhasil Dibuat!',
         html: `
           <div style="text-align:left;color:#ddd;font-size:14px;">
             <p>${msg}</p>
@@ -1272,16 +1297,17 @@ async function sendToDiscord(gmail, userID) {
   }
 }
 
-// ================= CHECK PAYMENT VIA QIOSPAY =================
-async function checkPaymentStatus() {
+// ================= CHECK PAYMENT VIA QIOSPAY (AUTO) =================
+async function checkPaymentStatus(autoTriggered = false) {
   const statusEl = document.getElementById('paymentStatus');
   const confirmBtn = document.getElementById('confirmBtn');
   
-  if (isProcessingPayment) return;
+  // Jika sudah terverifikasi, stop
   if (isPaymentVerified) {
     statusEl.className = 'payment-status success';
     statusEl.textContent = '✅ Pembayaran sudah terverifikasi!';
     statusEl.style.display = 'block';
+    stopAutoCheck();
     return;
   }
   
@@ -1290,6 +1316,7 @@ async function checkPaymentStatus() {
     statusEl.className = 'payment-status success';
     statusEl.textContent = '✅ Transaksi sudah dikonfirmasi sebelumnya!';
     statusEl.style.display = 'block';
+    stopAutoCheck();
     return;
   }
   
@@ -1300,6 +1327,7 @@ async function checkPaymentStatus() {
     statusEl.style.display = 'block';
     confirmBtn.disabled = true;
     confirmBtn.textContent = '✅ Pembayaran Terverifikasi';
+    stopAutoCheck();
     return;
   }
   
@@ -1313,8 +1341,14 @@ async function checkPaymentStatus() {
     }
   }
   
-  statusEl.className = 'payment-status loading';
-  statusEl.textContent = '⏳ Mengecek pembayaran...';
+  // Update status - bedain antara auto dan manual
+  if (autoTriggered) {
+    statusEl.className = 'payment-status auto-check';
+    statusEl.textContent = `🔄 Auto-cek #${++checkCount} · Mengecek pembayaran Rp ${(finalTotal + uniqueCode + adminFee).toLocaleString('id-ID')}...`;
+  } else {
+    statusEl.className = 'payment-status loading';
+    statusEl.textContent = '⏳ Mengecek pembayaran...';
+  }
   statusEl.style.display = 'block';
   confirmBtn.disabled = true;
   confirmBtn.textContent = '⏳ Mengecek...';
@@ -1329,17 +1363,16 @@ async function checkPaymentStatus() {
       statusEl.textContent = '🚫 Akun Anda diblokir!';
       confirmBtn.disabled = false;
       confirmBtn.textContent = '✅ Cek Status Pembayaran';
+      stopAutoCheck();
       return;
     }
     
     const totalBayar = finalTotal + uniqueCode + adminFee;
     currentTotalBayar = totalBayar;
     
-    console.log('💰 Nominal yang dicek ke QIOSPAY:', totalBayar);
+    console.log(`💰 [${autoTriggered ? 'AUTO' : 'MANUAL'}] Nominal yang dicek ke QIOSPAY:`, totalBayar);
     
     const url = QIOSPAY_MUTASI_URL();
-    console.log('📡 Fetching mutasi dari QIOSPAY...');
-    
     const res = await fetch(url + '?t=' + Date.now());
     
     if (!res.ok) {
@@ -1359,15 +1392,9 @@ async function checkPaymentStatus() {
         let cleanAmount = rawAmount.replace(/[^0-9]/g, '');
         let amountNumber = parseInt(cleanAmount) || 0;
         
-        if (amountNumber === totalBayar) {
+        if (amountNumber === totalBayar || Math.round(amountNumber) === totalBayar) {
           foundTransaction = t;
-          console.log('✅ Transaksi ditemukan (exact match):', t);
-          break;
-        }
-        
-        if (Math.round(amountNumber) === totalBayar) {
-          foundTransaction = t;
-          console.log('✅ Transaksi ditemukan (round match):', t);
+          console.log('✅ Transaksi ditemukan:', t);
           break;
         }
       }
@@ -1379,13 +1406,14 @@ async function checkPaymentStatus() {
       statusEl.className = 'payment-status success';
       statusEl.textContent = `✅ Pembayaran Rp ${totalBayar.toLocaleString('id-ID')} terverifikasi!`;
       
-      // 🔊 SUARA 1: Pembayaran berhasil diverifikasi
+      // 🔊 SUARA: Pembayaran berhasil diverifikasi
       playPaymentSuccessSound(totalBayar);
       
+      // Kirim ke Discord
       const sent = await sendToDiscord(gmail, userID);
       
       if (sent) {
-        // 🔊 SUARA 2: Pesanan sedang diproses (otomatis di dalam sendOrderToFayupedia)
+        // Auto-order ke Fayupedia
         await sendOrderToFayupedia();
         saveTransactionLockLocal();
         console.log('🔒 Transaksi locked');
@@ -1394,16 +1422,20 @@ async function checkPaymentStatus() {
       confirmBtn.disabled = true;
       confirmBtn.textContent = '✅ Pembayaran Terverifikasi';
       
-      if (verificationInterval) {
-        clearInterval(verificationInterval);
-        verificationInterval = null;
-      }
+      // Stop auto-check
+      stopAutoCheck();
       
       isProcessingPayment = false;
       
     } else {
-      statusEl.className = 'payment-status loading';
-      statusEl.textContent = '⏳ Belum ada pembayaran terdeteksi. Silakan scan QRIS dan transfer.';
+      // Masih belum ada pembayaran
+      if (autoTriggered) {
+        statusEl.className = 'payment-status auto-check';
+        statusEl.textContent = `⏳ Menunggu pembayaran Rp ${totalBayar.toLocaleString('id-ID')} · Auto-cek setiap ${AUTO_CHECK_INTERVAL/1000} detik`;
+      } else {
+        statusEl.className = 'payment-status loading';
+        statusEl.textContent = `⏳ Belum ada pembayaran terdeteksi. Silakan scan QRIS dan transfer.`;
+      }
       confirmBtn.disabled = false;
       confirmBtn.textContent = '✅ Cek Status Pembayaran';
     }
@@ -1416,6 +1448,47 @@ async function checkPaymentStatus() {
     confirmBtn.textContent = '✅ Cek Status Pembayaran';
     isProcessingPayment = false;
   }
+}
+
+// ================= AUTO CHECK CONTROL =================
+function startAutoCheck() {
+  if (autoCheckActive) {
+    console.log('⏳ Auto-check sudah aktif');
+    return;
+  }
+  
+  if (isPaymentVerified) {
+    console.log('✅ Pembayaran sudah terverifikasi, auto-check tidak perlu');
+    return;
+  }
+  
+  console.log(`🔄 Memulai auto-check setiap ${AUTO_CHECK_INTERVAL/1000} detik...`);
+  autoCheckActive = true;
+  checkCount = 0;
+  
+  // Langsung cek sekali
+  setTimeout(() => {
+    checkPaymentStatus(true);
+  }, 1000);
+  
+  // Mulai interval
+  if (verificationInterval) clearInterval(verificationInterval);
+  verificationInterval = setInterval(() => {
+    if (isPaymentVerified) {
+      stopAutoCheck();
+      return;
+    }
+    checkPaymentStatus(true);
+  }, AUTO_CHECK_INTERVAL);
+}
+
+function stopAutoCheck() {
+  if (verificationInterval) {
+    clearInterval(verificationInterval);
+    verificationInterval = null;
+    console.log('🛑 Auto-check dihentikan');
+  }
+  autoCheckActive = false;
 }
 
 // ================= LOCK LOCAL STORAGE =================
@@ -1609,7 +1682,7 @@ document.getElementById('applyVoucher').onclick = async function() {
   updateDisplay();
   
   const statusEl = document.getElementById('paymentStatus');
-  if (statusEl.className === 'payment-status loading') {
+  if (statusEl.className === 'payment-status loading' || statusEl.className === 'payment-status auto-check') {
     statusEl.textContent = `⏳ Mengecek pembayaran Rp ${(finalTotal + uniqueCode + adminFee).toLocaleString('id-ID')}...`;
   }
   
@@ -1623,7 +1696,8 @@ document.getElementById('applyVoucher').onclick = async function() {
 
 // ================= CONFIRM BUTTON =================
 document.getElementById('confirmBtn').onclick = function() {
-  checkPaymentStatus();
+  // Manual check
+  checkPaymentStatus(false);
 };
 
 // ================= INIT =================
@@ -1673,10 +1747,10 @@ document.getElementById('confirmBtn').onclick = function() {
   
   updateDisplay();
   
+  // MULAI AUTO CHECK
   setTimeout(() => {
-    checkPaymentStatus();
-    verificationInterval = setInterval(checkPaymentStatus, 10000);
-  }, 3000);
+    startAutoCheck();
+  }, 2000);
 })();
 
 // ================= REFERRAL =================
@@ -1714,7 +1788,7 @@ console.log('💳 QRIS Payment - Sosmed 2 siap!');
 console.log('📧 Gmail diambil dari localStorage');
 console.log('🚫 Cek banned berdasarkan Gmail');
 console.log('🕐 WIB real-time aktif');
-console.log('✅ Auto-verifikasi QRIS aktif (cek setiap 10 detik)');
+console.log(`🔄 Auto-verifikasi QRIS aktif (cek setiap ${AUTO_CHECK_INTERVAL/1000} detik)`);
 console.log('🔑 Kode unik PERSISTEN');
 console.log('📨 Notifikasi Discord hanya 1×');
 console.log('📦 Auto-order ke Fayupedia setelah pembayaran terverifikasi');
