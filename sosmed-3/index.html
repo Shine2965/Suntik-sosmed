@@ -702,104 +702,6 @@ textarea {
   .cselect-panel-title { display: none; }
 }
 
-/* ===== ORDER LIST ===== */
-.order-item {
-  background: rgba(11, 18, 32, 0.65);
-  border-radius: var(--radius-sm);
-  padding: 12px 14px;
-  margin-bottom: 10px;
-  border: 1px solid var(--border);
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 12px;
-  align-items: center;
-  transition: border-color var(--transition);
-}
-
-.order-item .order-info {
-  flex: 1;
-  min-width: 150px;
-}
-
-.order-item .order-info .row {
-  display: flex;
-  justify-content: space-between;
-  font-size: 13px;
-  padding: 2px 0;
-}
-
-.order-item .order-info .row .label {
-  color: var(--text-muted);
-  text-transform: none;
-  letter-spacing: 0;
-  font-size: 12px;
-  margin: 0;
-  font-weight: 400;
-}
-
-.order-item .order-info .row .value {
-  color: var(--text);
-  font-weight: 500;
-}
-
-.order-item .order-actions {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-.order-item .order-actions .btn-remove {
-  background: rgba(248, 113, 113, 0.15);
-  color: var(--danger);
-  border: 1px solid rgba(248, 113, 113, 0.2);
-  padding: 4px 12px;
-  border-radius: 8px;
-  font-size: 11px;
-  cursor: pointer;
-  font-weight: 600;
-  transition: 0.2s;
-  font-family: inherit;
-}
-
-.order-item .order-actions .btn-remove:hover {
-  background: rgba(248, 113, 113, 0.3);
-}
-
-.order-item .order-index {
-  color: var(--text-muted);
-  font-size: 12px;
-  font-weight: 600;
-  min-width: 30px;
-}
-
-.order-summary {
-  background: rgba(6, 182, 212, 0.06);
-  border: 1px solid rgba(6, 182, 212, 0.12);
-  border-radius: var(--radius-sm);
-  padding: 12px 16px;
-  margin: 12px 0;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.order-summary .total {
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--accent2);
-}
-
-.order-summary .count {
-  color: var(--text-muted);
-  font-size: 13px;
-}
-
-.order-summary .count strong {
-  color: var(--text);
-}
-
 .terms-container {
   margin-top: 18px;
   padding: 14px 16px;
@@ -981,28 +883,6 @@ button.primary:disabled {
   transform: none !important;
 }
 
-.btn-secondary {
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--text);
-  border: 1px solid var(--border);
-  padding: 10px 16px;
-  border-radius: var(--radius-sm);
-  font-weight: 600;
-  font-size: 13px;
-  cursor: pointer;
-  transition: background var(--transition);
-  font-family: inherit;
-}
-
-.btn-secondary:hover {
-  background: rgba(255, 255, 255, 0.14);
-}
-
-.btn-sm {
-  padding: 6px 12px;
-  font-size: 11px;
-}
-
 .alert {
   color: var(--danger);
   font-size: 13px;
@@ -1013,18 +893,6 @@ button.primary:disabled {
   background: rgba(248, 113, 113, 0.06);
   border-radius: var(--radius-sm);
   border-left: 3px solid var(--danger);
-}
-
-.empty-state {
-  text-align: center;
-  padding: 30px 16px;
-  color: var(--text-muted);
-}
-
-.empty-state .icon {
-  font-size: 36px;
-  display: block;
-  margin-bottom: 8px;
 }
 
 @media (max-width: 639px) {
@@ -1063,8 +931,6 @@ button.primary:disabled {
   .terms-content-inner { font-size: 12px; padding: 10px 12px; }
   .terms-container { padding: 12px 14px; }
   .comment-info { font-size: 11px; padding: 8px 10px; }
-  .order-item .order-info .row { font-size: 12px; }
-  .order-summary .total { font-size: 16px; }
 }
 
 @media (max-width: 380px) {
@@ -1186,24 +1052,6 @@ button.primary:disabled {
     </div>
   </div>
 
-  <!-- TOMBOL TAMBAH KE KERANJANG -->
-  <button class="btn-secondary" id="btnAddOrder" type="button" style="width:100%;margin-top:12px;">
-    ➕ Tambahkan ke Daftar Pesanan
-  </button>
-
-  <!-- DAFTAR PESANAN -->
-  <div id="orderListContainer" style="margin-top:16px;display:none;">
-    <label style="margin-top:0;">📋 Daftar Pesanan (<span id="orderCount">0</span>)</label>
-    <div id="orderList"></div>
-    <div class="order-summary">
-      <span class="count">Total <strong id="orderCountSummary">0</strong> pesanan</span>
-      <span class="total">Total: Rp <span id="orderTotalSummary">0</span></span>
-    </div>
-    <button class="btn-secondary" id="btnClearOrders" type="button" style="width:100%;">
-      🗑️ Kosongkan Semua
-    </button>
-  </div>
-
   <label for="total">Total Harga (Rp)</label>
   <input type="text" id="total" readonly>
 
@@ -1285,10 +1133,6 @@ button.primary:disabled {
   let isLoading = false;
   let refreshTimer = null;
   let currentSort = 'asc';
-
-  // ===== ORDER LIST =====
-  let orders = [];
-  let currentServiceForOrder = null;
 
   termsLink.addEventListener('click', function (e) {
     e.preventDefault();
@@ -1597,13 +1441,11 @@ button.primary:disabled {
         hidden.value = first.value;
         setTriggerLabel(document.getElementById('cselectLayanan'), first.label, false);
         showInfo();
-        currentServiceForOrder = first.service;
       }
     } else {
       document.getElementById('infoLayanan').innerHTML = '';
       document.getElementById('average').textContent = '—';
       selectedService = null;
-      currentServiceForOrder = null;
       document.getElementById('commentSection').style.display = 'none';
       requiresComment = false;
     }
@@ -1623,7 +1465,6 @@ button.primary:disabled {
       function (item) {
         hidden.value = item.value;
         setTriggerLabel(document.getElementById('cselectLayanan'), item.label, false);
-        currentServiceForOrder = item.service;
         showInfo();
       }
     );
@@ -1637,7 +1478,6 @@ button.primary:disabled {
 
     selectedService = layananData[kategori].find(l => String(l.id) === String(layananID));
     if (!selectedService) return;
-    currentServiceForOrder = selectedService;
 
     let priceDisplay = '';
     let diskonDisplay = '';
@@ -1677,13 +1517,31 @@ button.primary:disabled {
       'Min: ' + selectedService.min.toLocaleString('id-ID') +
       ' | Max: ' + selectedService.max.toLocaleString('id-ID') + '<br>' +
       (selectedService.desc || '');
+
+    // Update total otomatis
+    hitungTotal();
   }
 
-  // ===== HITUNG TOTAL =====
+  // ===== HITUNG TOTAL OTOMATIS =====
   function hitungTotal() {
-    const total = orders.reduce((sum, o) => sum + o.total, 0);
+    if (!selectedService) return;
+    const jumlah = parseInt(document.getElementById('jumlah').value || '0', 10);
+    
+    // Validasi min/max
+    if (jumlah < selectedService.min || jumlah > selectedService.max) {
+      document.getElementById('total').value = 'Jumlah tidak valid!';
+      return;
+    }
+    
+    const hargaAktif = getActivePrice(selectedService);
+    const total = calcTotal(jumlah, hargaAktif);
     document.getElementById('total').value = total;
-    document.getElementById('orderTotalSummary').textContent = total.toLocaleString('id-ID');
+    
+    // Update comment required
+    if (requiresComment) {
+      document.getElementById('commentRequired').textContent = jumlah;
+      validateComments();
+    }
   }
 
   function validateComments() {
@@ -1693,6 +1551,7 @@ button.primary:disabled {
     const commentCountEl = document.getElementById('commentCount');
     const commentRequiredEl = document.getElementById('commentRequired');
     const commentStatusEl = document.getElementById('commentStatus');
+    const commentInfo = document.getElementById('commentInfo');
     const jumlah = parseInt(document.getElementById('jumlah').value || '0', 10);
 
     const lines = commentsEl.value.split('\n').filter(line => line.trim() !== '');
@@ -1719,167 +1578,6 @@ button.primary:disabled {
     }
   }
 
-  // ===== TAMBAH ORDER =====
-  function addOrder() {
-    if (!currentServiceForOrder) {
-      alert('Pilih layanan terlebih dahulu!');
-      return;
-    }
-
-    const jumlah = parseInt(document.getElementById('jumlah').value || '0', 10);
-    const target = document.getElementById('target').value.trim();
-
-    if (jumlah < currentServiceForOrder.min || jumlah > currentServiceForOrder.max) {
-      alert('Jumlah harus antara ' + currentServiceForOrder.min + ' dan ' + currentServiceForOrder.max);
-      return;
-    }
-
-    if (!target) {
-      alert('Masukkan target / link!');
-      return;
-    }
-
-    if (requiresComment) {
-      const lines = document.getElementById('comments').value
-        .split('\n')
-        .filter(line => line.trim() !== '');
-      if (lines.length === 0) {
-        alert('⚠️ Layanan ini membutuhkan komentar!');
-        document.getElementById('comments').focus();
-        return;
-      }
-      if (lines.length !== jumlah) {
-        alert('⚠️ Jumlah komentar (' + lines.length + ') harus sama dengan jumlah pesanan (' + jumlah + ')!');
-        document.getElementById('comments').focus();
-        return;
-      }
-    }
-
-    const hargaAktif = getActivePrice(currentServiceForOrder);
-    const total = calcTotal(jumlah, hargaAktif);
-
-    const order = {
-      id: Date.now() + '_' + Math.random().toString(36).substring(2, 6),
-      serviceId: currentServiceForOrder.id,
-      serviceName: currentServiceForOrder.name,
-      kategori: document.getElementById('kategori').value,
-      jumlah: jumlah,
-      target: target,
-      total: total,
-      hargaPerUnit: hargaAktif,
-      comment: requiresComment ? document.getElementById('comments').value : null
-    };
-
-    orders.push(order);
-    renderOrders();
-    hitungTotal();
-    updateOrderCount();
-
-    // Reset form
-    document.getElementById('jumlah').value = '1';
-    document.getElementById('target').value = '';
-    if (requiresComment) {
-      document.getElementById('comments').value = '';
-      validateComments();
-    }
-
-    Swal.fire({
-      title: '✅ Ditambahkan!',
-      text: order.serviceName + ' x' + order.jumlah + ' berhasil ditambahkan.',
-      icon: 'success',
-      timer: 1500,
-      showConfirmButton: false,
-      toast: true,
-      position: 'top-end'
-    });
-  }
-
-  function removeOrder(index) {
-    orders.splice(index, 1);
-    renderOrders();
-    hitungTotal();
-    updateOrderCount();
-  }
-
-  function clearOrders() {
-    if (orders.length === 0) return;
-    Swal.fire({
-      title: '🗑️ Kosongkan Semua?',
-      text: 'Semua pesanan akan dihapus.',
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonText: '✅ Ya, Kosongkan',
-      cancelButtonText: '❌ Batal',
-      confirmButtonColor: '#f87171'
-    }).then((result) => {
-      if (result.isConfirmed) {
-        orders = [];
-        renderOrders();
-        hitungTotal();
-        updateOrderCount();
-      }
-    });
-  }
-
-  function renderOrders() {
-    const container = document.getElementById('orderList');
-    const wrapper = document.getElementById('orderListContainer');
-
-    if (orders.length === 0) {
-      container.innerHTML = '<div class="empty-state"><span class="icon">📭</span>Tidak ada pesanan</div>';
-      wrapper.style.display = 'none';
-      return;
-    }
-
-    wrapper.style.display = 'block';
-    let html = '';
-    orders.forEach((order, index) => {
-      const commentPreview = order.comment ? 
-        '<div style="font-size:11px;color:#94a3b8;margin-top:2px;">📝 ' + 
-        order.comment.split('\n').filter(l => l.trim()).length + ' komentar</div>' : '';
-      
-      html += `
-        <div class="order-item">
-          <span class="order-index">#${index + 1}</span>
-          <div class="order-info">
-            <div class="row">
-              <span class="label">Layanan</span>
-              <span class="value">${order.serviceName}</span>
-            </div>
-            <div class="row">
-              <span class="label">Target</span>
-              <span class="value">${order.target}</span>
-            </div>
-            <div class="row">
-              <span class="label">Jumlah</span>
-              <span class="value">${order.jumlah.toLocaleString('id-ID')}</span>
-            </div>
-            <div class="row">
-              <span class="label">Total</span>
-              <span class="value" style="color:#06b6d4;">${formatRp(order.total)}</span>
-            </div>
-            ${commentPreview}
-          </div>
-          <div class="order-actions">
-            <button class="btn-remove" onclick="window.removeOrder(${index})">✕</button>
-          </div>
-        </div>
-      `;
-    });
-
-    container.innerHTML = html;
-  }
-
-  function updateOrderCount() {
-    const count = orders.length;
-    document.getElementById('orderCount').textContent = count;
-    document.getElementById('orderCountSummary').textContent = count;
-  }
-
-  // Expose functions to global scope
-  window.removeOrder = removeOrder;
-  window.clearOrders = clearOrders;
-
   // ===== SEARCH =====
   let searchTimer = null;
   function searchLayanan() {
@@ -1897,7 +1595,6 @@ button.primary:disabled {
             loadLayanan();
             document.getElementById('layanan').value = l.id;
             setTriggerLabel(document.getElementById('cselectLayanan'), l.name, false);
-            currentServiceForOrder = l;
             showInfo();
             return;
           }
@@ -1928,7 +1625,6 @@ button.primary:disabled {
           const found = layananData[kategoriVal].find(l => String(l.id) === String(layananVal));
           if (found) {
             selectedService = found;
-            currentServiceForOrder = found;
             setTriggerLabel(document.getElementById('cselectLayanan'), found.name, false);
             showInfo();
           }
@@ -1964,7 +1660,7 @@ button.primary:disabled {
     return 'TRX' + Date.now() + Math.floor(Math.random() * 1000);
   }
 
-  // ===== LANJUT PEMBAYARAN (MASSAL) =====
+  // ===== LANJUT PEMBAYARAN =====
   function lanjutPembayaran() {
     if (!termsCheckbox.checked) {
       termsError.classList.add('show');
@@ -1973,31 +1669,55 @@ button.primary:disabled {
       return;
     }
 
-    if (orders.length === 0) {
-      alert('Tambahkan pesanan terlebih dahulu!');
+    if (!selectedService) {
+      alert('Pilih layanan terlebih dahulu!');
       return;
     }
 
+    const jumlah = parseInt(document.getElementById('jumlah').value || '0', 10);
+    if (jumlah < selectedService.min || jumlah > selectedService.max) {
+      alert('Jumlah harus antara ' + selectedService.min + ' dan ' + selectedService.max);
+      return;
+    }
+
+    if (requiresComment) {
+      const lines = document.getElementById('comments').value
+        .split('\n')
+        .filter(line => line.trim() !== '');
+      if (lines.length === 0) {
+        alert('⚠️ Layanan ini membutuhkan komentar!');
+        document.getElementById('comments').focus();
+        return;
+      }
+      if (lines.length !== jumlah) {
+        alert('⚠️ Jumlah komentar (' + lines.length + ') harus sama dengan jumlah pesanan (' + jumlah + ')!');
+        document.getElementById('comments').focus();
+        return;
+      }
+    }
+
     const trxID = generateTransactionID();
-    const totalBayar = orders.reduce((sum, o) => sum + o.total, 0);
+    const kategori = document.getElementById('kategori').value;
+    const target = document.getElementById('target').value;
+    const hargaAktif = getActivePrice(selectedService);
+    const total = calcTotal(jumlah, hargaAktif);
 
-    // Build URL dengan data massal
+    // Build URL sebagai single order (bisa diubah ke massal juga)
     let url = 'payment/?trx=' + trxID +
-      '&total=' + totalBayar +
-      '&mass=1';
+      '&kategori=' + encodeURIComponent(kategori) +
+      '&layanan=' + encodeURIComponent(selectedService.name) +
+      '&id=' + selectedService.id +
+      '&jumlah=' + jumlah +
+      '&total=' + total +
+      '&target=' + encodeURIComponent(target) +
+      '&mass=0';
 
-    // Kirim semua order sebagai JSON
-    const ordersData = orders.map(o => ({
-      serviceId: o.serviceId,
-      serviceName: o.serviceName,
-      kategori: o.kategori,
-      jumlah: o.jumlah,
-      target: o.target,
-      total: o.total,
-      comment: o.comment
-    }));
-
-    url += '&orders=' + encodeURIComponent(JSON.stringify(ordersData));
+    if (requiresComment) {
+      const lines = document.getElementById('comments').value
+        .split('\n')
+        .filter(line => line.trim() !== '');
+      url += '&comment=' + encodeURIComponent(lines.join('\r\n'));
+    }
 
     window.location.href = url;
   }
@@ -2009,17 +1729,19 @@ button.primary:disabled {
     .addEventListener('click', openLayananPicker);
   document.getElementById('sortHarga').addEventListener('change', loadLayanan);
   document.getElementById('jumlah').addEventListener('input', function() {
+    hitungTotal();
     if (requiresComment) {
       const jumlah = parseInt(this.value || '0', 10);
       document.getElementById('commentRequired').textContent = jumlah;
       validateComments();
     }
   });
+  document.getElementById('target').addEventListener('input', function() {
+    // Optional: bisa tambahkan validasi target di sini
+  });
   document.getElementById('comments').addEventListener('input', validateComments);
   document.getElementById('search').addEventListener('input', searchLayanan);
   document.getElementById('btnBayar').addEventListener('click', lanjutPembayaran);
-  document.getElementById('btnAddOrder').addEventListener('click', addOrder);
-  document.getElementById('btnClearOrders').addEventListener('click', clearOrders);
 
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape') closeAllCSelect();
@@ -2030,9 +1752,6 @@ button.primary:disabled {
     loadData(false);
     startSmartRefresh();
     loadTerms();
-    renderOrders();
-    updateOrderCount();
-    hitungTotal();
   });
 
   window.addEventListener('beforeunload', function () {
