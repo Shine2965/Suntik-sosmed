@@ -197,92 +197,6 @@
         opacity: 0.6;
     }
 
-    /* BANNED OVERLAY */
-    .banned-overlay {
-        position: fixed;
-        inset: 0;
-        background: rgba(0,0,0,0.92);
-        backdrop-filter: blur(8px);
-        z-index: 9999;
-        display: none;
-        align-items: center;
-        justify-content: center;
-        padding: 20px;
-    }
-
-    .banned-overlay.show {
-        display: flex;
-    }
-
-    .banned-card {
-        max-width: 420px;
-        background: #1a0e2e;
-        border: 1px solid #ff444455;
-        border-radius: 16px;
-        padding: 30px 24px;
-        text-align: center;
-        box-shadow: 0 0 60px rgba(255,68,68,0.1);
-    }
-
-    .banned-card .icon {
-        font-size: 56px;
-        display: block;
-        margin-bottom: 12px;
-    }
-
-    .banned-card h2 {
-        color: #ff4444;
-        font-size: 22px;
-        margin-bottom: 6px;
-    }
-
-    .banned-card .banned-gmail {
-        color: #4fc3f7;
-        font-size: 15px;
-        font-weight: 600;
-        word-break: break-all;
-        margin: 8px 0;
-    }
-
-    .banned-card .banned-reason {
-        color: #f1f5f9;
-        font-size: 14px;
-        line-height: 1.8;
-        background: rgba(255,68,68,0.08);
-        padding: 12px 16px;
-        border-radius: 10px;
-        border-left: 3px solid #ff4444;
-        text-align: left;
-        margin: 12px 0;
-    }
-
-    .banned-card .banned-until {
-        color: #ffaa00;
-        font-size: 13px;
-        font-weight: 600;
-        margin: 8px 0;
-    }
-
-    .banned-card .btn-appeal {
-        display: inline-block;
-        background: #ffaa0044;
-        color: #ffaa00;
-        border: 1px solid #ffaa0055;
-        padding: 10px 28px;
-        border-radius: 30px;
-        text-decoration: none;
-        font-weight: 600;
-        font-size: 14px;
-        transition: 0.3s;
-        font-family: 'Poppins', sans-serif;
-        margin-top: 8px;
-    }
-
-    .banned-card .btn-appeal:hover {
-        background: #ffaa0066;
-        transform: scale(1.02);
-    }
-
     @media (max-width: 480px) {
         .container { padding: 24px 16px; }
         h1 { font-size: 18px; }
@@ -293,24 +207,6 @@
 
 </head>
 <body>
-
-    <!-- ===== BANNED OVERLAY ===== -->
-    <div class="banned-overlay" id="bannedOverlay">
-        <div class="banned-card">
-            <span class="icon">🚫</span>
-            <h2>Akses Diblokir</h2>
-            <p style="color:#94a3b8;font-size:14px;">Akun Anda telah diblokir</p>
-            <div class="banned-gmail" id="bannedGmail">-</div>
-            <div class="banned-reason" id="bannedReason">-</div>
-            <div class="banned-until" id="bannedUntil">-</div>
-            <a href="https://wa.me/6289518103883?text=Halo%20Admin%2C%20saya%20ingin%20mengajukan%20banding%20atas%20ban%20akun%20saya.%20Gmail%3A%20" 
-               target="_blank" 
-               class="btn-appeal">
-               📱 Ajukan Banding
-            </a>
-            <div style="margin-top:10px;font-size:11px;color:#666;" id="bannedUserId">-</div>
-        </div>
-    </div>
 
     <!-- ===== MAIN CONTAINER ===== -->
     <div class="container">
@@ -367,7 +263,6 @@
     // ============================================================
 
     const GMAIL_KEY = 'user_gmail';
-    const GMAIL_BAN_URL = '/sosmed-2/payment/gmail.json';
     let gmailPromptActive = false;
     let userID = localStorage.getItem('user_id') || 'user-' + Math.random().toString(36).substring(2,8);
 
@@ -422,73 +317,6 @@
             console.error('❌ Error update display:', e);
             return false;
         }
-    }
-
-    // ============================================================
-    // 🔥 CEK BANNED GMAIL
-    // ============================================================
-    async function checkGmailBan() {
-        const gmail = getStoredGmail();
-        if (!gmail || !validateEmail(gmail)) return false;
-
-        try {
-            const res = await fetch(GMAIL_BAN_URL + '?t=' + Date.now(), { cache: "no-store" });
-            if (!res.ok) return false;
-
-            const list = await res.json();
-            if (!Array.isArray(list)) return false;
-
-            const banned = list.find(item => 
-                item.Gmail && item.Gmail.toLowerCase() === gmail.toLowerCase()
-            );
-
-            if (!banned) return false;
-
-            // Cek apakah ban sudah expired
-            if (banned["Dibanned sampai"]) {
-                const untilDate = new Date(banned["Dibanned sampai"]);
-                if (new Date() > untilDate) return false;
-            }
-
-            // TAMPILKAN BANNED OVERLAY
-            showBannedOverlay(banned, gmail);
-            return true;
-
-        } catch (err) {
-            console.error('Error check banned:', err);
-            return false;
-        }
-    }
-
-    function showBannedOverlay(bannedData, gmail) {
-        const overlay = document.getElementById('bannedOverlay');
-        if (!overlay) return;
-
-        document.getElementById('bannedGmail').textContent = gmail || '-';
-        document.getElementById('bannedReason').textContent = bannedData.Alasan || 'Tidak ada keterangan';
-        document.getElementById('bannedUserId').textContent = '🆔 User ID: ' + userID;
-
-        let untilText = '-';
-        if (bannedData["Dibanned sampai"]) {
-            untilText = new Date(bannedData["Dibanned sampai"]).toLocaleString('id-ID', {
-                timeZone: 'Asia/Jakarta',
-                day: '2-digit',
-                month: 'long',
-                year: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit'
-            });
-        }
-        document.getElementById('bannedUntil').textContent = '⏳ Dibanned sampai: ' + untilText;
-
-        // Update link banding
-        const appealLink = document.querySelector('.btn-appeal');
-        if (appealLink && gmail) {
-            appealLink.href = `https://wa.me/6289518103883?text=Halo%20Admin%2C%20saya%20ingin%20mengajukan%20banding%20atas%20ban%20akun%20saya.%20Gmail%3A%20${encodeURIComponent(gmail)}%0AUser%20ID%3A%20${encodeURIComponent(userID)}`;
-        }
-
-        overlay.classList.add('show');
-        document.querySelector('.container').style.display = 'none';
     }
 
     // ============================================================
@@ -606,7 +434,6 @@
                 });
 
                 await loadAnnouncementByGmail();
-                await checkGmailBan();
                 return true;
             }
             return false;
@@ -700,7 +527,6 @@
             if (saved) {
                 updateGmailDisplay();
                 await loadAnnouncementByGmail();
-                await checkGmailBan();
 
                 Swal.fire({
                     title: '✅ Gmail Diubah!',
@@ -738,24 +564,10 @@
     // 🔥 HANDLE BUTTON CLICK
     // ============================================================
     async function handleButtonClick(url) {
-        // CEK BAN TERLEBIH DAHULU
-        const isBanned = await checkGmailBan();
-        if (isBanned) {
-            console.log('🚫 Akun dibanned, akses ditolak');
-            return;
-        }
-
         // CEK GMAIL
         const gmailOk = await ensureGmail();
         if (!gmailOk && !getStoredGmail()) {
             console.log('❌ User membatalkan input Gmail, tidak lanjut navigasi');
-            return;
-        }
-
-        // CEK BAN LAGI SETELAH GMAIL TERSIMPAN (KALAU BARU)
-        const isBannedAgain = await checkGmailBan();
-        if (isBannedAgain) {
-            console.log('🚫 Akun dibanned, akses ditolak');
             return;
         }
 
@@ -788,10 +600,6 @@
         // Update Gmail display
         updateGmailDisplay();
 
-        // Cek ban berdasarkan Gmail
-        const isBanned = await checkGmailBan();
-        if (isBanned) return;
-
         // Load pengumuman berdasarkan Gmail
         await loadAnnouncementByGmail();
 
@@ -799,13 +607,12 @@
         console.log('📧 Gmail:', getStoredGmail() || 'Belum diatur');
         console.log('🆔 User ID:', userID);
         console.log('📢 Pengumuman berdasarkan Gmail');
-        console.log('🚫 Ban berdasarkan Gmail dari gmail.json');
     });
 
     // Event listener untuk tombol ubah Gmail
     document.getElementById('changeGmailBtn').addEventListener('click', changeGmailWithPassword);
 
-    console.log('✅ Semua tombol telah di-handle dengan Gmail check + Ban check');
+    console.log('✅ Semua tombol telah di-handle dengan Gmail check');
     </script>
 
 </body>
