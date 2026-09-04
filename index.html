@@ -981,7 +981,7 @@ function getStoredGmail() {
 }
 
 // ============================================================
-// 🔥 LOAD PENGUMUMAN DARI pesan.json (DROPDOWN)
+// 🔥 LOAD PENGUMUMAN DARI pesan.json (DROPDOWN) - SORT BY PRIORITY
 // ============================================================
 let announcementCount = 0;
 let isDropdownOpen = false;
@@ -998,38 +998,38 @@ async function loadAnnouncement() {
     const dropdown = document.getElementById('announcementDropdown');
     const body = document.getElementById('dropdownBody');
     const countEl = document.getElementById('announcementCount');
+    
+    // 🔥 KUMPULKAN SEMUA PENGUMUMAN DENGAN KEY "all..."
     const items = [];
 
-    // Cek pengumuman "all"
-    if (data && data.all) {
-      items.push({
-        type: 'all',
-        label: '📢 Pengumuman Umum',
-        content: data.all
-      });
+    for (const key in data) {
+      if (key.startsWith('all')) {
+        // Ekstrak angka dari key (misal: "all10" → 10, "all" → 0)
+        let priority = 0;
+        if (key === 'all') {
+          priority = 0;
+        } else {
+          const num = parseInt(key.replace('all', ''));
+          if (!isNaN(num)) {
+            priority = num;
+          }
+        }
+
+        items.push({
+          key: key,
+          priority: priority,
+          type: 'all',
+          label: '📢 Pengumuman',
+          content: data[key]
+        });
+      }
     }
 
-    // Cek pengumuman "all1"
-    if (data && data.all1) {
-      items.push({
-        type: 'all',
-        label: '📢 Pengumuman Umum',
-        content: data.all1
-      });
-    }
-
-    // Cek pengumuman "all2"
-    if (data && data.all2) {
-      items.push({
-        type: 'all',
-        label: '📢 Pengumuman Umum',
-        content: data.all2
-      });
-    }
-
-    // Cek pesan khusus untuk userID
+    // 🔥 CEK PESAN KHUSUS UNTUK USER (tetap di bawah pengumuman all)
     if (data && data[userID]) {
       items.push({
+        key: userID,
+        priority: -1, // prioritas terendah (di bawah semua all)
         type: 'user',
         label: '📩 Pesan Pribadi',
         content: data[userID]
@@ -1041,15 +1041,20 @@ async function loadAnnouncement() {
       return;
     }
 
+    // 🔥 URUTKAN BERDASARKAN PRIORITY (TERTINGGI DI ATAS)
+    items.sort((a, b) => b.priority - a.priority);
+
     // Render items
     let html = '';
     items.forEach((item, index) => {
       const badgeClass = item.type === 'user' ? 'user' : 'all';
       const badgeLabel = item.type === 'user' ? '🔒 Pribadi' : '🌐 Semua';
+      const priorityLabel = item.priority > 0 ? ` #${item.priority}` : '';
+      
       html += `
         <div class="announce-item" style="animation-delay: ${index * 0.05}s;">
           <span class="item-label">
-            ${item.label}
+            ${item.label}${priorityLabel}
             <span class="badge ${badgeClass}">${badgeLabel}</span>
           </span>
           ${item.content}
@@ -1066,12 +1071,12 @@ async function loadAnnouncement() {
     // Tampilkan dropdown
     dropdown.classList.add('show');
 
-    // Otomatis expand kalo pengumuman lebih dari 3 (biar user tau ada banyak)
+    // Otomatis expand kalo pengumuman lebih dari 3
     if (announcementCount > 3) {
       toggleAnnouncement(true);
     }
 
-    console.log(`📢 ${announcementCount} pengumuman dimuat dari pesan.json`);
+    console.log(`📢 ${announcementCount} pengumuman dimuat (prioritas: all10 > all9 > ... > all > user)`);
 
   } catch (e) {
     console.log('ℹ️ Gagal memuat pengumuman:', e.message);
@@ -1509,12 +1514,12 @@ window.addEventListener('load', function() {
     updateUserBubble();
     playAudio();
     
-    // Load pengumuman dari pesan.json (dropdown)
+    // Load pengumuman dari pesan.json (dropdown) - dengan prioritas
     loadAnnouncement();
     
     console.log('🌸 Anime Shine Shop Active! ✨');
     console.log('📧 Gmail akan diminta saat tombol diklik');
-    console.log('📢 Pengumuman dropdown dari pesan.json');
+    console.log('📢 Pengumuman dropdown dari pesan.json (prioritas: all10 > all9 > ... )');
   }, 100);
 });
 
@@ -1538,7 +1543,7 @@ console.log('🌸 Anime Shine Shop Active! ✨');
 console.log('📧 Gmail auto-sync dari localStorage (FIXED)');
 console.log('🔑 Lock localStorage diizinkan untuk update Gmail');
 console.log('🛑 Gmail TIDAK diminta otomatis saat load halaman');
-console.log('📢 Pengumuman DROPDOWN dari /home2/pesan.json');
+console.log('📢 Pengumuman DROPDOWN dari /home2/pesan.json (prioritas: all10 > all9 > ...)');
 </script>
 </body>
 </html>
