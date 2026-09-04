@@ -705,39 +705,37 @@ textarea {
 /* ===== MODE TOGGLE ===== */
 .mode-toggle {
   display: flex;
-  background: rgba(255, 255, 255, 0.05);
+  gap: 10px;
+  margin-top: 16px;
+  background: rgba(11, 18, 32, 0.65);
   border-radius: var(--radius-sm);
-  padding: 4px;
-  margin: 12px 0 4px;
+  padding: 6px;
   border: 1px solid var(--border);
 }
 
 .mode-toggle .mode-btn {
   flex: 1;
-  padding: 10px 8px;
+  padding: 10px 14px;
+  border-radius: 10px;
   border: none;
   background: transparent;
   color: var(--text-muted);
   font-weight: 600;
   font-size: 13px;
   cursor: pointer;
-  border-radius: 8px;
-  transition: all 0.3s ease;
+  transition: all 0.25s ease;
   font-family: inherit;
 }
 
 .mode-toggle .mode-btn.active {
   background: var(--accent-gradient);
   color: white;
-  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+  box-shadow: 0 4px 16px rgba(124, 58, 237, 0.25);
 }
 
 .mode-toggle .mode-btn:hover:not(.active) {
-  color: white;
-}
-
-.mode-toggle .mode-btn .icon {
-  margin-right: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
 }
 
 /* ===== ORDER LIST ===== */
@@ -1036,11 +1034,6 @@ button.primary:disabled {
   background: rgba(255, 255, 255, 0.14);
 }
 
-.btn-secondary:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
 .btn-sm {
   padding: 6px 12px;
   font-size: 11px;
@@ -1108,6 +1101,7 @@ button.primary:disabled {
   .comment-info { font-size: 11px; padding: 8px 10px; }
   .order-item .order-info .row { font-size: 12px; }
   .order-summary .total { font-size: 16px; }
+  .mode-toggle .mode-btn { font-size: 12px; padding: 8px 10px; }
 }
 
 @media (max-width: 380px) {
@@ -1128,7 +1122,6 @@ button.primary:disabled {
 
 .text-muted { color: var(--text-muted); }
 #commentSection { display: none; }
-#orderListContainer { display: none; }
 </style>
 </head>
 <body>
@@ -1210,42 +1203,57 @@ button.primary:disabled {
   <div class="aver" id="average">—</div>
 
   <!-- ===== MODE TOGGLE ===== -->
-  <div class="mode-toggle" id="modeToggle">
-    <button class="mode-btn active" data-mode="single" id="modeSingle">
-      <span class="icon">📋</span> Single
+  <div class="mode-toggle">
+    <button class="mode-btn active" data-mode="single" id="modeSingle">📋 Single Order</button>
+    <button class="mode-btn" data-mode="massal" id="modeMassal">📦 Massal Order</button>
+  </div>
+
+  <div id="singleSection">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;">
+      <div>
+        <label for="jumlah">Jumlah Pesanan</label>
+        <input type="number" id="jumlah" min="1" inputmode="numeric" value="1">
+      </div>
+      <div>
+        <label for="target">Target / Link</label>
+        <input type="text" id="target" placeholder="Username / Link" autocomplete="off">
+      </div>
+    </div>
+
+    <!-- COMMENT SECTION -->
+    <div id="commentSection">
+      <label for="comments">📝 Komentar (1 baris = 1 unit)</label>
+      <textarea id="comments" placeholder="Masukkan komentar per baris&#10;Contoh:&#10;Komentar 1&#10;Komentar 2&#10;Komentar 3"></textarea>
+      <div class="comment-info" id="commentInfo">
+        📊 Jumlah komentar: <span class="count" id="commentCount">0</span> / <span id="commentRequired">0</span> unit
+        <span id="commentStatus"></span>
+      </div>
+    </div>
+
+    <button class="btn-secondary" id="btnAddOrder" type="button" style="width:100%;margin-top:12px;">
+      ➕ Tambahkan ke Daftar
     </button>
-    <button class="mode-btn" data-mode="massal" id="modeMassal">
-      <span class="icon">📦</span> Massal
-    </button>
   </div>
 
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;">
-    <div>
-      <label for="jumlah">Jumlah Pesanan</label>
-      <input type="number" id="jumlah" min="1" inputmode="numeric" value="1">
+  <div id="massalSection" style="display:none;margin-top:12px;">
+    <div class="alert" style="border-left-color:var(--warning);color:var(--warning);background:rgba(251,191,36,0.06);">
+      📦 Mode Massal: Isi jumlah dan target sesuai dengan jumlah pesanan yang diinginkan. 
+      Setiap pesanan akan diproses secara terpisah.
     </div>
-    <div>
-      <label for="target">Target / Link</label>
-      <input type="text" id="target" placeholder="Username / Link" autocomplete="off">
-    </div>
-  </div>
 
-  <!-- COMMENT SECTION -->
-  <div id="commentSection">
-    <label for="comments">📝 Komentar (1 baris = 1 unit)</label>
-    <textarea id="comments" placeholder="Masukkan komentar per baris&#10;Contoh:&#10;Komentar 1&#10;Komentar 2&#10;Komentar 3"></textarea>
-    <div class="comment-info" id="commentInfo">
-      📊 Jumlah komentar: <span class="count" id="commentCount">0</span> / <span id="commentRequired">0</span> unit
-      <span id="commentStatus"></span>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;">
+      <div>
+        <label for="massalJumlah">Total Jumlah</label>
+        <input type="number" id="massalJumlah" min="1" inputmode="numeric" value="1">
+      </div>
+      <div>
+        <label for="massalTarget">Target / Link</label>
+        <input type="text" id="massalTarget" placeholder="Username / Link" autocomplete="off">
+      </div>
     </div>
   </div>
 
-  <!-- TOMBOL TAMBAH KE KERANJANG (HANYA UNTUK MODE MASSAL) -->
-  <button class="btn-secondary" id="btnAddOrder" type="button" style="width:100%;margin-top:12px;display:none;">
-    ➕ Tambahkan ke Daftar Pesanan
-  </button>
-
-  <!-- DAFTAR PESANAN (HANYA UNTUK MODE MASSAL) -->
+  <!-- DAFTAR PESANAN -->
   <div id="orderListContainer" style="margin-top:16px;display:none;">
     <label style="margin-top:0;">📋 Daftar Pesanan (<span id="orderCount">0</span>)</label>
     <div id="orderList"></div>
@@ -1324,37 +1332,6 @@ button.primary:disabled {
   closeBtn.addEventListener('click', closeMenu);
   overlay.addEventListener('click', closeMenu);
 
-  // ===== MODE TOGGLE =====
-  let currentMode = 'single'; // 'single' | 'massal'
-
-  const modeSingle = document.getElementById('modeSingle');
-  const modeMassal = document.getElementById('modeMassal');
-  const btnAddOrder = document.getElementById('btnAddOrder');
-  const orderListContainer = document.getElementById('orderListContainer');
-
-  function setMode(mode) {
-    currentMode = mode;
-    modeSingle.classList.toggle('active', mode === 'single');
-    modeMassal.classList.toggle('active', mode === 'massal');
-
-    // Tampilkan/sembunyikan elemen massal
-    if (mode === 'massal') {
-      btnAddOrder.style.display = 'block';
-      if (orders.length > 0) {
-        orderListContainer.style.display = 'block';
-      }
-    } else {
-      btnAddOrder.style.display = 'none';
-      orderListContainer.style.display = 'none';
-    }
-
-    // Update total
-    hitungTotal();
-  }
-
-  modeSingle.addEventListener('click', () => setMode('single'));
-  modeMassal.addEventListener('click', () => setMode('massal'));
-
   // ===== TERMS =====
   const termsCheckbox = document.getElementById('termsCheckbox');
   const termsError = document.getElementById('termsError');
@@ -1374,6 +1351,7 @@ button.primary:disabled {
   // ===== ORDER LIST =====
   let orders = [];
   let currentServiceForOrder = null;
+  let currentMode = 'single'; // 'single' | 'massal'
 
   termsLink.addEventListener('click', function (e) {
     e.preventDefault();
@@ -1433,6 +1411,27 @@ button.primary:disabled {
   });
 
   updateTermsUI();
+
+  // ===== MODE TOGGLE =====
+  const modeSingle = document.getElementById('modeSingle');
+  const modeMassal = document.getElementById('modeMassal');
+  const singleSection = document.getElementById('singleSection');
+  const massalSection = document.getElementById('massalSection');
+
+  function setMode(mode) {
+    currentMode = mode;
+    
+    // Update button states
+    modeSingle.classList.toggle('active', mode === 'single');
+    modeMassal.classList.toggle('active', mode === 'massal');
+    
+    // Show/hide sections
+    singleSection.style.display = mode === 'single' ? 'block' : 'none';
+    massalSection.style.display = mode === 'massal' ? 'block' : 'none';
+  }
+
+  modeSingle.addEventListener('click', () => setMode('single'));
+  modeMassal.addEventListener('click', () => setMode('massal'));
 
   // ===== DATA LAYANAN =====
   const SERVICES_ENDPOINT = '/api/fayupedia-services';
@@ -1762,30 +1761,13 @@ button.primary:disabled {
       'Min: ' + selectedService.min.toLocaleString('id-ID') +
       ' | Max: ' + selectedService.max.toLocaleString('id-ID') + '<br>' +
       (selectedService.desc || '');
-
-    // Update total ketika service berubah
-    hitungTotal();
   }
 
   // ===== HITUNG TOTAL =====
   function hitungTotal() {
-    const jumlah = parseInt(document.getElementById('jumlah').value || '0', 10);
-    let total = 0;
-
-    if (currentMode === 'massal') {
-      // Total dari semua order
-      total = orders.reduce((sum, o) => sum + o.total, 0);
-      document.getElementById('orderTotalSummary').textContent = total.toLocaleString('id-ID');
-      document.getElementById('orderCountSummary').textContent = orders.length;
-    } else {
-      // Single mode - hitung dari input
-      if (selectedService && jumlah >= selectedService.min && jumlah <= selectedService.max) {
-        const hargaAktif = getActivePrice(selectedService);
-        total = calcTotal(jumlah, hargaAktif);
-      }
-    }
-
+    const total = orders.reduce((sum, o) => sum + o.total, 0);
     document.getElementById('total').value = total;
+    document.getElementById('orderTotalSummary').textContent = total.toLocaleString('id-ID');
   }
 
   function validateComments() {
@@ -1821,7 +1803,7 @@ button.primary:disabled {
     }
   }
 
-  // ===== TAMBAH ORDER (MASSAL) =====
+  // ===== TAMBAH ORDER (SINGLE) =====
   function addOrder() {
     if (!currentServiceForOrder) {
       alert('Pilih layanan terlebih dahulu!');
@@ -1896,6 +1878,116 @@ button.primary:disabled {
     });
   }
 
+  // ===== TAMBAH ORDER MASSAL =====
+  function addMassalOrder() {
+    if (!currentServiceForOrder) {
+      alert('Pilih layanan terlebih dahulu!');
+      return;
+    }
+
+    const totalJumlah = parseInt(document.getElementById('massalJumlah').value || '0', 10);
+    const target = document.getElementById('massalTarget').value.trim();
+
+    if (totalJumlah < 1) {
+      alert('Jumlah minimal 1!');
+      return;
+    }
+
+    if (!target) {
+      alert('Masukkan target / link!');
+      return;
+    }
+
+    // Untuk massal, kita bagi per layanan sesuai dengan min/max
+    // Tapi karena kita kirim massal, kita kirim 1 order dengan quantity total
+    // Yang penting di payment nanti dikirim sebagai 1 order dengan quantity totalJumlah
+    // Tapi untuk lebih aman, kita kirim sebagai 1 order dengan totalJumlah
+
+    // Cek apakah totalJumlah melebihi max
+    if (totalJumlah > currentServiceForOrder.max) {
+      // Bisa split menjadi beberapa order
+      const maxPerOrder = currentServiceForOrder.max;
+      const minPerOrder = currentServiceForOrder.min;
+      let remaining = totalJumlah;
+      let splitOrders = [];
+
+      while (remaining > 0) {
+        const qty = Math.min(remaining, maxPerOrder);
+        if (qty < minPerOrder && remaining > minPerOrder) {
+          // Coba ambil lebih banyak
+          continue;
+        }
+        splitOrders.push(qty);
+        remaining -= qty;
+      }
+
+      // Jika splitOrders kosong atau tidak valid
+      if (splitOrders.length === 0) {
+        alert('Tidak dapat membagi pesanan. Coba kurangi jumlah.');
+        return;
+      }
+
+      // Tambahkan setiap split order
+      const hargaAktif = getActivePrice(currentServiceForOrder);
+      splitOrders.forEach((qty) => {
+        const total = calcTotal(qty, hargaAktif);
+        orders.push({
+          id: Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+          serviceId: currentServiceForOrder.id,
+          serviceName: currentServiceForOrder.name + ' (split)',
+          kategori: document.getElementById('kategori').value,
+          jumlah: qty,
+          target: target,
+          total: total,
+          hargaPerUnit: hargaAktif,
+          comment: null,
+          isMassal: true
+        });
+      });
+
+      Swal.fire({
+        title: '✅ Ditambahkan!',
+        text: totalJumlah + ' unit dibagi menjadi ' + splitOrders.length + ' pesanan.',
+        icon: 'success',
+        timer: 2000,
+        showConfirmButton: false,
+        toast: true,
+        position: 'top-end'
+      });
+
+    } else {
+      // Single order dengan totalJumlah
+      if (totalJumlah < currentServiceForOrder.min) {
+        alert('Jumlah ' + totalJumlah + ' kurang dari minimal ' + currentServiceForOrder.min);
+        return;
+      }
+
+      const hargaAktif = getActivePrice(currentServiceForOrder);
+      const total = calcTotal(totalJumlah, hargaAktif);
+
+      orders.push({
+        id: Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+        serviceId: currentServiceForOrder.id,
+        serviceName: currentServiceForOrder.name,
+        kategori: document.getElementById('kategori').value,
+        jumlah: totalJumlah,
+        target: target,
+        total: total,
+        hargaPerUnit: hargaAktif,
+        comment: null,
+        isMassal: true
+      });
+    }
+
+    renderOrders();
+    hitungTotal();
+    updateOrderCount();
+
+    // Reset massal form
+    document.getElementById('massalJumlah').value = '1';
+    document.getElementById('massalTarget').value = '';
+  }
+
   function removeOrder(index) {
     orders.splice(index, 1);
     renderOrders();
@@ -1940,13 +2032,16 @@ button.primary:disabled {
         '<div style="font-size:11px;color:#94a3b8;margin-top:2px;">📝 ' + 
         order.comment.split('\n').filter(l => l.trim()).length + ' komentar</div>' : '';
       
+      const massalBadge = order.isMassal ? 
+        '<span style="font-size:9px;background:rgba(251,191,36,0.15);color:#fbbf24;padding:1px 8px;border-radius:4px;margin-left:4px;">📦 MASSAL</span>' : '';
+      
       html += `
         <div class="order-item">
           <span class="order-index">#${index + 1}</span>
           <div class="order-info">
             <div class="row">
               <span class="label">Layanan</span>
-              <span class="value">${order.serviceName}</span>
+              <span class="value">${order.serviceName} ${massalBadge}</span>
             </div>
             <div class="row">
               <span class="label">Target</span>
@@ -1981,6 +2076,15 @@ button.primary:disabled {
   // Expose functions to global scope
   window.removeOrder = removeOrder;
   window.clearOrders = clearOrders;
+
+  // Override add order for massal mode
+  document.getElementById('btnAddOrder').addEventListener('click', function() {
+    if (currentMode === 'massal') {
+      addMassalOrder();
+    } else {
+      addOrder();
+    }
+  });
 
   // ===== SEARCH =====
   let searchTimer = null;
@@ -2075,88 +2179,32 @@ button.primary:disabled {
       return;
     }
 
+    if (orders.length === 0) {
+      alert('Tambahkan pesanan terlebih dahulu!');
+      return;
+    }
+
     const trxID = generateTransactionID();
-    let totalBayar = 0;
-    let ordersData = [];
+    const totalBayar = orders.reduce((sum, o) => sum + o.total, 0);
 
-    if (currentMode === 'massal') {
-      if (orders.length === 0) {
-        alert('Tambahkan pesanan terlebih dahulu!');
-        return;
-      }
-      totalBayar = orders.reduce((sum, o) => sum + o.total, 0);
-      ordersData = orders.map(o => ({
-        serviceId: o.serviceId,
-        serviceName: o.serviceName,
-        kategori: o.kategori,
-        jumlah: o.jumlah,
-        target: o.target,
-        total: o.total,
-        comment: o.comment
-      }));
-    } else {
-      // Single mode
-      if (!selectedService) {
-        alert('Pilih layanan terlebih dahulu!');
-        return;
-      }
-      const jumlah = parseInt(document.getElementById('jumlah').value || '0', 10);
-      if (jumlah < selectedService.min || jumlah > selectedService.max) {
-        alert('Jumlah harus antara ' + selectedService.min + ' dan ' + selectedService.max);
-        return;
-      }
-      if (!document.getElementById('target').value.trim()) {
-        alert('Masukkan target / link!');
-        return;
-      }
-      if (requiresComment) {
-        const lines = document.getElementById('comments').value
-          .split('\n')
-          .filter(line => line.trim() !== '');
-        if (lines.length === 0) {
-          alert('⚠️ Layanan ini membutuhkan komentar!');
-          document.getElementById('comments').focus();
-          return;
-        }
-        if (lines.length !== jumlah) {
-          alert('⚠️ Jumlah komentar (' + lines.length + ') harus sama dengan jumlah pesanan (' + jumlah + ')!');
-          document.getElementById('comments').focus();
-          return;
-        }
-      }
+    // Jika hanya 1 order, kirim sebagai single
+    const isMassal = orders.length > 1 || orders.some(o => o.isMassal);
 
-      const hargaAktif = getActivePrice(selectedService);
-      totalBayar = calcTotal(jumlah, hargaAktif);
-
-      ordersData = [{
-        serviceId: selectedService.id,
-        serviceName: selectedService.name,
-        kategori: document.getElementById('kategori').value,
-        jumlah: jumlah,
-        target: document.getElementById('target').value.trim(),
-        total: totalBayar,
-        comment: requiresComment ? document.getElementById('comments').value : null
-      }];
-    }
-
-    // Build URL
     let url = 'payment/?trx=' + trxID +
-      '&total=' + totalBayar;
+      '&total=' + totalBayar +
+      '&mass=' + (isMassal ? '1' : '0');
 
-    if (ordersData.length > 1) {
-      url += '&mass=1';
-      url += '&orders=' + encodeURIComponent(JSON.stringify(ordersData));
-    } else {
-      // Single order
-      const o = ordersData[0];
-      url += '&layanan=' + encodeURIComponent(o.serviceName) +
-        '&id=' + o.serviceId +
-        '&jumlah=' + o.jumlah +
-        '&target=' + encodeURIComponent(o.target);
-      if (o.comment) {
-        url += '&comment=' + encodeURIComponent(o.comment);
-      }
-    }
+    const ordersData = orders.map(o => ({
+      serviceId: o.serviceId,
+      serviceName: o.serviceName,
+      kategori: o.kategori,
+      jumlah: o.jumlah,
+      target: o.target,
+      total: o.total,
+      comment: o.comment
+    }));
+
+    url += '&orders=' + encodeURIComponent(JSON.stringify(ordersData));
 
     window.location.href = url;
   }
@@ -2167,26 +2215,16 @@ button.primary:disabled {
   document.getElementById('cselectLayanan').querySelector('.cselect-trigger')
     .addEventListener('click', openLayananPicker);
   document.getElementById('sortHarga').addEventListener('change', loadLayanan);
-
   document.getElementById('jumlah').addEventListener('input', function() {
-    hitungTotal();
     if (requiresComment) {
       const jumlah = parseInt(this.value || '0', 10);
       document.getElementById('commentRequired').textContent = jumlah;
       validateComments();
     }
   });
-
-  document.getElementById('target').addEventListener('input', function() {
-    if (currentMode === 'single') {
-      hitungTotal();
-    }
-  });
-
   document.getElementById('comments').addEventListener('input', validateComments);
   document.getElementById('search').addEventListener('input', searchLayanan);
   document.getElementById('btnBayar').addEventListener('click', lanjutPembayaran);
-  document.getElementById('btnAddOrder').addEventListener('click', addOrder);
   document.getElementById('btnClearOrders').addEventListener('click', clearOrders);
 
   document.addEventListener('keydown', function (e) {
@@ -2198,10 +2236,10 @@ button.primary:disabled {
     loadData(false);
     startSmartRefresh();
     loadTerms();
-    setMode('single');
     renderOrders();
     updateOrderCount();
     hitungTotal();
+    setMode('single');
   });
 
   window.addEventListener('beforeunload', function () {
