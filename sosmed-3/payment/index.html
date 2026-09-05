@@ -1175,11 +1175,12 @@ ${orderList || '  -'}
   }
 }
 
-// ================= CHECK PAYMENT VIA QIOSPAY =================
+// ================= CHECK PAYMENT VIA QIOSPAY (DENGAN NOMINAL SESUAI) =================
 async function checkPaymentStatus() {
   const statusEl = document.getElementById('paymentStatus');
   const confirmBtn = document.getElementById('confirmBtn');
   
+  // Jika sudah terverifikasi
   if (isPaymentVerified) {
     statusEl.className = 'payment-status success';
     statusEl.textContent = '✅ Pembayaran sudah terverifikasi!';
@@ -1187,6 +1188,7 @@ async function checkPaymentStatus() {
     return;
   }
   
+  // Cek lock local
   if (checkTransactionLockLocal()) {
     isPaymentVerified = true;
     statusEl.className = 'payment-status success';
@@ -1195,6 +1197,7 @@ async function checkPaymentStatus() {
     return;
   }
   
+  // Cek Discord sent
   if (isDiscordAlreadySent()) {
     isPaymentVerified = true;
     statusEl.className = 'payment-status success';
@@ -1205,6 +1208,7 @@ async function checkPaymentStatus() {
     return;
   }
   
+  // Cek API Key
   if (!QIOSPAY_API_KEY) {
     await fetchConfigFromEnv();
     if (!QIOSPAY_API_KEY) {
@@ -1225,6 +1229,7 @@ async function checkPaymentStatus() {
     const gmail = getStoredGmail();
     const userID = await getUserID();
     
+    // Cek banned
     const bannedData = await checkGmailBanned(gmail);
     if (bannedData) {
       statusEl.className = 'payment-status failed';
@@ -1234,10 +1239,12 @@ async function checkPaymentStatus() {
       return;
     }
     
+    // HITUNG NOMINAL YANG DICEK = TOTAL BAYAR (sudah termasuk kode unik + admin fee)
     const totalBayar = finalTotal + uniqueCode + adminFee;
     currentTotalBayar = totalBayar;
     
     console.log('💰 Nominal yang dicek ke QIOSPAY:', totalBayar);
+    console.log('💰 Detail: finalTotal=' + finalTotal + ', uniqueCode=' + uniqueCode + ', adminFee=' + adminFee);
     
     const url = QIOSPAY_MUTASI_URL();
     console.log('📡 Fetching mutasi dari QIOSPAY...');
@@ -1261,15 +1268,19 @@ async function checkPaymentStatus() {
         let cleanAmount = rawAmount.replace(/[^0-9]/g, '');
         let amountNumber = parseInt(cleanAmount) || 0;
         
+        console.log('🔍 Cek transaksi: ' + amountNumber + ' vs target ' + totalBayar);
+        
+        // CEK PERSIS SAMA DENGAN TOTAL BAYAR
         if (amountNumber === totalBayar) {
           foundTransaction = t;
           console.log('✅ Transaksi ditemukan (exact match):', t);
           break;
         }
         
-        if (Math.round(amountNumber) === totalBayar) {
+        // FALLBACK: cek dengan pembulatan (jika ada selisih kecil)
+        if (Math.abs(amountNumber - totalBayar) <= 2) {
           foundTransaction = t;
-          console.log('✅ Transaksi ditemukan (round match):', t);
+          console.log('✅ Transaksi ditemukan (near match, selisih ' + (amountNumber - totalBayar) + '):', t);
           break;
         }
       }
@@ -1298,7 +1309,7 @@ async function checkPaymentStatus() {
       
     } else {
       statusEl.className = 'payment-status loading';
-      statusEl.textContent = '⏳ Belum ada pembayaran terdeteksi. Silakan scan QRIS dan transfer.';
+      statusEl.textContent = `⏳ Belum ada pembayaran Rp ${totalBayar.toLocaleString('id-ID')} terdeteksi. Silakan scan QRIS dan transfer.`;
       confirmBtn.disabled = false;
       confirmBtn.textContent = '✅ Cek Status Pembayaran';
     }
@@ -1415,6 +1426,7 @@ function updateDisplay(){
   
   document.getElementById('orderDetails').innerHTML = detailHtml;
   
+  // BUILD QRIS PAKAI NOMINAL YANG SAMA
   QRCode.toCanvas(document.getElementById('qrisCanvas'), buildQR(totalDenganUnik), { width:240 }, function(err){
     if(err) return console.error(err);
     const ctx = document.getElementById('qrisCanvas').getContext("2d");
@@ -1507,8 +1519,10 @@ document.getElementById('applyVoucher').onclick = async function() {
   this.disabled = true;
   this.style.opacity = '0.4';
   
+  // UPDATE QRIS & NOMINAL CEK OTOMATIS
   updateDisplay();
   
+  // UPDATE JUGA PAYMENT STATUS KALO SEDANG LOADING
   const statusEl = document.getElementById('paymentStatus');
   if (statusEl.className === 'payment-status loading') {
     statusEl.textContent = `⏳ Mengecek pembayaran Rp ${(finalTotal + uniqueCode + adminFee).toLocaleString('id-ID')}...`;
@@ -1614,6 +1628,7 @@ console.log('💳 QRIS Payment - Sosmed 2 siap!');
 console.log('📦 Mass order:', isMass, ordersData.length, 'items');
 console.log('📧 Gmail diambil dari localStorage');
 console.log('✅ Auto-verifikasi QRIS aktif (cek setiap 10 detik)');
+console.log('💰 Nominal target:', currentTotalBayar);
 </script>
 </body>
 </html>
