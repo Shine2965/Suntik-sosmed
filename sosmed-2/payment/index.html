@@ -112,10 +112,38 @@ h2{
   width:fit-content;
   box-shadow:0 8px 32px rgba(0,0,0,0.3);
   transition:transform 0.3s ease, box-shadow 0.3s ease;
+  position:relative;
 }
 .qr-wrapper:hover{
   transform:scale(1.02);
   box-shadow:0 12px 40px rgba(0,0,0,0.4);
+}
+.qr-wrapper.expired .qr-overlay{
+  display:flex;
+}
+.qr-wrapper .qr-overlay{
+  position:absolute;
+  inset:0;
+  background:rgba(0,0,0,0.75);
+  border-radius:20px;
+  display:none;
+  align-items:center;
+  justify-content:center;
+  flex-direction:column;
+  gap:8px;
+  backdrop-filter:blur(8px);
+}
+.qr-wrapper .qr-overlay .overlay-icon{
+  font-size:40px;
+}
+.qr-wrapper .qr-overlay .overlay-text{
+  font-size:16px;
+  font-weight:700;
+  color:#ff4444;
+}
+.qr-wrapper .qr-overlay .overlay-sub{
+  font-size:12px;
+  color:#94a3b8;
 }
 #qrisCanvas{
   display:block;
@@ -141,6 +169,36 @@ h2{
   -webkit-text-fill-color:transparent;
   background-clip:text;
   font-weight:800;
+}
+.unique-code.expired{
+  opacity:0.4;
+  text-decoration:line-through;
+}
+.timer-display{
+  text-align:center;
+  font-size:14px;
+  color:#94a3b8;
+  margin:4px 0 8px 0;
+  padding:8px 12px;
+  border-radius:12px;
+  background:rgba(255,255,255,0.04);
+  border:1px solid rgba(255,255,255,0.06);
+}
+.timer-display .time{
+  font-weight:700;
+  font-size:18px;
+  color:#facc15;
+}
+.timer-display .time.warning{
+  color:#ffaa00;
+}
+.timer-display .time.danger{
+  color:#ff4444;
+  animation:blink 1s infinite;
+}
+@keyframes blink{
+  0%,100%{opacity:1}
+  50%{opacity:0.3}
 }
 .details{
   font-size:13.5px;
@@ -247,6 +305,15 @@ p{
 }
 .btn:active:not(:disabled){transform:scale(0.97)}
 .btn:disabled{opacity:0.4;cursor:not-allowed;transform:none!important;box-shadow:none!important}
+.btn-regenerate{
+  background:linear-gradient(135deg,#f59e0b,#d97706);
+  box-shadow:0 8px 24px rgba(245,158,11,0.25);
+  margin-top:8px;
+}
+.btn-regenerate:hover:not(:disabled){
+  background:linear-gradient(135deg,#fbbf24,#f59e0b);
+  box-shadow:0 12px 32px rgba(245,158,11,0.35);
+}
 #applyVoucher{
   background:linear-gradient(135deg,#22c55e,#16a34a);
   box-shadow:0 8px 24px rgba(34,197,94,0.25);
@@ -449,6 +516,7 @@ p{
   input{font-size:13px;padding:12px 14px}
   .banned-card{padding:28px 20px}
   .banned-card h1{font-size:22px}
+  .timer-display .time{font-size:15px}
 }
 </style>
 </head>
@@ -490,11 +558,27 @@ p{
     <span class="value" id="gmailDisplay">Belum diatur</span>
   </div>
   
-  <div class="qr-wrapper">
+  <!-- QRIS WRAPPER -->
+  <div class="qr-wrapper" id="qrWrapper">
     <canvas id="qrisCanvas" width="240" height="240"></canvas>
+    <div class="qr-overlay" id="qrOverlay">
+      <span class="overlay-icon">⏰</span>
+      <span class="overlay-text">QRIS Expired</span>
+      <span class="overlay-sub">Klik tombol di bawah untuk generate ulang</span>
+    </div>
   </div>
   
-  <div class="unique-code">🔑 Kode Unik: <span id="uniqueCode">-</span></div>
+  <!-- TIMER -->
+  <div class="timer-display" id="timerDisplay">
+    ⏳ Sisa Waktu: <span class="time" id="timerTime">59:59</span>
+  </div>
+  
+  <div class="unique-code" id="uniqueCodeContainer">🔑 Kode Unik: <span id="uniqueCode">-</span></div>
+  
+  <!-- TOMBOL REGENERATE -->
+  <button class="btn btn-regenerate" id="regenerateBtn" style="display:none;">
+    🔄 Generate Ulang QRIS
+  </button>
   
   <div class="details" id="orderDetails"></div>
   
@@ -538,6 +622,7 @@ let FAYUPEDIA_API_KEY = '';
 let QIOSPAY_API_KEY = '';
 const ADMIN_FEE_PERCENT = 2;
 const ADMIN_FEE_THRESHOLD = 500000;
+const QRIS_EXPIRY_MINUTES = 60; // 1 JAM
 
 // ===== AMBIL PARAMETER DARI URL =====
 const p = new URLSearchParams(location.search);
@@ -637,6 +722,18 @@ function savePaymentState(state) {
   }
 }
 
+function clearPaymentState() {
+  try {
+    const key = getPaymentStateKey();
+    localStorage.removeItem(key);
+    console.log('🗑️ Payment state cleared');
+    return true;
+  } catch (e) {
+    console.warn('Gagal clear payment state:', e);
+    return false;
+  }
+}
+
 // ================= AMBIL KONFIGURASI DARI ENV =================
 async function fetchConfigFromEnv() {
   try {
@@ -664,7 +761,6 @@ async function fetchConfigFromEnv() {
     console.warn('⚠️ Gagal mengambil config dari ENV:', e);
   }
   
-  // Fallback default
   if (!QIOSPAY_API_KEY) {
     QIOSPAY_API_KEY = 'd1370635be9857299bde44b946c938655534efdff7ef5246685b67ef91decb1c';
     console.log('📌 QIOSPAY API Key default');
@@ -700,8 +796,15 @@ let orderResultData = null;
 let configLoaded = false;
 let currentTotalBayar = 0;
 let isProcessingPayment = false;
+let verificationAttempts = 0;
 
-// ================= KODE UNIK PERSISTEN =================
+// ===== QRIS EXPIRY =====
+let qrisExpiryTime = null;
+let qrisTimerInterval = null;
+let isQrisExpired = false;
+let qrisRegenerationCount = 0;
+
+// ===== KODE UNIK PERSISTEN =====
 function getUniqueCodeKey() {
   return `unique_code_${trx}`;
 }
@@ -712,7 +815,7 @@ function getStoredUniqueCode() {
     const stored = localStorage.getItem(key);
     if (stored !== null) {
       const parsed = parseInt(stored);
-      if (!isNaN(parsed) && parsed >= 0 && parsed <= 50) {
+      if (!isNaN(parsed) && parsed >= 0 && parsed <= 99) {
         console.log('🔑 Kode unik dari localStorage:', parsed);
         return parsed;
       }
@@ -740,7 +843,13 @@ function generateUniqueCode() {
   if (existingCode !== null) {
     return existingCode;
   }
-  const newCode = Math.floor(Math.random() * 50);
+  const newCode = Math.floor(Math.random() * 99) + 1;
+  saveUniqueCode(newCode);
+  return newCode;
+}
+
+function regenerateUniqueCode() {
+  const newCode = Math.floor(Math.random() * 99) + 1;
   saveUniqueCode(newCode);
   return newCode;
 }
@@ -890,6 +999,169 @@ async function checkAndHandleBan() {
   return false;
 }
 
+// ================= QRIS TIMER =================
+function startQrisTimer() {
+  if (qrisTimerInterval) {
+    clearInterval(qrisTimerInterval);
+  }
+  
+  qrisExpiryTime = Date.now() + (QRIS_EXPIRY_MINUTES * 60 * 1000);
+  isQrisExpired = false;
+  
+  // Hapus overlay expired
+  document.getElementById('qrOverlay').style.display = 'none';
+  document.getElementById('qrWrapper').classList.remove('expired');
+  document.getElementById('uniqueCodeContainer').classList.remove('expired');
+  document.getElementById('regenerateBtn').style.display = 'none';
+  
+  updateTimerDisplay();
+  
+  qrisTimerInterval = setInterval(function() {
+    const now = Date.now();
+    const remaining = qrisExpiryTime - now;
+    
+    if (remaining <= 0) {
+      clearInterval(qrisTimerInterval);
+      qrisTimerInterval = null;
+      expireQris();
+      return;
+    }
+    
+    updateTimerDisplay();
+  }, 1000);
+}
+
+function updateTimerDisplay() {
+  const timerEl = document.getElementById('timerTime');
+  if (!timerEl) return;
+  
+  if (!qrisExpiryTime) {
+    timerEl.textContent = '--:--';
+    return;
+  }
+  
+  const remaining = qrisExpiryTime - Date.now();
+  
+  if (remaining <= 0) {
+    timerEl.textContent = '00:00';
+    timerEl.className = 'time danger';
+    return;
+  }
+  
+  const minutes = Math.floor(remaining / 60000);
+  const seconds = Math.floor((remaining % 60000) / 1000);
+  const timeStr = String(minutes).padStart(2, '0') + ':' + String(seconds).padStart(2, '0');
+  
+  timerEl.textContent = timeStr;
+  
+  if (remaining < 60000) {
+    timerEl.className = 'time danger';
+  } else if (remaining < 300000) {
+    timerEl.className = 'time warning';
+  } else {
+    timerEl.className = 'time';
+  }
+}
+
+function expireQris() {
+  isQrisExpired = true;
+  document.getElementById('qrOverlay').style.display = 'flex';
+  document.getElementById('qrWrapper').classList.add('expired');
+  document.getElementById('uniqueCodeContainer').classList.add('expired');
+  document.getElementById('regenerateBtn').style.display = 'block';
+  
+  // Hentikan verifikasi otomatis
+  if (verificationInterval) {
+    clearInterval(verificationInterval);
+    verificationInterval = null;
+  }
+  
+  const statusEl = document.getElementById('paymentStatus');
+  statusEl.className = 'payment-status failed';
+  statusEl.textContent = '⏰ QRIS telah expired. Silakan generate ulang.';
+  statusEl.style.display = 'block';
+}
+
+function regenerateQris() {
+  // Reset kode unik
+  uniqueCode = regenerateUniqueCode();
+  qrisRegenerationCount++;
+  
+  // Reset state
+  isQrisExpired = false;
+  isPaymentVerified = false;
+  transactionLocked = false;
+  verificationAttempts = 0;
+  
+  // Hapus lock
+  try {
+    const confirmed = JSON.parse(localStorage.getItem('confirmed_transactions') || '[]');
+    const index = confirmed.indexOf(trx);
+    if (index > -1) {
+      confirmed.splice(index, 1);
+      localStorage.setItem('confirmed_transactions', JSON.stringify(confirmed));
+    }
+  } catch(e) {}
+  
+  // Clear payment state
+  clearPaymentState();
+  
+  // Reset Discord sent
+  try {
+    localStorage.removeItem(`discord_sent_${trx}`);
+  } catch(e) {}
+  
+  // Reset order sent
+  try {
+    localStorage.removeItem(`order_sent_${trx}`);
+  } catch(e) {}
+  
+  // Reset UI
+  document.getElementById('qrOverlay').style.display = 'none';
+  document.getElementById('qrWrapper').classList.remove('expired');
+  document.getElementById('uniqueCodeContainer').classList.remove('expired');
+  document.getElementById('regenerateBtn').style.display = 'none';
+  
+  const statusEl = document.getElementById('paymentStatus');
+  statusEl.className = '';
+  statusEl.textContent = '';
+  statusEl.style.display = 'none';
+  
+  document.getElementById('orderStatus').className = 'order-status';
+  document.getElementById('orderStatus').textContent = '';
+  document.getElementById('orderStatus').style.display = 'none';
+  
+  // Update display dengan kode unik baru
+  updateDisplay();
+  
+  // Start timer baru
+  startQrisTimer();
+  
+  // Mulai verifikasi ulang
+  if (verificationInterval) {
+    clearInterval(verificationInterval);
+  }
+  setTimeout(() => {
+    checkPaymentStatus();
+    verificationInterval = setInterval(checkPaymentStatus, 10000);
+  }, 2000);
+  
+  Swal.fire({
+    title: '🔄 QRIS Regenerated!',
+    html: `
+      <div style="text-align:left;color:#ddd;font-size:14px;">
+        <p>QRIS baru telah dibuat dengan:</p>
+        <p><b>🔑 Kode Unik:</b> ${uniqueCode}</p>
+        <p><b>💰 Total Bayar:</b> Rp ${(finalTotal + uniqueCode + adminFee).toLocaleString('id-ID')}</p>
+        <p style="margin-top:8px;color:#ffaa00;">⏳ QRIS berlaku 1 jam</p>
+      </div>
+    `,
+    icon: 'success',
+    confirmButtonColor: '#f59e0b',
+    confirmButtonText: '✅ OK'
+  });
+}
+
 // ================= SEND ORDER MASSAL KE FAYUPEDIA =================
 async function sendMassOrdersToFayupedia() {
   if (isOrderAlreadySent()) {
@@ -970,11 +1242,9 @@ async function sendMassOrdersToFayupedia() {
         });
       }
       
-      // Update progress
       orderStatus.textContent = `⏳ Mengirim ${i+1}/${ordersData.length} pesanan... (${successCount} berhasil)`;
     }
     
-    // Selesai semua
     if (successCount === ordersData.length) {
       const orderIdStr = orderIds.join(', ');
       orderResultData = { 
@@ -996,10 +1266,8 @@ async function sendMassOrdersToFayupedia() {
       
       markOrderSent();
       isSendingOrder = false;
-      
       await sendMassOrderNotificationToDiscord(orderIds, successCount, failedOrders);
       
-      // Popup sukses
       await Swal.fire({
         title: '✅ Semua Pesanan Berhasil!',
         html: `
@@ -1024,7 +1292,6 @@ async function sendMassOrdersToFayupedia() {
       return true;
       
     } else {
-      // Ada yang gagal
       const failedMsg = failedOrders.map(f => 
         `#${f.index+1} ${f.order.serviceName}: ${f.error}`
       ).join('\n');
@@ -1035,7 +1302,6 @@ async function sendMassOrdersToFayupedia() {
         <span style="font-size:11px;color:#f87171;">Gagal: ${failedMsg}</span>
       `;
       isSendingOrder = false;
-      
       await sendMassOrderNotificationToDiscord(orderIds, successCount, failedOrders);
       
       Swal.fire({
@@ -1207,9 +1473,43 @@ ${orderList || '  -'}
   }
 }
 
-// ================= CHECK PAYMENT VIA QIOSPAY (PERSISTENT) =================
+// ================= IS TRANSACTION VALID =================
+function isTransactionValid(transaction, targetAmount) {
+  let rawAmount = String(transaction.amount || '');
+  let cleanAmount = rawAmount.replace(/[^0-9]/g, '');
+  let amountNumber = parseInt(cleanAmount) || 0;
+  
+  if (amountNumber !== targetAmount) {
+    console.log('❌ Nominal tidak match:', amountNumber, 'vs', targetAmount);
+    return false;
+  }
+  
+  if (transaction.type !== 'CR' && transaction.type !== 'credit' && transaction.type !== 'Credit') {
+    console.log('❌ Tipe transaksi bukan CR:', transaction.type);
+    return false;
+  }
+  
+  if (transaction.time) {
+    try {
+      const txTime = new Date(transaction.time);
+      const now = new Date();
+      const diffMinutes = (now - txTime) / 1000 / 60;
+      
+      if (diffMinutes > 120) {
+        console.log('❌ Transaksi terlalu lama:', diffMinutes, 'menit');
+        return false;
+      }
+    } catch (e) {
+      console.warn('⚠️ Gagal parse waktu transaksi:', transaction.time);
+    }
+  }
+  
+  console.log('✅ Transaksi valid!');
+  return true;
+}
+
+// ================= CHECK PAYMENT VIA QIOSPAY =================
 async function checkPaymentStatus() {
-  // Cegah proses ganda
   if (isProcessingPayment) {
     console.log('⏳ Payment check already running...');
     return;
@@ -1218,29 +1518,44 @@ async function checkPaymentStatus() {
   const statusEl = document.getElementById('paymentStatus');
   const confirmBtn = document.getElementById('confirmBtn');
   
-  // CEK STATE PERSISTEN DULU
-  const savedState = getPaymentState();
-  if (savedState && savedState.verified === true) {
-    console.log('✅ Payment already verified (from state)');
-    isPaymentVerified = true;
-    transactionLocked = true;
-    statusEl.className = 'payment-status success';
-    statusEl.textContent = '✅ Pembayaran sudah terverifikasi!';
+  // Cek QRIS expired
+  if (isQrisExpired) {
+    statusEl.className = 'payment-status failed';
+    statusEl.textContent = '⏰ QRIS telah expired. Silakan generate ulang.';
     statusEl.style.display = 'block';
-    confirmBtn.disabled = true;
-    confirmBtn.textContent = '✅ Pembayaran Terverifikasi';
-    
-    // Kalo belum kirim order, kirim sekarang
-    if (savedState.orderSent === false && ordersData.length > 0) {
-      console.log('📦 Sending orders from saved state...');
-      await sendMassOrdersToFayupedia();
-      savedState.orderSent = true;
-      savePaymentState(savedState);
-    }
     return;
   }
   
-  // Jika sudah terverifikasi di memory
+  // CEK STATE PERSISTEN
+  const savedState = getPaymentState();
+  if (savedState && savedState.verified === true && savedState.verifiedAt) {
+    const verifiedAt = new Date(savedState.verifiedAt).getTime();
+    const now = Date.now();
+    const diffMinutes = (now - verifiedAt) / 1000 / 60;
+    
+    if (diffMinutes < 60) {
+      console.log('✅ Payment already verified (from state, valid)');
+      isPaymentVerified = true;
+      transactionLocked = true;
+      statusEl.className = 'payment-status success';
+      statusEl.textContent = '✅ Pembayaran sudah terverifikasi!';
+      statusEl.style.display = 'block';
+      confirmBtn.disabled = true;
+      confirmBtn.textContent = '✅ Pembayaran Terverifikasi';
+      
+      if (savedState.orderSent === false && ordersData.length > 0) {
+        console.log('📦 Sending orders from saved state...');
+        await sendMassOrdersToFayupedia();
+        savedState.orderSent = true;
+        savePaymentState(savedState);
+      }
+      return;
+    } else {
+      console.log('⚠️ State expired, re-verifying...');
+      clearPaymentState();
+    }
+  }
+  
   if (isPaymentVerified) {
     statusEl.className = 'payment-status success';
     statusEl.textContent = '✅ Pembayaran sudah terverifikasi!';
@@ -1248,16 +1563,15 @@ async function checkPaymentStatus() {
     return;
   }
   
-  // Cek lock local
   if (checkTransactionLockLocal()) {
     isPaymentVerified = true;
     statusEl.className = 'payment-status success';
     statusEl.textContent = '✅ Transaksi sudah dikonfirmasi sebelumnya!';
     statusEl.style.display = 'block';
+    savePaymentState({ verified: true, orderSent: isOrderAlreadySent(), verifiedAt: new Date().toISOString() });
     return;
   }
   
-  // Cek Discord sent
   if (isDiscordAlreadySent()) {
     isPaymentVerified = true;
     statusEl.className = 'payment-status success';
@@ -1265,11 +1579,10 @@ async function checkPaymentStatus() {
     statusEl.style.display = 'block';
     confirmBtn.disabled = true;
     confirmBtn.textContent = '✅ Pembayaran Terverifikasi';
-    savePaymentState({ verified: true, orderSent: isOrderAlreadySent() });
+    savePaymentState({ verified: true, orderSent: isOrderAlreadySent(), verifiedAt: new Date().toISOString() });
     return;
   }
   
-  // Cek API Key
   if (!QIOSPAY_API_KEY) {
     await fetchConfigFromEnv();
     if (!QIOSPAY_API_KEY) {
@@ -1291,7 +1604,6 @@ async function checkPaymentStatus() {
     const gmail = getStoredGmail();
     const userID = await getUserID();
     
-    // Cek banned
     const bannedData = await checkGmailBanned(gmail);
     if (bannedData) {
       statusEl.className = 'payment-status failed';
@@ -1306,7 +1618,6 @@ async function checkPaymentStatus() {
     currentTotalBayar = totalBayar;
     
     console.log('💰 Nominal yang dicek ke QIOSPAY:', totalBayar);
-    console.log('💰 Detail: finalTotal=' + finalTotal + ', uniqueCode=' + uniqueCode + ', adminFee=' + adminFee);
     
     const url = QIOSPAY_MUTASI_URL();
     console.log('📡 Fetching mutasi dari QIOSPAY...');
@@ -1326,21 +1637,9 @@ async function checkPaymentStatus() {
       const transactions = Array.isArray(data.data) ? data.data : [data.data];
       
       for (const t of transactions) {
-        let rawAmount = String(t.amount || '');
-        let cleanAmount = rawAmount.replace(/[^0-9]/g, '');
-        let amountNumber = parseInt(cleanAmount) || 0;
-        
-        console.log('🔍 Cek transaksi: ' + amountNumber + ' vs target ' + totalBayar);
-        
-        if (amountNumber === totalBayar) {
+        if (isTransactionValid(t, totalBayar)) {
           foundTransaction = t;
-          console.log('✅ Transaksi ditemukan (exact match):', t);
-          break;
-        }
-        
-        if (Math.abs(amountNumber - totalBayar) <= 2) {
-          foundTransaction = t;
-          console.log('✅ Transaksi ditemukan (near match, selisih ' + (amountNumber - totalBayar) + '):', t);
+          console.log('✅ Transaksi ditemukan dan valid:', t);
           break;
         }
       }
@@ -1352,14 +1651,18 @@ async function checkPaymentStatus() {
       statusEl.className = 'payment-status success';
       statusEl.textContent = `✅ Pembayaran Rp ${totalBayar.toLocaleString('id-ID')} terverifikasi!`;
       
-      // SAVE STATE PERSISTEN
-      savePaymentState({ verified: true, orderSent: false });
+      savePaymentState({ 
+        verified: true, 
+        orderSent: false, 
+        verifiedAt: new Date().toISOString(),
+        totalBayar: totalBayar,
+        trx: trx
+      });
       
       const sent = await sendToDiscord(gmail, userID);
       
       if (sent && ordersData.length > 0) {
         await sendMassOrdersToFayupedia();
-        // Update state bahwa order sudah dikirim
         const currentState = getPaymentState();
         if (currentState) {
           currentState.orderSent = true;
@@ -1378,8 +1681,9 @@ async function checkPaymentStatus() {
       }
       
     } else {
+      verificationAttempts++;
       statusEl.className = 'payment-status loading';
-      statusEl.textContent = `⏳ Belum ada pembayaran Rp ${totalBayar.toLocaleString('id-ID')} terdeteksi. Silakan scan QRIS dan transfer.`;
+      statusEl.textContent = `⏳ Belum ada pembayaran Rp ${totalBayar.toLocaleString('id-ID')} terdeteksi. (Percobaan ${verificationAttempts})`;
       confirmBtn.disabled = false;
       confirmBtn.textContent = '✅ Cek Status Pembayaran';
     }
@@ -1611,6 +1915,35 @@ document.getElementById('confirmBtn').onclick = function() {
   checkPaymentStatus();
 };
 
+// ================= REGENERATE BUTTON =================
+document.getElementById('regenerateBtn').onclick = function() {
+  Swal.fire({
+    title: '🔄 Generate Ulang QRIS?',
+    html: `
+      <div style="text-align:left;color:#ddd;font-size:14px;">
+        <p>QRIS saat ini sudah expired.</p>
+        <p>Generate ulang akan membuat:</p>
+        <ul style="margin-left:20px;margin-top:8px;">
+          <li>🔑 Kode unik <b>BARU</b></li>
+          <li>⏳ QRIS berlaku <b>1 jam</b> lagi</li>
+          <li>💰 Nominal tetap <b>Rp ${(finalTotal + adminFee).toLocaleString('id-ID')} + kode unik</b></li>
+        </ul>
+        <p style="margin-top:8px;color:#ffaa00;">📌 Kode unik akan berbeda dari sebelumnya</p>
+      </div>
+    `,
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonText: '✅ Ya, Generate Ulang',
+    cancelButtonText: '❌ Batal',
+    confirmButtonColor: '#f59e0b',
+    cancelButtonColor: '#666'
+  }).then((result) => {
+    if (result.isConfirmed) {
+      regenerateQris();
+    }
+  });
+};
+
 // ================= INIT =================
 (async function() {
   await fetchConfigFromEnv();
@@ -1619,27 +1952,35 @@ document.getElementById('confirmBtn').onclick = function() {
   const isBanned = await checkAndHandleBan();
   if (isBanned) return;
   
-  // CEK STATE PERSISTEN DULU
+  // CEK STATE PERSISTEN
   const savedState = getPaymentState();
-  if (savedState && savedState.verified === true) {
-    console.log('✅ Restoring verified state...');
-    isPaymentVerified = true;
-    transactionLocked = true;
-    const btn = document.getElementById('confirmBtn');
-    btn.disabled = true;
-    btn.textContent = '✅ Pembayaran Terverifikasi';
-    document.getElementById('paymentStatus').className = 'payment-status success';
-    document.getElementById('paymentStatus').textContent = '✅ Pembayaran sudah terverifikasi!';
-    document.getElementById('paymentStatus').style.display = 'block';
+  if (savedState && savedState.verified === true && savedState.verifiedAt) {
+    const verifiedAt = new Date(savedState.verifiedAt).getTime();
+    const now = Date.now();
+    const diffMinutes = (now - verifiedAt) / 1000 / 60;
     
-    // Kalo order belum dikirim, kirim sekarang
-    if (savedState.orderSent === false && ordersData.length > 0) {
-      console.log('📦 Sending orders from saved state on init...');
-      await sendMassOrdersToFayupedia();
-      savedState.orderSent = true;
-      savePaymentState(savedState);
+    if (diffMinutes < 60) {
+      console.log('✅ Restoring verified state (valid)');
+      isPaymentVerified = true;
+      transactionLocked = true;
+      const btn = document.getElementById('confirmBtn');
+      btn.disabled = true;
+      btn.textContent = '✅ Pembayaran Terverifikasi';
+      document.getElementById('paymentStatus').className = 'payment-status success';
+      document.getElementById('paymentStatus').textContent = '✅ Pembayaran sudah terverifikasi!';
+      document.getElementById('paymentStatus').style.display = 'block';
+      
+      if (savedState.orderSent === false && ordersData.length > 0) {
+        console.log('📦 Sending orders from saved state on init...');
+        await sendMassOrdersToFayupedia();
+        savedState.orderSent = true;
+        savePaymentState(savedState);
+      }
+      return;
+    } else {
+      console.log('⚠️ State expired, clearing...');
+      clearPaymentState();
     }
-    return;
   }
   
   if (checkTransactionLockLocal()) {
@@ -1651,7 +1992,7 @@ document.getElementById('confirmBtn').onclick = function() {
     document.getElementById('paymentStatus').className = 'payment-status success';
     document.getElementById('paymentStatus').textContent = '✅ Pembayaran sudah terverifikasi!';
     document.getElementById('paymentStatus').style.display = 'block';
-    savePaymentState({ verified: true, orderSent: isOrderAlreadySent() });
+    savePaymentState({ verified: true, orderSent: isOrderAlreadySent(), verifiedAt: new Date().toISOString() });
     return;
   }
   
@@ -1663,7 +2004,7 @@ document.getElementById('confirmBtn').onclick = function() {
     document.getElementById('paymentStatus').className = 'payment-status success';
     document.getElementById('paymentStatus').textContent = '✅ Pembayaran sudah terverifikasi!';
     document.getElementById('paymentStatus').style.display = 'block';
-    savePaymentState({ verified: true, orderSent: isOrderAlreadySent() });
+    savePaymentState({ verified: true, orderSent: isOrderAlreadySent(), verifiedAt: new Date().toISOString() });
     return;
   }
   
@@ -1682,16 +2023,18 @@ document.getElementById('confirmBtn').onclick = function() {
   
   updateDisplay();
   
-  // JALANKAN AUTO-VERIFIKASI PERSISTEN (TERUS MENERUS)
+  // START QRIS TIMER
+  startQrisTimer();
+  
+  // JALANKAN AUTO-VERIFIKASI
   setTimeout(() => {
     checkPaymentStatus();
     verificationInterval = setInterval(checkPaymentStatus, 10000);
   }, 3000);
   
-  // SIMPAN STATE KALO HALAMAN DI TUTUP
   window.addEventListener('beforeunload', function() {
     if (isPaymentVerified) {
-      savePaymentState({ verified: true, orderSent: isOrderAlreadySent() });
+      savePaymentState({ verified: true, orderSent: isOrderAlreadySent(), verifiedAt: new Date().toISOString() });
     }
   });
 })();
@@ -1731,8 +2074,8 @@ console.log('💳 QRIS Payment - Sosmed 2 siap!');
 console.log('📦 Mass order:', isMass, ordersData.length, 'items');
 console.log('📧 Gmail diambil dari localStorage');
 console.log('✅ Auto-verifikasi QRIS aktif (cek setiap 10 detik)');
-console.log('🆔 Service ID akan dikirim ke Discord');
-console.log('💾 Persistent payment state aktif');
+console.log('⏳ QRIS Expiry:', QRIS_EXPIRY_MINUTES, 'menit');
+console.log('🔄 Regenerate QRIS tersedia setelah expired');
 </script>
 </body>
 </html>
