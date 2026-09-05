@@ -156,6 +156,13 @@ h2{
 .details .discount-text{color:#22c55e;font-weight:600}
 .details .voucher-text{color:#facc15;font-weight:600}
 .details .admin-fee-text{color:#ffaa00;font-weight:600}
+.details .order-item-detail{
+  font-size:12px;
+  color:#94a3b8;
+  padding:4px 0 4px 12px;
+  border-left:2px solid rgba(0,198,255,0.2);
+  margin:2px 0;
+}
 .gmail-display{
   background:rgba(255,255,255,0.04);
   padding:10px 16px;
@@ -266,7 +273,6 @@ p{
 .voucher-status .used{color:#ef4444}
 .voucher-status .info{color:#94a3b8}
 
-/* ===== BANNED PAGE ===== */
 .banned-page{
   display:flex;
   align-items:center;
@@ -336,7 +342,6 @@ p{
   word-break:break-all;
 }
 
-/* ===== WIB TIME DISPLAY ===== */
 .wib-time-display{
   text-align:center;
   color:#94a3b8;
@@ -355,7 +360,6 @@ p{
   font-variant-numeric:tabular-nums;
 }
 
-/* ===== PAYMENT STATUS ===== */
 .payment-status{
   margin-top:12px;
   padding:12px 16px;
@@ -383,7 +387,6 @@ p{
   color:#ef4444;
   border:1px solid rgba(239,68,68,0.3);
 }
-/* ===== ORDER STATUS ===== */
 .order-status{
   margin-top:8px;
   padding:10px 14px;
@@ -449,14 +452,13 @@ p{
 }
 </style>
 </head>
-
 <body>
     
 <div class="orb orb-1"></div>
 <div class="orb orb-2"></div>
 <div class="orb orb-3"></div>
 
-<!-- ===== BANNED CONTAINER ===== -->
+<!-- BANNED CONTAINER -->
 <div id="bannedContainer" style="display:none;" class="banned-page">
   <div class="banned-card">
     <span class="icon">🚫</span>
@@ -475,14 +477,14 @@ p{
   </div>
 </div>
 
-<!-- ===== QRIS CARD ===== -->
+<!-- QRIS CARD -->
 <div id="qrisCard" class="card">
   <h2>💳 Pembayaran QRIS</h2>
   <p style="color: #FF0000;"><b>Jangan tutup halaman saat sedang melakukan pembayaran atau pembayaran terverifikasi sampai muncul pop up id pesanan</b></p>
   
   <div class="subtitle">✦ Shine Shop - Sosmed 2 ✦</div>
   
-  <!-- ===== GMAIL DISPLAY ===== -->
+  <!-- GMAIL DISPLAY -->
   <div class="gmail-display">
     <span class="label">📧 Gmail:</span>
     <span class="value" id="gmailDisplay">Belum diatur</span>
@@ -500,17 +502,17 @@ p{
   <button id="applyVoucher" class="btn">🎫 Gunakan Voucher</button>
   <div class="voucher-status" id="voucherStatus"></div>
   
-  <!-- ===== PAYMENT STATUS ===== -->
+  <!-- PAYMENT STATUS -->
   <div id="paymentStatus" class="payment-status"></div>
   
-  <!-- ===== ORDER STATUS ===== -->
+  <!-- ORDER STATUS -->
   <div id="orderStatus" class="order-status"></div>
   
   <button id="confirmBtn" class="btn">✅ Cek Status Pembayaran</button>
   
   <div class="muted">⏳ Admin memproses maksimal 72 jam</div>
   
-  <!-- ===== WIB REAL-TIME ===== -->
+  <!-- WIB REAL-TIME -->
   <div class="wib-time-display">
     <span class="wib-label">🕐 WIB (GMT+7):</span>
     <span class="wib-value" id="wibTimeDisplay">--:--:--</span>
@@ -540,14 +542,20 @@ const ADMIN_FEE_THRESHOLD = 500000;
 // ===== AMBIL PARAMETER DARI URL =====
 const p = new URLSearchParams(location.search);
 const trx = p.get("trx") || "-";
-const layanan = p.get("layanan") || "-";
 const total = Number(p.get("total") || 0);
-const target = p.get("target") || "-";
-const serviceId = p.get("id") || null;
-const quantity = parseInt(p.get("jumlah") || 0);
-const comment = p.get("comment") || null; // AMBIL PARAMETER COMMENT
+const isMass = p.get("mass") === "1";
+let ordersData = [];
 
-// ===== NOTIFIKASI DISCORD - CEK SUDAH TERKIRIM =====
+try {
+  const ordersParam = p.get("orders");
+  if (ordersParam) {
+    ordersData = JSON.parse(decodeURIComponent(ordersParam));
+  }
+} catch (e) {
+  console.warn('Gagal parse orders data:', e);
+}
+
+// ===== NOTIFIKASI DISCORD =====
 function getDiscordSentKey() {
   return `discord_sent_${trx}`;
 }
@@ -573,7 +581,7 @@ function markDiscordSent() {
   }
 }
 
-// ===== ORDER FAYUPEDIA - CEK SUDAH TERKIRIM =====
+// ===== ORDER FAYUPEDIA =====
 function getOrderSentKey() {
   return `order_sent_${trx}`;
 }
@@ -606,13 +614,11 @@ async function fetchConfigFromEnv() {
     if (res.ok) {
       const data = await res.json();
       
-      // QIOSPAY API Key
       if (data.qiospay_api_key) {
         QIOSPAY_API_KEY = data.qiospay_api_key;
         console.log('✅ QIOSPAY API Key dari ENV');
       }
       
-      // FAYUPEDIA Config
       if (data.fayupedia_api_key) {
         FAYUPEDIA_API_KEY = data.fayupedia_api_key;
         console.log('✅ FAYUPEDIA API Key dari ENV');
@@ -643,17 +649,11 @@ async function fetchConfigFromEnv() {
 
 const QIOSPAY_MUTASI_URL = () => `https://qiospay.id/api/mutasi/qris/${MERCHANT_CODE}/${QIOSPAY_API_KEY}`;
 
-const maintenance = false;
-if (maintenance === true) {
-  window.location.replace("/tutup/");
-}
-
 function maskID(id) {
   id = String(id || "-");
   if (id.length <= 4) return id;
   return id.slice(0, 2) + "**" + id.slice(-2);
 }
-const maskedTrx = maskID(trx);
 
 let originalTotal = total;
 let finalTotal = total;
@@ -668,7 +668,7 @@ let isSendingDiscord = false;
 let isSendingOrder = false;
 let orderResultData = null;
 let configLoaded = false;
-let currentTotalBayar = 0; // SIMPAN NOMINAL TERAKHIR UNTUK CEK QIOSPAY
+let currentTotalBayar = 0;
 
 // ================= KODE UNIK PERSISTEN =================
 function getUniqueCodeKey() {
@@ -714,7 +714,6 @@ function generateUniqueCode() {
   return newCode;
 }
 
-// ================= HITUNG BIAYA ADMIN =================
 function calculateAdminFee(amount) {
   if (amount > ADMIN_FEE_THRESHOLD) {
     return Math.round(amount * (ADMIN_FEE_PERCENT / 100));
@@ -860,8 +859,8 @@ async function checkAndHandleBan() {
   return false;
 }
 
-// ================= SEND ORDER TO FAYUPEDIA (DENGAN COMMENT) =================
-async function sendOrderToFayupedia() {
+// ================= SEND ORDER MASSAL KE FAYUPEDIA =================
+async function sendMassOrdersToFayupedia() {
   if (isOrderAlreadySent()) {
     console.log('⏭️ Order sudah dikirim ke Fayupedia, skipping...');
     return true;
@@ -872,29 +871,11 @@ async function sendOrderToFayupedia() {
     return false;
   }
   
-  if (!serviceId) {
-    console.warn('⚠️ Tidak ada ID layanan');
+  if (!ordersData || ordersData.length === 0) {
+    console.warn('⚠️ Tidak ada data order massal');
     const orderStatus = document.getElementById('orderStatus');
     orderStatus.className = 'order-status failed';
-    orderStatus.textContent = '❌ ID layanan tidak ditemukan di URL';
-    orderStatus.style.display = 'block';
-    return false;
-  }
-  
-  if (!target || target === '-') {
-    console.warn('⚠️ Target tidak ditemukan');
-    const orderStatus = document.getElementById('orderStatus');
-    orderStatus.className = 'order-status failed';
-    orderStatus.textContent = '❌ Target tidak ditemukan.';
-    orderStatus.style.display = 'block';
-    return false;
-  }
-  
-  if (!quantity || quantity <= 0) {
-    console.warn('⚠️ Quantity tidak valid:', quantity);
-    const orderStatus = document.getElementById('orderStatus');
-    orderStatus.className = 'order-status failed';
-    orderStatus.textContent = '❌ Jumlah pesanan tidak valid.';
+    orderStatus.textContent = '❌ Tidak ada data pesanan.';
     orderStatus.style.display = 'block';
     return false;
   }
@@ -910,72 +891,95 @@ async function sendOrderToFayupedia() {
   isSendingOrder = true;
   const orderStatus = document.getElementById('orderStatus');
   orderStatus.className = 'order-status loading';
-  orderStatus.textContent = '⏳ Mengirim pesanan ke Shine Shop...';
+  orderStatus.textContent = `⏳ Mengirim ${ordersData.length} pesanan ke Fayupedia...`;
   orderStatus.style.display = 'block';
   
+  let successCount = 0;
+  let failedOrders = [];
+  let orderIds = [];
+  
   try {
-    // BUILD PAYLOAD DENGAN COMMENT JIKA ADA
-    const payload = {
-      api_id: FAYUPEDIA_API_ID,
-      api_key: FAYUPEDIA_API_KEY,
-      service: parseInt(serviceId),
-      target: target,
-      quantity: quantity
-    };
-    
-    // TAMBAHKAN COMMENT JIKA ADA
-    if (comment && comment.trim() !== '') {
-      payload.comments = comment.trim();
-      console.log('📝 Comment detected:', comment);
+    for (let i = 0; i < ordersData.length; i++) {
+      const order = ordersData[i];
+      
+      const payload = {
+        api_id: FAYUPEDIA_API_ID,
+        api_key: FAYUPEDIA_API_KEY,
+        service: parseInt(order.serviceId),
+        target: order.target,
+        quantity: order.jumlah
+      };
+      
+      if (order.comment && order.comment.trim() !== '') {
+        payload.comments = order.comment.trim();
+      }
+      
+      console.log(`📦 Sending order ${i+1}/${ordersData.length}:`, payload);
+      
+      const response = await fetch(FAYUPEDIA_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+      
+      const result = await response.json();
+      console.log(`📦 Response ${i+1}:`, result);
+      
+      if (result.status === true && result.order) {
+        successCount++;
+        orderIds.push(result.order);
+      } else {
+        failedOrders.push({
+          index: i,
+          order: order,
+          error: result.msg || 'Gagal'
+        });
+      }
+      
+      // Update progress
+      orderStatus.textContent = `⏳ Mengirim ${i+1}/${ordersData.length} pesanan... (${successCount} berhasil)`;
     }
     
-    console.log('📦 Sending order to Fayupedia:', payload);
-    
-    const response = await fetch(FAYUPEDIA_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
-      body: JSON.stringify(payload)
-    });
-    
-    const result = await response.json();
-    console.log('📦 Fayupedia Response:', result);
-    
-    if (result.status === true && result.order) {
-      const orderId = result.order;
-      const msg = result.msg || `Pesanan dengan ID #${orderId} berhasil dibuat.`;
-      
-      orderResultData = { orderId, message: msg };
+    // Selesai semua
+    if (successCount === ordersData.length) {
+      const orderIdStr = orderIds.join(', ');
+      orderResultData = { 
+        orderIds: orderIds, 
+        message: `${successCount} pesanan berhasil dibuat.`
+      };
       
       orderStatus.className = 'order-status success';
       orderStatus.innerHTML = `
-        ✅ ${msg}
+        ✅ ${successCount} pesanan berhasil dibuat!
         <div class="order-id-box">
-          🆔 ID Pesanan: <strong>${orderId}</strong>
-          <button class="copy-btn" onclick="copyOrderId('${orderId}')">📋 Salin</button>
+          🆔 ID Pesanan: <strong>${orderIdStr}</strong>
+          <button class="copy-btn" onclick="copyOrderId('${orderIdStr}')">📋 Salin Semua</button>
         </div>
         <div style="margin-top:6px;font-size:11px;color:#888;">
           ⚠️ Simpan ID pesanan ini untuk cek status order.
         </div>
       `;
+      
       markOrderSent();
       isSendingOrder = false;
       
-      await sendOrderNotificationToDiscord(result);
+      await sendMassOrderNotificationToDiscord(orderIds, successCount, failedOrders);
       
+      // Popup sukses
       await Swal.fire({
-        title: '✅ Pesanan Berhasil!',
+        title: '✅ Semua Pesanan Berhasil!',
         html: `
           <div style="text-align:left;color:#ddd;font-size:14px;">
-            <p>${msg}</p>
+            <p><b>${successCount}</b> pesanan berhasil dibuat.</p>
             <div style="background:#0d0d0d;padding:12px;border-radius:10px;margin:10px 0;border:1px solid #ffaa0033;text-align:center;">
               <span style="color:#888;font-size:12px;">🆔 ID Pesanan</span><br>
-              <span style="color:#ffaa00;font-size:20px;font-weight:700;font-family:monospace;">${orderId}</span>
+              <span style="color:#ffaa00;font-size:16px;font-weight:700;font-family:monospace;word-break:break-all;">${orderIdStr}</span>
               <br>
-              <button onclick="copyOrderId('${orderId}')" style="margin-top:6px;background:#ffaa0022;color:#ffaa00;border:1px solid #ffaa0044;padding:4px 16px;border-radius:6px;cursor:pointer;font-size:12px;">
-                📋 Salin ID Pesanan
+              <button onclick="copyOrderId('${orderIdStr}')" style="margin-top:6px;background:#ffaa0022;color:#ffaa00;border:1px solid #ffaa0044;padding:4px 16px;border-radius:6px;cursor:pointer;font-size:12px;">
+                📋 Salin Semua ID
               </button>
             </div>
             <p style="font-size:12px;color:#888;">⚠️ Simpan ID pesanan ini untuk cek status order.</p>
@@ -989,17 +993,40 @@ async function sendOrderToFayupedia() {
       return true;
       
     } else {
-      const errorMsg = result.msg || 'Gagal membuat pesanan.';
+      // Ada yang gagal
+      const failedMsg = failedOrders.map(f => 
+        `#${f.index+1} ${f.order.serviceName}: ${f.error}`
+      ).join('\n');
+      
       orderStatus.className = 'order-status failed';
-      orderStatus.textContent = `❌ ${errorMsg}`;
+      orderStatus.innerHTML = `
+        ❌ ${successCount}/${ordersData.length} pesanan berhasil.<br>
+        <span style="font-size:11px;color:#f87171;">Gagal: ${failedMsg}</span>
+      `;
       isSendingOrder = false;
-      await sendOrderErrorToDiscord(errorMsg);
+      
+      await sendMassOrderNotificationToDiscord(orderIds, successCount, failedOrders);
+      
+      Swal.fire({
+        title: '⚠️ Sebagian Gagal',
+        html: `
+          <div style="text-align:left;color:#ddd;font-size:14px;">
+            <p>${successCount}/${ordersData.length} pesanan berhasil.</p>
+            <div style="background:#ff444415;padding:12px;border-radius:10px;margin:10px 0;border:1px solid #ff444433;">
+              <b style="color:#f87171;">Gagal:</b><br>
+              ${failedMsg.replace(/\n/g, '<br>')}
+            </div>
+          </div>
+        `,
+        icon: 'warning',
+        confirmButtonColor: '#ffaa00'
+      });
+      
       return false;
     }
     
   } catch (err) {
-    console.error('❌ Error send order to Fayupedia:', err);
-    const orderStatus = document.getElementById('orderStatus');
+    console.error('❌ Error send mass orders:', err);
     orderStatus.className = 'order-status failed';
     orderStatus.textContent = `❌ Error: ${err.message}`;
     isSendingOrder = false;
@@ -1038,64 +1065,40 @@ window.copyOrderId = function(orderId) {
   });
 };
 
-// ================= SEND ORDER NOTIFICATION TO DISCORD =================
-async function sendOrderNotificationToDiscord(result) {
+// ================= SEND MASS ORDER NOTIFICATION TO DISCORD =================
+async function sendMassOrderNotificationToDiscord(orderIds, successCount, failedOrders) {
   try {
-    const orderId = result.order || '-';
-    const msg = result.msg || `Pesanan dengan id #${orderId} berhasil dibuat.`;
-    const commentInfo = comment ? `\n📝 **Komentar:** ${comment}` : '';
+    let orderList = '';
+    ordersData.forEach((o, i) => {
+      orderList += `\n  ${i+1}. ${o.serviceName} x${o.jumlah} → ${o.target}`;
+    });
     
-    const message = `📦 **ORDER FAYUPEDIA BERHASIL**
+    const orderIdStr = orderIds.join(', ') || '-';
+    const failedMsg = failedOrders.length > 0 
+      ? `\n⚠️ Gagal: ${failedOrders.length} pesanan` 
+      : '';
+    
+    const message = `📦 **ORDER MASSAL FAYUPEDIA**
 ━━━━━━━━━━━━━━━━━━━━━
 🆔 **ID Transaksi:** ${trx}
-📋 **Layanan:** ${layanan}
-🆔 **Service ID:** ${serviceId}
-🎯 **Target:** ${target}
-🔢 **Jumlah:** ${quantity}${commentInfo}
-📊 **Status:** ✅ SUCCESS
-🆔 **Order ID:** ${orderId}
-📝 **Pesan:** ${msg}
+📊 **Total Pesanan:** ${ordersData.length}
+✅ **Berhasil:** ${successCount}${failedMsg}
+🆔 **Order IDs:** ${orderIdStr}
 📅 **Waktu:** ${formatWIB(new Date())}
 ━━━━━━━━━━━━━━━━━━━━━
-✅ **Pesanan berhasil dibuat!**`;
+📋 **Detail Pesanan:**
+${orderList}
+━━━━━━━━━━━━━━━━━━━━━
+✅ **${successCount === ordersData.length ? 'Semua pesanan berhasil dibuat!' : 'Beberapa pesanan gagal, cek manual.'}**`;
 
     await fetch(discordWebhook, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ content: message })
     });
-    console.log('✅ Notifikasi order ke Discord terkirim');
+    console.log('✅ Notifikasi mass order ke Discord terkirim');
   } catch (err) {
-    console.error('❌ Gagal kirim notifikasi order ke Discord:', err);
-  }
-}
-
-// ================= SEND ORDER ERROR TO DISCORD =================
-async function sendOrderErrorToDiscord(errorMsg) {
-  try {
-    const commentInfo = comment ? `\n📝 **Komentar:** ${comment}` : '';
-    
-    const message = `❌ **ORDER FAYUPEDIA GAGAL**
-━━━━━━━━━━━━━━━━━━━━━
-🆔 **ID Transaksi:** ${trx}
-📋 **Layanan:** ${layanan}
-🆔 **Service ID:** ${serviceId}
-🎯 **Target:** ${target}
-🔢 **Jumlah:** ${quantity}${commentInfo}
-📊 **Status:** ❌ FAILED
-📝 **Error:** ${errorMsg}
-📅 **Waktu:** ${formatWIB(new Date())}
-━━━━━━━━━━━━━━━━━━━━━
-⚠️ **Order gagal dibuat!**`;
-
-    await fetch(discordWebhook, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content: message })
-    });
-    console.log('✅ Notifikasi error order ke Discord terkirim');
-  } catch (err) {
-    console.error('❌ Gagal kirim notifikasi error ke Discord:', err);
+    console.error('❌ Gagal kirim notifikasi ke Discord:', err);
   }
 }
 
@@ -1116,7 +1119,15 @@ async function sendToDiscord(gmail, userID) {
   try {
     const totalDenganUnik = finalTotal + uniqueCode + adminFee;
     const refCode = localStorage.getItem('referral_code') || "-";
-    const commentInfo = comment ? `\n📝 **Komentar:** ${comment}` : '';
+    
+    let orderList = '';
+    if (isMass && ordersData.length > 0) {
+      ordersData.forEach((o, i) => {
+        orderList += `\n  ${i+1}. ${o.serviceName} x${o.jumlah} → ${o.target}`;
+      });
+    } else if (!isMass && ordersData.length === 1) {
+      orderList = `\n  ${ordersData[0].serviceName} x${ordersData[0].jumlah} → ${ordersData[0].target}`;
+    }
     
     let adminFeeText = '';
     if (adminFee > 0) {
@@ -1126,17 +1137,18 @@ async function sendToDiscord(gmail, userID) {
     const message = `💰 **PEMBAYARAN BERHASIL DIVERIFIKASI**
 ━━━━━━━━━━━━━━━━━━━━━
 🆔 **ID Transaksi:** ${trx}
-📋 **Layanan:** ${layanan}
-🎯 **Target:** ${target}
-💰 **Harga Asli:** Rp ${originalTotal.toLocaleString('id-ID')}
+📊 **Jenis:** ${isMass ? 'MASSAL ('+ordersData.length+' pesanan)' : 'Single'}
 💵 **Total Bayar:** Rp ${totalDenganUnik.toLocaleString('id-ID')}
 🔑 **Kode Unik:** ${uniqueCode}${adminFeeText}
 🎫 **Voucher:** ${appliedVoucher || "-"}
-📉 **Diskon:** ${appliedVoucher ? `Rp ${appliedDiscount.toLocaleString('id-ID')}` : "-"}${commentInfo}
+📉 **Diskon:** ${appliedVoucher ? `Rp ${appliedDiscount.toLocaleString('id-ID')}` : "-"}
 📧 **Gmail:** ${gmail}
 🆔 **User ID:** ${userID}
 🔗 **Referral:** ${refCode}
 📅 **Waktu:** ${formatWIB(new Date())}
+━━━━━━━━━━━━━━━━━━━━━
+📋 **Detail Pesanan:**
+${orderList || '  -'}
 ━━━━━━━━━━━━━━━━━━━━━
 ✅ **Status: LUNAS**`;
 
@@ -1163,11 +1175,12 @@ async function sendToDiscord(gmail, userID) {
   }
 }
 
-// ================= CHECK PAYMENT VIA QIOSPAY (FIXED + SYNC QRIS) =================
+// ================= CHECK PAYMENT VIA QIOSPAY (DENGAN NOMINAL SESUAI) =================
 async function checkPaymentStatus() {
   const statusEl = document.getElementById('paymentStatus');
   const confirmBtn = document.getElementById('confirmBtn');
   
+  // Jika sudah terverifikasi
   if (isPaymentVerified) {
     statusEl.className = 'payment-status success';
     statusEl.textContent = '✅ Pembayaran sudah terverifikasi!';
@@ -1175,6 +1188,7 @@ async function checkPaymentStatus() {
     return;
   }
   
+  // Cek lock local
   if (checkTransactionLockLocal()) {
     isPaymentVerified = true;
     statusEl.className = 'payment-status success';
@@ -1183,6 +1197,7 @@ async function checkPaymentStatus() {
     return;
   }
   
+  // Cek Discord sent
   if (isDiscordAlreadySent()) {
     isPaymentVerified = true;
     statusEl.className = 'payment-status success';
@@ -1193,6 +1208,7 @@ async function checkPaymentStatus() {
     return;
   }
   
+  // Cek API Key
   if (!QIOSPAY_API_KEY) {
     await fetchConfigFromEnv();
     if (!QIOSPAY_API_KEY) {
@@ -1213,6 +1229,7 @@ async function checkPaymentStatus() {
     const gmail = getStoredGmail();
     const userID = await getUserID();
     
+    // Cek banned
     const bannedData = await checkGmailBanned(gmail);
     if (bannedData) {
       statusEl.className = 'payment-status failed';
@@ -1222,9 +1239,9 @@ async function checkPaymentStatus() {
       return;
     }
     
-    // HITUNG ULANG NOMINAL YANG SAMA DENGAN QRIS
+    // HITUNG NOMINAL YANG DICEK = TOTAL BAYAR (sudah termasuk kode unik + admin fee)
     const totalBayar = finalTotal + uniqueCode + adminFee;
-    currentTotalBayar = totalBayar; // SIMPAN UNTUK REFERENCE
+    currentTotalBayar = totalBayar;
     
     console.log('💰 Nominal yang dicek ke QIOSPAY:', totalBayar);
     console.log('💰 Detail: finalTotal=' + finalTotal + ', uniqueCode=' + uniqueCode + ', adminFee=' + adminFee);
@@ -1251,16 +1268,19 @@ async function checkPaymentStatus() {
         let cleanAmount = rawAmount.replace(/[^0-9]/g, '');
         let amountNumber = parseInt(cleanAmount) || 0;
         
-        // CEK APAKAH SAMA DENGAN NOMINAL YANG DIHARAPKAN
+        console.log('🔍 Cek transaksi: ' + amountNumber + ' vs target ' + totalBayar);
+        
+        // CEK PERSIS SAMA DENGAN TOTAL BAYAR
         if (amountNumber === totalBayar) {
           foundTransaction = t;
           console.log('✅ Transaksi ditemukan (exact match):', t);
           break;
         }
         
-        if (Math.round(amountNumber) === totalBayar) {
+        // FALLBACK: cek dengan pembulatan (jika ada selisih kecil)
+        if (Math.abs(amountNumber - totalBayar) <= 2) {
           foundTransaction = t;
-          console.log('✅ Transaksi ditemukan (round match):', t);
+          console.log('✅ Transaksi ditemukan (near match, selisih ' + (amountNumber - totalBayar) + '):', t);
           break;
         }
       }
@@ -1273,8 +1293,8 @@ async function checkPaymentStatus() {
       
       const sent = await sendToDiscord(gmail, userID);
       
-      if (sent) {
-        await sendOrderToFayupedia();
+      if (sent && ordersData.length > 0) {
+        await sendMassOrdersToFayupedia();
         saveTransactionLockLocal();
         console.log('🔒 Transaksi locked');
       }
@@ -1289,7 +1309,7 @@ async function checkPaymentStatus() {
       
     } else {
       statusEl.className = 'payment-status loading';
-      statusEl.textContent = '⏳ Belum ada pembayaran terdeteksi. Silakan scan QRIS dan transfer.';
+      statusEl.textContent = `⏳ Belum ada pembayaran Rp ${totalBayar.toLocaleString('id-ID')} terdeteksi. Silakan scan QRIS dan transfer.`;
       confirmBtn.disabled = false;
       confirmBtn.textContent = '✅ Cek Status Pembayaran';
     }
@@ -1360,7 +1380,7 @@ function buildQR(a){
   return base+tag+"6304"+crc16(base+tag+"6304");
 }
 
-// ================= UPDATE DISPLAY (FIXED + SYNC) =================
+// ================= UPDATE DISPLAY =================
 function updateDisplay(){
   uniqueCode = generateUniqueCode();
   document.getElementById('uniqueCode').textContent = uniqueCode;
@@ -1368,14 +1388,31 @@ function updateDisplay(){
   adminFee = calculateAdminFee(originalTotal);
   
   const totalDenganUnik = finalTotal + uniqueCode + adminFee;
-  currentTotalBayar = totalDenganUnik; // SIMPAN UNTUK CEK QIOSPAY
+  currentTotalBayar = totalDenganUnik;
   
   let detailHtml = `
   <strong>ID Transaksi:</strong> ${trx}<br>
-  <strong>Layanan:</strong> ${layanan}<br>
-  <strong>Target:</strong> ${target}<br>
+  <strong>Tipe:</strong> ${isMass ? '📦 MASSAL ('+ordersData.length+' pesanan)' : '📋 Single'}<br>
   <strong>Total:</strong> <s>Rp ${originalTotal.toLocaleString("id-ID")}</s><br>
   `;
+  
+  if (isMass && ordersData.length > 0) {
+    detailHtml += `<strong>📋 Detail Pesanan:</strong><br>`;
+    ordersData.forEach((o, i) => {
+      detailHtml += `<div class="order-item-detail">
+        ${i+1}. ${o.serviceName} x${o.jumlah.toLocaleString('id-ID')} → ${o.target}
+        ${o.comment ? ` 📝 komentar: ${o.comment.split('\n').filter(l=>l.trim()).length} baris` : ''}
+      </div>`;
+    });
+  } else if (!isMass && ordersData.length === 1) {
+    const o = ordersData[0];
+    detailHtml += `
+    <strong>Layanan:</strong> ${o.serviceName}<br>
+    <strong>Target:</strong> ${o.target}<br>
+    <strong>Jumlah:</strong> ${o.jumlah.toLocaleString('id-ID')}<br>
+    ${o.comment ? `<strong>📝 Komentar:</strong> ${o.comment}<br>` : ''}
+    `;
+  }
   
   if (appliedVoucher) {
     detailHtml += `<strong>🎫 Voucher:</strong> <span class="voucher-text">${appliedVoucher}</span> <span class="discount-text">(Diskon Rp ${appliedDiscount.toLocaleString("id-ID")})</span><br>`;
@@ -1383,16 +1420,6 @@ function updateDisplay(){
   
   if (adminFee > 0) {
     detailHtml += `<strong>📊 Biaya Admin 2%:</strong> <span class="admin-fee-text">Rp ${adminFee.toLocaleString("id-ID")}</span><br>`;
-  }
-  
-  if (serviceId) {
-    detailHtml += `<strong>🆔 ID Layanan:</strong> ${serviceId}<br>`;
-  }
-  if (quantity > 0) {
-    detailHtml += `<strong>🔢 Jumlah:</strong> ${quantity}<br>`;
-  }
-  if (comment && comment.trim() !== '') {
-    detailHtml += `<strong>📝 Komentar:</strong> ${comment}<br>`;
   }
   
   detailHtml += `<strong>Total Bayar:</strong> Rp ${totalDenganUnik.toLocaleString("id-ID")}`;
@@ -1431,7 +1458,7 @@ async function loadVoucher(){
   }catch{return []}
 }
 
-// ================= APPLY VOUCHER (UPDATE QRIS & NOMINAL CEK) =================
+// ================= APPLY VOUCHER =================
 document.getElementById('applyVoucher').onclick = async function() {
   const code = document.getElementById('voucherInput').value.trim().toUpperCase();
   if(!code) return Swal.fire("Isi kode voucher","","warning");
@@ -1555,10 +1582,8 @@ document.getElementById('confirmBtn').onclick = function() {
     document.getElementById('applyVoucher').style.opacity = '0.4';
   }
   
-  // LOG COMMENT JIKA ADA
-  if (comment && comment.trim() !== '') {
-    console.log('📝 Comment detected from URL:', comment);
-  }
+  console.log('📦 Orders data:', ordersData);
+  console.log('📊 Is Mass:', isMass);
   
   updateDisplay();
   
@@ -1600,19 +1625,10 @@ setInterval(() => {
 }, 2000);
 
 console.log('💳 QRIS Payment - Sosmed 2 siap!');
+console.log('📦 Mass order:', isMass, ordersData.length, 'items');
 console.log('📧 Gmail diambil dari localStorage');
-console.log('🚫 Cek banned berdasarkan Gmail');
-console.log('🕐 WIB real-time aktif');
 console.log('✅ Auto-verifikasi QRIS aktif (cek setiap 10 detik)');
-console.log('🔑 Kode unik PERSISTEN');
-console.log('📨 Notifikasi Discord hanya 1×');
-console.log('📦 Auto-order ke Fayupedia setelah pembayaran terverifikasi');
-console.log('📝 Comment:', comment || 'Tidak ada');
-console.log('🆔 Service ID:', serviceId || 'Tidak ada');
-console.log('🔢 Quantity:', quantity);
-console.log('🎯 Target:', target);
+console.log('💰 Nominal target:', currentTotalBayar);
 </script>
 </body>
 </html>
-
-
