@@ -607,6 +607,36 @@ function markOrderSent() {
   }
 }
 
+// ================= PERSISTENT STATE =================
+function getPaymentStateKey() {
+  return `payment_state_${trx}`;
+}
+
+function getPaymentState() {
+  try {
+    const key = getPaymentStateKey();
+    const data = localStorage.getItem(key);
+    if (data) {
+      return JSON.parse(data);
+    }
+  } catch (e) {
+    console.warn('Gagal baca payment state:', e);
+  }
+  return null;
+}
+
+function savePaymentState(state) {
+  try {
+    const key = getPaymentStateKey();
+    localStorage.setItem(key, JSON.stringify(state));
+    console.log('💾 Payment state saved:', state);
+    return true;
+  } catch (e) {
+    console.warn('Gagal simpan payment state:', e);
+    return false;
+  }
+}
+
 // ================= AMBIL KONFIGURASI DARI ENV =================
 async function fetchConfigFromEnv() {
   try {
@@ -669,6 +699,7 @@ let isSendingOrder = false;
 let orderResultData = null;
 let configLoaded = false;
 let currentTotalBayar = 0;
+let isProcessingPayment = false;
 
 // ================= KODE UNIK PERSISTEN =================
 function getUniqueCodeKey() {
@@ -862,7 +893,7 @@ async function checkAndHandleBan() {
 // ================= SEND ORDER MASSAL KE FAYUPEDIA =================
 async function sendMassOrdersToFayupedia() {
   if (isOrderAlreadySent()) {
-    console.log('⏭️ Order sudah dikirim ke Shine Shop, skipping...');
+    console.log('⏭️ Order sudah dikirim ke Fayupedia, skipping...');
     return true;
   }
   
@@ -883,7 +914,7 @@ async function sendMassOrdersToFayupedia() {
   if (!FAYUPEDIA_API_KEY) {
     const orderStatus = document.getElementById('orderStatus');
     orderStatus.className = 'order-status failed';
-    orderStatus.textContent = '❌ API Key Shine Shop tidak ditemukan.';
+    orderStatus.textContent = '❌ API Key Fayupedia tidak ditemukan.';
     orderStatus.style.display = 'block';
     return false;
   }
@@ -891,7 +922,7 @@ async function sendMassOrdersToFayupedia() {
   isSendingOrder = true;
   const orderStatus = document.getElementById('orderStatus');
   orderStatus.className = 'order-status loading';
-  orderStatus.textContent = `⏳ Mengirim ${ordersData.length} pesanan ke Shine Shop...`;
+  orderStatus.textContent = `⏳ Mengirim ${ordersData.length} pesanan ke Fayupedia...`;
   orderStatus.style.display = 'block';
   
   let successCount = 0;
@@ -1065,7 +1096,7 @@ window.copyOrderId = function(orderId) {
   });
 };
 
-// ================= SEND MASS ORDER NOTIFICATION TO DISCORD (DENGAN SERVICE ID) =================
+// ================= SEND MASS ORDER NOTIFICATION TO DISCORD =================
 async function sendMassOrderNotificationToDiscord(orderIds, successCount, failedOrders) {
   try {
     let orderList = '';
@@ -1078,7 +1109,7 @@ async function sendMassOrderNotificationToDiscord(orderIds, successCount, failed
       ? `\n⚠️ Gagal: ${failedOrders.length} pesanan` 
       : '';
     
-    const message = `📦 **ORDER MASSAL SHINE SHOP**
+    const message = `📦 **ORDER MASSAL FAYUPEDIA**
 ━━━━━━━━━━━━━━━━━━━━━
 🆔 **ID Transaksi:** ${trx}
 📊 **Total Pesanan:** ${ordersData.length}
@@ -1176,11 +1207,40 @@ ${orderList || '  -'}
   }
 }
 
-// ================= CHECK PAYMENT VIA QIOSPAY =================
+// ================= CHECK PAYMENT VIA QIOSPAY (PERSISTENT) =================
 async function checkPaymentStatus() {
+  // Cegah proses ganda
+  if (isProcessingPayment) {
+    console.log('⏳ Payment check already running...');
+    return;
+  }
+  
   const statusEl = document.getElementById('paymentStatus');
   const confirmBtn = document.getElementById('confirmBtn');
   
+  // CEK STATE PERSISTEN DULU
+  const savedState = getPaymentState();
+  if (savedState && savedState.verified === true) {
+    console.log('✅ Payment already verified (from state)');
+    isPaymentVerified = true;
+    transactionLocked = true;
+    statusEl.className = 'payment-status success';
+    statusEl.textContent = '✅ Pembayaran sudah terverifikasi!';
+    statusEl.style.display = 'block';
+    confirmBtn.disabled = true;
+    confirmBtn.textContent = '✅ Pembayaran Terverifikasi';
+    
+    // Kalo belum kirim order, kirim sekarang
+    if (savedState.orderSent === false && ordersData.length > 0) {
+      console.log('📦 Sending orders from saved state...');
+      await sendMassOrdersToFayupedia();
+      savedState.orderSent = true;
+      savePaymentState(savedState);
+    }
+    return;
+  }
+  
+  // Jika sudah terverifikasi di memory
   if (isPaymentVerified) {
     statusEl.className = 'payment-status success';
     statusEl.textContent = '✅ Pembayaran sudah terverifikasi!';
@@ -1188,6 +1248,7 @@ async function checkPaymentStatus() {
     return;
   }
   
+  // Cek lock local
   if (checkTransactionLockLocal()) {
     isPaymentVerified = true;
     statusEl.className = 'payment-status success';
@@ -1196,6 +1257,7 @@ async function checkPaymentStatus() {
     return;
   }
   
+  // Cek Discord sent
   if (isDiscordAlreadySent()) {
     isPaymentVerified = true;
     statusEl.className = 'payment-status success';
@@ -1203,9 +1265,11 @@ async function checkPaymentStatus() {
     statusEl.style.display = 'block';
     confirmBtn.disabled = true;
     confirmBtn.textContent = '✅ Pembayaran Terverifikasi';
+    savePaymentState({ verified: true, orderSent: isOrderAlreadySent() });
     return;
   }
   
+  // Cek API Key
   if (!QIOSPAY_API_KEY) {
     await fetchConfigFromEnv();
     if (!QIOSPAY_API_KEY) {
@@ -1216,6 +1280,7 @@ async function checkPaymentStatus() {
     }
   }
   
+  isProcessingPayment = true;
   statusEl.className = 'payment-status loading';
   statusEl.textContent = '⏳ Mengecek pembayaran...';
   statusEl.style.display = 'block';
@@ -1226,12 +1291,14 @@ async function checkPaymentStatus() {
     const gmail = getStoredGmail();
     const userID = await getUserID();
     
+    // Cek banned
     const bannedData = await checkGmailBanned(gmail);
     if (bannedData) {
       statusEl.className = 'payment-status failed';
       statusEl.textContent = '🚫 Akun Anda diblokir!';
       confirmBtn.disabled = false;
       confirmBtn.textContent = '✅ Cek Status Pembayaran';
+      isProcessingPayment = false;
       return;
     }
     
@@ -1281,13 +1348,23 @@ async function checkPaymentStatus() {
     
     if (foundTransaction) {
       isPaymentVerified = true;
+      transactionLocked = true;
       statusEl.className = 'payment-status success';
       statusEl.textContent = `✅ Pembayaran Rp ${totalBayar.toLocaleString('id-ID')} terverifikasi!`;
+      
+      // SAVE STATE PERSISTEN
+      savePaymentState({ verified: true, orderSent: false });
       
       const sent = await sendToDiscord(gmail, userID);
       
       if (sent && ordersData.length > 0) {
         await sendMassOrdersToFayupedia();
+        // Update state bahwa order sudah dikirim
+        const currentState = getPaymentState();
+        if (currentState) {
+          currentState.orderSent = true;
+          savePaymentState(currentState);
+        }
         saveTransactionLockLocal();
         console.log('🔒 Transaksi locked');
       }
@@ -1314,6 +1391,8 @@ async function checkPaymentStatus() {
     confirmBtn.disabled = false;
     confirmBtn.textContent = '✅ Cek Status Pembayaran';
   }
+  
+  isProcessingPayment = false;
 }
 
 // ================= LOCK LOCAL STORAGE =================
@@ -1540,6 +1619,29 @@ document.getElementById('confirmBtn').onclick = function() {
   const isBanned = await checkAndHandleBan();
   if (isBanned) return;
   
+  // CEK STATE PERSISTEN DULU
+  const savedState = getPaymentState();
+  if (savedState && savedState.verified === true) {
+    console.log('✅ Restoring verified state...');
+    isPaymentVerified = true;
+    transactionLocked = true;
+    const btn = document.getElementById('confirmBtn');
+    btn.disabled = true;
+    btn.textContent = '✅ Pembayaran Terverifikasi';
+    document.getElementById('paymentStatus').className = 'payment-status success';
+    document.getElementById('paymentStatus').textContent = '✅ Pembayaran sudah terverifikasi!';
+    document.getElementById('paymentStatus').style.display = 'block';
+    
+    // Kalo order belum dikirim, kirim sekarang
+    if (savedState.orderSent === false && ordersData.length > 0) {
+      console.log('📦 Sending orders from saved state on init...');
+      await sendMassOrdersToFayupedia();
+      savedState.orderSent = true;
+      savePaymentState(savedState);
+    }
+    return;
+  }
+  
   if (checkTransactionLockLocal()) {
     transactionLocked = true;
     isPaymentVerified = true;
@@ -1549,6 +1651,7 @@ document.getElementById('confirmBtn').onclick = function() {
     document.getElementById('paymentStatus').className = 'payment-status success';
     document.getElementById('paymentStatus').textContent = '✅ Pembayaran sudah terverifikasi!';
     document.getElementById('paymentStatus').style.display = 'block';
+    savePaymentState({ verified: true, orderSent: isOrderAlreadySent() });
     return;
   }
   
@@ -1560,6 +1663,7 @@ document.getElementById('confirmBtn').onclick = function() {
     document.getElementById('paymentStatus').className = 'payment-status success';
     document.getElementById('paymentStatus').textContent = '✅ Pembayaran sudah terverifikasi!';
     document.getElementById('paymentStatus').style.display = 'block';
+    savePaymentState({ verified: true, orderSent: isOrderAlreadySent() });
     return;
   }
   
@@ -1578,10 +1682,18 @@ document.getElementById('confirmBtn').onclick = function() {
   
   updateDisplay();
   
+  // JALANKAN AUTO-VERIFIKASI PERSISTEN (TERUS MENERUS)
   setTimeout(() => {
     checkPaymentStatus();
     verificationInterval = setInterval(checkPaymentStatus, 10000);
   }, 3000);
+  
+  // SIMPAN STATE KALO HALAMAN DI TUTUP
+  window.addEventListener('beforeunload', function() {
+    if (isPaymentVerified) {
+      savePaymentState({ verified: true, orderSent: isOrderAlreadySent() });
+    }
+  });
 })();
 
 // ================= REFERRAL =================
@@ -1620,6 +1732,7 @@ console.log('📦 Mass order:', isMass, ordersData.length, 'items');
 console.log('📧 Gmail diambil dari localStorage');
 console.log('✅ Auto-verifikasi QRIS aktif (cek setiap 10 detik)');
 console.log('🆔 Service ID akan dikirim ke Discord');
+console.log('💾 Persistent payment state aktif');
 </script>
 </body>
 </html>
