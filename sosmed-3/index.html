@@ -1063,16 +1063,32 @@ button.primary:disabled {
   margin-bottom: 8px;
 }
 
-/* ===== SINGLE MODE - JUMLAH DI-FIX ===== */
-.single-jumlah-info {
-  font-size: 12px;
-  color: var(--text-muted);
-  background: rgba(6, 182, 212, 0.06);
-  border: 1px solid rgba(6, 182, 212, 0.1);
+/* ===== SINGLE MODE - LANGSUNG CHECKOUT ===== */
+.single-checkout-btn {
+  width: 100%;
+  padding: 14px;
+  margin-top: 16px;
   border-radius: var(--radius-sm);
-  padding: 8px 12px;
-  margin-top: 4px;
-  text-align: center;
+  border: none;
+  font-weight: 650;
+  font-size: 15px;
+  cursor: pointer;
+  background: var(--accent-gradient);
+  color: white;
+  box-shadow: 0 6px 20px rgba(124, 58, 237, 0.28);
+  transition: transform var(--transition), box-shadow var(--transition);
+  font-family: inherit;
+}
+
+.single-checkout-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 28px rgba(6, 182, 212, 0.32);
+}
+
+.single-checkout-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none !important;
 }
 
 @media (max-width: 639px) {
@@ -1100,6 +1116,7 @@ button.primary:disabled {
   .cselect-panel { max-height: 70vh; }
   .cselect-item { padding: 11px 12px; font-size: 13px; }
   button.primary, .btn-primary { font-size: 13px; padding: 12px 16px; margin-top: 16px; }
+  .single-checkout-btn { font-size: 13px; padding: 12px 16px; }
   .desc, .aver { padding: 10px 12px; font-size: 12px; }
   .alert { font-size: 12px; padding: 10px 12px; }
   .filter-row { flex-direction: column; gap: 8px; }
@@ -1122,6 +1139,7 @@ button.primary:disabled {
   input, select, textarea { font-size: 12px; padding: 8px 10px; min-height: 36px; }
   .cselect-trigger { min-height: 36px; padding: 8px 32px 8px 10px; font-size: 12px; }
   button.primary, .btn-primary { font-size: 12px; padding: 10px 14px; }
+  .single-checkout-btn { font-size: 12px; padding: 10px 14px; }
   .desc, .aver { font-size: 11px; padding: 8px 10px; }
 }
 
@@ -1220,12 +1238,12 @@ button.primary:disabled {
     <button class="mode-btn" data-mode="massal" id="modeMassal">📦 Massal Order</button>
   </div>
 
+  <!-- ===== SINGLE SECTION ===== -->
   <div id="singleSection">
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;">
       <div>
         <label for="jumlah">Jumlah Pesanan</label>
-        <input type="number" id="jumlah" min="1" inputmode="numeric" value="1" readonly disabled style="opacity:0.5;cursor:not-allowed;">
-        <div class="single-jumlah-info">📌 Single Order: 1 pesanan per klik</div>
+        <input type="number" id="jumlah" min="1" inputmode="numeric" value="1">
       </div>
       <div>
         <label for="target">Target / Link</label>
@@ -1243,19 +1261,25 @@ button.primary:disabled {
       </div>
     </div>
 
-    <button class="btn-secondary" id="btnAddOrder" type="button" style="width:100%;margin-top:12px;">
-      ➕ Tambahkan ke Daftar
+    <!-- SINGLE MODE: LANGSUNG CHECKOUT -->
+    <button class="single-checkout-btn" id="btnSingleCheckout" type="button">
+      💳 Lanjut ke Pembayaran (Single)
     </button>
+    <div style="color:#64748b;font-size:11px;text-align:center;margin-top:6px;">
+      ⚡ Single order langsung checkout tanpa daftar
+    </div>
   </div>
 
+  <!-- ===== MASSAL SECTION ===== -->
   <div id="massalSection" style="display:none;margin-top:12px;">
     <div class="alert" style="border-left-color:var(--warning);color:var(--warning);background:rgba(251,191,36,0.06);">
-      📦 Mode Massal: Isi jumlah total dan target. Pesanan akan diproses secara massal.
+      📦 Mode Massal: Isi jumlah dan target sesuai dengan pesanan yang diinginkan.
+      Klik "Tambahkan" untuk menambah ke daftar, bisa tambah banyak pesanan.
     </div>
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;">
       <div>
-        <label for="massalJumlah">Total Jumlah</label>
+        <label for="massalJumlah">Jumlah</label>
         <input type="number" id="massalJumlah" min="1" inputmode="numeric" value="1">
       </div>
       <div>
@@ -1264,26 +1288,26 @@ button.primary:disabled {
       </div>
     </div>
 
-    <button class="btn-secondary" id="btnAddMassalOrder" type="button" style="width:100%;margin-top:12px;">
-      ➕ Tambahkan Massal ke Daftar
+    <button class="btn-secondary" id="btnAddMassal" type="button" style="width:100%;margin-top:12px;">
+      ➕ Tambahkan ke Daftar Massal
     </button>
-  </div>
 
-  <!-- DAFTAR PESANAN -->
-  <div id="orderListContainer" style="margin-top:16px;display:none;">
-    <label style="margin-top:0;">📋 Daftar Pesanan (<span id="orderCount">0</span>)</label>
-    <div id="orderList"></div>
-    <div class="order-summary">
-      <span class="count">Total <strong id="orderCountSummary">0</strong> pesanan</span>
-      <span class="total">Total: Rp <span id="orderTotalSummary">0</span></span>
+    <!-- DAFTAR PESANAN MASSAL -->
+    <div id="orderListContainer" style="margin-top:16px;display:none;">
+      <label style="margin-top:0;">📋 Daftar Pesanan Massal (<span id="orderCount">0</span>)</label>
+      <div id="orderList"></div>
+      <div class="order-summary">
+        <span class="count">Total <strong id="orderCountSummary">0</strong> pesanan</span>
+        <span class="total">Total: Rp <span id="orderTotalSummary">0</span></span>
+      </div>
+      <button class="btn-secondary" id="btnClearOrders" type="button" style="width:100%;">
+        🗑️ Kosongkan Semua
+      </button>
+      <button class="single-checkout-btn" id="btnMassalCheckout" type="button" style="margin-top:12px;">
+        📦 Checkout Massal
+      </button>
     </div>
-    <button class="btn-secondary" id="btnClearOrders" type="button" style="width:100%;">
-      🗑️ Kosongkan Semua
-    </button>
   </div>
-
-  <label for="total">Total Harga (Rp)</label>
-  <input type="text" id="total" readonly>
 
   <div class="alert">
     Peringatan: Waktu rata-rata selesai tidak sepenuhnya akurat. Perhitungan berdasarkan 10 transaksi terakhir.<br>
@@ -1318,7 +1342,6 @@ button.primary:disabled {
     <div class="terms-error" id="termsError">⚠️ Anda harus menyetujui syarat &amp; ketentuan terlebih dahulu!</div>
   </div>
 
-  <button class="primary" id="btnBayar" type="button">Lanjut ke Pembayaran</button>
 </main>
 
 <script>
@@ -1364,10 +1387,10 @@ button.primary:disabled {
   let refreshTimer = null;
   let currentSort = 'asc';
 
-  // ===== ORDER LIST =====
+  // ===== ORDER LIST (MASSAL ONLY) =====
   let orders = [];
   let currentServiceForOrder = null;
-  let currentMode = 'single'; // 'single' | 'massal'
+  let currentMode = 'single';
 
   termsLink.addEventListener('click', function (e) {
     e.preventDefault();
@@ -1433,16 +1456,13 @@ button.primary:disabled {
   const modeMassal = document.getElementById('modeMassal');
   const singleSection = document.getElementById('singleSection');
   const massalSection = document.getElementById('massalSection');
-  const jumlahInput = document.getElementById('jumlah');
 
   function setMode(mode) {
     currentMode = mode;
-    
-    // Update button states
+
     modeSingle.classList.toggle('active', mode === 'single');
     modeMassal.classList.toggle('active', mode === 'massal');
-    
-    // Show/hide sections
+
     singleSection.style.display = mode === 'single' ? 'block' : 'none';
     massalSection.style.display = mode === 'massal' ? 'block' : 'none';
   }
@@ -1783,7 +1803,6 @@ button.primary:disabled {
   // ===== HITUNG TOTAL =====
   function hitungTotal() {
     const total = orders.reduce((sum, o) => sum + o.total, 0);
-    document.getElementById('total').value = total;
     document.getElementById('orderTotalSummary').textContent = total.toLocaleString('id-ID');
   }
 
@@ -1820,25 +1839,30 @@ button.primary:disabled {
     }
   }
 
-  // ===== TAMBAH ORDER SINGLE =====
-  function addSingleOrder() {
+  // ===== SINGLE MODE - LANGSUNG CHECKOUT =====
+  function singleCheckout() {
+    if (!termsCheckbox.checked) {
+      termsError.classList.add('show');
+      document.getElementById('termsContainer').scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setTimeout(function () { termsError.classList.remove('show'); }, 3000);
+      return;
+    }
+
     if (!currentServiceForOrder) {
       alert('Pilih layanan terlebih dahulu!');
       return;
     }
 
-    // SINGLE ORDER: jumlah selalu 1
-    const jumlah = 1;
+    const jumlah = parseInt(document.getElementById('jumlah').value || '0', 10);
     const target = document.getElementById('target').value.trim();
 
-    if (!target) {
-      alert('Masukkan target / link!');
+    if (jumlah < currentServiceForOrder.min || jumlah > currentServiceForOrder.max) {
+      alert('Jumlah harus antara ' + currentServiceForOrder.min + ' dan ' + currentServiceForOrder.max);
       return;
     }
 
-    // Cek apakah layanan support jumlah 1 (min harus <= 1)
-    if (currentServiceForOrder.min > 1) {
-      alert('Layanan ini minimal ' + currentServiceForOrder.min + ' unit. Gunakan mode Massal untuk jumlah besar.');
+    if (!target) {
+      alert('Masukkan target / link!');
       return;
     }
 
@@ -1852,7 +1876,7 @@ button.primary:disabled {
         return;
       }
       if (lines.length !== jumlah) {
-        alert('⚠️ Jumlah komentar (' + lines.length + ') harus sama dengan jumlah pesanan (1)!');
+        alert('⚠️ Jumlah komentar (' + lines.length + ') harus sama dengan jumlah pesanan (' + jumlah + ')!');
         document.getElementById('comments').focus();
         return;
       }
@@ -1861,52 +1885,37 @@ button.primary:disabled {
     const hargaAktif = getActivePrice(currentServiceForOrder);
     const total = calcTotal(jumlah, hargaAktif);
 
-    const order = {
-      id: Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+    const trxID = 'TRX' + Date.now() + Math.floor(Math.random() * 1000);
+
+    const orderData = [{
       serviceId: currentServiceForOrder.id,
       serviceName: currentServiceForOrder.name,
       kategori: document.getElementById('kategori').value,
       jumlah: jumlah,
       target: target,
       total: total,
-      hargaPerUnit: hargaAktif,
       comment: requiresComment ? document.getElementById('comments').value : null
-    };
+    }];
 
-    orders.push(order);
-    renderOrders();
-    hitungTotal();
-    updateOrderCount();
+    let url = 'payment/?trx=' + trxID +
+      '&total=' + total +
+      '&mass=0' +
+      '&orders=' + encodeURIComponent(JSON.stringify(orderData));
 
-    // Reset form
-    document.getElementById('target').value = '';
-    if (requiresComment) {
-      document.getElementById('comments').value = '';
-      validateComments();
-    }
-
-    Swal.fire({
-      title: '✅ Ditambahkan!',
-      text: order.serviceName + ' x' + order.jumlah + ' berhasil ditambahkan.',
-      icon: 'success',
-      timer: 1500,
-      showConfirmButton: false,
-      toast: true,
-      position: 'top-end'
-    });
+    window.location.href = url;
   }
 
-  // ===== TAMBAH ORDER MASSAL =====
+  // ===== MASSAL - TAMBAH ORDER =====
   function addMassalOrder() {
     if (!currentServiceForOrder) {
       alert('Pilih layanan terlebih dahulu!');
       return;
     }
 
-    const totalJumlah = parseInt(document.getElementById('massalJumlah').value || '0', 10);
+    const jumlah = parseInt(document.getElementById('massalJumlah').value || '0', 10);
     const target = document.getElementById('massalTarget').value.trim();
 
-    if (totalJumlah < 1) {
+    if (jumlah < 1) {
       alert('Jumlah minimal 1!');
       return;
     }
@@ -1916,43 +1925,36 @@ button.primary:disabled {
       return;
     }
 
-    if (totalJumlah < currentServiceForOrder.min) {
-      alert('Jumlah ' + totalJumlah + ' kurang dari minimal ' + currentServiceForOrder.min);
-      return;
-    }
-
-    if (totalJumlah > currentServiceForOrder.max) {
-      alert('Jumlah ' + totalJumlah + ' melebihi maksimal ' + currentServiceForOrder.max + '. Silakan kurangi.');
+    if (jumlah < currentServiceForOrder.min || jumlah > currentServiceForOrder.max) {
+      alert('Jumlah harus antara ' + currentServiceForOrder.min + ' dan ' + currentServiceForOrder.max);
       return;
     }
 
     const hargaAktif = getActivePrice(currentServiceForOrder);
-    const total = calcTotal(totalJumlah, hargaAktif);
+    const total = calcTotal(jumlah, hargaAktif);
 
     orders.push({
       id: Date.now() + '_' + Math.random().toString(36).substring(2, 6),
       serviceId: currentServiceForOrder.id,
       serviceName: currentServiceForOrder.name,
       kategori: document.getElementById('kategori').value,
-      jumlah: totalJumlah,
+      jumlah: jumlah,
       target: target,
       total: total,
       hargaPerUnit: hargaAktif,
-      comment: null,
-      isMassal: true
+      comment: null
     });
 
     renderOrders();
     hitungTotal();
     updateOrderCount();
 
-    // Reset massal form
     document.getElementById('massalJumlah').value = '1';
     document.getElementById('massalTarget').value = '';
 
     Swal.fire({
       title: '✅ Ditambahkan!',
-      text: currentServiceForOrder.name + ' x' + totalJumlah + ' berhasil ditambahkan.',
+      text: currentServiceForOrder.name + ' x' + jumlah + ' berhasil ditambahkan.',
       icon: 'success',
       timer: 1500,
       showConfirmButton: false,
@@ -1972,7 +1974,7 @@ button.primary:disabled {
     if (orders.length === 0) return;
     Swal.fire({
       title: '🗑️ Kosongkan Semua?',
-      text: 'Semua pesanan akan dihapus.',
+      text: 'Semua pesanan massal akan dihapus.',
       icon: 'warning',
       showCancelButton: true,
       confirmButtonText: '✅ Ya, Kosongkan',
@@ -1993,7 +1995,7 @@ button.primary:disabled {
     const wrapper = document.getElementById('orderListContainer');
 
     if (orders.length === 0) {
-      container.innerHTML = '<div class="empty-state"><span class="icon">📭</span>Tidak ada pesanan</div>';
+      container.innerHTML = '<div class="empty-state"><span class="icon">📭</span>Tidak ada pesanan massal</div>';
       wrapper.style.display = 'none';
       return;
     }
@@ -2001,20 +2003,13 @@ button.primary:disabled {
     wrapper.style.display = 'block';
     let html = '';
     orders.forEach((order, index) => {
-      const commentPreview = order.comment ? 
-        '<div style="font-size:11px;color:#94a3b8;margin-top:2px;">📝 ' + 
-        order.comment.split('\n').filter(l => l.trim()).length + ' komentar</div>' : '';
-      
-      const massalBadge = order.isMassal ? 
-        '<span style="font-size:9px;background:rgba(251,191,36,0.15);color:#fbbf24;padding:1px 8px;border-radius:4px;margin-left:4px;">📦 MASSAL</span>' : '';
-      
       html += `
         <div class="order-item">
           <span class="order-index">#${index + 1}</span>
           <div class="order-info">
             <div class="row">
               <span class="label">Layanan</span>
-              <span class="value">${order.serviceName} ${massalBadge}</span>
+              <span class="value">${order.serviceName}</span>
             </div>
             <div class="row">
               <span class="label">Target</span>
@@ -2028,7 +2023,6 @@ button.primary:disabled {
               <span class="label">Total</span>
               <span class="value" style="color:#06b6d4;">${formatRp(order.total)}</span>
             </div>
-            ${commentPreview}
           </div>
           <div class="order-actions">
             <button class="btn-remove" onclick="window.removeOrder(${index})">✕</button>
@@ -2049,6 +2043,41 @@ button.primary:disabled {
   // Expose functions to global scope
   window.removeOrder = removeOrder;
   window.clearOrders = clearOrders;
+
+  // ===== MASSAL CHECKOUT =====
+  function massalCheckout() {
+    if (!termsCheckbox.checked) {
+      termsError.classList.add('show');
+      document.getElementById('termsContainer').scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setTimeout(function () { termsError.classList.remove('show'); }, 3000);
+      return;
+    }
+
+    if (orders.length === 0) {
+      alert('Tambahkan pesanan massal terlebih dahulu!');
+      return;
+    }
+
+    const trxID = 'TRX' + Date.now() + Math.floor(Math.random() * 1000);
+    const totalBayar = orders.reduce((sum, o) => sum + o.total, 0);
+
+    const ordersData = orders.map(o => ({
+      serviceId: o.serviceId,
+      serviceName: o.serviceName,
+      kategori: o.kategori,
+      jumlah: o.jumlah,
+      target: o.target,
+      total: o.total,
+      comment: o.comment
+    }));
+
+    let url = 'payment/?trx=' + trxID +
+      '&total=' + totalBayar +
+      '&mass=1' +
+      '&orders=' + encodeURIComponent(JSON.stringify(ordersData));
+
+    window.location.href = url;
+  }
 
   // ===== SEARCH =====
   let searchTimer = null;
@@ -2129,64 +2158,29 @@ button.primary:disabled {
     }
   });
 
-  // ===== GENERATE TRX =====
-  function generateTransactionID() {
-    return 'TRX' + Date.now() + Math.floor(Math.random() * 1000);
-  }
-
-  // ===== LANJUT PEMBAYARAN =====
-  function lanjutPembayaran() {
-    if (!termsCheckbox.checked) {
-      termsError.classList.add('show');
-      document.getElementById('termsContainer').scrollIntoView({ behavior: 'smooth', block: 'center' });
-      setTimeout(function () { termsError.classList.remove('show'); }, 3000);
-      return;
-    }
-
-    if (orders.length === 0) {
-      alert('Tambahkan pesanan terlebih dahulu!');
-      return;
-    }
-
-    const trxID = generateTransactionID();
-    const totalBayar = orders.reduce((sum, o) => sum + o.total, 0);
-
-    // Jika hanya 1 order dan bukan massal, kirim sebagai single
-    const isMassal = orders.length > 1 || orders.some(o => o.isMassal);
-
-    let url = 'payment/?trx=' + trxID +
-      '&total=' + totalBayar +
-      '&mass=' + (isMassal ? '1' : '0');
-
-    const ordersData = orders.map(o => ({
-      serviceId: o.serviceId,
-      serviceName: o.serviceName,
-      kategori: o.kategori,
-      jumlah: o.jumlah,
-      target: o.target,
-      total: o.total,
-      comment: o.comment
-    }));
-
-    url += '&orders=' + encodeURIComponent(JSON.stringify(ordersData));
-
-    window.location.href = url;
-  }
-
   // ===== EVENT BINDING =====
   document.getElementById('cselectKategori').querySelector('.cselect-trigger')
     .addEventListener('click', openKategoriPicker);
   document.getElementById('cselectLayanan').querySelector('.cselect-trigger')
     .addEventListener('click', openLayananPicker);
   document.getElementById('sortHarga').addEventListener('change', loadLayanan);
+  document.getElementById('jumlah').addEventListener('input', function() {
+    if (requiresComment) {
+      const jumlah = parseInt(this.value || '0', 10);
+      document.getElementById('commentRequired').textContent = jumlah;
+      validateComments();
+    }
+  });
   document.getElementById('comments').addEventListener('input', validateComments);
   document.getElementById('search').addEventListener('input', searchLayanan);
-  document.getElementById('btnBayar').addEventListener('click', lanjutPembayaran);
+
+  // Single checkout
+  document.getElementById('btnSingleCheckout').addEventListener('click', singleCheckout);
+
+  // Massal
+  document.getElementById('btnAddMassal').addEventListener('click', addMassalOrder);
   document.getElementById('btnClearOrders').addEventListener('click', clearOrders);
-  
-  // Tombol tambah single & massal
-  document.getElementById('btnAddOrder').addEventListener('click', addSingleOrder);
-  document.getElementById('btnAddMassalOrder').addEventListener('click', addMassalOrder);
+  document.getElementById('btnMassalCheckout').addEventListener('click', massalCheckout);
 
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape') closeAllCSelect();
