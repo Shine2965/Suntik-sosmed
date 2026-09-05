@@ -1065,12 +1065,12 @@ window.copyOrderId = function(orderId) {
   });
 };
 
-// ================= SEND MASS ORDER NOTIFICATION TO DISCORD =================
+// ================= SEND MASS ORDER NOTIFICATION TO DISCORD (DENGAN SERVICE ID) =================
 async function sendMassOrderNotificationToDiscord(orderIds, successCount, failedOrders) {
   try {
     let orderList = '';
     ordersData.forEach((o, i) => {
-      orderList += `\n  ${i+1}. ${o.serviceName} x${o.jumlah} → ${o.target}`;
+      orderList += `\n  ${i+1}. ${o.serviceName} (ID: ${o.serviceId}) x${o.jumlah} → ${o.target}`;
     });
     
     const orderIdStr = orderIds.join(', ') || '-';
@@ -1123,10 +1123,11 @@ async function sendToDiscord(gmail, userID) {
     let orderList = '';
     if (isMass && ordersData.length > 0) {
       ordersData.forEach((o, i) => {
-        orderList += `\n  ${i+1}. ${o.serviceName} x${o.jumlah} → ${o.target}`;
+        orderList += `\n  ${i+1}. ${o.serviceName} (ID: ${o.serviceId}) x${o.jumlah} → ${o.target}`;
       });
     } else if (!isMass && ordersData.length === 1) {
-      orderList = `\n  ${ordersData[0].serviceName} x${ordersData[0].jumlah} → ${ordersData[0].target}`;
+      const o = ordersData[0];
+      orderList = `\n  ${o.serviceName} (ID: ${o.serviceId}) x${o.jumlah} → ${o.target}`;
     }
     
     let adminFeeText = '';
@@ -1175,12 +1176,11 @@ ${orderList || '  -'}
   }
 }
 
-// ================= CHECK PAYMENT VIA QIOSPAY (DENGAN NOMINAL SESUAI) =================
+// ================= CHECK PAYMENT VIA QIOSPAY =================
 async function checkPaymentStatus() {
   const statusEl = document.getElementById('paymentStatus');
   const confirmBtn = document.getElementById('confirmBtn');
   
-  // Jika sudah terverifikasi
   if (isPaymentVerified) {
     statusEl.className = 'payment-status success';
     statusEl.textContent = '✅ Pembayaran sudah terverifikasi!';
@@ -1188,7 +1188,6 @@ async function checkPaymentStatus() {
     return;
   }
   
-  // Cek lock local
   if (checkTransactionLockLocal()) {
     isPaymentVerified = true;
     statusEl.className = 'payment-status success';
@@ -1197,7 +1196,6 @@ async function checkPaymentStatus() {
     return;
   }
   
-  // Cek Discord sent
   if (isDiscordAlreadySent()) {
     isPaymentVerified = true;
     statusEl.className = 'payment-status success';
@@ -1208,7 +1206,6 @@ async function checkPaymentStatus() {
     return;
   }
   
-  // Cek API Key
   if (!QIOSPAY_API_KEY) {
     await fetchConfigFromEnv();
     if (!QIOSPAY_API_KEY) {
@@ -1229,7 +1226,6 @@ async function checkPaymentStatus() {
     const gmail = getStoredGmail();
     const userID = await getUserID();
     
-    // Cek banned
     const bannedData = await checkGmailBanned(gmail);
     if (bannedData) {
       statusEl.className = 'payment-status failed';
@@ -1239,7 +1235,6 @@ async function checkPaymentStatus() {
       return;
     }
     
-    // HITUNG NOMINAL YANG DICEK = TOTAL BAYAR (sudah termasuk kode unik + admin fee)
     const totalBayar = finalTotal + uniqueCode + adminFee;
     currentTotalBayar = totalBayar;
     
@@ -1270,14 +1265,12 @@ async function checkPaymentStatus() {
         
         console.log('🔍 Cek transaksi: ' + amountNumber + ' vs target ' + totalBayar);
         
-        // CEK PERSIS SAMA DENGAN TOTAL BAYAR
         if (amountNumber === totalBayar) {
           foundTransaction = t;
           console.log('✅ Transaksi ditemukan (exact match):', t);
           break;
         }
         
-        // FALLBACK: cek dengan pembulatan (jika ada selisih kecil)
         if (Math.abs(amountNumber - totalBayar) <= 2) {
           foundTransaction = t;
           console.log('✅ Transaksi ditemukan (near match, selisih ' + (amountNumber - totalBayar) + '):', t);
@@ -1400,7 +1393,7 @@ function updateDisplay(){
     detailHtml += `<strong>📋 Detail Pesanan:</strong><br>`;
     ordersData.forEach((o, i) => {
       detailHtml += `<div class="order-item-detail">
-        ${i+1}. ${o.serviceName} x${o.jumlah.toLocaleString('id-ID')} → ${o.target}
+        ${i+1}. ${o.serviceName} (ID: ${o.serviceId}) x${o.jumlah.toLocaleString('id-ID')} → ${o.target}
         ${o.comment ? ` 📝 komentar: ${o.comment.split('\n').filter(l=>l.trim()).length} baris` : ''}
       </div>`;
     });
@@ -1408,6 +1401,7 @@ function updateDisplay(){
     const o = ordersData[0];
     detailHtml += `
     <strong>Layanan:</strong> ${o.serviceName}<br>
+    <strong>Service ID:</strong> ${o.serviceId}<br>
     <strong>Target:</strong> ${o.target}<br>
     <strong>Jumlah:</strong> ${o.jumlah.toLocaleString('id-ID')}<br>
     ${o.comment ? `<strong>📝 Komentar:</strong> ${o.comment}<br>` : ''}
@@ -1426,7 +1420,6 @@ function updateDisplay(){
   
   document.getElementById('orderDetails').innerHTML = detailHtml;
   
-  // BUILD QRIS PAKAI NOMINAL YANG SAMA
   QRCode.toCanvas(document.getElementById('qrisCanvas'), buildQR(totalDenganUnik), { width:240 }, function(err){
     if(err) return console.error(err);
     const ctx = document.getElementById('qrisCanvas').getContext("2d");
@@ -1519,10 +1512,8 @@ document.getElementById('applyVoucher').onclick = async function() {
   this.disabled = true;
   this.style.opacity = '0.4';
   
-  // UPDATE QRIS & NOMINAL CEK OTOMATIS
   updateDisplay();
   
-  // UPDATE JUGA PAYMENT STATUS KALO SEDANG LOADING
   const statusEl = document.getElementById('paymentStatus');
   if (statusEl.className === 'payment-status loading') {
     statusEl.textContent = `⏳ Mengecek pembayaran Rp ${(finalTotal + uniqueCode + adminFee).toLocaleString('id-ID')}...`;
@@ -1628,7 +1619,7 @@ console.log('💳 QRIS Payment - Sosmed 2 siap!');
 console.log('📦 Mass order:', isMass, ordersData.length, 'items');
 console.log('📧 Gmail diambil dari localStorage');
 console.log('✅ Auto-verifikasi QRIS aktif (cek setiap 10 detik)');
-console.log('💰 Nominal target:', currentTotalBayar);
+console.log('🆔 Service ID akan dikirim ke Discord');
 </script>
 </body>
 </html>
