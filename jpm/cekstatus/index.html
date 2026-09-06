@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0b1220">
+<title>Cek Status Pesanan - Shine Shop</title>
+<style>
+/* ===============================
+   ROOT THEME
+=================================*/
+:root {
+  --bg: #0b1220;
+  --bg-soft: #111827;
+  --glass: rgba(255, 255, 255, 0.045);
+  --glass-strong: rgba(255, 255, 255, 0.09);
+  --border: rgba(255, 255, 255, 0.08);
+  --accent1: #8b5cf6;
+  --accent2: #06b6d4;
+  --accent-gradient: linear-gradient(135deg, #8b5cf6, #06b6d4);
+  --text: #f1f5f9;
+  --text-muted: #94a3b8;
+  --danger: #f87171;
+  --success: #34d399;
+  --warning: #fbbf24;
+  --radius: 16px;
+  --radius-sm: 12px;
+  --shadow: 0 10px 40px rgba(0, 0, 0, 0.35);
+  --transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  --container-max: 720px;
+  --header-height: 60px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+body {
+  font-family: 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+  color: var(--text);
+  background: var(--bg);
+  min-height: 100vh;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+  padding-top: var(--header-height);
+}
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 80% 50% at 20% -10%, rgba(139, 92, 246, 0.18), transparent 50%),
+    radial-gradient(ellipse 60% 40% at 90% 10%, rgba(6, 182, 212, 0.12), transparent 45%),
+    radial-gradient(ellipse 50% 30% at 50% 100%, rgba(139, 92, 246, 0.08), transparent 50%);
+  pointer-events: none;
+  z-index: 0;
+}
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(139, 92, 246, 0.45); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: var(--accent2); }
+
+/* ===== HEADER ===== */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: rgba(11, 18, 32, 0.88);
+  border-bottom: 1px solid var(--border);
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 80;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  height: var(--header-height);
+}
+.brand { display: flex; align-items: center; gap: 12px; }
+.logo {
+  width: 36px; height: 36px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--glass);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.logo img { width: 100%; height: 100%; object-fit: cover; }
+h1 {
+  font-size: 17px;
+  font-weight: 650;
+  letter-spacing: 0.2px;
+  background: var(--accent-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.back-btn {
+  background: var(--glass);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 6px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: background var(--transition), border-color var(--transition);
+  text-decoration: none;
+  font-family: inherit;
+}
+.back-btn:hover { background: var(--glass-strong); border-color: rgba(255,255,255,0.18); }
+
+/* ===== CONTAINER ===== */
+.container {
+  position: relative;
+  z-index: 1;
+  max-width: var(--container-max);
+  margin: 16px auto 32px;
+  padding: 20px 16px 24px;
+  border-radius: var(--radius);
+  background: rgba(17, 24, 39, 0.72);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+}
+
+h2 {
+  text-align: center;
+  margin: 0 0 8px;
+  font-weight: 700;
+  font-size: 22px;
+  letter-spacing: -0.3px;
+  background: var(--accent-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.subtitle {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 13px;
+  margin-bottom: 20px;
+}
+
+.gmail-display {
+  background: var(--glass);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px 16px;
+  margin-bottom: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.gmail-display .label { color: var(--text-muted); font-size: 12px; font-weight: 500; }
+.gmail-display .value { color: var(--accent2); font-weight: 600; font-size: 14px; word-break: break-all; }
+.gmail-display .value.not-set { color: var(--danger); font-style: italic; font-weight: 400; }
+.gmail-display .badge {
+  background: rgba(139, 92, 246, 0.15);
+  color: var(--accent1);
+  padding: 2px 12px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* ===== ORDER CARDS ===== */
+.order-card {
+  background: rgba(11, 18, 32, 0.6);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 16px 18px;
+  margin-bottom: 14px;
+  transition: border-color var(--transition), transform var(--transition);
+}
+.order-card:hover { border-color: rgba(255,255,255,0.12); transform: translateY(-1px); }
+
+.order-card .order-id {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+.order-card .order-id span { color: var(--text); }
+
+.order-card .order-produk {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+.order-card .order-detail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 6px 0;
+}
+.order-card .order-detail strong { color: var(--text); font-weight: 600; }
+.order-card .order-detail .label { color: var(--text-muted); }
+
+.order-card .order-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 14px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  margin-top: 8px;
+}
+
+/* Status Colors */
+.status-sukses { background: rgba(52, 211, 153, 0.15); color: var(--success); border: 1px solid rgba(52, 211, 153, 0.2); }
+.status-proses { background: rgba(6, 182, 212, 0.15); color: var(--accent2); border: 1px solid rgba(6, 182, 212, 0.2); }
+.status-pending { background: rgba(251, 191, 36, 0.15); color: var(--warning); border: 1px solid rgba(251, 191, 36, 0.2); }
+.status-cancel { background: rgba(248, 113, 113, 0.15); color: var(--danger); border: 1px solid rgba(248, 113, 113, 0.2); }
+.status-partial { background: rgba(251, 146, 60, 0.15); color: #fb923c; border: 1px solid rgba(251, 146, 60, 0.2); }
+
+.order-card .order-pesan {
+  margin-top: 10px;
+  padding: 10px 14px;
+  background: var(--glass);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  color: var(--text-muted);
+  border-left: 3px solid var(--accent2);
+  line-height: 1.6;
+}
+
+.order-card .order-pesan .icon { margin-right: 6px; }
+
+/* ===== EMPTY STATE ===== */
+.empty-state {
+  text-align: center;
+  padding: 50px 20px;
+  color: var(--text-muted);
+}
+.empty-state .icon { font-size: 56px; display: block; margin-bottom: 16px; }
+.empty-state h3 { color: var(--text); font-size: 18px; margin-bottom: 6px; }
+.empty-state p { font-size: 14px; max-width: 360px; margin: 0 auto; }
+
+/* ===== STATUS LEGEND ===== */
+.status-legend {
+  margin-top: 24px;
+  padding: 16px 18px;
+  background: var(--glass);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+}
+.status-legend h4 {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.status-legend .legend-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.status-legend .legend-item .dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.dot-sukses { background: var(--success); }
+.dot-proses { background: var(--accent2); }
+.dot-pending { background: var(--warning); }
+.dot-cancel { background: var(--danger); }
+.dot-partial { background: #fb923c; }
+
+.status-legend .legend-item .desc { color: var(--text); font-weight: 400; }
+.status-legend .legend-item .ket { color: var(--text-muted); font-size: 12px; }
+
+/* ===== LOADING ===== */
+.loading-state {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-muted);
+}
+.loading-state .spinner {
+  display: inline-block;
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--border);
+  border-top: 3px solid var(--accent2);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin-bottom: 12px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 639px) {
+  .container { padding: 16px 12px 20px; margin: 10px 8px 24px; border-radius: 14px; }
+  h2 { font-size: 18px; }
+  .header { padding: 10px 12px; height: 54px; }
+  :root { --header-height: 54px; }
+  h1 { font-size: 15px; }
+  .logo { width: 32px; height: 32px; }
+  .order-card { padding: 14px 14px; }
+  .order-card .order-produk { font-size: 14px; }
+  .order-card .order-detail { font-size: 12px; gap: 4px 12px; }
+  .status-legend .legend-item { font-size: 12px; }
+  .gmail-display { font-size: 13px; padding: 10px 14px; }
+  .back-btn { font-size: 12px; padding: 4px 10px; }
+}
+@media (max-width: 380px) {
+  .container { padding: 12px 8px 16px; margin: 8px 4px 16px; border-radius: 12px; }
+  h2 { font-size: 16px; }
+  .order-card { padding: 12px 10px; }
+  .order-card .order-produk { font-size: 13px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="header">
+  <div class="brand">
+    <div class="logo">
+      <img src="/home/logo.png" alt="Shine Shop Logo" width="40" height="40" loading="lazy">
+    </div>
+    <h1>Shine Shop</h1>
+  </div>
+  <a href="/sosmed-2/" class="back-btn">← Kembali</a>
+</header>
+
+<!-- MAIN CONTENT -->
+<main class="container">
+  <h2>📋 Riwayat & Status Pesanan</h2>
+  <p class="subtitle">Cek status pesanan Anda di sini</p>
+
+  <!-- GMAIL DISPLAY -->
+  <div class="gmail-display" id="gmailDisplay">
+    <span class="label">📧 Gmail:</span>
+    <span class="value" id="gmailValue">Memuat...</span>
+    <span class="badge" id="orderCountBadge">0 pesanan</span>
+  </div>
+
+  <!-- LOADING -->
+  <div class="loading-state" id="loadingState">
+    <div class="spinner"></div>
+    <p>⏳ Memuat riwayat pesanan...</p>
+  </div>
+
+  <!-- ORDER LIST -->
+  <div id="orderList" style="display:none;"></div>
+
+  <!-- EMPTY STATE -->
+  <div class="empty-state" id="emptyState" style="display:none;">
+    <span class="icon">📭</span>
+    <h3>Belum Ada Pesanan</h3>
+    <p>Anda belum memiliki riwayat transaksi. Silakan lakukan pembelian terlebih dahulu.</p>
+  </div>
+
+  <!-- STATUS LEGEND -->
+  <div class="status-legend">
+    <h4>📌 Keterangan Status</h4>
+    <div class="legend-item">
+      <span class="dot dot-pending"></span>
+      <span><span class="desc">Pending</span> — <span class="ket">Pesanan dalam antrian</span></span>
+    </div>
+    <div class="legend-item">
+      <span class="dot dot-proses"></span>
+      <span><span class="desc">Proses</span> — <span class="ket">Pesanan sedang dikerjakan</span></span>
+    </div>
+    <div class="legend-item">
+      <span class="dot dot-sukses"></span>
+      <span><span class="desc">Sukses</span> — <span class="ket">Pesanan telah selesai dikerjakan</span></span>
+    </div>
+    <div class="legend-item">
+      <span class="dot dot-cancel"></span>
+      <span><span class="desc">Cancel</span> — <span class="ket">Pesanan dibatalkan (tanpa refund)</span></span>
+    </div>
+    <div class="legend-item">
+      <span class="dot dot-partial"></span>
+      <span><span class="desc">Partial</span> — <span class="ket">Pesanan dibatalkan (dengan refund, ajukan ke WhatsApp)</span></span>
+    </div>
+  </div>
+
+  <div style="text-align:center;margin-top:16px;font-size:12px;color:var(--text-muted);">
+    💬 Ada kendala? Hubungi CS: <a href="https://wa.me/6289518103883" target="_blank" style="color:var(--accent2);text-decoration:none;">+6289518103883</a>
+  </div>
+</main>
+
+<script>
+(function() {
+  'use strict';
+
+  const GMAIL_KEY = 'user_gmail';
+  const RIWAYAT_URL = '/jpm/riwayat.json?t=' + Date.now();
+
+  // ===== UTILITY =====
+  function getStoredGmail() {
+    try {
+      return localStorage.getItem(GMAIL_KEY) || null;
+    } catch { return null; }
+  }
+
+  function validateEmail(email) {
+    return email && typeof email === 'string' && email.includes('@') && email.includes('.') && email.length > 5;
+  }
+
+  function formatStatus(status) {
+    if (!status) return 'Pending';
+    const map = {
+      'sukses': 'Sukses',
+      'success': 'Sukses',
+      'proses': 'Proses',
+      'processing': 'Proses',
+      'pending': 'Pending',
+      'cancel': 'Cancel',
+      'cancelled': 'Cancel',
+      'partial': 'Partial'
+    };
+    return map[status.toLowerCase()] || status;
+  }
+
+  function getStatusClass(status) {
+    if (!status) return 'status-pending';
+    const s = status.toLowerCase();
+    if (s === 'sukses' || s === 'success') return 'status-sukses';
+    if (s === 'proses' || s === 'processing') return 'status-proses';
+    if (s === 'pending') return 'status-pending';
+    if (s === 'cancel' || s === 'cancelled') return 'status-cancel';
+    if (s === 'partial') return 'status-partial';
+    return 'status-pending';
+  }
+
+  function getStatusIcon(status) {
+    if (!status) return '⏳';
+    const s = status.toLowerCase();
+    if (s === 'sukses' || s === 'success') return '✅';
+    if (s === 'proses' || s === 'processing') return '🔄';
+    if (s === 'pending') return '⏳';
+    if (s === 'cancel' || s === 'cancelled') return '❌';
+    if (s === 'partial') return '⚠️';
+    return '📌';
+  }
+
+  // ===== RENDER =====
+  function renderOrders(orders, gmail) {
+    const container = document.getElementById('orderList');
+    const emptyState = document.getElementById('emptyState');
+    const loadingState = document.getElementById('loadingState');
+    const badge = document.getElementById('orderCountBadge');
+
+    if (!orders || orders.length === 0) {
+      container.style.display = 'none';
+      emptyState.style.display = 'block';
+      loadingState.style.display = 'none';
+      badge.textContent = '0 pesanan';
+      return;
+    }
+
+    container.style.display = 'block';
+    emptyState.style.display = 'none';
+    loadingState.style.display = 'none';
+    badge.textContent = orders.length + ' pesanan';
+
+    let html = '';
+    orders.forEach(function(order, index) {
+      const status = order.status || 'Pending';
+      const statusLabel = formatStatus(status);
+      const statusClass = getStatusClass(status);
+      const statusIcon = getStatusIcon(status);
+
+      const orderId = Object.keys(order._raw || {})[0] || '#' + (index + 1);
+      const produk = order.produk || 'Tidak diketahui';
+      const jumlah = order.jumlah || '-';
+      const waktu = order.waktu || '-';
+      const pesan = order.pesan || 'Terima kasih sudah mempercayai Shine Shop';
+
+      html += `
+        <div class="order-card">
+          <div class="order-id">🆔 Order ID: <span>${orderId}</span></div>
+          <div class="order-produk">📦 ${produk}</div>
+          <div class="order-detail">
+            <span><span class="label">📊 Jumlah:</span> <strong>${jumlah}</strong></span>
+            <span><span class="label">📅 Waktu:</span> <strong>${waktu}</strong></span>
+          </div>
+          <div class="order-status ${statusClass}">
+            ${statusIcon} ${statusLabel}
+          </div>
+          ${pesan ? `<div class="order-pesan"><span class="icon">📝</span> ${pesan}</div>` : ''}
+        </div>
+      `;
+    });
+
+    container.innerHTML = html;
+  }
+
+  // ===== LOAD DATA =====
+  async function loadRiwayat() {
+    const gmail = getStoredGmail();
+    const gmailEl = document.getElementById('gmailValue');
+    const loadingState = document.getElementById('loadingState');
+
+    // Tampilkan Gmail
+    if (gmail && validateEmail(gmail)) {
+      gmailEl.textContent = gmail;
+      gmailEl.className = 'value';
+    } else {
+      gmailEl.textContent = '⚠️ Gmail belum diatur! Silakan login terlebih dahulu.';
+      gmailEl.className = 'value not-set';
+      loadingState.style.display = 'none';
+      document.getElementById('emptyState').style.display = 'block';
+      document.getElementById('emptyState').querySelector('h3').textContent = '⚠️ Gmail Belum Diatur';
+      document.getElementById('emptyState').querySelector('p').textContent = 'Silakan login ke akun Anda terlebih dahulu untuk melihat riwayat pesanan.';
+      return;
+    }
+
+    try {
+      const res = await fetch(RIWAYAT_URL);
+      if (!res.ok) throw new Error('Gagal memuat riwayat (HTTP ' + res.status + ')');
+
+      const data = await res.json();
+      if (!data || typeof data !== 'object') {
+        throw new Error('Format data tidak valid');
+      }
+
+      // Filter pesanan berdasarkan Gmail
+      const matchedOrders = [];
+      for (const [orderId, orderData] of Object.entries(data)) {
+        if (orderData.gmail && orderData.gmail.toLowerCase() === gmail.toLowerCase()) {
+          matchedOrders.push({
+            ...orderData,
+            _raw: { [orderId]: orderData },
+            orderId: orderId
+          });
+        }
+      }
+
+      // Urutkan berdasarkan waktu (terbaru di atas)
+      matchedOrders.sort(function(a, b) {
+        if (!a.waktu) return 1;
+        if (!b.waktu) return -1;
+        // Coba parse tanggal
+        const da = new Date(a.waktu.replace(' WIB', '').replace(/,/g, ''));
+        const db = new Date(b.waktu.replace(' WIB', '').replace(/,/g, ''));
+        if (isNaN(da.getTime())) return 1;
+        if (isNaN(db.getTime())) return -1;
+        return db - da;
+      });
+
+      renderOrders(matchedOrders, gmail);
+
+    } catch (err) {
+      console.error('❌ Error load riwayat:', err);
+      loadingState.style.display = 'none';
+      document.getElementById('emptyState').style.display = 'block';
+      document.getElementById('emptyState').querySelector('h3').textContent = '❌ Gagal Memuat Data';
+      document.getElementById('emptyState').querySelector('p').textContent = err.message || 'Silakan refresh halaman.';
+    }
+  }
+
+  // ===== INIT =====
+  document.addEventListener('DOMContentLoaded', function() {
+    loadRiwayat();
+  });
+
+  // Auto refresh setiap 30 detik
+  let refreshInterval = setInterval(function() {
+    if (document.visibilityState === 'visible') {
+      loadRiwayat();
+    }
+  }, 30000);
+
+  document.addEventListener('visibilitychange', function() {
+    if (document.visibilityState === 'visible') {
+      loadRiwayat();
+    }
+  });
+
+  console.log('📋 Riwayat Status - Shine Shop');
+  console.log('📧 Gmail:', getStoredGmail() || 'Belum diatur');
+
+})();
+</script>
+</body>
+</html>
