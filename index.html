@@ -333,6 +333,90 @@ h1 {
   font-weight: 600;
 }
 
+/* ========== STATS ========== */
+.stats-container {
+  width: 90%;
+  max-width: 500px;
+  margin: 0 auto 16px;
+  position: relative;
+  z-index: 1;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.stat-card {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  border-radius: 18px;
+  padding: 18px 14px;
+  text-align: center;
+  border: 1px solid rgba(255, 107, 157, 0.12);
+  transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  position: relative;
+  overflow: hidden;
+}
+
+.stat-card::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle at 30% 30%, rgba(255, 107, 157, 0.05), transparent 60%);
+  pointer-events: none;
+}
+
+.stat-card:hover {
+  transform: translateY(-3px) scale(1.02);
+  border-color: rgba(255, 107, 157, 0.25);
+  box-shadow: 0 8px 30px rgba(255, 107, 157, 0.08);
+}
+
+.stat-card .stat-icon {
+  font-size: 24px;
+  display: block;
+  margin-bottom: 4px;
+}
+
+.stat-card .stat-number {
+  font-size: 28px;
+  font-weight: 900;
+  background: linear-gradient(135deg, #ff6b9d, #ffb3d9);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  font-family: 'Poppins', sans-serif;
+  line-height: 1.2;
+}
+
+.stat-card .stat-label {
+  font-size: 11px;
+  color: #b39ddb;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-top: 2px;
+}
+
+.stat-card .stat-suffix {
+  font-size: 16px;
+  font-weight: 700;
+  color: #ffb3d9;
+  -webkit-text-fill-color: #ffb3d9;
+}
+
+.stat-card .stat-sub {
+  font-size: 10px;
+  color: #6b4a7a;
+  margin-top: 2px;
+}
+
 /* ========== DROPDOWN PENGUMUMAN ========== */
 .announcement-dropdown {
   background: rgba(255, 107, 157, 0.06);
@@ -758,6 +842,10 @@ h1 {
     font-size: 12px;
     padding: 10px 12px;
   }
+  .stat-card .stat-number { font-size: 22px; }
+  .stat-card { padding: 14px 10px; }
+  .stat-card .stat-icon { font-size: 20px; }
+  .stats-grid { gap: 8px; }
 }
 </style>
 </head>
@@ -788,10 +876,21 @@ h1 {
 <div class="anime-orb anime-orb-2"></div>
 <div class="anime-orb anime-orb-3"></div>
 
-<!-- ========== AUDIO BACKSOUND ========== -->
-<audio id="bgm" autoplay loop>
-  <source src="https://files.catbox.moe/7ff0k5.mp3" type="audio/mpeg">
-</audio>
+<!-- ========== STATS ========== -->
+<div class="stats-container">
+  <div class="stats-grid">
+    <div class="stat-card">
+      <span class="stat-icon">👥</span>
+      <div class="stat-number" id="statUsers">0</div>
+      <div class="stat-label">Total User</div>
+    </div>
+    <div class="stat-card">
+      <span class="stat-icon">📦</span>
+      <div class="stat-number" id="statOrders">0</div>
+      <div class="stat-label">Total Transaksi</div>
+    </div>
+  </div>
+</div>
 
 <!-- ========== CONTAINER 1 ========== -->
 <div class="container">
@@ -978,6 +1077,63 @@ function getStoredGmail() {
     console.error('❌ Error get Gmail:', e);
     return null;
   }
+}
+
+// ============================================================
+// 🔥 STATS COUNTER ANIMATION
+// ============================================================
+const STATS_DATA = {
+  users: 38,
+  orders: 1000,
+  ordersSuffix: '+'
+};
+
+let statsAnimated = false;
+
+function animateCounter(elementId, target, duration = 2000, suffix = '') {
+  const el = document.getElementById(elementId);
+  if (!el) return;
+  
+  const start = 0;
+  const startTime = performance.now();
+  
+  function updateCounter(currentTime) {
+    const elapsed = currentTime - startTime;
+    const progress = Math.min(elapsed / duration, 1);
+    
+    // Easing function (ease-out)
+    const eased = 1 - Math.pow(1 - progress, 3);
+    const current = Math.floor(eased * target);
+    
+    el.textContent = current.toLocaleString('id-ID') + suffix;
+    
+    if (progress < 1) {
+      requestAnimationFrame(updateCounter);
+    } else {
+      el.textContent = target.toLocaleString('id-ID') + suffix;
+    }
+  }
+  
+  requestAnimationFrame(updateCounter);
+}
+
+function initStats() {
+  // Cek apakah elemen stats ada
+  if (!document.getElementById('statUsers') || !document.getElementById('statOrders')) {
+    console.log('ℹ️ Stats elements not found, skipping...');
+    return;
+  }
+  
+  // Animasi dengan delay
+  setTimeout(() => {
+    animateCounter('statUsers', STATS_DATA.users, 2000);
+  }, 500);
+  
+  setTimeout(() => {
+    animateCounter('statOrders', STATS_DATA.orders, 2200, STATS_DATA.ordersSuffix);
+  }, 800);
+  
+  statsAnimated = true;
 }
 
 // ============================================================
@@ -1517,9 +1673,13 @@ window.addEventListener('load', function() {
     // Load pengumuman dari pesan.json (dropdown) - dengan prioritas
     loadAnnouncement();
     
+    // Init Stats Animation
+    initStats();
+    
     console.log('🌸 Anime Shine Shop Active! ✨');
     console.log('📧 Gmail akan diminta saat tombol diklik');
     console.log('📢 Pengumuman dropdown dari pesan.json (prioritas: all10 > all9 > ... )');
+    console.log('👥 Stats: Total User ' + STATS_DATA.users + ', Total Transaksi ' + STATS_DATA.orders + STATS_DATA.ordersSuffix);
   }, 100);
 });
 
@@ -1544,6 +1704,7 @@ console.log('📧 Gmail auto-sync dari localStorage (FIXED)');
 console.log('🔑 Lock localStorage diizinkan untuk update Gmail');
 console.log('🛑 Gmail TIDAK diminta otomatis saat load halaman');
 console.log('📢 Pengumuman DROPDOWN dari /home2/pesan.json (prioritas: all10 > all9 > ...)');
+console.log('👥 Stats: Total User 37, Total Transaksi 1000+ (animated)');
 </script>
 </body>
 </html>
