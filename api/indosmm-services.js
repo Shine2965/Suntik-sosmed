@@ -33,25 +33,16 @@ export default async function handler(req, res) {
         }
 
         // ===== BUILD PAYLOAD =====
-        // Indosmm API v2/services menerima POST dengan form-data atau JSON
-        // Kita kirim JSON dengan api_key
         const payload = {
-            api_key: apiKey
+            key: apiKey,
+            action: 'services'
         };
-
-        // Tambahkan parameter filter jika ada dari request body (optional)
-        if (req.method === 'POST' && req.body) {
-            // Jika ada parameter tambahan dari frontend
-            if (req.body.category) payload.category = req.body.category;
-            if (req.body.search) payload.search = req.body.search;
-            if (req.body.limit) payload.limit = req.body.limit;
-        }
 
         console.log('📡 Fetching services from Indosmm (POST)...');
         console.log('📦 Payload:', payload);
 
         // ===== POST KE INDOSMM API =====
-        const response = await fetch('https://indosmm.id/api/v2/services', {
+        const response = await fetch('https://indosmm.id/api/v2', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -73,11 +64,11 @@ export default async function handler(req, res) {
         console.log('📦 Indosmm response:', data);
 
         // ===== VALIDASI RESPONSE =====
-        if (!data.status || !Array.isArray(data.services)) {
+        if (!Array.isArray(data)) {
             console.error('❌ Indosmm response invalid:', data);
             return res.status(502).json({
                 status: false,
-                msg: data.msg || 'Respon provider tidak valid'
+                msg: 'Respon provider tidak valid'
             });
         }
 
@@ -85,7 +76,7 @@ export default async function handler(req, res) {
         const grouped = {};
         const MARKUP = 1.08; // +8%
 
-        for (const s of data.services) {
+        for (const s of data) {
             const category = (s.category || 'Lainnya').trim() || 'Lainnya';
             if (!grouped[category]) {
                 grouped[category] = [];
@@ -104,38 +95,28 @@ export default async function handler(req, res) {
                 name.includes('custom');
 
             // Harga dari Indosmm = per 1.000 unit
-            const rawPrice = Number(s.price) || 0;
+            const rawPrice = Number(s.rate) || 0;
             const markedUpPrice = Math.round(rawPrice * MARKUP);
 
-            // Cek apakah ada diskon dari provider
-            let diskon = null;
-            if (s.discount && s.discount > 0 && s.discount < rawPrice) {
-                diskon = Math.round(s.discount * MARKUP);
-            }
-
-            // Rate (dari provider)
-            const rate = s.rate || s.rating || 0;
-
             grouped[category].push({
-                id: s.id,
-                name: s.name || `Service #${s.id}`,
+                id: s.service,
+                name: s.name || `Service #${s.service}`,
                 pricePerFollower: markedUpPrice,
-                diskon: diskon,
+                diskon: null,
                 min: Number(s.min) || 1,
                 max: Number(s.max) || 1000000,
-                average: s.average || s.avg_time || s.avg || '-',
-                desc: s.description || s.desc || '',
+                average: '-',
+                desc: '',
                 comment: needsComment,
                 type: s.type || 'default',
-                refill: s.refill === 1 || s.refill === true,
-                rate: rate,
-                // Simpan data asli untuk referensi
+                refill: s.refill === true || s.refill === 1,
+                rate: s.rate || 0,
                 _raw: {
-                    price: s.price,
-                    discount: s.discount || null,
+                    rate: s.rate,
                     min: s.min,
                     max: s.max,
-                    rate: s.rate
+                    refill: s.refill,
+                    cancel: s.cancel
                 }
             });
         }
