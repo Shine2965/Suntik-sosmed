@@ -23,9 +23,8 @@ export default function handler(req, res) {
         const qiospayApiKey = process.env.QIOSPAY_API_KEY || '';
         const merchantCode = process.env.QIOSPAY_MERCHANT_CODE || 'QP052692';
 
-        // ===== INDOSMM CONFIG (BARU) =====
+        // ===== INDOSMM CONFIG =====
         const indoApiKey = process.env.INDO_API_KEY || 'a1174c530b97e1bc0a7eec7baff3ac6e';
-        const indoApiId = parseInt(process.env.INDO_API_ID) || 0;
 
         // ===== ORDER SOSMED CONFIG (LEGACY) =====
         const orderApiId = parseInt(process.env.ORDER_API_ID || process.env.ORDERSOSMED_API_ID) || 11313;
@@ -41,21 +40,18 @@ export default function handler(req, res) {
         const irvankardeApiId = parseInt(process.env.IRVANKARDE_API_ID) || 81074;
 
         // ===== RESPONSE =====
-        // Catatan: order_api_key & secret TIDAK dikirim ke frontend (aman).
-        // Order dilakukan via proxy /api/create-order
         return res.status(200).json({
             success: true,
             qiospay_api_key: qiospayApiKey,
             merchant_code: merchantCode,
 
-            // ===== INDOSMM (BARU) =====
+            // ===== INDOSMM =====
             indo_api_key: indoApiKey,
-            indo_api_id: indoApiId,
 
             // ===== LEGACY ORDER SOSMED =====
             order_api_id: orderApiId,
 
-            // ===== FAYUPEDIA (TETAP) =====
+            // ===== FAYUPEDIA =====
             fayupedia_api_key: fayupediaApiKey,
             fayupedia_api_id: fayupediaApiId,
 
