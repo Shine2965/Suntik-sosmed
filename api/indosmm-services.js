@@ -34,7 +34,7 @@ export default async function handler(req, res) {
         console.log('📡 Fetching services from Indosmm API...');
 
         // ===== GET KE INDOSMM API - DAFTAR LAYANAN =====
-        const response = await fetch('https://indosmm.id/api/v2/services', {
+        const response = await fetch('https://indosmm.id/api/v2/', {
             method: 'GET',
             headers: {
                 'Accept': 'application/json',
