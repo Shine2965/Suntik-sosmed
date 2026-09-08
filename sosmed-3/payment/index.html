@@ -614,7 +614,7 @@ const MERCHANT_CODE = "QP052692";
 
 // ===== API KEY QIOSPAY =====
 let QIOSPAY_API_KEY = '';
-const ADMIN_FEE_PERCENT = 1;
+const ADMIN_FEE_PERCENT = 2;
 const ADMIN_FEE_THRESHOLD = 500;
 const QRIS_EXPIRY_MINUTES = 60;
 
@@ -784,7 +784,7 @@ async function fetchConfigFromEnv() {
     console.log('📌 QIOSPAY API Key default');
   }
   if (!INDO_API_KEY) {
-    INDO_API_KEY = 'a1174c530b97e1bc0a7eec7baff3ac6e';
+    INDO_API_KEY = 'a11570b88893e5d72b274539c98c1fba';
     console.log('📌 INDO API Key default');
   }
   
@@ -1231,16 +1231,27 @@ async function sendOrdersToIndosmm() {
       
       console.log(`📦 Sending order ${i+1}/${ordersData.length} ke Indosmm:`, payload);
       
+      // Gunakan form-urlencoded (lebih kompatibel dengan SMM panel)
+      const formBody = new URLSearchParams();
+      for (const [k, v] of Object.entries(payload)) {
+        formBody.append(k, v);
+      }
+      
       const response = await fetch('https://indosmm.id/api/v2', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/x-www-form-urlencoded',
           'Accept': 'application/json'
         },
-        body: JSON.stringify(payload)
+        body: formBody.toString()
       });
       
-      const result = await response.json();
+      let result;
+      try {
+        result = await response.json();
+      } catch (e) {
+        result = { error: 'Invalid JSON response', status: response.status };
+      }
       console.log(`📦 Response ${i+1}:`, result);
       
       if (result.order) {
@@ -1250,7 +1261,7 @@ async function sendOrdersToIndosmm() {
         failedOrders.push({
           index: i,
           order: order,
-          error: result.msg || 'Gagal'
+          error: result.msg || result.error || result.message || ('HTTP ' + response.status) || 'Gagal'
         });
       }
       
@@ -1818,7 +1829,7 @@ function updateDisplay(){
     if(err) return console.error(err);
     const ctx = document.getElementById('qrisCanvas').getContext("2d");
     const logo = new Image();
-    logo.src = "/home/logo.png";
+    logo.src = "/logo.png"; // ganti path logo jika perlu
     logo.onload = function(){
       const size = 50;
       const x = (240 - size)/2;
