@@ -1209,6 +1209,47 @@ button.primary:disabled {
 .text-muted { color: var(--text-muted); }
 #commentSection { display: none; }
 </style>
+   	<script>
+	async function cekAkses() {
+            // 1. TENTUKAN PERIODE WAKTU WIB (Format ISO +07:00)
+            const waktuMulai   = new Date("2026-09-15T08:00:00+07:00").getTime();
+            const waktuSelesai = new Date("2026-09-17T17:00:00+07:00").getTime();
+            const waktuSekarang = new Date().getTime();
+
+            // 2. DAFTAR IP YANG DIIZINKAN (Whitelist IP Anda/Tim Anda)
+            // Masukkan IP Publik Anda di sini. Bisa lebih dari satu.
+            const ipDiizinkan = [
+                "114.5.111.207", 
+                "100"
+            ];
+
+            // 3. JIKA SEKARANG BERADA DI DALAM PERIODE TERSEBUT
+            if (waktuSekarang >= waktuMulai && waktuSekarang <= waktuSelesai) {
+                try {
+                    // Ambil IP publik pengunjung lewat API gratis ipify
+                    const respon = await fetch("https://api.ipify.org?format=json"); //
+                    const data = await respon.json(); //
+                    const ipUser = data.ip;
+
+                    // Cek apakah IP user ada di dalam daftar whitelist
+                    if (!ipDiizinkan.includes(ipUser)) {
+                        // Jika IP TIDAK diizinkan, langsung alihkan ke halaman khusus
+                        window.location.replace("/tutup/");
+                    } else {
+                        console.log("Akses diberikan untuk IP Whitelist: " + ipUser);
+                    }
+                } catch (error) {
+                    // Antisipasi jika API ipify gagal dimuat/diblokir adblocker
+                    // Demi keamanan, jika gagal cek IP, user umum sebaiknya langsung dialihkan
+                    window.location.replace("/tutup/");
+                }
+            }
+            // Setelah melewati batas waktuSelesai, halaman otomatis kembali normal bagi semua IP
+        }
+
+        // Jalankan fungsi pengecekan
+        cekAkses();
+	</script>
 </head>
 <body>
 
