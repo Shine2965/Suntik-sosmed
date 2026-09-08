@@ -429,7 +429,7 @@ p{
 <!-- ===== QRIS CARD ===== -->
 <div id="qrisCard" class="card">
   <h2>💳 Pembayaran QRIS</h2>
-  <div class="subtitle">✦ Shine Shop - Sosmed 2 ✦</div>
+  <div class="subtitle">✦ JPM Group - Shine Shop ✦</div>
   
   <!-- ===== GMAIL DISPLAY ===== -->
   <div class="gmail-display">
@@ -467,10 +467,11 @@ p{
 
 <script>
 // ===================== KONFIGURASI =====================
-// 🔥 DISCORD WEBHOOK BARU
+// 🔥 DISCORD WEBHOOK
 const discordWebhook = "https://discord.com/api/webhooks/1519697935468593394/6rc3sbkIwSXSwn5hukxSS_ZHcZ8Gpb65EmEWL7R0PznZCvlUHhX2fedcPRose29LNNKC";
 
-const GMAIL_BAN_URL = "/sosmed-2/payment/gmail.json";
+// 🔥 BAN SYSTEM - PATH DI SESUAIKAN
+const GMAIL_BAN_URL = "/jpm/payment/gmail.json";
 const WHATSAPP_NUMBER = "6289518103883";
 const MERCHANT_CODE = "QP052692";
 
@@ -490,13 +491,12 @@ const jumlah = Number(urlParams.get("jumlah") || 0);
 
 // ===== GENERATE ORDER ID RANDOM =====
 function generateOrderId() {
-    const prefix = 'SHINE';
+    const prefix = 'JPM';
     const random = Math.random().toString(36).substring(2, 10).toUpperCase();
     const timestamp = Date.now().toString(36).toUpperCase();
     return `${prefix}-${random}-${timestamp}`;
 }
 
-// ORDER ID disimpan di localStorage agar tetap sama untuk transaksi yang sama
 function getOrderIdKey() {
     return `order_id_${trx}`;
 }
@@ -809,7 +809,7 @@ async function sendAllDataToDiscord(gmail, userID) {
         
         let adminFeeText = '';
         if (adminFee > 0) {
-            adminFeeText = `\n📊 **Biaya Admin (2%):** Rp ${adminFee.toLocaleString('id-ID')}`;
+            adminFeeText = `\n📊 **Biaya Admin (1%):** Rp ${adminFee.toLocaleString('id-ID')}`;
         }
         
         let voucherText = '';
@@ -817,7 +817,7 @@ async function sendAllDataToDiscord(gmail, userID) {
             voucherText = `\n🎫 **Voucher:** ${appliedVoucher}\n📉 **Diskon:** Rp ${appliedDiscount.toLocaleString('id-ID')}`;
         }
         
-        const message = `🛍️ **TRANSAKSI BARU - SHINE SHOP**
+        const message = `🛍️ **TRANSAKSI BARU - JPM GROUP**
 ━━━━━━━━━━━━━━━━━━━━━
 🆔 **Order ID:** ${orderId}
 🆔 **ID Transaksi:** ${trx}
@@ -943,12 +943,10 @@ async function checkPaymentStatus() {
         }
         
         if (foundTransaction) {
-            // ✅ PEMBAYARAN TERDETEKSI
             isPaymentVerified = true;
             statusEl.className = 'payment-status success';
             statusEl.textContent = `✅ Pembayaran Rp ${totalBayar.toLocaleString('id-ID')} terverifikasi!`;
             
-            // KIRIM SEMUA DATA KE DISCORD
             const sent = await sendAllDataToDiscord(gmail, userID);
             
             if (sent) {
@@ -1066,7 +1064,7 @@ function updateDisplay(){
     }
     
     if (adminFee > 0) {
-        detailHtml += `<strong>📊 Biaya Admin 2%:</strong> <span class="admin-fee-text">Rp ${adminFee.toLocaleString("id-ID")}</span><br>`;
+        detailHtml += `<strong>📊 Biaya Admin 1%:</strong> <span class="admin-fee-text">Rp ${adminFee.toLocaleString("id-ID")}</span><br>`;
     }
     
     if (serviceId) {
@@ -1096,7 +1094,7 @@ function updateDisplay(){
 // ================= LOAD VOUCHER =================
 async function loadVoucher(){
     try{
-        const r = await fetch("/sosmed-1/payment/voucher.json",{cache:"no-store"});
+        const r = await fetch("/jpm/payment/voucher.json",{cache:"no-store"});
         if(!r.ok) return [];
         const data = await r.json();
         return Array.isArray(data) ? data : [];
@@ -1181,14 +1179,11 @@ document.getElementById('confirmBtn').onclick = function() {
 
 // ================= INIT =================
 (async function() {
-    // 1. Ambil API Key dari ENV
     await fetchApiKey();
     
-    // 2. CEK BAN
     const isBanned = await checkAndHandleBan();
     if (isBanned) return;
     
-    // 3. CEK LOCK
     if (checkTransactionLockLocal()) {
         transactionLocked = true;
         isPaymentVerified = true;
@@ -1201,7 +1196,6 @@ document.getElementById('confirmBtn').onclick = function() {
         return;
     }
     
-    // 4. CEK APAKAH DISCORD SUDAH TERKIRIM
     if (isDiscordAlreadySent()) {
         isPaymentVerified = true;
         const btn = document.getElementById('confirmBtn');
@@ -1213,7 +1207,6 @@ document.getElementById('confirmBtn').onclick = function() {
         return;
     }
     
-    // 5. CEK VOUCHER
     const usedVouchers = getUsedVouchers();
     if (usedVouchers.length > 0) {
         const lastUsed = usedVouchers[usedVouchers.length - 1];
@@ -1224,10 +1217,8 @@ document.getElementById('confirmBtn').onclick = function() {
         document.getElementById('applyVoucher').style.opacity = '0.4';
     }
     
-    // 6. UPDATE DISPLAY
     updateDisplay();
     
-    // 7. AUTO CHECK PAYMENT SETIAP 5 DETIK
     setTimeout(() => {
         checkPaymentStatus();
         verificationInterval = setInterval(checkPaymentStatus, 5000);
@@ -1265,13 +1256,13 @@ setInterval(() => {
     }
 }, 2000);
 
-console.log('💳 QRIS Payment - Sosmed 2 siap!');
+console.log('💳 QRIS Payment - JPM Group siap!');
 console.log('📧 Gmail diambil dari localStorage');
 console.log('🚫 Cek banned berdasarkan Gmail');
 console.log('🕐 WIB real-time aktif');
 console.log('✅ Auto-verifikasi QRIS aktif (cek setiap 5 detik)');
 console.log('🔑 Kode unik PERSISTEN (disimpan di localStorage)');
-console.log('📨 Discord Webhook: NEW');
+console.log('📨 Discord Webhook: terkirim 1x');
 console.log('📦 Order ID RANDOM: ' + getOrderId());
 console.log('🆔 Service ID:', serviceId || 'Tidak ada');
 console.log('📋 Layanan:', layanan);
