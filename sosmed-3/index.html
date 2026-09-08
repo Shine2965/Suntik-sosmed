@@ -7,7 +7,7 @@
 <title>Shine Shop - SMM</title>
 <style>
 /* ===============================
-   ROOT THEME
+   ROOT THEME (SAMA SEPERTI SEBELUMNYA)
 =================================*/
 :root {
   --bg: #0b1220;
@@ -1534,8 +1534,8 @@ button.primary:disabled {
   modeSingle.addEventListener('click', () => setMode('single'));
   modeMassal.addEventListener('click', () => setMode('massal'));
 
-  // ===== DATA LAYANAN - INDOSMM =====
-  const SERVICES_ENDPOINT = '/api/indosmm-services';
+  // ===== DATA LAYANAN - INDOSMM V2 (POST) =====
+  const INDOSMM_API_URL = 'https://indosmm.id/api/v2';
 
   function formatRp(n) {
     return 'Rp' + Number(n || 0).toLocaleString('id-ID');
@@ -2261,18 +2261,98 @@ button.primary:disabled {
     }, 280);
   }
 
-  // ===== LOAD DATA =====
+  // ===== LOAD DATA DARI INDOSMM V2 (POST) =====
   async function loadData(silent) {
     if (isLoading) return;
     isLoading = true;
+
+    // Tampilkan loading di UI
+    const infoEl = document.getElementById('infoLayanan');
+    if (infoEl) {
+      infoEl.innerHTML = '<div style="text-align:center;color:#94a3b8;padding:8px;">⏳ Memuat layanan dari Indosmm...</div>';
+    }
+
     try {
-      const res = await fetch(SERVICES_ENDPOINT + '?ts=' + Date.now());
-      if (!res.ok) throw new Error('Gagal memuat data layanan');
-      const data = await res.json();
-      if (data && data.status === false) {
-        throw new Error(data.msg || 'Provider error');
+      // 🔥 POST ke Indosmm API v2/services
+      const response = await fetch(INDOSMM_API_URL + '/services', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          // Indosmm API key dari environment atau default
+          api_key: 'a1174c530b97e1bc0a7eec7baff3ac6e'
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Gagal memuat data layanan (HTTP ' + response.status + ')');
       }
-      layananData = data;
+
+      const data = await response.json();
+
+      // Validasi response
+      if (!data.status || !Array.isArray(data.services)) {
+        throw new Error(data.msg || 'Respon provider tidak valid');
+      }
+
+      // ===== GROUP BY CATEGORY + MARKUP 8% =====
+      const grouped = {};
+      const MARKUP = 1.08; // +8%
+
+      for (const s of data.services) {
+        const category = (s.category || 'Lainnya').trim() || 'Lainnya';
+        if (!grouped[category]) {
+          grouped[category] = [];
+        }
+
+        // Deteksi apakah butuh komentar berdasarkan type atau name
+        const type = (s.type || 'default').toLowerCase();
+        const name = (s.name || '').toLowerCase();
+        const needsComment =
+          type.includes('comment') ||
+          type === 'custom_comment' ||
+          type === 'comment_likes' ||
+          type === 'comment_reply' ||
+          name.includes('comment') ||
+          name.includes('komentar') ||
+          name.includes('custom');
+
+        const rawPrice = Number(s.price) || 0;
+        const markedUpPrice = Math.round(rawPrice * MARKUP);
+
+        let diskon = null;
+        if (s.discount && s.discount > 0 && s.discount < rawPrice) {
+          diskon = Math.round(s.discount * MARKUP);
+        }
+
+        grouped[category].push({
+          id: s.id,
+          name: s.name || `Service #${s.id}`,
+          pricePerFollower: markedUpPrice,
+          diskon: diskon,
+          min: Number(s.min) || 1,
+          max: Number(s.max) || 1000000,
+          average: s.average || s.avg_time || s.avg || '-',
+          desc: s.description || s.desc || '',
+          comment: needsComment,
+          type: s.type || 'default',
+          refill: s.refill === 1 || s.refill === true
+        });
+      }
+
+      // Urutkan
+      const sorted = {};
+      Object.keys(grouped)
+        .sort((a, b) => a.localeCompare(b, 'id'))
+        .forEach((cat) => {
+          sorted[cat] = grouped[cat].sort((a, b) =>
+            String(a.name).localeCompare(String(b.name), 'id')
+          );
+        });
+
+      layananData = sorted;
       populateKategori(true);
       loadLayanan();
 
@@ -2289,10 +2369,18 @@ button.primary:disabled {
           }
         }
       }
+
+      console.log('✅ Data layanan Indosmm dimuat:', Object.keys(layananData).length, 'kategori');
+
     } catch (err) {
       if (!silent) {
-        console.error(err);
-        alert('Data layanan gagal dimuat.\n' + (err.message || ''));
+        console.error('❌ Error load data:', err);
+        alert('Data layanan gagal dimuat.\n' + (err.message || 'Silakan refresh halaman.'));
+      }
+      // Reset info
+      const infoEl = document.getElementById('infoLayanan');
+      if (infoEl) {
+        infoEl.innerHTML = '<div style="color:#f87171;">❌ Gagal memuat layanan: ' + (err.message || '') + '</div>';
       }
     } finally {
       isLoading = false;
