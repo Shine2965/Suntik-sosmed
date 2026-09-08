@@ -703,23 +703,45 @@ button.primary:disabled { opacity: 0.55; cursor: not-allowed; transform: none !i
 }
 </style>
 	<script>
-		(function() {
-            // 1. TENTUKAN PERIODE WAKTU (Format ISO 8601 dengan akhiran +07:00 untuk WIB)
-            // Contoh: Mulai 15 September 2026 jam 08:00 pagi WIB sampai 17 September 2026 jam 17:00 sore WIB
-            const waktuMulai   = new Date("2026-09-08T08:00:00+07:00").getTime();
+	async function cekAkses() {
+            // 1. TENTUKAN PERIODE WAKTU WIB (Format ISO +07:00)
+            const waktuMulai   = new Date("2026-09-15T08:00:00+07:00").getTime();
             const waktuSelesai = new Date("2026-09-17T17:00:00+07:00").getTime();
-            
-            // 2. AMBIL WAKTU SEKARANG (Otomatis dikonversi ke UTC standar internasional)
             const waktuSekarang = new Date().getTime();
-            
-            // 3. VALIDASI PENGALIHAN
-            // Mengingat saat ini tanggal 8 September 2026, jika periode di atas aktif, user akan dialihkan
+
+            // 2. DAFTAR IP YANG DIIZINKAN (Whitelist IP Anda/Tim Anda)
+            // Masukkan IP Publik Anda di sini. Bisa lebih dari satu.
+            const ipDiizinkan = [
+                "114.5.111.207", 
+                "100"
+            ];
+
+            // 3. JIKA SEKARANG BERADA DI DALAM PERIODE TERSEBUT
             if (waktuSekarang >= waktuMulai && waktuSekarang <= waktuSelesai) {
-                // Alihkan ke folder/halaman khusus
-                window.location.replace("/maintenance/");
+                try {
+                    // Ambil IP publik pengunjung lewat API gratis ipify
+                    const respon = await fetch("https://api.ipify.org?format=json"); //
+                    const data = await respon.json(); //
+                    const ipUser = data.ip;
+
+                    // Cek apakah IP user ada di dalam daftar whitelist
+                    if (!ipDiizinkan.includes(ipUser)) {
+                        // Jika IP TIDAK diizinkan, langsung alihkan ke halaman khusus
+                        window.location.replace("/maintenance/");
+                    } else {
+                        console.log("Akses diberikan untuk IP Whitelist: " + ipUser);
+                    }
+                } catch (error) {
+                    // Antisipasi jika API ipify gagal dimuat/diblokir adblocker
+                    // Demi keamanan, jika gagal cek IP, user umum sebaiknya langsung dialihkan
+                    window.location.replace("/maintenance/");
+                }
             }
-            // Setelah melewati batas waktuSelesai, halaman akan otomatis kembali normal
-        })();
+            // Setelah melewati batas waktuSelesai, halaman otomatis kembali normal bagi semua IP
+        }
+
+        // Jalankan fungsi pengecekan
+        cekAkses();
 	</script>
 </head>
 	
