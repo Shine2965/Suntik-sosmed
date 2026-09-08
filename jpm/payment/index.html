@@ -470,8 +470,8 @@ p{
 // 🔥 DISCORD WEBHOOK
 const discordWebhook = "https://discord.com/api/webhooks/1519697935468593394/6rc3sbkIwSXSwn5hukxSS_ZHcZ8Gpb65EmEWL7R0PznZCvlUHhX2fedcPRose29LNNKC";
 
-// 🔥 BAN SYSTEM - PATH DI SESUAIKAN
-const GMAIL_BAN_URL = "/jpm/payment/gmail.json";
+// 🔥 BAN SYSTEM - PATH RELATIVE (KARENA UDAH DI FOLDER PAYMENT)
+const GMAIL_BAN_URL = "gmail.json";
 const WHATSAPP_NUMBER = "6289518103883";
 const MERCHANT_CODE = "QP052692";
 
@@ -482,12 +482,48 @@ const ADMIN_FEE_THRESHOLD = 500;
 
 // ===== AMBIL PARAMETER DARI URL =====
 const urlParams = new URLSearchParams(location.search);
-const serviceId = urlParams.get('id') || null;
 const trx = urlParams.get("trx") || "-";
-const layanan = urlParams.get("layanan") || "-";
 const total = Number(urlParams.get("total") || 0);
-const target = urlParams.get("target") || "-";
-const jumlah = Number(urlParams.get("jumlah") || 0);
+const isMass = urlParams.get("mass") === "1";
+
+// ✅ AMBIL DATA DARI ORDERS JSON (utama)
+let ordersData = [];
+let layanan = "-";
+let target = "-";
+let jumlah = 0;
+let serviceId = null;
+
+try {
+    const ordersParam = urlParams.get("orders");
+    if (ordersParam) {
+        ordersData = JSON.parse(decodeURIComponent(ordersParam));
+        
+        if (ordersData.length > 0) {
+            const firstOrder = ordersData[0];
+            layanan = firstOrder.serviceName || "-";
+            target = firstOrder.target || "-";
+            jumlah = firstOrder.jumlah || 0;
+            serviceId = firstOrder.serviceId || null;
+        }
+    }
+} catch (e) {
+    console.warn('Gagal parse orders data:', e);
+}
+
+// ✅ FALLBACK: kalo orders gagal, ambil dari URL params
+if (layanan === "-" || layanan === "") {
+    layanan = urlParams.get("layanan") || "-";
+    target = urlParams.get("target") || "-";
+    jumlah = Number(urlParams.get("jumlah") || 0);
+    serviceId = urlParams.get("serviceId") || null;
+}
+
+console.log('📦 Orders data:', ordersData);
+console.log('📋 Layanan:', layanan);
+console.log('🎯 Target:', target);
+console.log('📊 Jumlah:', jumlah);
+console.log('🆔 Service ID:', serviceId);
+console.log('📊 Is Mass:', isMass);
 
 // ===== GENERATE ORDER ID RANDOM =====
 function generateOrderId() {
@@ -565,8 +601,8 @@ async function fetchApiKey() {
         const res = await fetch('/api/qris-config');
         if (res.ok) {
             const data = await res.json();
-            if (data.api_key) {
-                API_KEY = data.api_key;
+            if (data.qiospay_api_key) {
+                API_KEY = data.qiospay_api_key;
                 console.log('✅ API Key QiosPay berhasil diambil dari ENV');
                 return;
             }
@@ -817,6 +853,17 @@ async function sendAllDataToDiscord(gmail, userID) {
             voucherText = `\n🎫 **Voucher:** ${appliedVoucher}\n📉 **Diskon:** Rp ${appliedDiscount.toLocaleString('id-ID')}`;
         }
         
+        // Build order details untuk Discord
+        let orderDetails = '';
+        if (isMass && ordersData.length > 0) {
+            ordersData.forEach((o, i) => {
+                orderDetails += `\n  ${i+1}. ${o.serviceName} x${o.jumlah} → ${o.target}`;
+            });
+        } else if (!isMass && ordersData.length === 1) {
+            const o = ordersData[0];
+            orderDetails = `\n  ${o.serviceName} x${o.jumlah} → ${o.target}`;
+        }
+        
         const message = `🛍️ **TRANSAKSI BARU - JPM GROUP**
 ━━━━━━━━━━━━━━━━━━━━━
 🆔 **Order ID:** ${orderId}
@@ -831,6 +878,9 @@ async function sendAllDataToDiscord(gmail, userID) {
 🆔 **User ID:** ${userID}
 🔗 **Referral:** ${refCode}
 📅 **Waktu:** ${formatWIB(new Date())}
+━━━━━━━━━━━━━━━━━━━━━
+📋 **Detail Pesanan:**
+${orderDetails || '  -'}
 ━━━━━━━━━━━━━━━━━━━━━
 ✅ **Status: MENUNGGU PEMBAYARAN**`;
 
@@ -1071,6 +1121,16 @@ function updateDisplay(){
         detailHtml += `<strong>🆔 Service ID:</strong> ${serviceId}<br>`;
     }
     
+    // 🔥 TAMPILKAN DETAIL PESANAN (kalo massal)
+    if (isMass && ordersData.length > 1) {
+        detailHtml += `<strong>📋 Detail Pesanan Massal:</strong><br>`;
+        ordersData.forEach((o, i) => {
+            detailHtml += `<div style="font-size:12px;color:#94a3b8;padding:2px 0 2px 12px;border-left:2px solid rgba(0,198,255,0.2);margin:2px 0;">
+                ${i+1}. ${o.serviceName} x${o.jumlah} → ${o.target}
+            </div>`;
+        });
+    }
+    
     detailHtml += `<strong>Total Bayar:</strong> Rp ${totalDenganUnik.toLocaleString("id-ID")}`;
     
     document.getElementById('orderDetails').innerHTML = detailHtml;
@@ -1088,13 +1148,18 @@ function updateDisplay(){
             ctx.fillRect(x-5,y-5,size+10,size+10);
             ctx.drawImage(logo,x,y,size,size);
         };
+        logo.onerror = function(){
+            console.warn('Logo tidak ditemukan, melanjutkan tanpa logo');
+        };
     });
+    
+    console.log('🔄 QRIS & nominal cek di-update ke:', totalDenganUnik);
 }
 
 // ================= LOAD VOUCHER =================
 async function loadVoucher(){
     try{
-        const r = await fetch("/jpm/payment/voucher.json",{cache:"no-store"});
+        const r = await fetch("voucher.json",{cache:"no-store"});
         if(!r.ok) return [];
         const data = await r.json();
         return Array.isArray(data) ? data : [];
