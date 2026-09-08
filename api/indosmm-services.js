@@ -51,7 +51,7 @@ export default async function handler(req, res) {
         console.log('📦 Payload:', payload);
 
         // ===== POST KE INDOSMM API =====
-        const response = await fetch('https://indosmm.id/api/v2/', {
+        const response = await fetch('https://indosmm.id/api/v2/services', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
