@@ -8,7 +8,6 @@
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
 <style>
-/* ===== SAME STYLE AS PREVIOUS PAYMENT ===== */
 *{box-sizing:border-box;margin:0;padding:0}
 body{
   font-family:'Poppins',sans-serif;
@@ -615,8 +614,8 @@ const MERCHANT_CODE = "QP052692";
 
 // ===== API KEY QIOSPAY =====
 let QIOSPAY_API_KEY = '';
-const ADMIN_FEE_PERCENT = 2;
-const ADMIN_FEE_THRESHOLD = 500000;
+const ADMIN_FEE_PERCENT = 1;
+const ADMIN_FEE_THRESHOLD = 500;
 const QRIS_EXPIRY_MINUTES = 60;
 
 // ===== INDOSMM CONFIG (Hanya API Key, tanpa ID) =====
@@ -628,15 +627,40 @@ const trx = p.get("trx") || "-";
 const total = Number(p.get("total") || 0);
 const isMass = p.get("mass") === "1";
 let ordersData = [];
+let layanan = "-";
+let target = "-";
+let jumlah = 0;
+let serviceId = null;
 
 try {
   const ordersParam = p.get("orders");
   if (ordersParam) {
     ordersData = JSON.parse(decodeURIComponent(ordersParam));
+    if (ordersData.length > 0) {
+      const firstOrder = ordersData[0];
+      layanan = firstOrder.serviceName || "-";
+      target = firstOrder.target || "-";
+      jumlah = firstOrder.jumlah || 0;
+      serviceId = firstOrder.serviceId || null;
+    }
   }
 } catch (e) {
   console.warn('Gagal parse orders data:', e);
 }
+
+// Fallback
+if (layanan === "-" || layanan === "") {
+  layanan = p.get("layanan") || "-";
+  target = p.get("target") || "-";
+  jumlah = Number(p.get("jumlah") || 0);
+  serviceId = p.get("serviceId") || null;
+}
+
+console.log('📦 Orders data:', ordersData);
+console.log('📋 Layanan:', layanan);
+console.log('🎯 Target:', target);
+console.log('📊 Jumlah:', jumlah);
+console.log('🆔 Service ID:', serviceId);
 
 // ===== NOTIFIKASI DISCORD =====
 function getDiscordSentKey() {
@@ -682,7 +706,7 @@ function markOrderSent() {
   try {
     const key = getOrderSentKey();
     localStorage.setItem(key, 'true');
-    console.log('📦 Order marked as sent');
+    console.log('📦 Order marked as sent to Indosmm');
     return true;
   } catch (e) {
     console.warn('Gagal mark order sent:', e);
@@ -792,6 +816,7 @@ let currentTotalBayar = 0;
 let isProcessingPayment = false;
 let verificationAttempts = 0;
 
+// ===== QRIS EXPIRY =====
 let qrisExpiryTime = null;
 let qrisTimerInterval = null;
 let isQrisExpired = false;
@@ -1187,18 +1212,26 @@ async function sendOrdersToIndosmm() {
       const order = ordersData[i];
       
       const payload = {
-        serviceId: parseInt(order.serviceId),
-        target: order.target.trim(),
+        key: INDO_API_KEY,
+        action: 'add',
+        service: parseInt(order.serviceId),
+        link: order.target.trim(),
         quantity: parseInt(order.jumlah)
       };
       
+      // Tambahkan comments jika ada
       if (order.comment && order.comment.trim() !== '') {
-        payload.comment = order.comment.trim();
+        const comments = order.comment.split('\n')
+          .filter(line => line.trim() !== '')
+          .join('\n');
+        if (comments) {
+          payload.comments = comments;
+        }
       }
       
-      console.log(`📦 Sending order ${i+1}/${ordersData.length}:`, payload);
+      console.log(`📦 Sending order ${i+1}/${ordersData.length} ke Indosmm:`, payload);
       
-      const response = await fetch('/api/create-order', {
+      const response = await fetch('https://indosmm.id/api/v2', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1210,9 +1243,9 @@ async function sendOrdersToIndosmm() {
       const result = await response.json();
       console.log(`📦 Response ${i+1}:`, result);
       
-      if (result.status === true) {
+      if (result.order) {
         successCount++;
-        orderIds.push(result.orderId || 'success');
+        orderIds.push(result.order);
       } else {
         failedOrders.push({
           index: i,
@@ -1409,7 +1442,7 @@ async function sendToDiscord(gmail, userID) {
     
     let adminFeeText = '';
     if (adminFee > 0) {
-      adminFeeText = `\n📊 **Biaya Admin (2%):** Rp ${adminFee.toLocaleString('id-ID')}`;
+      adminFeeText = `\n📊 **Biaya Admin (1%):** Rp ${adminFee.toLocaleString('id-ID')}`;
     }
     
     const message = `💰 **PEMBAYARAN BERHASIL DIVERIFIKASI**
@@ -1774,7 +1807,7 @@ function updateDisplay(){
   }
   
   if (adminFee > 0) {
-    detailHtml += `<strong>📊 Biaya Admin 2%:</strong> <span class="admin-fee-text">Rp ${adminFee.toLocaleString("id-ID")}</span><br>`;
+    detailHtml += `<strong>📊 Biaya Admin 1%:</strong> <span class="admin-fee-text">Rp ${adminFee.toLocaleString("id-ID")}</span><br>`;
   }
   
   detailHtml += `<strong>Total Bayar:</strong> Rp ${totalDenganUnik.toLocaleString("id-ID")}`;
@@ -2045,13 +2078,13 @@ setInterval(() => {
   }
 }, 2000);
 
-console.log('💳 QRIS Payment - Sosmed 3 siap!');
+console.log('💳 QRIS Payment - Sosmed 3 siap! (Indosmm)');
 console.log('📦 Mass order:', isMass, ordersData.length, 'items');
 console.log('📧 Gmail diambil dari localStorage');
 console.log('✅ Auto-verifikasi QRIS aktif (cek setiap 10 detik)');
 console.log('⏳ QRIS Expiry:', QRIS_EXPIRY_MINUTES, 'menit');
 console.log('🔄 Regenerate QRIS tersedia setelah expired');
-console.log('📦 Menggunakan Indosmm API untuk create order');
+console.log('📦 Menggunakan Indosmm API v2 untuk create order');
 </script>
 </body>
 </html>
