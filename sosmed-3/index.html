@@ -1288,13 +1288,13 @@ button.primary:disabled {
   <label>Waktu rata-rata selesai</label>
   <div class="aver" id="average">—</div>
 
-  <!-- MODE TOGGLE -->
+  <!-- ===== MODE TOGGLE ===== -->
   <div class="mode-toggle">
     <button class="mode-btn active" data-mode="single" id="modeSingle">📋 Single Order</button>
     <button class="mode-btn" data-mode="massal" id="modeMassal">📦 Massal Order</button>
   </div>
 
-  <!-- SINGLE SECTION -->
+  <!-- ===== SINGLE SECTION ===== -->
   <div id="singleSection">
     <label for="jumlah">Jumlah Pesanan</label>
     <input type="number" id="jumlah" min="1" inputmode="numeric" placeholder="Masukkan jumlah">
@@ -1325,7 +1325,7 @@ button.primary:disabled {
     </div>
   </div>
 
-  <!-- MASSAL SECTION -->
+  <!-- ===== MASSAL SECTION ===== -->
   <div id="massalSection" style="display:none;margin-top:12px;">
     <div class="alert" style="border-left-color:var(--warning);color:var(--warning);background:rgba(251,191,36,0.06);">
       📦 Mode Massal: Isi jumlah dan target, lalu klik "Tambahkan" untuk menambah ke daftar.
@@ -1517,13 +1517,10 @@ button.primary:disabled {
 
   function setMode(mode) {
     currentMode = mode;
-
     modeSingle.classList.toggle('active', mode === 'single');
     modeMassal.classList.toggle('active', mode === 'massal');
-
     singleSection.style.display = mode === 'single' ? 'block' : 'none';
     massalSection.style.display = mode === 'massal' ? 'block' : 'none';
-
     if (mode === 'single') {
       updatePriceDisplay();
     } else {
@@ -2047,9 +2044,14 @@ button.primary:disabled {
       comment: requiresComment ? document.getElementById('comments').value : null
     }];
 
+    // ✅ Kirim semua data ke payment
     let url = 'payment/?trx=' + trxID +
       '&total=' + total +
       '&mass=0' +
+      '&layanan=' + encodeURIComponent(selectedService.name) +
+      '&target=' + encodeURIComponent(target) +
+      '&jumlah=' + jumlah +
+      '&serviceId=' + selectedService.id +
       '&orders=' + encodeURIComponent(JSON.stringify(orderData));
 
     window.location.href = url;
@@ -2261,15 +2263,14 @@ button.primary:disabled {
     }, 280);
   }
 
-  // ===== LOAD DATA - POST METHOD =====
+  // ===== LOAD DATA - INDOSMM (POST METHOD) =====
   async function loadData(silent) {
     if (isLoading) return;
     isLoading = true;
     
-    // Tampilkan loading state di UI
     const infoLayanan = document.getElementById('infoLayanan');
     if (infoLayanan) {
-      infoLayanan.innerHTML = '⏳ Memuat data layanan...';
+      infoLayanan.innerHTML = '⏳ Memuat data layanan dari Indosmm...';
     }
     
     try {
@@ -2281,10 +2282,7 @@ button.primary:disabled {
           'Accept': 'application/json'
         },
         body: JSON.stringify({
-          // Optional: bisa tambah filter di sini
-          // category: '',
-          // search: '',
-          // limit: 100
+          // Optional filter
         })
       });
       
@@ -2292,7 +2290,6 @@ button.primary:disabled {
       
       const data = await res.json();
       
-      // Cek apakah response error
       if (data && data.status === false) {
         throw new Error(data.msg || 'Provider error');
       }
@@ -2315,12 +2312,12 @@ button.primary:disabled {
         }
       }
       
-      console.log('✅ Data layanan berhasil dimuat (POST method)');
+      console.log('✅ Data layanan berhasil dimuat dari Indosmm (POST method)');
       
     } catch (err) {
       if (!silent) {
         console.error('❌ Error load data:', err);
-        alert('Data layanan gagal dimuat.\n' + (err.message || 'Silakan refresh halaman.'));
+        alert('Data layanan gagal dimuat dari Indosmm.\n' + (err.message || 'Silakan refresh halaman.'));
       }
       if (infoLayanan) {
         infoLayanan.innerHTML = '❌ Gagal memuat data: ' + (err.message || '');
