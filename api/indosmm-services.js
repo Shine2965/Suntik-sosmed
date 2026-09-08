@@ -1,26 +1,27 @@
 // /api/indosmm-services.js
-// Vercel Serverless Function - Proxy ke Indosmm API v2/services
+// Vercel Serverless Function - Proxy ke Indosmm API (POST)
 // Mengambil daftar layanan, markup harga 8%, group by category
 
 export default async function handler(req, res) {
     // CORS
     res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
     if (req.method === 'OPTIONS') {
         return res.status(200).end();
     }
 
-    if (req.method !== 'GET') {
+    // Support GET dan POST
+    if (req.method !== 'GET' && req.method !== 'POST') {
         return res.status(405).json({
             status: false,
-            msg: 'Method not allowed'
+            msg: 'Method not allowed. Use GET or POST'
         });
     }
 
     try {
-        // ===== AMBIL API KEY DARI ENVIRONMENT =====
+        // ===== AMBIL API KEY DARI ENV =====
         const apiKey = process.env.INDO_API_KEY || 'a1174c530b97e1bc0a7eec7baff3ac6e';
 
         if (!apiKey) {
@@ -31,15 +32,32 @@ export default async function handler(req, res) {
             });
         }
 
-        console.log('📡 Fetching services from Indosmm API...');
+        // ===== BUILD PAYLOAD =====
+        // Indosmm API v2/services menerima POST dengan form-data atau JSON
+        // Kita kirim JSON dengan api_key
+        const payload = {
+            api_key: apiKey
+        };
 
-        // ===== GET KE INDOSMM API - DAFTAR LAYANAN =====
+        // Tambahkan parameter filter jika ada dari request body (optional)
+        if (req.method === 'POST' && req.body) {
+            // Jika ada parameter tambahan dari frontend
+            if (req.body.category) payload.category = req.body.category;
+            if (req.body.search) payload.search = req.body.search;
+            if (req.body.limit) payload.limit = req.body.limit;
+        }
+
+        console.log('📡 Fetching services from Indosmm (POST)...');
+        console.log('📦 Payload:', payload);
+
+        // ===== POST KE INDOSMM API =====
         const response = await fetch('https://indosmm.id/api/v2/', {
-            method: 'GET',
+            method: 'POST',
             headers: {
-                'Accept': 'application/json',
-                'X-API-Key': apiKey
-            }
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify(payload)
         });
 
         if (!response.ok) {
@@ -52,7 +70,7 @@ export default async function handler(req, res) {
         }
 
         const data = await response.json();
-        console.log('📦 Indosmm response status:', data.status);
+        console.log('📦 Indosmm response:', data);
 
         // ===== VALIDASI RESPONSE =====
         if (!data.status || !Array.isArray(data.services)) {
@@ -68,7 +86,6 @@ export default async function handler(req, res) {
         const MARKUP = 1.08; // +8%
 
         for (const s of data.services) {
-            // Kategori fallback
             const category = (s.category || 'Lainnya').trim() || 'Lainnya';
             if (!grouped[category]) {
                 grouped[category] = [];
@@ -83,10 +100,10 @@ export default async function handler(req, res) {
                 type === 'comment_likes' ||
                 type === 'comment_reply' ||
                 name.includes('comment') ||
-                name.includes('komentar');
+                name.includes('komentar') ||
+                name.includes('custom');
 
             // Harga dari Indosmm = per 1.000 unit
-            // Markup 8%, dibulatkan
             const rawPrice = Number(s.price) || 0;
             const markedUpPrice = Math.round(rawPrice * MARKUP);
 
@@ -96,23 +113,31 @@ export default async function handler(req, res) {
                 diskon = Math.round(s.discount * MARKUP);
             }
 
-            // Service object untuk frontend
-            const serviceObj = {
+            // Rate (dari provider)
+            const rate = s.rate || s.rating || 0;
+
+            grouped[category].push({
                 id: s.id,
                 name: s.name || `Service #${s.id}`,
                 pricePerFollower: markedUpPrice,
+                diskon: diskon,
                 min: Number(s.min) || 1,
                 max: Number(s.max) || 1000000,
-                average: s.average || s.avg_time || '-',
+                average: s.average || s.avg_time || s.avg || '-',
                 desc: s.description || s.desc || '',
                 comment: needsComment,
                 type: s.type || 'default',
                 refill: s.refill === 1 || s.refill === true,
-                // Tambahkan diskon jika ada
-                ...(diskon && { diskon: diskon })
-            };
-
-            grouped[category].push(serviceObj);
+                rate: rate,
+                // Simpan data asli untuk referensi
+                _raw: {
+                    price: s.price,
+                    discount: s.discount || null,
+                    min: s.min,
+                    max: s.max,
+                    rate: s.rate
+                }
+            });
         }
 
         // ===== URUTKAN KATEGORI & LAYANAN =====
@@ -125,10 +150,8 @@ export default async function handler(req, res) {
                 );
             });
 
-        // ===== CACHE DI EDGE (VERCEL) =====
+        // ===== CACHE =====
         res.setHeader('Cache-Control', 's-maxage=30, stale-while-revalidate=60');
-
-        console.log(`✅ ${sorted.length} kategori, total ${data.services.length} layanan dimuat dari Indosmm`);
 
         return res.status(200).json(sorted);
 
