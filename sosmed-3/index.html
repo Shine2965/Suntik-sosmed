@@ -1491,6 +1491,124 @@ button.primary:disabled {
   let currentServiceForOrder = null;
   let currentMode = 'single';
 
+  // ===== SALDO SHINE SHOP =====
+  let shopBalance = null;
+  let balanceInsufficient = false;
+  let isCheckingBalance = false;
+  const BALANCE_ENDPOINT = '/api/indosmm-balance';
+
+  async function checkShopBalance(requiredAmount = 0) {
+    if (isCheckingBalance) return { ok: false, balance: 0 };
+
+    isCheckingBalance = true;
+    setCheckoutButtonsLoading(true);
+
+    try {
+      const res = await fetch(BALANCE_ENDPOINT, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({})
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.status) {
+        throw new Error(data.msg || 'Gagal memeriksa saldo');
+      }
+
+      shopBalance = Number(data.balance) || 0;
+
+      if (requiredAmount > 0 && shopBalance < requiredAmount) {
+        balanceInsufficient = true;
+        disableCheckoutButtons('Maaf saat ini layanan sedang gangguan');
+        return { ok: false, balance: shopBalance };
+      }
+
+      balanceInsufficient = false;
+      enableCheckoutButtons();
+      return { ok: true, balance: shopBalance };
+
+    } catch (err) {
+      console.error('❌ Cek saldo gagal:', err);
+      balanceInsufficient = true;
+      disableCheckoutButtons('Maaf saat ini layanan sedang gangguan');
+      return { ok: false, balance: 0 };
+    } finally {
+      isCheckingBalance = false;
+      setCheckoutButtonsLoading(false);
+    }
+  }
+
+  function setCheckoutButtonsLoading(loading) {
+    const btnSingle = document.getElementById('btnSingleCheckout');
+    const btnMassal = document.getElementById('btnMassalCheckout');
+
+    if (loading) {
+      if (btnSingle) {
+        btnSingle.disabled = true;
+        btnSingle.dataset.originalText = btnSingle.innerHTML;
+        btnSingle.innerHTML = '⏳ Memeriksa saldo Shine Shop...';
+      }
+      if (btnMassal) {
+        btnMassal.disabled = true;
+        btnMassal.dataset.originalText = btnMassal.innerHTML;
+        btnMassal.innerHTML = '⏳ Memeriksa saldo Shine Shop...';
+      }
+    } else {
+      if (btnSingle && btnSingle.dataset.originalText) {
+        btnSingle.innerHTML = btnSingle.dataset.originalText;
+      }
+      if (btnMassal && btnMassal.dataset.originalText) {
+        btnMassal.innerHTML = btnMassal.dataset.originalText;
+      }
+      if (!balanceInsufficient) {
+        enableCheckoutButtons();
+      }
+    }
+  }
+
+  function disableCheckoutButtons(reason) {
+    const btnSingle = document.getElementById('btnSingleCheckout');
+    const btnMassal = document.getElementById('btnMassalCheckout');
+
+    if (btnSingle) {
+      btnSingle.disabled = true;
+      btnSingle.title = reason;
+      btnSingle.innerHTML = '🚫 ' + reason;
+    }
+    if (btnMassal) {
+      btnMassal.disabled = true;
+      btnMassal.title = reason;
+      btnMassal.innerHTML = '🚫 ' + reason;
+    }
+
+    if (!window._balanceAlertShown) {
+      window._balanceAlertShown = true;
+      alert(reason);
+    }
+  }
+
+  function enableCheckoutButtons() {
+    if (balanceInsufficient) return;
+
+    const btnSingle = document.getElementById('btnSingleCheckout');
+    const btnMassal = document.getElementById('btnMassalCheckout');
+
+    if (btnSingle) {
+      btnSingle.disabled = false;
+      btnSingle.title = '';
+      btnSingle.innerHTML = '💳 Lanjut ke Pembayaran (Single)';
+    }
+    if (btnMassal) {
+      btnMassal.disabled = false;
+      btnMassal.title = '';
+      btnMassal.innerHTML = '📦 Checkout Massal';
+    }
+  }
+
   termsLink.addEventListener('click', function (e) {
     e.preventDefault();
     e.stopPropagation();
@@ -2028,7 +2146,7 @@ button.primary:disabled {
   }
 
   // ===== SINGLE CHECKOUT =====
-  function singleCheckout() {
+  async function singleCheckout() {
     if (!termsCheckbox.checked) {
       termsError.classList.add('show');
       document.getElementById('termsContainer').scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -2073,6 +2191,12 @@ button.primary:disabled {
     const hargaAktif = getActivePrice(selectedService);
     const total = calcTotal(jumlah, hargaAktif);
 
+    // ===== CEK SALDO SEBELUM LANJUT =====
+    const balanceResult = await checkShopBalance(total);
+    if (!balanceResult.ok) {
+      return;
+    }
+
     const trxID = 'TRX' + Date.now() + Math.floor(Math.random() * 1000);
 
     const orderData = [{
@@ -2085,7 +2209,6 @@ button.primary:disabled {
       comment: requiresComment ? document.getElementById('comments').value : null
     }];
 
-    // ✅ Kirim semua data ke payment
     let url = 'payment/?trx=' + trxID +
       '&total=' + total +
       '&mass=0' +
@@ -2244,7 +2367,7 @@ button.primary:disabled {
   window.clearOrders = clearOrders;
 
   // ===== MASSAL CHECKOUT =====
-  function massalCheckout() {
+  async function massalCheckout() {
     if (!termsCheckbox.checked) {
       termsError.classList.add('show');
       document.getElementById('termsContainer').scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -2257,8 +2380,15 @@ button.primary:disabled {
       return;
     }
 
-    const trxID = 'TRX' + Date.now() + Math.floor(Math.random() * 1000);
     const totalBayar = orders.reduce((sum, o) => sum + o.total, 0);
+
+    // ===== CEK SALDO SEBELUM LANJUT =====
+    const balanceResult = await checkShopBalance(totalBayar);
+    if (!balanceResult.ok) {
+      return;
+    }
+
+    const trxID = 'TRX' + Date.now() + Math.floor(Math.random() * 1000);
 
     const ordersData = orders.map(o => ({
       serviceId: o.serviceId,
@@ -2315,16 +2445,13 @@ button.primary:disabled {
     }
     
     try {
-      // ===== PAKAI METHOD POST =====
       const res = await fetch(SERVICES_ENDPOINT, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         },
-        body: JSON.stringify({
-          // Optional filter
-        })
+        body: JSON.stringify({})
       });
       
       if (!res.ok) throw new Error('Gagal memuat data layanan (HTTP ' + res.status + ')');
@@ -2421,6 +2548,8 @@ button.primary:disabled {
     updateOrderCount();
     updateMassalTotal();
     setMode('single');
+    // Cek saldo awal (opsional)
+    checkShopBalance(0);
   });
 
   window.addEventListener('beforeunload', function () {
