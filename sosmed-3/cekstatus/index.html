@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Order Manager - Shine Shop</title>
+<title>Cek Status Sosmed 3 - Shine Shop</title>
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <style>
@@ -75,37 +75,6 @@ body::before{
   box-shadow:0 30px 80px rgba(0,0,0,0.4);
   margin-bottom:20px;
 }
-
-.api-key-box{
-  display:flex;
-  gap:10px;
-  margin-bottom:20px;
-}
-.api-key-box input{
-  flex:1;
-  padding:12px 16px;
-  border-radius:12px;
-  border:1px solid rgba(255,255,255,0.08);
-  background:rgba(255,255,255,0.05);
-  color:#f1f5f9;
-  font-size:13px;
-  font-family:'Poppins',sans-serif;
-  outline:none;
-}
-.api-key-box input:focus{border-color:#00c6ff;box-shadow:0 0 0 3px rgba(0,198,255,0.1)}
-.api-key-box button{
-  padding:12px 18px;
-  border-radius:12px;
-  border:none;
-  background:linear-gradient(135deg,#00c6ff,#0072ff);
-  color:#fff;
-  font-weight:600;
-  font-size:13px;
-  cursor:pointer;
-  white-space:nowrap;
-  font-family:'Poppins',sans-serif;
-}
-.api-key-box button:hover{opacity:0.9}
 
 .tabs{
   display:flex;
@@ -273,7 +242,6 @@ textarea{min-height:90px}
   </div>
 
   <div class="card">
-  
     <!-- TABS -->
     <div class="tabs">
       <div class="tab active" data-tab="status" onclick="switchTab('status')">📊 Status</div>
@@ -320,21 +288,13 @@ textarea{min-height:90px}
   </div>
 
   <div class="footer">
-    Shine Shop • Powered by Indosmm API v2
+    Shine Shop • Powered by Alvino Jeremy 
   </div>
 </div>
 
 <script>
 const API_URL = 'https://indosmm.id/api/v2';
-
-function getKey() {
-  return document.getElementById('apiKey').value.trim();
-}
-
-function toggleKeyVisibility() {
-  const input = document.getElementById('apiKey');
-  input.type = input.type === 'password' ? 'text' : 'password';
-}
+const API_KEY = 'a11570b88893e5d72b274539c98c1fba';
 
 function switchTab(tab) {
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -352,18 +312,13 @@ function parseIds(text) {
 
 function statusBadge(status) {
   const s = String(status || '-');
-  const cls = 'status-' + s.replace(/\s+/g, '\\ ');
   return `<span class="status-badge status-${s}">${s}</span>`;
 }
 
 async function apiCall(params) {
-  const key = getKey();
-  if (!key) {
-    Swal.fire('Error', 'API Key wajib diisi', 'error');
-    return null;
-  }
-
-  const body = new URLSearchParams({ key, ...params });
+  const body = new URLSearchParams({ key: API_KEY, ...params });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 12000); // timeout 12 detik
 
   try {
     const res = await fetch(API_URL, {
@@ -372,14 +327,20 @@ async function apiCall(params) {
         'Content-Type': 'application/x-www-form-urlencoded',
         'Accept': 'application/json'
       },
-      body: body.toString()
+      body: body.toString(),
+      signal: controller.signal
     });
-
+    clearTimeout(timeoutId);
     const data = await res.json();
     return data;
   } catch (err) {
+    clearTimeout(timeoutId);
     console.error(err);
-    Swal.fire('Error', 'Gagal menghubungi API: ' + err.message, 'error');
+    if (err.name === 'AbortError') {
+      Swal.fire('Timeout', 'Server terlalu lama merespons. Coba lagi.', 'warning');
+    } else {
+      Swal.fire('Error', 'Gagal menghubungi API: ' + err.message, 'error');
+    }
     return null;
   }
 }
