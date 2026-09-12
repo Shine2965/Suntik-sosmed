@@ -626,18 +626,152 @@ const QRIS_EXPIRY_MINUTES = 60; // 1 JAM
 
 // ===== AMBIL PARAMETER DARI URL =====
 const p = new URLSearchParams(location.search);
-const trx = p.get("trx") || "-";
-const total = Number(p.get("total") || 0);
-const isMass = p.get("mass") === "1";
+let trx = p.get("trx") || "-";
+let total = Number(p.get("total") || 0);
+let isMass = p.get("mass") === "1";
 let ordersData = [];
 
-try {
-  const ordersParam = p.get("orders");
-  if (ordersParam) {
-    ordersData = JSON.parse(decodeURIComponent(ordersParam));
+// ================= PERSISTENT URL PARAMS =================
+function getUrlParamsKey(trxId) {
+  return `url_params_${trxId}`;
+}
+
+function saveUrlParams() {
+  try {
+    if (!trx || trx === "-") return;
+    const data = {
+      trx: trx,
+      total: total,
+      isMass: isMass,
+      orders: ordersData,
+      savedAt: new Date().toISOString()
+    };
+    localStorage.setItem(getUrlParamsKey(trx), JSON.stringify(data));
+    localStorage.setItem('last_trx', trx);
+    console.log('💾 URL params disimpan:', data);
+  } catch (e) {
+    console.warn('Gagal simpan URL params:', e);
   }
-} catch (e) {
-  console.warn('Gagal parse orders data:', e);
+}
+
+function loadUrlParams() {
+  try {
+    // Coba ambil dari URL dulu
+    const ordersParam = p.get("orders");
+    if (ordersParam && trx !== "-") {
+      ordersData = JSON.parse(decodeURIComponent(ordersParam));
+      console.log('📦 Orders data dari URL:', ordersData.length, 'items');
+      saveUrlParams(); // Simpan ke localStorage
+      return true;
+    }
+    
+    // Jika URL kosong (tidak ada trx), ambil dari localStorage
+    if (trx === "-" || !p.get("trx")) {
+      const storedTrx = localStorage.getItem('last_trx');
+      if (storedTrx) {
+        const key = getUrlParamsKey(storedTrx);
+        const stored = localStorage.getItem(key);
+        if (stored) {
+          const data = JSON.parse(stored);
+          trx = data.trx;
+          total = data.total;
+          isMass = data.isMass;
+          ordersData = data.orders || [];
+          console.log('🔄 URL params dipulihkan dari localStorage:', data);
+          
+          // Update URL tanpa reload
+          try {
+            const newUrl = new URL(window.location.href);
+            newUrl.searchParams.set('trx', trx);
+            newUrl.searchParams.set('total', total);
+            if (isMass) newUrl.searchParams.set('mass', '1');
+            if (ordersData.length > 0) {
+              newUrl.searchParams.set('orders', encodeURIComponent(JSON.stringify(ordersData)));
+            }
+            window.history.replaceState({}, '', newUrl.toString());
+          } catch(e) {
+            console.warn('Gagal update URL:', e);
+          }
+          
+          return true;
+        }
+      }
+    } else if (trx !== "-" && !ordersParam) {
+      // Ada trx di URL tapi tidak ada orders, coba ambil dari storage
+      const key = getUrlParamsKey(trx);
+      const stored = localStorage.getItem(key);
+      if (stored) {
+        const data = JSON.parse(stored);
+        ordersData = data.orders || [];
+        console.log('🔄 Orders data dipulihkan dari localStorage (partial):', ordersData.length, 'items');
+      }
+    }
+  } catch (e) {
+    console.warn('Gagal load URL params:', e);
+  }
+  return false;
+}
+
+// Simpan trx terakhir
+if (trx && trx !== "-") {
+  localStorage.setItem('last_trx', trx);
+}
+
+// Load params (dari URL atau localStorage)
+loadUrlParams();
+
+// ================= PERSISTENT ORDER IDS =================
+function getOrderIdsKey(trxId) {
+  return `order_ids_${trxId}`;
+}
+
+function saveOrderIds(orderIds) {
+  try {
+    const key = getOrderIdsKey(trx);
+    const existing = JSON.parse(localStorage.getItem(key) || '[]');
+    const combined = [...new Set([...existing, ...orderIds])];
+    localStorage.setItem(key, JSON.stringify(combined));
+    console.log('💾 Order IDs disimpan:', combined);
+  } catch (e) {
+    console.warn('Gagal simpan order IDs:', e);
+  }
+}
+
+function loadOrderIds() {
+  try {
+    const key = getOrderIdsKey(trx);
+    const stored = localStorage.getItem(key);
+    if (stored) {
+      const ids = JSON.parse(stored);
+      console.log('🔄 Order IDs dipulihkan:', ids);
+      return ids;
+    }
+  } catch (e) {
+    console.warn('Gagal load order IDs:', e);
+  }
+  return [];
+}
+
+function displayStoredOrderIds() {
+  const storedIds = loadOrderIds();
+  if (storedIds.length > 0) {
+    const orderStatus = document.getElementById('orderStatus');
+    const orderIdStr = storedIds.join(', ');
+    orderStatus.className = 'order-status success';
+    orderStatus.innerHTML = `
+      ✅ ${storedIds.length} pesanan tersimpan!
+      <div class="order-id-box">
+        🆔 ID Pesanan: <strong>${orderIdStr}</strong>
+        <button class="copy-btn" onclick="copyOrderId('${orderIdStr}')">📋 Salin Semua</button>
+      </div>
+      <div style="margin-top:6px;font-size:11px;color:#888;">
+        ⚠️ Simpan ID pesanan ini untuk cek status order.
+      </div>
+    `;
+    orderStatus.style.display = 'block';
+    return true;
+  }
+  return false;
 }
 
 // ===== NOTIFIKASI DISCORD =====
@@ -1265,6 +1399,7 @@ async function sendMassOrdersToFayupedia() {
       `;
       
       markOrderSent();
+      saveOrderIds(orderIds); // <-- SIMPAN ORDER IDS KE LOCALSTORAGE
       isSendingOrder = false;
       await sendMassOrderNotificationToDiscord(orderIds, successCount, failedOrders);
       
@@ -1301,6 +1436,12 @@ async function sendMassOrdersToFayupedia() {
         ❌ ${successCount}/${ordersData.length} pesanan berhasil.<br>
         <span style="font-size:11px;color:#f87171;">Gagal: ${failedMsg}</span>
       `;
+      
+      // Simpan order IDs yang berhasil saja
+      if (orderIds.length > 0) {
+        saveOrderIds(orderIds);
+      }
+      
       isSendingOrder = false;
       await sendMassOrderNotificationToDiscord(orderIds, successCount, failedOrders);
       
@@ -1976,6 +2117,9 @@ document.getElementById('regenerateBtn').onclick = function() {
         savedState.orderSent = true;
         savePaymentState(savedState);
       }
+      
+      // Tampilkan order IDs yang sudah tersimpan
+      displayStoredOrderIds();
       return;
     } else {
       console.log('⚠️ State expired, clearing...');
@@ -1993,6 +2137,7 @@ document.getElementById('regenerateBtn').onclick = function() {
     document.getElementById('paymentStatus').textContent = '✅ Pembayaran sudah terverifikasi!';
     document.getElementById('paymentStatus').style.display = 'block';
     savePaymentState({ verified: true, orderSent: isOrderAlreadySent(), verifiedAt: new Date().toISOString() });
+    displayStoredOrderIds();
     return;
   }
   
@@ -2005,6 +2150,7 @@ document.getElementById('regenerateBtn').onclick = function() {
     document.getElementById('paymentStatus').textContent = '✅ Pembayaran sudah terverifikasi!';
     document.getElementById('paymentStatus').style.display = 'block';
     savePaymentState({ verified: true, orderSent: isOrderAlreadySent(), verifiedAt: new Date().toISOString() });
+    displayStoredOrderIds();
     return;
   }
   
@@ -2022,6 +2168,9 @@ document.getElementById('regenerateBtn').onclick = function() {
   console.log('📊 Is Mass:', isMass);
   
   updateDisplay();
+  
+  // TAMPILKAN ORDER IDS YANG SUDAH TERSIMPAN (JIKA ADA)
+  displayStoredOrderIds();
   
   // START QRIS TIMER
   startQrisTimer();
@@ -2076,6 +2225,7 @@ console.log('📧 Gmail diambil dari localStorage');
 console.log('✅ Auto-verifikasi QRIS aktif (cek setiap 10 detik)');
 console.log('⏳ QRIS Expiry:', QRIS_EXPIRY_MINUTES, 'menit');
 console.log('🔄 Regenerate QRIS tersedia setelah expired');
+console.log('💾 URL params & Order IDs tersimpan di localStorage');
 </script>
 </body>
 </html>
