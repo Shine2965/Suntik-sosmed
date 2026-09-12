@@ -1114,13 +1114,18 @@ async function sendOrdersToIndosmm() {
       });
       
       let result;
-      try { result = await response.json(); } catch (e) {
+      try { 
+        result = await response.json(); 
+      } catch (e) {
         result = { error: 'Invalid JSON response', status: response.status };
       }
       
-      if (result.order) {
+      // Mengecek ID Order dari response API { "order": 23501 } atau struktur berulang
+      const extractedOrderId = result.order || (result.data && result.data.order);
+
+      if (extractedOrderId) {
         successCount++;
-        orderIds.push(result.order);
+        orderIds.push(extractedOrderId);
       } else {
         failedOrders.push({
           index: i,
@@ -1142,7 +1147,7 @@ async function sendOrdersToIndosmm() {
         ✅ ${successCount} pesanan berhasil dibuat!
         <div class="order-id-box">
           🆔 ID Pesanan: <strong>${orderIdStr}</strong>
-          <button class="copy-btn" onclick="copyOrderId('${orderIdStr}')">📋 Salin Semua</button>
+          <button class="copy-btn" onclick="copyOrderId('${orderIdStr}')">📋 Salin</button>
         </div>
         <div style="margin-top:6px;font-size:11px;color:#888;">
           ⚠️ Simpan ID pesanan ini untuk cek status order.
@@ -1153,24 +1158,24 @@ async function sendOrdersToIndosmm() {
       await sendMassOrderNotificationToDiscord(orderIds, successCount, failedOrders);
       
       await Swal.fire({
-        title: '✅ Semua Pesanan Berhasil!',
+        title: '🎉 Pesanan Berhasil Diproses!',
         html: `
-          <div style="text-align:left;color:#ddd;font-size:14px;">
-            <p><b>${successCount}</b> pesanan berhasil dibuat.</p>
-            <div style="background:#0d0d0d;padding:12px;border-radius:10px;margin:10px 0;border:1px solid #ffaa0033;text-align:center;">
-              <span style="color:#888;font-size:12px;">🆔 ID Pesanan</span><br>
-              <span style="color:#ffaa00;font-size:16px;font-weight:700;font-family:monospace;word-break:break-all;">${orderIdStr}</span>
-              <br>
-              <button onclick="copyOrderId('${orderIdStr}')" style="margin-top:6px;background:#ffaa0022;color:#ffaa00;border:1px solid #ffaa0044;padding:4px 16px;border-radius:6px;cursor:pointer;font-size:12px;">
-                📋 Salin Semua ID
+          <div style="text-align:center;color:#ddd;font-size:14px;">
+            <p>Transaksi Anda telah terverifikasi dan pesanan sudah diteruskan.</p>
+            <div style="background:#1e293b;padding:15px;border-radius:12px;margin:15px 0;border:1px solid #00c6ff;">
+              <span style="color:#94a3b8;font-size:12px;">ID PESANAN Anda:</span><br>
+              <span style="color:#00ffaa;font-size:22px;font-weight:800;font-family:monospace;letter-spacing:1px;">${orderIdStr}</span>
+              <br><br>
+              <button onclick="copyOrderId('${orderIdStr}')" style="background:linear-gradient(135deg,#00c6ff,#0072ff);color:#fff;border:none;padding:8px 18px;border-radius:20px;cursor:pointer;font-size:13px;font-weight:600;">
+                📋 Salin ID Pesanan
               </button>
             </div>
-            <p style="font-size:12px;color:#888;">⚠️ Simpan ID pesanan ini untuk cek status order.</p>
+            <p style="font-size:12px;color:#facc15;">⚠️ Catat atau simpan ID Pesanan di atas untuk keperluan komplain/tracking!</p>
           </div>
         `,
         icon: 'success',
-        confirmButtonColor: '#ffaa00',
-        confirmButtonText: '✅ OK, Saya Simpan'
+        confirmButtonColor: '#00c6ff',
+        confirmButtonText: '✅ Saya Sudah Menyimpannya'
       });
       return true;
     } else {
@@ -1184,18 +1189,19 @@ async function sendOrdersToIndosmm() {
       await sendMassOrderNotificationToDiscord(orderIds, successCount, failedOrders);
       
       Swal.fire({
-        title: '⚠️ Sebagian Gagal',
+        title: '⚠️ Sebagian Pesanan Gagal',
         html: `
           <div style="text-align:left;color:#ddd;font-size:14px;">
-            <p>${successCount}/${ordersData.length} pesanan berhasil.</p>
-            <div style="background:#ff444415;padding:12px;border-radius:10px;margin:10px 0;border:1px solid #ff444433;">
-              <b style="color:#f87171;">Gagal:</b><br>
+            <p>Berhasil: <b>${successCount}</b> dari <b>${ordersData.length}</b> pesanan.</p>
+            ${orderIds.length > 0 ? `<p>ID Berhasil: <b style="color:#00ffaa;">${orderIds.join(', ')}</b></p>` : ''}
+            <div style="background:rgba(239,68,68,0.1);padding:12px;border-radius:10px;margin:10px 0;border:1px solid rgba(239,68,68,0.3);">
+              <b style="color:#f87171;">Detail Gagal:</b><br>
               ${failedMsg.replace(/\n/g, '<br>')}
             </div>
           </div>
         `,
         icon: 'warning',
-        confirmButtonColor: '#ffaa00'
+        confirmButtonColor: '#f59e0b'
       });
       return false;
     }
