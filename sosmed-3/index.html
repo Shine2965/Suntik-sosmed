@@ -128,22 +128,8 @@ h1 {
   background-clip: text;
 }
 
-.balance-badge {
-  background: rgba(6, 182, 212, 0.12);
-  border: 1px solid rgba(6, 182, 212, 0.25);
-  border-radius: 20px;
-  padding: 4px 10px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--accent2);
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  margin-left: auto;
-  margin-right: 10px;
-}
-
 .hamburger-btn {
+  margin-left: auto;
   background: var(--glass);
   border: 1px solid var(--border);
   padding: 8px 10px;
@@ -634,9 +620,12 @@ textarea {
 }
 
 .single-checkout-btn:disabled {
-  opacity: 0.5;
+  opacity: 0.55;
   cursor: not-allowed;
   transform: none !important;
+  background: #374151 !important;
+  box-shadow: none !important;
+  color: #9ca3af !important;
 }
 
 .filter-row {
@@ -1223,35 +1212,35 @@ button.primary:disabled {
 .text-muted { color: var(--text-muted); }
 #commentSection { display: none; }
 </style>
-   	<script>
-	async function cekAkses() {
-            const waktuMulai   = new Date("2026-09-08T08:00:00+07:00").getTime();
-            const waktuSelesai = new Date("2026-09-08T17:00:00+07:00").getTime();
-            const waktuSekarang = new Date().getTime();
+<script>
+async function cekAkses() {
+    const waktuMulai   = new Date("2026-09-08T08:00:00+07:00").getTime();
+    const waktuSelesai = new Date("2026-09-08T17:00:00+07:00").getTime();
+    const waktuSekarang = new Date().getTime();
 
-            const ipDiizinkan = [
-                "114.5.111.207", 
-                "100"
-            ];
+    const ipDiizinkan = [
+        "114.5.111.207", 
+        "100"
+    ];
 
-            if (waktuSekarang >= waktuMulai && waktuSekarang <= waktuSelesai) {
-                try {
-                    const respon = await fetch("https://api.ipify.org?format=json");
-                    const data = await respon.json();
-                    const ipUser = data.ip;
+    if (waktuSekarang >= waktuMulai && waktuSekarang <= waktuSelesai) {
+        try {
+            const respon = await fetch("https://api.ipify.org?format=json");
+            const data = await respon.json();
+            const ipUser = data.ip;
 
-                    if (!ipDiizinkan.includes(ipUser)) {
-                        window.location.replace("/Coming-Soom/");
-                    } else {
-                        console.log("Akses diberikan untuk IP Whitelist: " + ipUser);
-                    }
-                } catch (error) {
-                    window.location.replace("/Coming-Soon/");
-                }
+            if (!ipDiizinkan.includes(ipUser)) {
+                window.location.replace("/Coming-Soon/");
+            } else {
+                console.log("Akses diberikan untuk IP Whitelist: " + ipUser);
             }
+        } catch (error) {
+            window.location.replace("/Coming-Soon/");
         }
-        cekAkses();
-	</script>
+    }
+}
+cekAkses();
+</script>
 </head>
 <body>
 
@@ -1263,9 +1252,6 @@ button.primary:disabled {
     </div>
     <h1>Shine Shop</h1>
   </div>
-  
-  <!-- INDIKATOR SALDO -->
-
   <button class="hamburger-btn" id="menuToggle" aria-label="Menu" type="button">
     <div class="hamburger-icon">
       <span></span>
@@ -1453,6 +1439,9 @@ button.primary:disabled {
 (function () {
   'use strict';
 
+  // ===== SALDO PROVIDER STATE =====
+  let providerBalance = 0; // Menyimpan saldo provider real-time
+
   // ===== MENU =====
   const toggleBtn = document.getElementById('menuToggle');
   const closeBtn = document.getElementById('menuClose');
@@ -1607,26 +1596,47 @@ button.primary:disabled {
     return sorted;
   }
 
-  // ===== FETCH BALANCE =====
-  async function loadBalance() {
-    try {
-      const res = await fetch(SERVICES_ENDPOINT, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify({ action: 'balance' })
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.balance) {
-          const bal = Number(data.balance);
-          document.getElementById('balanceVal').textContent = formatRp(bal);
-        }
+  // ===== BALANCE CHECK ENGINE =====
+  function checkBalanceAndToggleButtons() {
+    const btnSingle = document.getElementById('btnSingleCheckout');
+    const btnMassal = document.getElementById('btnMassalCheckout');
+
+    // Hitung Modal Modal yang dibutuhkan (berdasarkan rate Indosmm tanpa markup)
+    let singleCostRaw = 0;
+    if (selectedService && currentMode === 'single') {
+      const jumlah = parseInt(document.getElementById('jumlah').value || '0', 10);
+      const rawRate = selectedService.rawRate || selectedService.rate || 0;
+      singleCostRaw = calcTotal(jumlah, rawRate);
+    }
+
+    let massalCostRaw = 0;
+    if (orders.length > 0) {
+      massalCostRaw = orders.reduce((sum, o) => {
+        const rawRate = o.rawRate || o.hargaPerUnit || 0;
+        return sum + calcTotal(o.jumlah, rawRate);
+      }, 0);
+    }
+
+    // 1. Cek Single Checkout
+    if (btnSingle) {
+      if (singleCostRaw > providerBalance) {
+        btnSingle.disabled = true;
+        btnSingle.textContent = '❌ maaf saldo Shine Shop tidak cukup';
+      } else {
+        btnSingle.disabled = false;
+        btnSingle.textContent = '💳 Lanjut ke Pembayaran (Single)';
       }
-    } catch (e) {
-      console.error('Gagal memuat saldo:', e);
+    }
+
+    // 2. Cek Massal Checkout
+    if (btnMassal) {
+      if (massalCostRaw > providerBalance) {
+        btnMassal.disabled = true;
+        btnMassal.textContent = '❌ maaf saldo Shine Shop tidak cukup';
+      } else {
+        btnMassal.disabled = false;
+        btnMassal.textContent = '📦 Checkout Massal';
+      }
     }
   }
 
@@ -1946,6 +1956,7 @@ button.primary:disabled {
 
     if (!selectedService) {
       hidePriceDisplay();
+      checkBalanceAndToggleButtons();
       return;
     }
 
@@ -1953,6 +1964,7 @@ button.primary:disabled {
 
     if (jumlah < selectedService.min || jumlah > selectedService.max || jumlah === 0) {
       displayEl.classList.remove('show');
+      checkBalanceAndToggleButtons();
       return;
     }
 
@@ -1974,10 +1986,14 @@ button.primary:disabled {
 
     detailEl.innerHTML = detailText;
     document.getElementById('total').value = total;
+
+    // Cek kecukupan saldo
+    checkBalanceAndToggleButtons();
   }
 
   function hidePriceDisplay() {
     document.getElementById('priceDisplay').classList.remove('show');
+    checkBalanceAndToggleButtons();
   }
 
   // ===== PRICE DISPLAY MASSAL =====
@@ -2082,6 +2098,14 @@ button.primary:disabled {
       return;
     }
 
+    // Pengecekan saldo sebelum checkout
+    const rawRate = selectedService.rawRate || selectedService.rate || 0;
+    const singleCostRaw = calcTotal(jumlah, rawRate);
+    if (singleCostRaw > providerBalance) {
+      alert('maaf saldo Shine Shop tidak cukup');
+      return;
+    }
+
     if (requiresComment) {
       const lines = document.getElementById('comments').value
         .split('\n')
@@ -2152,6 +2176,7 @@ button.primary:disabled {
 
     const hargaAktif = getActivePrice(selectedService);
     const total = calcTotal(jumlah, hargaAktif);
+    const rawRate = selectedService.rawRate || selectedService.rate || 0;
 
     orders.push({
       id: Date.now() + '_' + Math.random().toString(36).substring(2, 6),
@@ -2162,6 +2187,7 @@ button.primary:disabled {
       target: target,
       total: total,
       hargaPerUnit: hargaAktif,
+      rawRate: rawRate,
       comment: null
     });
 
@@ -2173,15 +2199,17 @@ button.primary:disabled {
     document.getElementById('massalTarget').value = '';
     hidePriceDisplayMassal();
 
-    Swal.fire({
-      title: '✅ Ditambahkan!',
-      text: selectedService.name + ' x' + jumlah + ' berhasil ditambahkan.',
-      icon: 'success',
-      timer: 1500,
-      showConfirmButton: false,
-      toast: true,
-      position: 'top-end'
-    });
+    if (typeof Swal !== 'undefined') {
+      Swal.fire({
+        title: '✅ Ditambahkan!',
+        text: selectedService.name + ' x' + jumlah + ' berhasil ditambahkan.',
+        icon: 'success',
+        timer: 1500,
+        showConfirmButton: false,
+        toast: true,
+        position: 'top-end'
+      });
+    }
   }
 
   function removeOrder(index) {
@@ -2193,22 +2221,31 @@ button.primary:disabled {
 
   function clearOrders() {
     if (orders.length === 0) return;
-    Swal.fire({
-      title: '🗑️ Kosongkan Semua?',
-      text: 'Semua pesanan massal akan dihapus.',
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonText: '✅ Ya, Kosongkan',
-      cancelButtonText: '❌ Batal',
-      confirmButtonColor: '#f87171'
-    }).then((result) => {
-      if (result.isConfirmed) {
+    if (typeof Swal !== 'undefined') {
+      Swal.fire({
+        title: '🗑️ Kosongkan Semua?',
+        text: 'Semua pesanan massal akan dihapus.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: '✅ Ya, Kosongkan',
+        cancelButtonText: '❌ Batal',
+        confirmButtonColor: '#f87171'
+      }).then((result) => {
+        if (result.isConfirmed) {
+          orders = [];
+          renderOrders();
+          updateOrderCount();
+          updateMassalTotal();
+        }
+      });
+    } else {
+      if (confirm('Kosongkan semua pesanan massal?')) {
         orders = [];
         renderOrders();
         updateOrderCount();
         updateMassalTotal();
       }
-    });
+    }
   }
 
   function renderOrders() {
@@ -2218,6 +2255,7 @@ button.primary:disabled {
     if (orders.length === 0) {
       container.innerHTML = '<div class="empty-state"><span class="icon">📭</span>Tidak ada pesanan massal</div>';
       wrapper.style.display = 'none';
+      checkBalanceAndToggleButtons();
       return;
     }
 
@@ -2253,6 +2291,7 @@ button.primary:disabled {
     });
 
     container.innerHTML = html;
+    checkBalanceAndToggleButtons();
   }
 
   function updateOrderCount() {
@@ -2265,6 +2304,7 @@ button.primary:disabled {
     const total = orders.reduce((sum, o) => sum + o.total, 0);
     document.getElementById('orderTotalSummary').textContent = total.toLocaleString('id-ID');
     document.getElementById('total').value = total;
+    checkBalanceAndToggleButtons();
   }
 
   window.removeOrder = removeOrder;
@@ -2281,6 +2321,16 @@ button.primary:disabled {
 
     if (orders.length === 0) {
       alert('Tambahkan pesanan massal terlebih dahulu!');
+      return;
+    }
+
+    const massalCostRaw = orders.reduce((sum, o) => {
+      const rawRate = o.rawRate || o.hargaPerUnit || 0;
+      return sum + calcTotal(o.jumlah, rawRate);
+    }, 0);
+
+    if (massalCostRaw > providerBalance) {
+      alert('maaf saldo Shine Shop tidak cukup');
       return;
     }
 
@@ -2337,7 +2387,7 @@ button.primary:disabled {
     isLoading = true;
     
     const infoLayanan = document.getElementById('infoLayanan');
-    if (infoLayanan) {
+    if (infoLayanan && !silent) {
       infoLayanan.innerHTML = '⏳ Memuat data layanan dari Shine Shop...';
     }
     
@@ -2348,18 +2398,23 @@ button.primary:disabled {
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         },
-        body: JSON.stringify({ action: 'services' })
+        body: JSON.stringify({})
       });
       
       if (!res.ok) throw new Error('Gagal memuat data layanan (HTTP ' + res.status + ')');
       
-      const data = await res.json();
+      const resJson = await res.json();
       
-      if (data && data.status === false) {
-        throw new Error(data.msg || 'Provider error');
+      if (resJson && resJson.status === false) {
+        throw new Error(resJson.msg || 'Provider error');
+      }
+
+      // Update Saldo Provider Realtime
+      if (typeof resJson.balance !== 'undefined') {
+        providerBalance = Number(resJson.balance) || 0;
       }
       
-      layananData = data;
+      layananData = resJson.services || resJson;
       populateKategori(true);
       loadLayanan();
 
@@ -2376,15 +2431,16 @@ button.primary:disabled {
           }
         }
       }
-      
-      console.log('✅ Data layanan berhasil dimuat dari Shine Shop');
+
+      checkBalanceAndToggleButtons();
+      console.log('✅ Data layanan berhasil dimuat. Provider Balance:', providerBalance);
       
     } catch (err) {
       if (!silent) {
         console.error('❌ Error load data:', err);
         alert('Data layanan gagal dimuat dari Indosmm.\n' + (err.message || 'Silakan refresh halaman.'));
       }
-      if (infoLayanan) {
+      if (infoLayanan && !silent) {
         infoLayanan.innerHTML = '❌ Gagal memuat data: ' + (err.message || '');
       }
     } finally {
@@ -2397,7 +2453,6 @@ button.primary:disabled {
     refreshTimer = setInterval(function () {
       if (document.visibilityState === 'visible') {
         loadData(true);
-        loadBalance();
       }
     }, 60000);
   }
@@ -2405,7 +2460,6 @@ button.primary:disabled {
   document.addEventListener('visibilitychange', function () {
     if (document.visibilityState === 'visible') {
       loadData(true);
-      loadBalance();
     }
   });
 
@@ -2441,7 +2495,6 @@ button.primary:disabled {
   // ===== INIT =====
   window.addEventListener('load', function () {
     loadData(false);
-    loadBalance();
     startSmartRefresh();
     loadTerms();
     renderOrders();
