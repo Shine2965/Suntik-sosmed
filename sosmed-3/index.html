@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="id">
 <head>
@@ -129,8 +128,22 @@ h1 {
   background-clip: text;
 }
 
-.hamburger-btn {
+.balance-badge {
+  background: rgba(6, 182, 212, 0.12);
+  border: 1px solid rgba(6, 182, 212, 0.25);
+  border-radius: 20px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent2);
+  display: flex;
+  align-items: center;
+  gap: 5px;
   margin-left: auto;
+  margin-right: 10px;
+}
+
+.hamburger-btn {
   background: var(--glass);
   border: 1px solid var(--border);
   padding: 8px 10px;
@@ -1212,43 +1225,31 @@ button.primary:disabled {
 </style>
    	<script>
 	async function cekAkses() {
-            // 1. TENTUKAN PERIODE WAKTU WIB (Format ISO +07:00)
             const waktuMulai   = new Date("2026-09-08T08:00:00+07:00").getTime();
             const waktuSelesai = new Date("2026-09-08T17:00:00+07:00").getTime();
             const waktuSekarang = new Date().getTime();
 
-            // 2. DAFTAR IP YANG DIIZINKAN (Whitelist IP Anda/Tim Anda)
-            // Masukkan IP Publik Anda di sini. Bisa lebih dari satu.
             const ipDiizinkan = [
                 "114.5.111.207", 
                 "100"
             ];
 
-            // 3. JIKA SEKARANG BERADA DI DALAM PERIODE TERSEBUT
             if (waktuSekarang >= waktuMulai && waktuSekarang <= waktuSelesai) {
                 try {
-                    // Ambil IP publik pengunjung lewat API gratis ipify
-                    const respon = await fetch("https://api.ipify.org?format=json"); //
-                    const data = await respon.json(); //
+                    const respon = await fetch("https://api.ipify.org?format=json");
+                    const data = await respon.json();
                     const ipUser = data.ip;
 
-                    // Cek apakah IP user ada di dalam daftar whitelist
                     if (!ipDiizinkan.includes(ipUser)) {
-                        // Jika IP TIDAK diizinkan, langsung alihkan ke halaman khusus
                         window.location.replace("/Coming-Soom/");
                     } else {
                         console.log("Akses diberikan untuk IP Whitelist: " + ipUser);
                     }
                 } catch (error) {
-                    // Antisipasi jika API ipify gagal dimuat/diblokir adblocker
-                    // Demi keamanan, jika gagal cek IP, user umum sebaiknya langsung dialihkan
                     window.location.replace("/Coming-Soon/");
                 }
             }
-            // Setelah melewati batas waktuSelesai, halaman otomatis kembali normal bagi semua IP
         }
-
-        // Jalankan fungsi pengecekan
         cekAkses();
 	</script>
 </head>
@@ -1262,6 +1263,9 @@ button.primary:disabled {
     </div>
     <h1>Shine Shop</h1>
   </div>
+  
+  <!-- INDIKATOR SALDO -->
+
   <button class="hamburger-btn" id="menuToggle" aria-label="Menu" type="button">
     <div class="hamburger-icon">
       <span></span>
@@ -1601,6 +1605,29 @@ button.primary:disabled {
       sorted.sort((a, b) => getActivePrice(b) - getActivePrice(a));
     }
     return sorted;
+  }
+
+  // ===== FETCH BALANCE =====
+  async function loadBalance() {
+    try {
+      const res = await fetch(SERVICES_ENDPOINT, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({ action: 'balance' })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.balance) {
+          const bal = Number(data.balance);
+          document.getElementById('balanceVal').textContent = formatRp(bal);
+        }
+      }
+    } catch (e) {
+      console.error('Gagal memuat saldo:', e);
+    }
   }
 
   // ===== CUSTOM SELECT ENGINE =====
@@ -2086,7 +2113,6 @@ button.primary:disabled {
       comment: requiresComment ? document.getElementById('comments').value : null
     }];
 
-    // ✅ Kirim semua data ke payment
     let url = 'payment/?trx=' + trxID +
       '&total=' + total +
       '&mass=0' +
@@ -2316,16 +2342,13 @@ button.primary:disabled {
     }
     
     try {
-      // ===== PAKAI METHOD POST =====
       const res = await fetch(SERVICES_ENDPOINT, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         },
-        body: JSON.stringify({
-          // Optional filter
-        })
+        body: JSON.stringify({ action: 'services' })
       });
       
       if (!res.ok) throw new Error('Gagal memuat data layanan (HTTP ' + res.status + ')');
@@ -2374,6 +2397,7 @@ button.primary:disabled {
     refreshTimer = setInterval(function () {
       if (document.visibilityState === 'visible') {
         loadData(true);
+        loadBalance();
       }
     }, 60000);
   }
@@ -2381,6 +2405,7 @@ button.primary:disabled {
   document.addEventListener('visibilitychange', function () {
     if (document.visibilityState === 'visible') {
       loadData(true);
+      loadBalance();
     }
   });
 
@@ -2416,6 +2441,7 @@ button.primary:disabled {
   // ===== INIT =====
   window.addEventListener('load', function () {
     loadData(false);
+    loadBalance();
     startSmartRefresh();
     loadTerms();
     renderOrders();
