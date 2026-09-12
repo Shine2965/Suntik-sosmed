@@ -617,8 +617,6 @@ const ADMIN_FEE_PERCENT = 1;
 const ADMIN_FEE_THRESHOLD = 500;
 const QRIS_EXPIRY_MINUTES = 60;
 
-let INDO_API_KEY = '';
-
 // ===== AMBIL PARAMETER DARI URL =====
 const p = new URLSearchParams(location.search);
 const trx = p.get("trx") || "-";
@@ -724,7 +722,6 @@ async function fetchConfigFromEnv() {
     if (res.ok) {
       const data = await res.json();
       if (data.qiospay_api_key) QIOSPAY_API_KEY = data.qiospay_api_key;
-      if (data.indo_api_key) INDO_API_KEY = data.indo_api_key;
       return true;
     }
   } catch (e) {
@@ -1054,6 +1051,7 @@ function regenerateQris() {
   });
 }
 
+// ===== DIUBAH: Menggunakan endpoint Vercel /api/indosmm untuk mencegah error CORS =====
 async function sendOrdersToIndosmm() {
   if (isOrderAlreadySent()) return true;
   if (isSendingOrder) return false;
@@ -1063,13 +1061,6 @@ async function sendOrdersToIndosmm() {
   if (!ordersData || ordersData.length === 0) {
     orderStatus.className = 'order-status failed';
     orderStatus.textContent = '❌ Tidak ada data pesanan.';
-    orderStatus.style.display = 'block';
-    return false;
-  }
-  
-  if (!INDO_API_KEY) {
-    orderStatus.className = 'order-status failed';
-    orderStatus.textContent = '❌ API Key Indosmm belum terkonfigurasi pada server.';
     orderStatus.style.display = 'block';
     return false;
   }
@@ -1086,8 +1077,8 @@ async function sendOrdersToIndosmm() {
   try {
     for (let i = 0; i < ordersData.length; i++) {
       const order = ordersData[i];
-      const payload = {
-        key: INDO_API_KEY,
+      
+      const payloadData = {
         action: 'add',
         service: parseInt(order.serviceId, 10),
         link: order.target.trim(),
@@ -1096,21 +1087,16 @@ async function sendOrdersToIndosmm() {
       
       if (order.comment && order.comment.trim() !== '') {
         const comments = order.comment.split('\n').filter(l => l.trim()).join('\n');
-        if (comments) payload.comments = comments;
+        if (comments) payloadData.comments = comments;
       }
       
-      const formBody = new URLSearchParams();
-      for (const [k, v] of Object.entries(payload)) {
-        formBody.append(k, v);
-      }
-      
-      const response = await fetch('https://indosmm.id/api/v2', {
+      // Request dialihkan ke Serverless Endpoint Vercel (/api/indosmm)
+      const response = await fetch('/api/indosmm', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'Accept': 'application/json'
+          'Content-Type': 'application/json'
         },
-        body: formBody.toString()
+        body: JSON.stringify(payloadData)
       });
       
       let result;
@@ -1120,7 +1106,6 @@ async function sendOrdersToIndosmm() {
         result = { error: 'Invalid JSON response', status: response.status };
       }
       
-      // Mengecek ID Order dari response API { "order": 23501 } atau struktur berulang
       const extractedOrderId = result.order || (result.data && result.data.order);
 
       if (extractedOrderId) {
@@ -1588,7 +1573,7 @@ function updateDisplay(){
     if(err) return console.error(err);
     const ctx = document.getElementById('qrisCanvas').getContext("2d");
     const logo = new Image();
-    logo.src = "/home/logo.png";
+    logo.src = "data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='48' fill='%2000c6ff'/%3E%3Ctext x='50%' y='55%' text-anchor='middle' fill='white' font-weight='bold' font-size='30' font-family='sans-serif'%3ES%3C/text%3E%3C/svg%3E";
     logo.onload = function(){
       const size = 50;
       const x = (240 - size)/2;
