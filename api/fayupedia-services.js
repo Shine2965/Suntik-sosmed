@@ -1,38 +1,80 @@
 // /api/fayupedia-services.js
 // Vercel Serverless Function - Proxy ke Fayupedia API
-// Mengambil daftar layanan, markup harga 5%, group by category
+// Support: 1. Ambil daftar layanan  2. Cek saldo
 
 export default async function handler(req, res) {
   // CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
 
-  if (req.method !== 'GET') {
-    return res.status(405).json({
-      status: false,
-      msg: 'Method not allowed'
-    });
-  }
-
   try {
     const apiId = parseInt(process.env.FAYUPEDIA_API_ID) || 5522;
-    const apiKey = process.env.FAYUPEDIA_API_KEY || '';
+    const apiKey = process.env.FAYUPEDIA_API_KEY || '6mnjom-ing8mx-a4csgp-6bwv4c-4zdv1l';
 
     if (!apiKey) {
-      console.error('FAYUPEDIA_API_KEY tidak ditemukan di environment');
       return res.status(500).json({
         status: false,
         msg: 'Konfigurasi API belum lengkap (FAYUPEDIA_API_KEY missing)'
       });
     }
 
-    // POST ke Fayupedia
-    const response = await fetch('https://fayupedia.id/api/services', {
+    // ===== DETECT ACTION =====
+    // ?action=services (default) atau ?action=balance
+    const action = (req.query && req.query.action) || 'services';
+
+    // ============================================================
+    // 🔥 ACTION: BALANCE (CEK SALDO)
+    // ============================================================
+    if (action === 'balance') {
+      const balanceResponse = await fetch('https://fayupedia.id/api/balance', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          api_id: apiId,
+          api_key: apiKey
+        })
+      });
+
+      if (!balanceResponse.ok) {
+        const text = await balanceResponse.text().catch(() => '');
+        console.error('Fayupedia balance HTTP error:', balanceResponse.status, text);
+        return res.status(502).json({
+          status: false,
+          msg: `Gagal menghubungi provider (HTTP ${balanceResponse.status})`
+        });
+      }
+
+      const balanceData = await balanceResponse.json();
+
+      if (!balanceData.status) {
+        return res.status(502).json({
+          status: false,
+          msg: balanceData.msg || 'Respon provider tidak valid'
+        });
+      }
+
+      // Cache singkat
+      res.setHeader('Cache-Control', 's-maxage=10, stale-while-revalidate=20');
+
+      return res.status(200).json({
+        status: true,
+        msg: balanceData.msg || 'OK',
+        balance: Number(balanceData.balance) || 0
+      });
+    }
+
+    // ============================================================
+    // 🔥 ACTION: SERVICES (DAFTAR LAYANAN)
+    // ============================================================
+    const servicesResponse = await fetch('https://fayupedia.id/api/services', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -44,16 +86,16 @@ export default async function handler(req, res) {
       })
     });
 
-    if (!response.ok) {
-      const text = await response.text().catch(() => '');
-      console.error('Fayupedia API HTTP error:', response.status, text);
+    if (!servicesResponse.ok) {
+      const text = await servicesResponse.text().catch(() => '');
+      console.error('Fayupedia services HTTP error:', servicesResponse.status, text);
       return res.status(502).json({
         status: false,
-        msg: `Gagal menghubungi provider (HTTP ${response.status})`
+        msg: `Gagal menghubungi provider (HTTP ${servicesResponse.status})`
       });
     }
 
-    const data = await response.json();
+    const data = await servicesResponse.json();
 
     if (!data.status || !Array.isArray(data.services)) {
       console.error('Fayupedia response invalid:', data);
@@ -63,17 +105,16 @@ export default async function handler(req, res) {
       });
     }
 
-    // Group by category + markup 5% + map ke format frontend
+    // ===== GROUP BY CATEGORY + MARKUP 10% =====
     const grouped = {};
-    const MARKUP = 1.10; // +5%
+    const MARKUP = 1.09;
 
     for (const s of data.services) {
       const category = (s.category || 'Lainnya').trim() || 'Lainnya';
       if (!grouped[category]) {
         grouped[category] = [];
       }
-    
-      // Deteksi apakah butuh komentar berdasarkan type
+
       const type = (s.type || 'default').toLowerCase();
       const needsComment =
         type.includes('comment') ||
@@ -81,20 +122,18 @@ export default async function handler(req, res) {
         type === 'comment_likes' ||
         type === 'comment_reply';
 
-      // Harga dari Fayupedia = per 1.000 unit
-      // Markup 5%, dibulatkan — frontend: total = (jumlah / 1000) * price
       const rawPrice = Number(s.price) || 0;
       const markedUpPrice = Math.round(rawPrice * MARKUP);
 
       grouped[category].push({
         id: s.id,
         name: s.name || `Service #${s.id}`,
-        // pricePerFollower = harga per 1000 (setelah markup)
         pricePerFollower: markedUpPrice,
-        // Tidak ada diskon dari provider → tidak set field diskon
+        // 🔥 SIMPAN HARGA ASLI PROVIDER UNTUK CEK SALDO
+        rawPricePerFollower: rawPrice,
         min: Number(s.min) || 1,
         max: Number(s.max) || 1000000,
-        average: s.average || '-', // provider tidak kirim average
+        average: s.average || '-',
         desc: s.description || '',
         comment: needsComment,
         type: s.type || 'default',
@@ -102,7 +141,6 @@ export default async function handler(req, res) {
       });
     }
 
-    // Urutkan kategori & layanan (opsional, biar rapi)
     const sorted = {};
     Object.keys(grouped)
       .sort((a, b) => a.localeCompare(b, 'id'))
@@ -112,15 +150,15 @@ export default async function handler(req, res) {
         );
       });
 
-    // Cache singkat di edge (opsional)
     res.setHeader('Cache-Control', 's-maxage=30, stale-while-revalidate=60');
 
     return res.status(200).json(sorted);
+
   } catch (error) {
     console.error('Error fayupedia-services:', error);
     return res.status(500).json({
       status: false,
-      msg: 'Internal server error'
+      msg: 'Internal server error: ' + (error.message || '')
     });
   }
 }
