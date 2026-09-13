@@ -1,441 +1,319 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Status & Refill - Shine Shop</title>
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-<style>
-*{box-sizing:border-box;margin:0;padding:0}
-body{
-  font-family:'Poppins',sans-serif;
-  min-height:100vh;
-  background:#0a0e1a;
-  color:#e2e8f0;
-  padding:20px;
-  position:relative;
-  overflow-x:hidden;
-}
-body::before{
-  content:'';
-  position:fixed;
-  top:-50%;left:-50%;
-  width:200%;height:200%;
-  background:
-    radial-gradient(circle at 20% 30%, rgba(0,198,255,0.12) 0%, transparent 50%),
-    radial-gradient(circle at 80% 70%, rgba(0,114,255,0.10) 0%, transparent 50%),
-    radial-gradient(circle at 50% 50%, rgba(168,85,247,0.06) 0%, transparent 60%);
-  animation:bgFloat 20s ease-in-out infinite alternate;
-  z-index:0;pointer-events:none;
-}
-@keyframes bgFloat{
-  0%{transform:translate(0,0)}
-  50%{transform:translate(2%,-2%)}
-  100%{transform:translate(-1%,1%)}
-}
-.orb{position:fixed;border-radius:50%;filter:blur(80px);pointer-events:none;z-index:0;animation:orbPulse 6s ease-in-out infinite alternate}
-.orb-1{width:400px;height:400px;top:-100px;right:-100px;background:rgba(0,198,255,0.10)}
-.orb-2{width:300px;height:300px;bottom:-50px;left:-50px;background:rgba(168,85,247,0.08);animation-delay:2s}
-@keyframes orbPulse{0%{transform:scale(0.8);opacity:0.6}100%{transform:scale(1.2);opacity:1}}
-
-.container{max-width:640px;margin:0 auto;position:relative;z-index:1}
-.header{text-align:center;margin-bottom:28px}
-.header h1{
-  font-size:26px;font-weight:800;letter-spacing:-0.5px;
-  background:linear-gradient(135deg,#f0f9ff,#b6d4fe,#a5b4fc,#c4b5fd);
-  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
-}
-.header p{color:#94a3b8;font-size:13px;margin-top:4px;font-weight:300}
-
-.card{
-  background:rgba(255,255,255,0.04);
-  backdrop-filter:blur(24px) saturate(180%);
-  -webkit-backdrop-filter:blur(24px) saturate(180%);
-  border-radius:24px;padding:24px;
-  border:1px solid rgba(255,255,255,0.06);
-  box-shadow:0 30px 80px rgba(0,0,0,0.4);
-}
-
-.tabs{display:flex;gap:6px;margin-bottom:20px}
-.tab{
-  flex:1;padding:12px 8px;border-radius:12px;
-  border:1px solid rgba(255,255,255,0.08);
-  background:rgba(255,255,255,0.03);
-  color:#94a3b8;font-size:13px;font-weight:600;
-  cursor:pointer;text-align:center;transition:all 0.2s;
-  font-family:'Poppins',sans-serif;
-}
-.tab:hover{background:rgba(255,255,255,0.06);color:#e2e8f0}
-.tab.active{
-  background:linear-gradient(135deg,#00c6ff,#0072ff);
-  color:#fff;border-color:transparent;
-  box-shadow:0 4px 16px rgba(0,114,255,0.3);
-}
-
-.panel{display:none}
-.panel.active{display:block}
-
-label{display:block;font-size:13px;color:#94a3b8;margin-bottom:6px;font-weight:500}
-textarea{
-  width:100%;padding:14px 16px;border-radius:14px;
-  border:1px solid rgba(255,255,255,0.08);
-  background:rgba(255,255,255,0.05);
-  color:#f1f5f9;font-size:14px;font-family:'Poppins',sans-serif;
-  outline:none;resize:vertical;margin-bottom:14px;transition:all 0.2s;
-  min-height:80px;
-}
-textarea:focus{
-  border-color:#00c6ff;box-shadow:0 0 0 4px rgba(0,198,255,0.1);
-}
-.hint{font-size:12px;color:#64748b;margin-top:-8px;margin-bottom:14px}
-
-.btn{
-  width:100%;padding:15px;border-radius:999px;border:none;
-  font-size:14px;font-weight:700;color:#fff;cursor:pointer;
-  font-family:'Poppins',sans-serif;letter-spacing:0.3px;
-  transition:all 0.25s;margin-top:4px;
-}
-.btn:hover:not(:disabled){transform:translateY(-2px)}
-.btn:disabled{opacity:0.45;cursor:not-allowed;transform:none!important}
-.btn-status{background:linear-gradient(135deg,#00c6ff,#0072ff);box-shadow:0 8px 24px rgba(0,114,255,0.25)}
-.btn-refill{background:linear-gradient(135deg,#22c55e,#16a34a);box-shadow:0 8px 24px rgba(34,197,94,0.25)}
-.btn-refill-status{background:linear-gradient(135deg,#a855f7,#7c3aed);box-shadow:0 8px 24px rgba(168,85,247,0.25)}
-
-.result-box{
-  margin-top:18px;background:rgba(0,0,0,0.3);border-radius:16px;
-  padding:16px;border:1px solid rgba(255,255,255,0.06);
-  display:none;max-height:400px;overflow-y:auto;
-}
-.result-box.show{display:block}
-.result-box h3{font-size:14px;color:#94a3b8;margin-bottom:12px;font-weight:600}
-
-.order-card{
-  background:rgba(255,255,255,0.04);border-radius:12px;
-  padding:14px;margin-bottom:10px;border-left:3px solid #00c6ff;
-}
-.order-card.ok{border-left-color:#22c55e}
-.order-card.err{border-left-color:#ef4444}
-.order-card .oid{
-  font-family:'Courier New',monospace;color:#facc15;
-  font-weight:700;font-size:15px;
-}
-.order-card .row{
-  display:flex;justify-content:space-between;
-  font-size:13px;margin-top:6px;color:#cbd5e1;
-}
-.order-card .row span:last-child{font-weight:600;color:#f1f5f9}
-
-.status-badge{
-  display:inline-block;padding:3px 10px;border-radius:20px;
-  font-size:11px;font-weight:700;text-transform:uppercase;
-}
-.status-Completed,.status-completed{background:rgba(34,197,94,0.2);color:#22c55e}
-.status-Partial,.status-partial{background:rgba(250,204,21,0.2);color:#facc15}
-.status-Pending,.status-pending,.status-In\ progress,.status-Processing{background:rgba(0,198,255,0.2);color:#00c6ff}
-.status-Canceled,.status-Cancelled,.status-canceled{background:rgba(239,68,68,0.2);color:#ef4444}
-.status-Error,.status-error{background:rgba(239,68,68,0.2);color:#ef4444}
-.status-Refilling{background:rgba(168,85,247,0.2);color:#a855f7}
-.status-Created{background:rgba(0,198,255,0.2);color:#00c6ff}
-
-.footer{text-align:center;margin-top:24px;font-size:12px;color:#64748b}
-
-@media(max-width:480px){
-  .header h1{font-size:22px}
-  .tab{font-size:12px;padding:10px 6px}
-  .card{padding:18px}
-}
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cek Status & Refill Pesanan IndoSMM</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    body {
+      background-color: #f4f7f6;
+      color: #333;
+      display: flex;
+      justify-content: center;
+      padding: 20px;
+    }
+    .container {
+      width: 100%;
+      max-width: 600px;
+      background: #ffffff;
+      padding: 25px;
+      border-radius: 12px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+    }
+    h2 {
+      text-align: center;
+      margin-bottom: 20px;
+      color: #2c3e50;
+    }
+    .tabs {
+      display: flex;
+      border-bottom: 2px solid #eee;
+      margin-bottom: 20px;
+    }
+    .tab-btn {
+      flex: 1;
+      padding: 10px;
+      text-align: center;
+      background: none;
+      border: none;
+      font-weight: bold;
+      color: #7f8c8d;
+      cursor: pointer;
+      border-bottom: 3px solid transparent;
+      transition: all 0.3s;
+    }
+    .tab-btn.active {
+      color: #3498db;
+      border-bottom-color: #3498db;
+    }
+    .tab-content {
+      display: none;
+    }
+    .tab-content.active {
+      display: block;
+    }
+    .form-group {
+      margin-bottom: 15px;
+    }
+    label {
+      display: block;
+      margin-bottom: 6px;
+      font-weight: 600;
+      font-size: 14px;
+    }
+    input[type="text"] {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-size: 14px;
+    }
+    button.btn-submit {
+      width: 100%;
+      padding: 12px;
+      background-color: #3498db;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+    button.btn-submit:hover {
+      background-color: #2980b9;
+    }
+    .result-box {
+      margin-top: 20px;
+      padding: 15px;
+      border-radius: 8px;
+      background-color: #f8f9fa;
+      border: 1px solid #e9ecef;
+      display: none;
+    }
+    .result-item {
+      margin-bottom: 8px;
+      font-size: 15px;
+    }
+    .badge {
+      padding: 4px 8px;
+      border-radius: 4px;
+      color: #fff;
+      font-weight: bold;
+      font-size: 12px;
+    }
+    .badge-success { background-color: #2ecc71; }
+    .badge-process { background-color: #f1c40f; color: #333; }
+    .badge-canceled { background-color: #e74c3c; }
+    .badge-partial { background-color: #e67e22; }
+    
+    .btn-whatsapp {
+      display: inline-block;
+      margin-top: 10px;
+      padding: 10px 15px;
+      background-color: #25d366;
+      color: white;
+      text-decoration: none;
+      border-radius: 6px;
+      font-weight: bold;
+      font-size: 14px;
+      text-align: center;
+    }
+    .btn-whatsapp:hover {
+      background-color: #1eb954;
+    }
+  </style>
 </head>
 <body>
-<div class="orb orb-1"></div>
-<div class="orb orb-2"></div>
 
 <div class="container">
-  <div class="header">
-    <h1>✦ Shine Shop</h1>
-    <p>Cek Status • Refill Order • Refill Status</p>
+  <h2>Layanan Cek & Refill IndoSMM</h2>
+
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('statusTab')">Cek Status Pesanan</button>
+    <button class="tab-btn" onclick="switchTab('createRefillTab')">Ajuin Refill</button>
+    <button class="tab-btn" onclick="switchTab('refillStatusTab')">Cek Status Refill</button>
   </div>
 
-  <div class="card">
-    <div class="tabs">
-      <div class="tab active" data-tab="status" onclick="switchTab('status')">📊 Status</div>
-      <div class="tab" data-tab="refill" onclick="switchTab('refill')">🔄 Refill</div>
-      <div class="tab" data-tab="refillStatus" onclick="switchTab('refillStatus')">📋 Refill Status</div>
-    </div>
-
-    <!-- STATUS -->
-    <div class="panel active" id="panel-status">
-      <label>Order ID</label>
-      <textarea id="orderIdsStatus" placeholder="Contoh: 18705567&#10;atau multiple: 18705567,18704824"></textarea>
-      <div class="hint">Bisa 1 atau banyak (pisah koma / baris baru) • Max 100</div>
-      <button class="btn btn-status" id="btnStatus" onclick="checkStatus()">🔍 Cek Status Order</button>
-      <div class="result-box" id="resultStatus"></div>
-    </div>
-
-    <!-- REFILL -->
-    <div class="panel" id="panel-refill">
-      <label>Order ID</label>
-      <textarea id="orderIdsRefill" placeholder="Contoh: 18705567&#10;atau multiple: 18705567,18704824"></textarea>
-      <div class="hint">Hanya order yang support refill yang bisa diproses</div>
-      <button class="btn btn-refill" id="btnRefill" onclick="createRefill()">🔄 Buat Refill</button>
-      <div class="result-box" id="resultRefill"></div>
-    </div>
-
-    <!-- REFILL STATUS -->
-    <div class="panel" id="panel-refillStatus">
-      <label>Refill ID</label>
-      <textarea id="refillIds" placeholder="Contoh: 1&#10;atau multiple: 1,2,5"></textarea>
-      <div class="hint">Masukkan Refill ID hasil dari create refill</div>
-      <button class="btn btn-refill-status" id="btnRefillStatus" onclick="checkRefillStatus()">📋 Cek Status Refill</button>
-      <div class="result-box" id="resultRefillStatus"></div>
-    </div>
+  <!-- Tab 1: Cek Status Pesanan -->
+  <div id="statusTab" class="tab-content active">
+    <form id="formCekStatus">
+      <div class="form-group">
+        <label for="orderId">Order ID:</label>
+        <input type="text" id="orderId" placeholder="Masukkan ID Pesanan (cth: 1234456)" required />
+      </div>
+      <button type="submit" class="btn-submit">Cek Status</button>
+    </form>
+    <div id="resultStatus" class="result-box"></div>
   </div>
 
-  <div class="footer">Shine Shop • Indosmm API v2</div>
+  <!-- Tab 2: Create Refill -->
+  <div id="createRefillTab" class="tab-content">
+    <form id="formCreateRefill">
+      <div class="form-group">
+        <label for="refillOrderId">Order ID (Gunakan koma jika > 1 ID):</label>
+        <input type="text" id="refillOrderId" placeholder="cth: 1234, 1235, 1236" required />
+      </div>
+      <button type="submit" class="btn-submit">Ajuin Refill</button>
+    </form>
+    <div id="resultCreateRefill" class="result-box"></div>
+  </div>
+
+  <!-- Tab 3: Get Refill Status -->
+  <div id="refillStatusTab" class="tab-content">
+    <form id="formRefillStatus">
+      <div class="form-group">
+        <label for="refillId">Refill ID (Gunakan koma jika > 1 ID):</label>
+        <input type="text" id="refillId" placeholder="cth: 1, 2, 3" required />
+      </div>
+      <button type="submit" class="btn-submit">Cek Status Refill</button>
+    </form>
+    <div id="resultRefillStatus" class="result-box"></div>
+  </div>
 </div>
 
 <script>
-// Panggil backend proxy (bukan langsung ke Indosmm)
-const API_ENDPOINT = '/api/cekstatus';
-
-function switchTab(tab) {
-  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-  document.querySelector(`.tab[data-tab="${tab}"]`).classList.add('active');
-  document.getElementById('panel-' + tab).classList.add('active');
-}
-
-function parseIds(text) {
-  return text.split(/[\n,]+/).map(s => s.trim()).filter(s => s.length > 0);
-}
-
-function statusBadge(status) {
-  const s = String(status || '-');
-  return `<span class="status-badge status-${s}">${s}</span>`;
-}
-
-async function apiCall(payload) {
-  try {
-    const res = await fetch(API_ENDPOINT, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
-      body: JSON.stringify(payload)
-    });
-
-    const data = await res.json();
-    return data;
-  } catch (err) {
-    console.error(err);
-    Swal.fire('Error', 'Gagal menghubungi server: ' + err.message, 'error');
-    return null;
-  }
-}
-
-/* ===== CEK STATUS ORDER ===== */
-async function checkStatus() {
-  const ids = parseIds(document.getElementById('orderIdsStatus').value);
-  if (!ids.length) return Swal.fire('Peringatan', 'Masukkan minimal 1 Order ID', 'warning');
-  if (ids.length > 100) return Swal.fire('Peringatan', 'Maksimal 100 Order ID', 'warning');
-
-  const btn = document.getElementById('btnStatus');
-  const box = document.getElementById('resultStatus');
-  btn.disabled = true;
-  btn.textContent = '⏳ Mengecek...';
-  box.classList.remove('show');
-  box.innerHTML = '';
-
-  const payload = ids.length === 1
-    ? { action: 'status', order: ids[0] }
-    : { action: 'status', orders: ids.join(',') };
-
-  const data = await apiCall(payload);
-
-  btn.disabled = false;
-  btn.textContent = '🔍 Cek Status Order';
-  if (!data) return;
-
-  if (data.error || data.msg || data.message) {
-    box.innerHTML = `<h3>❌ Error</h3><div class="order-card err">${data.error || data.msg || data.message}</div>`;
-    box.classList.add('show');
-    return;
+  function switchTab(tabId) {
+    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+    
+    document.getElementById(tabId).classList.add('active');
+    event.currentTarget.classList.add('active');
   }
 
-  let html = '<h3>📊 Hasil Status Order</h3>';
-
-  if (ids.length === 1) {
-    html += `
-      <div class="order-card">
-        <div class="oid">#${ids[0]}</div>
-        <div class="row"><span>Status</span><span>${statusBadge(data.status)}</span></div>
-        <div class="row"><span>Charge</span><span>${data.charge ?? '-'}</span></div>
-        <div class="row"><span>Start Count</span><span>${data.start_count || '-'}</span></div>
-        <div class="row"><span>Remains</span><span>${data.remains ?? '-'}</span></div>
-        ${data.currency ? `<div class="row"><span>Currency</span><span>${data.currency}</span></div>` : ''}
-      </div>`;
-  } else {
-    const entries = Array.isArray(data)
-      ? data.map((item, i) => [item.order || ids[i], item])
-      : Object.entries(data);
-
-    for (const [oid, item] of entries) {
-      if (item.error || item.msg) {
-        html += `<div class="order-card err"><div class="oid">#${oid}</div><div class="row"><span>Error</span><span style="color:#ef4444">${item.error || item.msg}</span></div></div>`;
-      } else {
-        html += `
-          <div class="order-card">
-            <div class="oid">#${oid}</div>
-            <div class="row"><span>Status</span><span>${statusBadge(item.status)}</span></div>
-            <div class="row"><span>Charge</span><span>${item.charge ?? '-'}</span></div>
-            <div class="row"><span>Start Count</span><span>${item.start_count || '-'}</span></div>
-            <div class="row"><span>Remains</span><span>${item.remains ?? '-'}</span></div>
-          </div>`;
-      }
+  // Helper badge warna status
+  function getStatusBadge(status) {
+    const st = String(status).toLowerCase();
+    if (st.includes('success') || st.includes('completed')) {
+      return `<span class="badge badge-success">${status} (Selesai)</span>`;
+    } else if (st.includes('process') || st.includes('in progress')) {
+      return `<span class="badge badge-process">${status} (Dalam Proses)</span>`;
+    } else if (st.includes('canceled') || st.includes('cancelled')) {
+      return `<span class="badge badge-canceled">${status} (Dibatalkan)</span>`;
+    } else if (st.includes('partial')) {
+      return `<span class="badge badge-partial">${status} (Parsial)</span>`;
     }
+    return `<span class="badge badge-process">${status}</span>`;
   }
 
-  box.innerHTML = html;
-  box.classList.add('show');
-}
+  // Form 1: Cek Status Pesanan
+  document.getElementById('formCekStatus').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const orderId = document.getElementById('orderId').value.trim();
+    const resultBox = document.getElementById('resultStatus');
 
-/* ===== CREATE REFILL ===== */
-async function createRefill() {
-  const ids = parseIds(document.getElementById('orderIdsRefill').value);
-  if (!ids.length) return Swal.fire('Peringatan', 'Masukkan minimal 1 Order ID', 'warning');
-  if (ids.length > 100) return Swal.fire('Peringatan', 'Maksimal 100 Order ID', 'warning');
+    resultBox.style.display = 'block';
+    resultBox.innerHTML = 'Sedang memuat...';
 
-  const conf = await Swal.fire({
-    title: 'Buat Refill?',
-    text: `Refill untuk ${ids.length} order.`,
-    icon: 'question',
-    showCancelButton: true,
-    confirmButtonText: 'Ya, Refill',
-    cancelButtonText: 'Batal',
-    confirmButtonColor: '#22c55e'
+    try {
+      const res = await fetch('/api/cekstatus.js', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'status', order: orderId })
+      });
+      const data = await res.json();
+
+      if (data.error) {
+        resultBox.innerHTML = `<strong style="color: red;">Error:</strong> ${data.error}`;
+        return;
+      }
+
+      const statusText = data.status || 'Unknown';
+      let htmlOutput = `
+        <div class="result-item"><strong>Order ID:</strong> ${orderId}</div>
+        <div class="result-item"><strong>Jumlah Awal (Start Count):</strong> ${data.start_count || '-'}</div>
+        <div class="result-item"><strong>Sisa (Remains):</strong> ${data.remains || '-'}</div>
+        <div class="result-item"><strong>Status:</strong> ${getStatusBadge(statusText)}</div>
+      `;
+
+      // Jika status Partial atau Canceled -> Tampilkan Tombol Refund WhatsApp
+      const lowerStatus = statusText.toLowerCase();
+      if (lowerStatus.includes('partial') || lowerStatus.includes('canceled') || lowerStatus.includes('cancelled')) {
+        const waText = encodeURIComponent(`min Saya mau mengajukan reffund Sosmed 3 berikut id pesanannya : ${orderId}`);
+        const waLink = `https://wa.me/6289518103883?text=${waText}`;
+        htmlOutput += `
+          <div style="margin-top: 15px;">
+            <p style="font-size: 13px; color: #666; margin-bottom: 5px;">Pesanan bermasalah? Ajukan refund via WhatsApp:</p>
+            <a href="${waLink}" target="_blank" class="btn-whatsapp">💬 Ajukan Refund via WhatsApp</a>
+          </div>
+        `;
+      }
+
+      resultBox.innerHTML = htmlOutput;
+
+    } catch (err) {
+      resultBox.innerHTML = '<span style="color:red;">Gagal mengambil data pesanan.</span>';
+    }
   });
-  if (!conf.isConfirmed) return;
 
-  const btn = document.getElementById('btnRefill');
-  const box = document.getElementById('resultRefill');
-  btn.disabled = true;
-  btn.textContent = '⏳ Membuat Refill...';
-  box.classList.remove('show');
-  box.innerHTML = '';
+  // Form 2: Create Refill
+  document.getElementById('formCreateRefill').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const orderId = document.getElementById('refillOrderId').value.trim();
+    const resultBox = document.getElementById('resultCreateRefill');
 
-  const payload = ids.length === 1
-    ? { action: 'refill', order: ids[0] }
-    : { action: 'refill', orders: ids.join(',') };
+    resultBox.style.display = 'block';
+    resultBox.innerHTML = 'Mengajukan refill...';
 
-  const data = await apiCall(payload);
+    try {
+      const res = await fetch('/api/cekstatus.js', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'refill', order: orderId })
+      });
+      const data = await res.json();
 
-  btn.disabled = false;
-  btn.textContent = '🔄 Buat Refill';
-  if (!data) return;
-
-  if (data.error || data.msg || data.message) {
-    box.innerHTML = `<h3>❌ Error</h3><div class="order-card err">${data.error || data.msg || data.message}</div>`;
-    box.classList.add('show');
-    return;
-  }
-
-  let html = '<h3>🔄 Hasil Create Refill</h3>';
-
-  if (ids.length === 1) {
-    if (data.refill) {
-      html += `
-        <div class="order-card ok">
-          <div class="oid">Order #${ids[0]}</div>
-          <div class="row"><span>Refill ID</span><span style="color:#22c55e;font-weight:700">${data.refill}</span></div>
-          <div class="row"><span>Status</span><span>${statusBadge('Created')}</span></div>
-        </div>`;
-    } else {
-      html += `<div class="order-card err"><div class="oid">#${ids[0]}</div><div class="row"><span>Response</span><span>${JSON.stringify(data)}</span></div></div>`;
-    }
-  } else {
-    const list = Array.isArray(data)
-      ? data
-      : Object.entries(data).map(([k, v]) => ({ order: k, ...(typeof v === 'object' ? v : { refill: v }) }));
-
-    list.forEach(item => {
-      const oid = item.order || '-';
-      if (item.refill) {
-        html += `
-          <div class="order-card ok">
-            <div class="oid">Order #${oid}</div>
-            <div class="row"><span>Refill ID</span><span style="color:#22c55e;font-weight:700">${item.refill}</span></div>
-          </div>`;
+      if (data.error) {
+        resultBox.innerHTML = `<strong style="color: red;">Error:</strong> ${data.error}`;
+      } else if (data.refill) {
+        resultBox.innerHTML = `
+          <div class="result-item"><strong style="color: green;">Refill Berhasil Diajukan!</strong></div>
+          <div class="result-item"><strong>Refill ID:</strong> ${data.refill}</div>
+        `;
       } else {
-        html += `
-          <div class="order-card err">
-            <div class="oid">Order #${oid}</div>
-            <div class="row"><span>Error</span><span style="color:#ef4444">${item.error || item.msg || 'Gagal'}</span></div>
-          </div>`;
+        resultBox.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
       }
-    });
-  }
-
-  box.innerHTML = html;
-  box.classList.add('show');
-}
-
-/* ===== CEK REFILL STATUS ===== */
-async function checkRefillStatus() {
-  const ids = parseIds(document.getElementById('refillIds').value);
-  if (!ids.length) return Swal.fire('Peringatan', 'Masukkan minimal 1 Refill ID', 'warning');
-  if (ids.length > 100) return Swal.fire('Peringatan', 'Maksimal 100 Refill ID', 'warning');
-
-  const btn = document.getElementById('btnRefillStatus');
-  const box = document.getElementById('resultRefillStatus');
-  btn.disabled = true;
-  btn.textContent = '⏳ Mengecek...';
-  box.classList.remove('show');
-  box.innerHTML = '';
-
-  const payload = ids.length === 1
-    ? { action: 'refill_status', refill: ids[0] }
-    : { action: 'refill_status', refills: ids.join(',') };
-
-  const data = await apiCall(payload);
-
-  btn.disabled = false;
-  btn.textContent = '📋 Cek Status Refill';
-  if (!data) return;
-
-  if (data.error || data.msg || data.message) {
-    box.innerHTML = `<h3>❌ Error</h3><div class="order-card err">${data.error || data.msg || data.message}</div>`;
-    box.classList.add('show');
-    return;
-  }
-
-  let html = '<h3>📋 Status Refill</h3>';
-
-  if (ids.length === 1) {
-    html += `
-      <div class="order-card">
-        <div class="oid">Refill #${ids[0]}</div>
-        <div class="row"><span>Status</span><span>${statusBadge(data.status)}</span></div>
-      </div>`;
-  } else {
-    const entries = Array.isArray(data)
-      ? data.map((item, i) => [item.refill || ids[i], item])
-      : Object.entries(data);
-
-    for (const [rid, item] of entries) {
-      const status = item.status || item;
-      html += `
-        <div class="order-card">
-          <div class="oid">Refill #${rid}</div>
-          <div class="row"><span>Status</span><span>${statusBadge(status)}</span></div>
-        </div>`;
+    } catch (err) {
+      resultBox.innerHTML = '<span style="color:red;">Gagal melakukan pengajuan refill.</span>';
     }
-  }
+  });
 
-  box.innerHTML = html;
-  box.classList.add('show');
-}
+  // Form 3: Get Refill Status
+  document.getElementById('formRefillStatus').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const refillId = document.getElementById('refillId').value.trim();
+    const resultBox = document.getElementById('resultRefillStatus');
+
+    resultBox.style.display = 'block';
+    resultBox.innerHTML = 'Sedang mengecek status refill...';
+
+    try {
+      const res = await fetch('/api/cekstatus.js', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'refill_status', refill: refillId })
+      });
+      const data = await res.json();
+
+      if (data.error) {
+        resultBox.innerHTML = `<strong style="color: red;">Error:</strong> ${data.error}`;
+      } else {
+        resultBox.innerHTML = `
+          <div class="result-item"><strong>Refill ID:</strong> ${refillId}</div>
+          <div class="result-item"><strong>Status Refill:</strong> ${getStatusBadge(data.status || 'Unknown')}</div>
+        `;
+      }
+    } catch (err) {
+      resultBox.innerHTML = '<span style="color:red;">Gagal mengambil status refill.</span>';
+    }
+  });
 </script>
+
 </body>
 </html>
