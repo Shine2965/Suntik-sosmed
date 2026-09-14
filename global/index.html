@@ -450,7 +450,7 @@
             <button class="btn-change" id="changeGmailBtn">✏️ Ubah</button>
         </div>
 
-        <!-- ===== DROPDOWN PENGUMUMAN (STYLE BARU) ===== -->
+        <!-- ===== DROPDOWN PENGUMUMAN ===== -->
         <div class="announcement-dropdown" id="announcementDropdown">
             <div class="dropdown-header" id="dropdownHeader" onclick="toggleAnnouncement()">
                 <div class="title">
@@ -499,7 +499,6 @@
     // 🔒 DRAGON PROTOCOL: GMAIL, BAN, DISCORD, USER ID
     // ============================================================
 
-    // ===== CONFIG =====
     const GMAIL_KEY = 'user_gmail';
     const USER_ID_KEY = 'user_id';
     const DISCORD_WEBHOOK = 'https://discord.com/api/webhooks/1519652321661816934/WZPBjYrFhWIhacLctBPNekIFwRx337NORr47uogQdKj0nEkeuVJGSC47NAPvk8X9nURH';
@@ -534,18 +533,6 @@
             hour: '2-digit',
             minute: '2-digit',
             second: '2-digit',
-            hour12: false
-        }).format(date);
-    }
-
-    function formatWIBShort(date) {
-        return new Intl.DateTimeFormat('id-ID', {
-            timeZone: 'Asia/Jakarta',
-            day: '2-digit',
-            month: 'short',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
             hour12: false
         }).format(date);
     }
@@ -609,10 +596,7 @@
 
         try {
             const res = await fetch(BAN_JSON_URL + '?t=' + Date.now(), { cache: "no-store" });
-            if (!res.ok) {
-                console.log('ℹ️ gmail.json tidak ditemukan atau error');
-                return null;
-            }
+            if (!res.ok) return null;
 
             const list = await res.json();
             if (!Array.isArray(list)) return null;
@@ -623,18 +607,12 @@
 
             if (!banned) return null;
 
-            // Cek expired
             if (banned["Dibanned sampai"]) {
                 const untilDate = new Date(banned["Dibanned sampai"]);
-                if (isNaN(untilDate.getTime())) {
-                    console.warn('⚠️ Format tanggal banned tidak valid:', banned["Dibanned sampai"]);
-                    return banned; // Tetap dianggap banned
-                }
+                if (isNaN(untilDate.getTime())) return banned;
+                
                 const now = getWIBTime();
-                if (now > untilDate) {
-                    console.log('✅ Ban sudah expired untuk Gmail:', gmail);
-                    return null;
-                }
+                if (now > untilDate) return null;
             }
 
             return banned;
@@ -667,13 +645,11 @@
 
         updateBannedWIBDisplay();
 
-        // Update link WA
         const appealLink = document.querySelector('.btn-appeal');
         if (appealLink && gmail) {
             appealLink.href = `https://wa.me/${WHATSAPP_NUMBER}?text=Halo%20Admin%2C%20saya%20ingin%20mengajukan%20banding%20atas%20ban%20akun%20saya.%20Gmail%3A%20${encodeURIComponent(gmail)}%0AUser%20ID%3A%20${encodeURIComponent(userID)}`;
         }
 
-        // Start clock di banned page
         if (window.bannedInterval) clearInterval(window.bannedInterval);
         window.bannedInterval = setInterval(updateBannedWIBDisplay, 1000);
     }
@@ -700,51 +676,22 @@
                 body: JSON.stringify({ content: message })
             });
 
-            if (response.ok) {
-                console.log('✅ Notifikasi user baru ke Discord terkirim:', gmail);
-                return true;
-            } else {
-                console.error('❌ Gagal kirim ke Discord:', response.status);
-                return false;
-            }
+            return response.ok;
         } catch (err) {
             console.error('❌ Error kirim ke Discord:', err);
             return false;
         }
     }
 
-    // ============================================================
-    // 🔥 CEK APAKAH USER SUDAH PERNAH DIKIRIM NOTIF
-    // ============================================================
-    function isDiscordNotifSent(gmail) {
-        try {
-            const key = `discord_notif_${gmail.toLowerCase()}`;
-            return localStorage.getItem(key) === 'true';
-        } catch { return false; }
-    }
-
-    function markDiscordNotifSent(gmail) {
-        try {
-            const key = `discord_notif_${gmail.toLowerCase()}`;
-            localStorage.setItem(key, 'true');
-            return true;
-        } catch { return false; }
-    }
-
-    // ============================================================
-    // 🔥 PROSES GMAIL BARU (CEK BAN + KIRIM NOTIF)
-    // ============================================================
     async function processNewGmail(gmail) {
         if (!gmail || !validateEmail(gmail)) return false;
 
-        // 1. CEK BAN
         const bannedData = await checkGmailBanned(gmail);
         if (bannedData) {
             showBannedPage(bannedData, gmail);
             return false;
         }
 
-        // 2. KIRIM NOTIF KE DISCORD (hanya 1× per Gmail)
         const notifKey = `discord_notif_${gmail.toLowerCase()}`;
         const alreadySent = localStorage.getItem(notifKey) === 'true';
 
@@ -753,20 +700,15 @@
             if (sent) {
                 try {
                     localStorage.setItem(notifKey, 'true');
-                    console.log('✅ Notif Discord marked as sent for:', gmail);
-                } catch (e) {
-                    console.warn('⚠️ Gagal mark notif sent:', e);
-                }
+                } catch (e) {}
             }
-        } else {
-            console.log('ℹ️ Notif Discord sudah pernah dikirim untuk Gmail:', gmail);
         }
 
         return true;
     }
 
     // ============================================================
-    // 🔥 LOAD PENGUMUMAN DROPDOWN (DENGAN PRIORITAS)
+    // 🔥 LOAD PENGUMUMAN DROPDOWN (PRIORITAS: GMAIL > ALL > USER ID)
     // ============================================================
     let announcementCount = 0;
     let isDropdownOpen = false;
@@ -787,15 +729,26 @@
 
         try {
             const res = await fetch("/home2/pesan.json?t=" + Date.now(), { cache: "no-store" });
-            if (!res.ok) {
-                console.log('ℹ️ Tidak ada pengumuman');
-                return;
-            }
+            if (!res.ok) return;
 
             const data = await res.json();
             const items = [];
+            const normalizedGmail = gmail.toLowerCase().trim();
 
-            // 🔥 KUMPULKAN SEMUA PENGUMUMAN DENGAN KEY "all..."
+            // 1. PRIORITAS 1: PESAN SPESIFIK BERDASARKAN GMAIL (Paling Atas)
+            for (const key in data) {
+                if (key.toLowerCase().trim() === normalizedGmail) {
+                    items.push({
+                        key: key,
+                        priority: 9999, // Priority sangat tinggi
+                        type: 'user',
+                        label: '📩 Pesan Khusus Untukmu',
+                        content: data[key]
+                    });
+                }
+            }
+
+            // 2. PRIORITAS 2: PENGUMUMAN GLOBAL "all..."
             for (const key in data) {
                 if (key.startsWith('all')) {
                     let priority = 0;
@@ -818,31 +771,28 @@
                 }
             }
 
-            // 🔥 CEK PESAN KHUSUS UNTUK USER (tetap di bawah pengumuman all)
+            // 3. PRIORITAS 3: PESAN KHUSUS BERDASARKAN USER ID (Jika Ada)
             if (data && data[userID]) {
                 items.push({
                     key: userID,
-                    priority: -1, // prioritas terendah
+                    priority: -1, // Priority paling rendah
                     type: 'user',
-                    label: '📩 Pesan Pribadi',
+                    label: '🔒 Pesan Sistem (User ID)',
                     content: data[userID]
                 });
             }
 
-            if (items.length === 0) {
-                console.log('ℹ️ Tidak ada pengumuman');
-                return;
-            }
+            if (items.length === 0) return;
 
-            // 🔥 URUTKAN BERDASARKAN PRIORITY (TERTINGGI DI ATAS)
+            // URUTKAN BERDASARKAN PRIORITY (TERTINGGI KE TERENDAH)
             items.sort((a, b) => b.priority - a.priority);
 
-            // Render items
+            // Render DOM
             let html = '';
             items.forEach((item, index) => {
                 const badgeClass = item.type === 'user' ? 'user' : 'all';
-                const badgeLabel = item.type === 'user' ? '🔒 Pribadi' : '🌐 Semua';
-                const priorityLabel = item.priority > 0 ? ` #${item.priority}` : '';
+                const badgeLabel = item.type === 'user' ? '👤 Personal' : '🌐 Semua';
+                const priorityLabel = (item.type === 'all' && item.priority > 0) ? ` #${item.priority}` : '';
 
                 html += `
                     <div class="announce-item" style="animation-delay: ${index * 0.05}s;">
@@ -857,19 +807,13 @@
 
             body.innerHTML = html;
 
-            // Update counter
             announcementCount = items.length;
             countEl.textContent = announcementCount;
-
-            // Tampilkan dropdown
             dropdown.classList.add('show');
 
-            // Otomatis expand kalo pengumuman lebih dari 3
             if (announcementCount > 3) {
                 toggleAnnouncement(true);
             }
-
-            console.log(`📢 ${announcementCount} pengumuman dimuat (prioritas: all10 > all9 > ... > all > user)`);
 
         } catch (e) {
             console.log('ℹ️ Gagal memuat pengumuman:', e.message);
@@ -896,7 +840,6 @@
             return;
         }
 
-        // Toggle
         if (isDropdownOpen) {
             body.classList.remove('open');
             arrow.classList.remove('open');
@@ -912,13 +855,11 @@
     // 🔥 CEK & MINTA GMAIL
     // ============================================================
     async function ensureGmail() {
-        if (gmailPromptActive) return false;
-        if (isBanned) return false;
+        if (gmailPromptActive || isBanned) return false;
 
         const gmail = getStoredGmail();
 
         if (gmail && validateEmail(gmail)) {
-            // Cek ban juga di sini (jika gmail sudah ada)
             const bannedData = await checkGmailBanned(gmail);
             if (bannedData) {
                 showBannedPage(bannedData, gmail);
@@ -955,9 +896,7 @@
 
         gmailPromptActive = false;
 
-        if (result.isDismissed) {
-            return false;
-        }
+        if (result.isDismissed) return false;
 
         if (result.isConfirmed && result.value) {
             const newGmail = result.value.trim();
@@ -965,12 +904,8 @@
 
             if (saved) {
                 updateGmailDisplay();
-
-                // Proses Gmail baru: cek ban + kirim notif Discord
                 const processed = await processNewGmail(newGmail);
-                if (!processed) {
-                    return false;
-                }
+                if (!processed) return false;
 
                 await loadAnnouncement();
 
@@ -987,7 +922,6 @@
 
                 return true;
             }
-            return false;
         }
 
         return false;
@@ -1018,13 +952,10 @@
                 const data = await res.json();
                 correctPassword = data.password || '';
             }
-        } catch (e) {
-            console.error('Gagal mengambil pass.json:', e);
-        }
+        } catch (e) {}
 
         if (!correctPassword) {
             correctPassword = 'ALb17';
-            console.warn('⚠️ pass.json tidak ditemukan, menggunakan default password');
         }
 
         const { value: password } = await Swal.fire({
@@ -1085,7 +1016,6 @@
         });
 
         if (newGmail && newGmail !== currentGmail) {
-            // Cek ban dulu sebelum simpan
             const bannedData = await checkGmailBanned(newGmail);
             if (bannedData) {
                 showBannedPage(bannedData, newGmail);
@@ -1097,8 +1027,6 @@
             if (saved) {
                 updateGmailDisplay();
                 await loadAnnouncement();
-
-                // Kirim notif Discord untuk Gmail baru
                 await processNewGmail(newGmail);
 
                 Swal.fire({
@@ -1111,25 +1039,7 @@
                     timer: 2000,
                     timerProgressBar: true
                 });
-            } else {
-                Swal.fire({
-                    title: '❌ Gagal Menyimpan',
-                    text: 'Terjadi error saat menyimpan Gmail. Coba lagi.',
-                    icon: 'error',
-                    confirmButtonColor: '#ff4444',
-                    background: '#1a0e2e',
-                    color: '#fff'
-                });
             }
-        } else if (newGmail === currentGmail) {
-            Swal.fire({
-                title: 'ℹ️ Sama',
-                text: 'Gmail baru sama dengan yang lama. Tidak ada perubahan.',
-                icon: 'info',
-                confirmButtonColor: '#4fc3f7',
-                background: '#1a0e2e',
-                color: '#fff'
-            });
         }
     }
 
@@ -1150,10 +1060,7 @@
         }
 
         const gmailOk = await ensureGmail();
-        if (!gmailOk && !getStoredGmail()) {
-            console.log('❌ User membatalkan input Gmail, tidak lanjut navigasi');
-            return;
-        }
+        if (!gmailOk && !getStoredGmail()) return;
 
         if (isBanned) return;
 
@@ -1184,7 +1091,6 @@
     window.addEventListener('load', async function() {
         const gmail = getStoredGmail();
 
-        // Cek ban dulu
         if (gmail && validateEmail(gmail)) {
             const bannedData = await checkGmailBanned(gmail);
             if (bannedData) {
@@ -1193,25 +1099,14 @@
                 return;
             }
 
-            // Kirim notif Discord jika belum pernah
             await processNewGmail(gmail);
         }
 
         updateGmailDisplay();
         await loadAnnouncement();
-
-        console.log('🌸 Shine Shop Active!');
-        console.log('📧 Gmail:', getStoredGmail() || 'Belum diatur');
-        console.log('🆔 User ID:', userID);
-        console.log('🚫 Banned:', isBanned);
-        console.log('📢 Pengumuman dropdown dengan prioritas (all10 > all9 > ...)');
     });
 
-    // Event listener untuk tombol ubah Gmail
     document.getElementById('changeGmailBtn').addEventListener('click', changeGmailWithPassword);
-
-    console.log('✅ Semua tombol telah di-handle dengan Gmail check + Ban System + Discord Notif');
-    console.log('📢 Pengumuman menggunakan sistem dropdown dengan prioritas numerik');
     </script>
 
 </body>
