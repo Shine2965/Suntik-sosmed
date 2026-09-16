@@ -39,6 +39,9 @@ export default function handler(req, res) {
         const irvankardeApiKey = process.env.IRVANKARDE_API_KEY || '';
         const irvankardeApiId = parseInt(process.env.IRVANKARDE_API_ID) || 81074;
 
+        // ===== LOLLIPOP CONFIG =====
+        const lollipopApiKey = process.env.LOLLIPOP_API_KEY || '83c6f89a66909869d90b81fd3d13444e';
+
         // ===== RESPONSE =====
         return res.status(200).json({
             success: true,
@@ -59,12 +62,16 @@ export default function handler(req, res) {
             irvankarde_api_key: irvankardeApiKey,
             irvankarde_api_id: irvankardeApiId,
 
+            // ===== LOLLIPOP =====
+            lollipop_api_key: lollipopApiKey,
+
             from_env: {
                 qiospay: !!process.env.QIOSPAY_API_KEY,
                 indo: !!process.env.INDO_API_KEY,
                 order: !!(process.env.ORDER_API_KEY || process.env.ORDERSOSMED_API_KEY),
                 fayupedia: !!process.env.FAYUPEDIA_API_KEY,
-                irvankarde: !!process.env.IRVANKARDE_API_KEY
+                irvankarde: !!process.env.IRVANKARDE_API_KEY,
+                lollipop: !!process.env.LOLLIPOP_API_KEY
             }
         });
 
