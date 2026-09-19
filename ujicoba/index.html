@@ -3,758 +3,1252 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cek Status Pesanan Suntik Sosmed 1 | Shine Shop</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: {
-                        sans: ['Plus Jakarta Sans', 'sans-serif'],
-                    },
-                    colors: {
-                        brand: {
-                            50:  '#f5f3ff',
-                            100: '#ede9fe',
-                            200: '#ddd6fe',
-                            300: '#c4b5fd',
-                            400: '#a78bfa',
-                            500: '#8b5cf6',
-                            600: '#7c3aed',
-                            700: '#6d28d9',
-                            800: '#5b21b6',
-                            900: '#4c1d95',
-                        }
-                    }
-                }
-            }
-        }
-    </script>
+    <title>Shine Shop</title>
+
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
     <style>
-        body { font-family: 'Plus Jakarta Sans', sans-serif; }
-        .status-badge {
-            padding: 0.3rem 0.85rem;
-            border-radius: 9999px;
-            font-size: 0.7rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.04em;
-        }
-        .status-pending   { background: #fef3c7; color: #92400e; }
-        .status-processing{ background: #dbeafe; color: #1e40af; }
-        .status-success,
-        .status-completed { background: #d1fae5; color: #065f46; }
-        .status-error,
-        .status-failed,
-        .status-rejected  { background: #fee2e2; color: #991b1b; }
-        .status-partial   { background: #ffedd5; color: #9a3412; }
-        .status-unknown   { background: #f3f4f6; color: #374151; }
+    *{
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+    }
 
-        .card-hover { transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); }
-        .card-hover:hover { transform: translateY(-3px); box-shadow: 0 20px 40px -12px rgba(124, 58, 237, 0.15); }
+    body{
+        font-family: 'Poppins', sans-serif;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background:
+            linear-gradient(rgba(0,0,0,0.75), rgba(0,0,0,0.75)),
+            url('/home/logo.png') center/cover no-repeat fixed;
+        color: white;
+        padding: 20px;
+    }
 
-        .fade-in { animation: fadeIn 0.35s ease-out; }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(12px); }
-            to   { opacity: 1; transform: translateY(0); }
-        }
+    :root{
+        --border: rgba(255,255,255,0.15);
+    }
 
-        .tab-active {
-            background: linear-gradient(135deg, #7c3aed, #6d28d9);
-            color: white !important;
-            box-shadow: 0 4px 14px -3px rgba(124, 58, 237, 0.45);
-        }
-        .tab-inactive {
-            background: #f5f3ff;
-            color: #6d28d9;
-        }
-        .tab-inactive:hover { background: #ede9fe; }
+    .container{
+        width: 100%;
+        max-width: 480px;
+        background: rgba(255,255,255,0.05);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        border-radius: 18px;
+        padding: 35px 25px;
+        text-align: center;
+        border: 1px solid rgba(255,255,255,0.1);
+    }
 
-        .btn-primary {
-            background: linear-gradient(135deg, #7c3aed, #6d28d9);
-            box-shadow: 0 4px 14px -3px rgba(124, 58, 237, 0.4);
-        }
-        .btn-primary:hover {
-            background: linear-gradient(135deg, #6d28d9, #5b21b6);
-            box-shadow: 0 6px 20px -3px rgba(124, 58, 237, 0.5);
-        }
+    h1{
+        font-size: 22px;
+        font-weight: 600;
+        margin-bottom: 30px;
+        letter-spacing: 1px;
+    }
 
-        .btn-success {
-            background: linear-gradient(135deg, #059669, #047857);
-            box-shadow: 0 4px 14px -3px rgba(5, 150, 105, 0.4);
-        }
-        .btn-success:hover {
-            background: linear-gradient(135deg, #047857, #065f46);
-            box-shadow: 0 6px 20px -3px rgba(5, 150, 105, 0.5);
-        }
+    .gmail-display {
+        background: rgba(255,255,255,0.05);
+        border: 1px solid rgba(255,255,255,0.1);
+        border-radius: 10px;
+        padding: 10px 14px;
+        margin: 10px 0 16px 0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 6px;
+        font-size: 13px;
+    }
 
-        .glass {
-            background: rgba(255, 255, 255, 0.85);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-        }
+    .gmail-display .label {
+        color: #aaa;
+        font-weight: 400;
+    }
 
-        .shine-text {
-            background: linear-gradient(135deg, #7c3aed 0%, #a78bfa 50%, #c4b5fd 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
+    .gmail-display .value {
+        color: #4fc3f7;
+        font-weight: 500;
+        word-break: break-all;
+        flex: 1;
+        text-align: left;
+        padding: 0 8px;
+    }
+
+    .gmail-display .value.not-set {
+        color: #ff6666;
+        font-style: italic;
+        font-weight: 400;
+    }
+
+    .gmail-display .btn-change {
+        background: rgba(255,255,255,0.08);
+        border: 1px solid rgba(255,255,255,0.1);
+        color: #fff;
+        padding: 4px 14px;
+        border-radius: 8px;
+        font-size: 11px;
+        cursor: pointer;
+        transition: 0.3s;
+        font-family: 'Poppins', sans-serif;
+    }
+
+    .gmail-display .btn-change:hover {
+        background: rgba(255,255,255,0.15);
+    }
+
+    /* ===== DROPDOWN PENGUMUMAN ===== */
+    .announcement-dropdown {
+        background: rgba(255, 215, 0, 0.06);
+        border: 1px solid rgba(255, 215, 0, 0.12);
+        border-radius: 14px;
+        margin: 8px 0 14px 0;
+        overflow: hidden;
+        display: none;
+    }
+
+    .announcement-dropdown.show {
+        display: block;
+        animation: fadeSlide 0.5s ease both;
+    }
+
+    @keyframes fadeSlide {
+        from { opacity: 0; transform: translateY(-8px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    .announcement-dropdown .dropdown-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px 16px;
+        cursor: pointer;
+        user-select: none;
+        transition: 0.3s;
+        border-bottom: 1px solid transparent;
+    }
+
+    .announcement-dropdown .dropdown-header:hover {
+        background: rgba(255, 215, 0, 0.05);
+    }
+
+    .announcement-dropdown .dropdown-header .title {
+        font-size: 13px;
+        font-weight: 700;
+        color: #ffd54f;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .announcement-dropdown .dropdown-header .title .icon {
+        font-size: 16px;
+    }
+
+    .announcement-dropdown .dropdown-header .badge-count {
+        background: #ffd54f;
+        color: #1a0e2e;
+        font-size: 10px;
+        font-weight: 700;
+        padding: 1px 10px;
+        border-radius: 30px;
+        margin-left: 6px;
+    }
+
+    .announcement-dropdown .dropdown-header .arrow {
+        font-size: 14px;
+        color: #6b4a7a;
+        transition: transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    }
+
+    .announcement-dropdown .dropdown-header .arrow.open {
+        transform: rotate(180deg);
+    }
+
+    .announcement-dropdown .dropdown-body {
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        padding: 0 16px;
+    }
+
+    .announcement-dropdown .dropdown-body.open {
+        max-height: 600px;
+        padding: 0 16px 16px 16px;
+        overflow-y: auto;
+    }
+
+    .announcement-dropdown .dropdown-body::-webkit-scrollbar {
+        width: 4px;
+    }
+
+    .announcement-dropdown .dropdown-body::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    .announcement-dropdown .dropdown-body::-webkit-scrollbar-thumb {
+        background: #ffd54f55;
+        border-radius: 10px;
+    }
+
+    .announcement-dropdown .dropdown-body .announce-item {
+        padding: 12px 14px;
+        margin-top: 10px;
+        background: rgba(255, 255, 255, 0.04);
+        border-radius: 10px;
+        border-left: 3px solid #ffd54f;
+        font-size: 13px;
+        color: #e8d5f0;
+        line-height: 1.7;
+        transition: 0.3s;
+    }
+
+    .announcement-dropdown .dropdown-body .announce-item:first-child {
+        margin-top: 6px;
+    }
+
+    .announcement-dropdown .dropdown-body .announce-item:hover {
+        background: rgba(255, 255, 255, 0.07);
+    }
+
+    .announcement-dropdown .dropdown-body .announce-item a {
+        color: #4fc3f7;
+        text-decoration: none;
+        font-weight: 600;
+    }
+
+    .announcement-dropdown .dropdown-body .announce-item a:hover {
+        text-decoration: underline;
+    }
+
+    .announcement-dropdown .dropdown-body .announce-item .item-label {
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: #ffd54f;
+        font-weight: 700;
+        display: block;
+        margin-bottom: 4px;
+    }
+
+    .announcement-dropdown .dropdown-body .announce-item .item-label .badge {
+        background: rgba(255, 215, 0, 0.2);
+        padding: 0 8px;
+        border-radius: 4px;
+        font-size: 9px;
+    }
+
+    .announcement-dropdown .dropdown-body .announce-item .item-label .badge.all {
+        color: #ffd54f;
+    }
+
+    .announcement-dropdown .dropdown-body .announce-item .item-label .badge.user {
+        color: #ffaa00;
+        background: rgba(255, 170, 0, 0.2);
+    }
+
+    .note-box {
+        font-family: Arial, sans-serif;
+        font-size: 13px;
+        line-height: 1.6;
+        color: #1a202c;
+        background-color: #ebf8ff;
+        border-left: 4px solid #3182ce;
+        padding: 12px 14px;
+        border-radius: 4px;
+        margin: 12px 0;
+        text-align: left;
+    }
+
+    .note-box strong {
+        color: #2b6cb0;
+    }
+
+    /* ===== NAV BUTTONS ===== */
+    .nav-btn{
+        width: 100%;
+        padding: 14px;
+        margin: 10px 0;
+        border-radius: 12px;
+        border: 1px solid rgba(255,255,255,0.15);
+        background: rgba(255,255,255,0.08);
+        color: white;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: 0.25s;
+        font-family: 'Poppins', sans-serif;
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+    }
+
+    .nav-btn:hover:not(:disabled){
+        background: rgba(255,255,255,0.18);
+    }
+
+    .nav-btn:disabled {
+        opacity: 0.55;
+        cursor: not-allowed;
+        background: rgba(255,255,255,0.04);
+    }
+
+    .nav-btn.checking {
+        cursor: wait;
+        opacity: 0.75;
+    }
+
+    /* ===== BADGE GANGGUAN ===== */
+    .nav-btn .badge-status {
+        font-size: 9px;
+        font-weight: 700;
+        padding: 3px 8px;
+        border-radius: 20px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-left: 6px;
+        animation: pulseBadge 1.6s ease-in-out infinite;
+    }
+
+    .nav-btn .badge-status.gangguan {
+        background: rgba(239,68,68,0.2);
+        color: #ff6b6b;
+        border: 1px solid rgba(239,68,68,0.4);
+    }
+
+    .nav-btn .badge-status.checking-badge {
+        background: rgba(255,255,255,0.08);
+        color: #94a3b8;
+        border: 1px solid rgba(255,255,255,0.1);
+        animation: none;
+    }
+
+    .nav-btn .badge-status.ok-badge {
+        background: rgba(34,197,94,0.15);
+        color: #22c55e;
+        border: 1px solid rgba(34,197,94,0.3);
+        animation: none;
+    }
+
+    @keyframes pulseBadge {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.55; }
+    }
+
+    .footer{
+        margin-top: 25px;
+        font-size: 12px;
+        opacity: 0.6;
+    }
+
+    /* ===== BANNED PAGE ===== */
+    .banned-page {
+        display: none;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        padding: 20px;
+        background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+        color: white;
+        text-align: center;
+        width: 100%;
+    }
+
+    .banned-page.show {
+        display: flex;
+    }
+
+    .banned-card {
+        max-width: 460px;
+        background: rgba(255,255,255,0.06);
+        backdrop-filter: blur(20px);
+        padding: 40px 30px;
+        border-radius: 24px;
+        border: 1px solid rgba(255,68,68,0.3);
+        box-shadow: 0 0 60px rgba(255,68,68,0.1);
+        width: 100%;
+    }
+
+    .banned-card .icon {
+        font-size: 64px;
+        display: block;
+        margin-bottom: 16px;
+    }
+
+    .banned-card h1 {
+        color: #ff4444;
+        font-size: 28px;
+        margin-bottom: 8px;
+    }
+
+    .banned-card .banned-gmail {
+        color: #00ffaa;
+        font-size: 16px;
+        font-weight: 600;
+        word-break: break-all;
+        margin: 8px 0;
+    }
+
+    .banned-card .banned-reason {
+        color: #f1f5f9;
+        font-size: 14px;
+        line-height: 1.8;
+        background: rgba(255,68,68,0.08);
+        padding: 14px 18px;
+        border-radius: 12px;
+        border-left: 3px solid #ff4444;
+        text-align: left;
+        margin: 12px 0;
+    }
+
+    .banned-card .banned-until {
+        color: #ffaa00;
+        font-size: 13px;
+        font-weight: 600;
+        margin: 8px 0;
+    }
+
+    .banned-card .banned-current-time {
+        color: #94a3b8;
+        font-size: 12px;
+        margin: 4px 0 16px 0;
+    }
+
+    .banned-card .btn-appeal {
+        display: inline-block;
+        background: #ffaa0044;
+        color: #ffaa00;
+        border: 1px solid #ffaa0055;
+        padding: 12px 30px;
+        border-radius: 30px;
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 14px;
+        transition: 0.3s;
+        font-family: 'Poppins', sans-serif;
+        margin-top: 8px;
+        cursor: pointer;
+    }
+
+    .banned-card .btn-appeal:hover {
+        background: #ffaa0066;
+        transform: scale(1.02);
+    }
+
+    .banned-card .banned-id {
+        color: #666;
+        font-size: 11px;
+        margin-top: 12px;
+        word-break: break-all;
+    }
+
+    .container.hidden {
+        display: none !important;
+    }
+
+    @media (max-width: 480px) {
+        .container { padding: 24px 16px; }
+        h1 { font-size: 18px; }
+        .gmail-display { font-size: 12px; }
+        .note-box { font-size: 12px; }
+        .banned-card { padding: 28px 20px; }
+        .banned-card h1 { font-size: 22px; }
+        .announcement-dropdown .dropdown-body .announce-item {
+            font-size: 12px;
+            padding: 10px 12px;
         }
+        .nav-btn { font-size: 13px; padding: 12px; }
+        .nav-btn .badge-status { font-size: 8px; padding: 2px 6px; }
+    }
     </style>
-</head>
-<body class="bg-gradient-to-br from-brand-50 via-white to-violet-50 min-h-screen">
 
-    <!-- Decorative blobs -->
-    <div class="fixed inset-0 overflow-hidden pointer-events-none -z-10">
-        <div class="absolute -top-40 -right-40 w-96 h-96 bg-brand-200/40 rounded-full blur-3xl"></div>
-        <div class="absolute top-1/3 -left-32 w-80 h-80 bg-violet-200/30 rounded-full blur-3xl"></div>
-        <div class="absolute bottom-0 right-1/4 w-72 h-72 bg-purple-100/40 rounded-full blur-3xl"></div>
+</head>
+<body>
+
+    <!-- ===== BANNED PAGE ===== -->
+    <div class="banned-page" id="bannedPage">
+        <div class="banned-card">
+            <span class="icon">🚫</span>
+            <h1>Akses Diblokir</h1>
+            <p style="color:#94a3b8;font-size:14px;border:none;background:none;padding:0;margin:0;">Akun Anda telah diblokir</p>
+            <div class="banned-gmail" id="bannedGmail">-</div>
+            <div class="banned-reason" id="bannedReason">-</div>
+            <div class="banned-until" id="bannedUntil">-</div>
+            <div class="banned-current-time" id="bannedCurrentTime">-</div>
+            <a href="https://wa.me/6289518103883?text=Halo%20Admin%2C%20saya%20ingin%20mengajukan%20banding%20atas%20ban%20akun%20saya.%20Gmail%3A%20" 
+               target="_blank" 
+               class="btn-appeal">
+               📱 Ajukan Banding
+            </a>
+            <div class="banned-id" id="bannedUserId">-</div>
+        </div>
     </div>
 
-    <div class="container mx-auto px-4 py-8 max-w-2xl relative">
+    <!-- ===== MAIN CONTAINER ===== -->
+    <div class="container" id="mainContainer">
+        <h1>Shine Shop Menu Global</h1>
 
-        <!-- ===== HEADER / BRAND ===== -->
-        <div class="text-center mb-8 fade-in">
-            <div class="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-gradient-to-br from-brand-500 to-brand-700 shadow-xl shadow-brand-500/30 mb-5 relative">
-                <i class="fas fa-bolt text-white text-3xl"></i>
-                <div class="absolute -bottom-1 -right-1 w-6 h-6 bg-emerald-400 rounded-full border-4 border-white"></div>
+        <!-- GMAIL DISPLAY -->
+        <div class="gmail-display" id="gmailDisplayContainer">
+            <span class="label">📧 Gmail:</span>
+            <span class="value" id="gmailDisplay">Belum diatur</span>
+            <button class="btn-change" id="changeGmailBtn">✏️ Ubah</button>
+        </div>
+
+        <!-- ===== DROPDOWN PENGUMUMAN ===== -->
+        <div class="announcement-dropdown" id="announcementDropdown">
+            <div class="dropdown-header" id="dropdownHeader" onclick="toggleAnnouncement()">
+                <div class="title">
+                    <span class="icon">📢</span> Pengumuman
+                    <span class="badge-count" id="announcementCount">0</span>
+                </div>
+                <span class="arrow" id="dropdownArrow">▼</span>
             </div>
-
-            <p class="text-sm font-semibold tracking-widest text-brand-500 uppercase mb-1">Shine Shop</p>
-            <h1 class="text-2xl sm:text-3xl font-extrabold text-gray-900 leading-tight">
-                Cek Status Pesanan<br>
-                <span class="shine-text">Suntik Sosmed 1</span>
-            </h1>
-            <p class="text-gray-500 text-sm mt-2 max-w-md mx-auto">
-                Pantau status pesanan & request refill dengan cepat dan mudah
-            </p>
-
-            <p id="configStatus" class="text-xs text-gray-400 mt-4 inline-flex items-center gap-1.5 bg-white/70 px-3 py-1.5 rounded-full border border-gray-100">
-                <i class="fas fa-spinner fa-spin"></i>
-                <span>Memuat konfigurasi...</span>
-            </p>
-        </div>
-
-        <!-- ===== TABS ===== -->
-        <div class="flex gap-2 mb-6 p-1.5 bg-white/60 rounded-2xl border border-white shadow-sm">
-            <button onclick="switchTab('order')" id="tab-order"
-                class="flex-1 py-3 px-4 rounded-xl text-sm font-semibold transition-all duration-200 tab-active flex items-center justify-center gap-2">
-                <i class="fas fa-clipboard-list"></i>
-                <span>Status Pesanan</span>
-            </button>
-            <button onclick="switchTab('refill')" id="tab-refill"
-                class="flex-1 py-3 px-4 rounded-xl text-sm font-semibold transition-all duration-200 tab-inactive flex items-center justify-center gap-2">
-                <i class="fas fa-sync-alt"></i>
-                <span>Status Refill</span>
-            </button>
-        </div>
-
-        <!-- ==================== TAB: ORDER ==================== -->
-        <div id="panel-order">
-            <div class="glass rounded-3xl shadow-xl shadow-brand-500/5 p-6 mb-6 border border-white">
-                <div class="mb-5">
-                    <label for="orderId" class="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2.5">
-                        <span class="w-7 h-7 rounded-lg bg-brand-100 text-brand-600 flex items-center justify-center text-xs">
-                            <i class="fas fa-hashtag"></i>
-                        </span>
-                        ID Pesanan
-                    </label>
-                    <textarea 
-                        id="orderId" 
-                        rows="3"
-                        placeholder="Masukkan ID pesanan (satu atau lebih)&#10;Contoh: 1107, 1234, 5678"
-                        class="w-full px-4 py-3.5 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 outline-none transition resize-none text-gray-800 placeholder-gray-400 text-sm"
-                    ></textarea>
-                    <p class="text-xs text-gray-400 mt-2.5 flex items-center gap-1.5">
-                        <i class="fas fa-info-circle text-brand-400"></i>
-                        Bisa cek / refill beberapa order sekaligus (pisahkan dengan koma)
-                    </p>
-                </div>
-
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <button id="cekBtn" onclick="cekStatus()"
-                        class="btn-primary text-white font-semibold py-3.5 px-5 rounded-2xl transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed">
-                        <i class="fas fa-search" id="btnIcon"></i>
-                        <span id="btnText">Cek Status</span>
-                    </button>
-
-                    <button id="refillBtn" onclick="refillOrder()"
-                        class="btn-success text-white font-semibold py-3.5 px-5 rounded-2xl transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed">
-                        <i class="fas fa-sync-alt" id="refillBtnIcon"></i>
-                        <span id="refillBtnText">Refill Pesanan</span>
-                    </button>
-                </div>
+            <div class="dropdown-body" id="dropdownBody">
+                <!-- Diisi dari pesan.json -->
             </div>
         </div>
 
-        <!-- ==================== TAB: REFILL STATUS ==================== -->
-        <div id="panel-refill" class="hidden">
-            <div class="glass rounded-3xl shadow-xl shadow-brand-500/5 p-6 mb-6 border border-white">
-                <div class="mb-5">
-                    <label for="refillId" class="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2.5">
-                        <span class="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center text-xs">
-                            <i class="fas fa-hashtag"></i>
-                        </span>
-                        ID Refill
-                    </label>
-                    <textarea 
-                        id="refillId" 
-                        rows="2"
-                        placeholder="Masukkan ID Refill&#10;Contoh: 123, 456"
-                        class="w-full px-4 py-3.5 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 outline-none transition resize-none text-gray-800 placeholder-gray-400 text-sm"
-                    ></textarea>
-                    <p class="text-xs text-gray-400 mt-2.5 flex items-center gap-1.5">
-                        <i class="fas fa-info-circle text-emerald-400"></i>
-                        ID Refill didapat setelah berhasil request refill
-                    </p>
-                </div>
-
-                <button id="cekRefillBtn" onclick="cekRefillStatus()"
-                    class="w-full btn-success text-white font-semibold py-3.5 px-5 rounded-2xl transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed">
-                    <i class="fas fa-search" id="cekRefillBtnIcon"></i>
-                    <span id="cekRefillBtnText">Cek Status Refill</span>
-                </button>
-            </div>
+        <!-- NOTE -->
+        <div class="note-box">
+            <strong>📌 Catatan Penting:</strong><br>
+            Status pesanan: Partial / Canceled / Error<br>
+            Silahkan mengajukan refund hubungi Customer Service melalui:<br>
+            WhatsApp: +62 895-1810-3883<br>
+            Instagram: onivla_
         </div>
 
-        <!-- Loading -->
-        <div id="loading" class="hidden text-center py-12">
-            <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-brand-100 mb-4">
-                <div class="w-7 h-7 border-3 border-brand-500 border-t-transparent rounded-full animate-spin" style="border-width: 3px;"></div>
-            </div>
-            <p class="text-gray-500 text-sm font-medium" id="loadingText">Sedang memproses...</p>
-        </div>
+        <!-- ===== TOMBOL PROVIDER ===== -->
+        <button class="nav-btn" 
+                id="btnSosmed1" 
+                data-provider="lollipop" 
+                data-endpoint="/api/lollipop-services" 
+                onclick="handleButtonClick('/sosmed-1/')">
+            <span>📱 Suntik Sosmed 1 🫣 ( Layanan Baru )</span>
+            <span class="badge-status checking-badge" id="badgeSosmed1">CEK...</span>
+        </button>
 
-        <!-- Results -->
-        <div id="results" class="space-y-4"></div>
+        <button class="nav-btn" 
+                id="btnSosmed2" 
+                data-provider="fayupedia" 
+                data-endpoint="/api/fayupedia-services" 
+                onclick="handleButtonClick('/sosmed-2/')">
+            <span>📱 Suntik Sosmed 2 🔥 (Paling Ramai dipesan)</span>
+            <span class="badge-status checking-badge" id="badgeSosmed2">CEK...</span>
+        </button>
 
-        <!-- Error -->
-        <div id="errorBox" class="hidden bg-red-50 border border-red-100 text-red-700 px-5 py-4 rounded-2xl fade-in">
-            <div class="flex items-start gap-3">
-                <div class="w-9 h-9 rounded-xl bg-red-100 flex items-center justify-center flex-shrink-0">
-                    <i class="fas fa-exclamation-circle text-red-500"></i>
-                </div>
-                <div>
-                    <p class="font-semibold text-sm" id="errorTitle">Terjadi Kesalahan</p>
-                    <p class="text-sm mt-0.5 text-red-600/80" id="errorMsg"></p>
-                </div>
-            </div>
-        </div>
+        <button class="nav-btn" 
+                id="btnSosmed3" 
+                data-provider="indosmm" 
+                data-endpoint="/api/indosmm-services" 
+                onclick="handleButtonClick('/sosmed-3/')">
+            <span>📱 Suntik Sosmed 3</span>
+            <span class="badge-status checking-badge" id="badgeSosmed3">CEK...</span>
+        </button>
 
-        <!-- Success -->
-        <div id="successBox" class="hidden bg-emerald-50 border border-emerald-100 text-emerald-700 px-5 py-4 rounded-2xl fade-in">
-            <div class="flex items-start gap-3">
-                <div class="w-9 h-9 rounded-xl bg-emerald-100 flex items-center justify-center flex-shrink-0">
-                    <i class="fas fa-check-circle text-emerald-500"></i>
-                </div>
-                <div>
-                    <p class="font-semibold text-sm" id="successTitle">Berhasil</p>
-                    <p class="text-sm mt-0.5 text-emerald-600/80" id="successMsg"></p>
-                </div>
-            </div>
-        </div>
+        <button class="nav-btn" onclick="handleButtonClick('/event/')">
+            💲 Event - Daftar dan jadilah Pemenang 
+        </button>
 
-        <!-- Footer -->
-        <div class="text-center mt-12 pb-6">
-            <div class="inline-flex items-center gap-2 text-sm text-gray-400">
-                <span class="w-8 h-px bg-gray-200"></span>
-                <span class="font-medium text-brand-500">Shine Shop</span>
-                <span class="w-8 h-px bg-gray-200"></span>
-            </div>
-            <p class="text-xs text-gray-400 mt-2">Cek Status Pesanan Suntik Sosmed 1</p>
+        <button class="nav-btn" onclick="handleButtonClick('https://wa.me/6289518103883')">
+            🎧 CUSTOMER SERVICE (WhatsApp)
+        </button>
+
+        <div class="footer">
+            &copy; Shine Shop - 2026
         </div>
     </div>
 
     <script>
-        // ==================== CONFIG ====================
-        let API_ID = null;
-        let API_KEY = null;
-        let configLoaded = false;
+    // ============================================================
+    // 🔒 DRAGON PROTOCOL: GMAIL, BAN, DISCORD, USER ID
+    // ============================================================
 
-        const ENDPOINTS = {
-            status:       'https://irvankedesmm.co.id/api/status',
-            refill:       'https://irvankedesmm.co.id/api/refill',
-            refillStatus: 'https://irvankedesmm.co.id/api/refill/status',
-            config:       '/api/qris-config'
-        };
+    const GMAIL_KEY = 'user_gmail';
+    const USER_ID_KEY = 'user_id';
+    const DISCORD_WEBHOOK = 'https://discord.com/api/webhooks/1519652321661816934/WZPBjYrFhWIhacLctBPNekIFwRx337NORr47uogQdKj0nEkeuVJGSC47NAPvk8X9nURH';
+    const BAN_JSON_URL = '/sosmed-2/payment/gmail.json';
+    const WHATSAPP_NUMBER = '6289518103883';
 
-        async function loadConfig() {
-            const statusEl = document.getElementById('configStatus');
-            try {
-                const res = await fetch(ENDPOINTS.config);
-                if (!res.ok) throw new Error('HTTP ' + res.status);
-                const data = await res.json();
+    // ===== MINIMAL SALDO PROVIDER =====
+    const MIN_BALANCE = 5000;
 
-                if (!data.success) throw new Error(data.message || 'Gagal mengambil konfigurasi');
+    let gmailPromptActive = false;
+    let isBanned = false;
+    let userID = localStorage.getItem(USER_ID_KEY);
 
-                API_ID  = data.irvankarde_api_id;
-                API_KEY = data.irvankarde_api_key;
+    if (!userID) {
+        userID = 'user-' + Math.random().toString(36).substring(2,10) + '-' + Date.now().toString(36);
+        localStorage.setItem(USER_ID_KEY, userID);
+    }
 
-                if (!API_ID || !API_KEY) {
-                    throw new Error('API ID / API Key belum diset');
-                }
+    // ===== UTILITY FUNCTIONS =====
+    function validateEmail(email) {
+        return email && typeof email === 'string' && email.includes('@') && email.includes('.') && email.length > 5;
+    }
 
-                configLoaded = true;
-                statusEl.innerHTML = `
-                    <i class="fas fa-check-circle text-emerald-500"></i>
-                    <span class="text-emerald-600">Konfigurasi siap · API ID: ${API_ID}</span>
-                `;
-            } catch (err) {
-                console.error('Gagal load config:', err);
-                configLoaded = false;
-                statusEl.innerHTML = `
-                    <i class="fas fa-exclamation-triangle text-red-500"></i>
-                    <span class="text-red-500">Gagal memuat konfigurasi</span>
-                `;
-            }
+    function getWIBTime() {
+        const now = new Date();
+        return new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }));
+    }
+
+    function formatWIB(date) {
+        return new Intl.DateTimeFormat('id-ID', {
+            timeZone: 'Asia/Jakarta',
+            day: '2-digit',
+            month: 'long',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false
+        }).format(date);
+    }
+
+    function getStoredGmail() {
+        try {
+            return localStorage.getItem(GMAIL_KEY) || null;
+        } catch (e) {
+            console.error('❌ Error get Gmail:', e);
+            return null;
         }
+    }
 
-        loadConfig();
-
-        // ==================== UI Helpers ====================
-        function switchTab(tab) {
-            const orderTab   = document.getElementById('tab-order');
-            const refillTab  = document.getElementById('tab-refill');
-            const orderPanel = document.getElementById('panel-order');
-            const refillPanel= document.getElementById('panel-refill');
-
-            document.getElementById('results').innerHTML = '';
-            hideError();
-            hideSuccess();
-
-            if (tab === 'order') {
-                orderTab.className  = 'flex-1 py-3 px-4 rounded-xl text-sm font-semibold transition-all duration-200 tab-active flex items-center justify-center gap-2';
-                refillTab.className = 'flex-1 py-3 px-4 rounded-xl text-sm font-semibold transition-all duration-200 tab-inactive flex items-center justify-center gap-2';
-                orderPanel.classList.remove('hidden');
-                refillPanel.classList.add('hidden');
-            } else {
-                refillTab.className = 'flex-1 py-3 px-4 rounded-xl text-sm font-semibold transition-all duration-200 tab-active flex items-center justify-center gap-2';
-                orderTab.className  = 'flex-1 py-3 px-4 rounded-xl text-sm font-semibold transition-all duration-200 tab-inactive flex items-center justify-center gap-2';
-                refillPanel.classList.remove('hidden');
-                orderPanel.classList.add('hidden');
-            }
-        }
-
-        function getStatusClass(status) {
-            if (!status) return 'status-unknown';
-            const s = status.toLowerCase();
-            if (s === 'pending') return 'status-pending';
-            if (s === 'processing') return 'status-processing';
-            if (s === 'success' || s === 'completed') return 'status-success';
-            if (s === 'error' || s === 'failed' || s === 'rejected') return 'status-error';
-            if (s === 'partial') return 'status-partial';
-            return 'status-unknown';
-        }
-
-        function getStatusIcon(status) {
-            if (!status) return 'fa-question';
-            const s = status.toLowerCase();
-            if (s === 'pending') return 'fa-clock';
-            if (s === 'processing') return 'fa-spinner';
-            if (s === 'success' || s === 'completed') return 'fa-check-circle';
-            if (s === 'error' || s === 'failed' || s === 'rejected') return 'fa-times-circle';
-            if (s === 'partial') return 'fa-adjust';
-            return 'fa-question';
-        }
-
-        function formatNumber(num) {
-            if (num === undefined || num === null) return '-';
-            return new Intl.NumberFormat('id-ID').format(num);
-        }
-
-        function parseIds(input) {
-            return input.split(/[\s,]+/).map(id => id.trim()).filter(id => id.length > 0);
-        }
-
-        function showLoading(text = 'Sedang memproses...') {
-            document.getElementById('loadingText').textContent = text;
-            document.getElementById('loading').classList.remove('hidden');
-            document.getElementById('results').innerHTML = '';
-            hideError();
-            hideSuccess();
-        }
-
-        function hideLoading() {
-            document.getElementById('loading').classList.add('hidden');
-        }
-
-        function showError(title, msg) {
-            document.getElementById('errorTitle').textContent = title;
-            document.getElementById('errorMsg').textContent = msg;
-            document.getElementById('errorBox').classList.remove('hidden');
-            document.getElementById('successBox').classList.add('hidden');
-        }
-
-        function hideError() {
-            document.getElementById('errorBox').classList.add('hidden');
-        }
-
-        function showSuccess(title, msg) {
-            document.getElementById('successTitle').textContent = title;
-            document.getElementById('successMsg').textContent = msg;
-            document.getElementById('successBox').classList.remove('hidden');
-            document.getElementById('errorBox').classList.add('hidden');
-        }
-
-        function hideSuccess() {
-            document.getElementById('successBox').classList.add('hidden');
-        }
-
-        function setButtonLoading(btnId, iconId, textId, loading, defaultText, defaultIcon) {
-            const btn  = document.getElementById(btnId);
-            const icon = document.getElementById(iconId);
-            const text = document.getElementById(textId);
-            btn.disabled = loading;
-            if (loading) {
-                icon.className = 'fas fa-spinner fa-spin';
-                text.textContent = 'Memproses...';
-            } else {
-                icon.className = 'fas ' + defaultIcon;
-                text.textContent = defaultText;
-            }
-        }
-
-        function ensureConfig() {
-            if (!configLoaded || !API_ID || !API_KEY) {
-                showError('Konfigurasi Belum Siap', 'API Key belum berhasil dimuat. Silakan refresh halaman.');
+    function saveGmailToStorage(newGmail) {
+        try {
+            if (!newGmail || !validateEmail(newGmail)) {
+                console.error('❌ Gmail tidak valid:', newGmail);
                 return false;
             }
+            localStorage.setItem(GMAIL_KEY, newGmail);
+            console.log('✅ Gmail tersimpan:', newGmail);
+            return true;
+        } catch (e) {
+            console.error('❌ Error simpan Gmail:', e);
+            return false;
+        }
+    }
+
+    function updateGmailDisplay() {
+        try {
+            const gmail = getStoredGmail();
+            const displayEl = document.getElementById('gmailDisplay');
+            if (!displayEl) return;
+
+            if (gmail && validateEmail(gmail)) {
+                displayEl.textContent = gmail;
+                displayEl.className = 'value';
+            } else {
+                displayEl.textContent = '⚠️ Wajib diatur!';
+                displayEl.className = 'value not-set';
+            }
+            return true;
+        } catch (e) {
+            console.error('❌ Error update display:', e);
+            return false;
+        }
+    }
+
+    function updateBannedWIBDisplay() {
+        const timeEl = document.getElementById('bannedCurrentTime');
+        if (timeEl && document.getElementById('bannedPage').classList.contains('show')) {
+            timeEl.textContent = '🕐 WIB (GMT+7): ' + formatWIB(getWIBTime());
+        }
+    }
+
+    // ============================================================
+    // 🔥 CEK BANNED GMAIL
+    // ============================================================
+    async function checkGmailBanned(gmail) {
+        if (!gmail || !validateEmail(gmail)) return null;
+        try {
+            const res = await fetch(BAN_JSON_URL + '?t=' + Date.now(), { cache: "no-store" });
+            if (!res.ok) return null;
+            const list = await res.json();
+            if (!Array.isArray(list)) return null;
+
+            const banned = list.find(item => 
+                item.Gmail && item.Gmail.toLowerCase() === gmail.toLowerCase()
+            );
+            if (!banned) return null;
+
+            if (banned["Dibanned sampai"]) {
+                const untilDate = new Date(banned["Dibanned sampai"]);
+                if (isNaN(untilDate.getTime())) return banned;
+                const now = getWIBTime();
+                if (now > untilDate) return null;
+            }
+            return banned;
+        } catch (err) {
+            console.error('❌ Error check banned:', err);
+            return null;
+        }
+    }
+
+    function showBannedPage(bannedData, gmail) {
+        isBanned = true;
+        document.getElementById('bannedPage').classList.add('show');
+        document.getElementById('mainContainer').classList.add('hidden');
+
+        document.getElementById('bannedGmail').textContent = gmail || '-';
+        document.getElementById('bannedReason').textContent = bannedData.Alasan || 'Tidak ada keterangan';
+        document.getElementById('bannedUserId').textContent = '🆔 User ID: ' + userID;
+
+        let untilText = '-';
+        if (bannedData["Dibanned sampai"]) {
+            const d = new Date(bannedData["Dibanned sampai"]);
+            if (!isNaN(d.getTime())) untilText = formatWIB(d);
+        }
+        document.getElementById('bannedUntil').textContent = '⏳ Dibanned sampai: ' + untilText;
+
+        updateBannedWIBDisplay();
+
+        const appealLink = document.querySelector('.btn-appeal');
+        if (appealLink && gmail) {
+            appealLink.href = `https://wa.me/${WHATSAPP_NUMBER}?text=Halo%20Admin%2C%20saya%20ingin%20mengajukan%20banding%20atas%20ban%20akun%20saya.%20Gmail%3A%20${encodeURIComponent(gmail)}%0AUser%20ID%3A%20${encodeURIComponent(userID)}`;
+        }
+
+        if (window.bannedInterval) clearInterval(window.bannedInterval);
+        window.bannedInterval = setInterval(updateBannedWIBDisplay, 1000);
+    }
+
+    // ============================================================
+    // 🔥 KIRIM NOTIFIKASI KE DISCORD
+    // ============================================================
+    async function sendNewUserToDiscord(gmail) {
+        try {
+            const now = getWIBTime();
+            const timestamp = formatWIB(now);
+            const message = `🆕 **USER BARU LOGIN**
+━━━━━━━━━━━━━━━━━━━━━
+📧 **Gmail:** ${gmail}
+🆔 **User ID:** ${userID}
+📅 **Tanggal & Jam Login:** ${timestamp}
+━━━━━━━━━━━━━━━━━━━━━
+✅ **User baru terdaftar!**`;
+
+            const response = await fetch(DISCORD_WEBHOOK, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ content: message })
+            });
+            return response.ok;
+        } catch (err) {
+            console.error('❌ Error kirim ke Discord:', err);
+            return false;
+        }
+    }
+
+    async function processNewGmail(gmail) {
+        if (!gmail || !validateEmail(gmail)) return false;
+        const bannedData = await checkGmailBanned(gmail);
+        if (bannedData) {
+            showBannedPage(bannedData, gmail);
+            return false;
+        }
+
+        const notifKey = `discord_notif_${gmail.toLowerCase()}`;
+        const alreadySent = localStorage.getItem(notifKey) === 'true';
+
+        if (!alreadySent) {
+            const sent = await sendNewUserToDiscord(gmail);
+            if (sent) {
+                try { localStorage.setItem(notifKey, 'true'); } catch (e) {}
+            }
+        }
+        return true;
+    }
+
+    // ============================================================
+    // 🔥 LOAD PENGUMUMAN DROPDOWN
+    // ============================================================
+    let announcementCount = 0;
+    let isDropdownOpen = false;
+
+    async function loadAnnouncement() {
+        const dropdown = document.getElementById('announcementDropdown');
+        const body = document.getElementById('dropdownBody');
+        const countEl = document.getElementById('announcementCount');
+
+        if (!dropdown || !body) return;
+        const gmail = getStoredGmail();
+        if (!gmail || !validateEmail(gmail)) return;
+
+        try {
+            const res = await fetch("/home2/pesan.json?t=" + Date.now(), { cache: "no-store" });
+            if (!res.ok) return;
+
+            const data = await res.json();
+            const items = [];
+            const normalizedGmail = gmail.toLowerCase().trim();
+
+            for (const key in data) {
+                if (key.toLowerCase().trim() === normalizedGmail) {
+                    items.push({
+                        key: key,
+                        priority: 9999,
+                        type: 'user',
+                        label: '📩 Pesan Khusus Untukmu',
+                        content: data[key]
+                    });
+                }
+            }
+
+            for (const key in data) {
+                if (key.startsWith('all')) {
+                    let priority = 0;
+                    if (key === 'all') {
+                        priority = 0;
+                    } else {
+                        const num = parseInt(key.replace('all', ''));
+                        if (!isNaN(num)) priority = num;
+                    }
+                    items.push({
+                        key: key,
+                        priority: priority,
+                        type: 'all',
+                        label: '📢 Pengumuman',
+                        content: data[key]
+                    });
+                }
+            }
+
+            if (data && data[userID]) {
+                items.push({
+                    key: userID,
+                    priority: -1,
+                    type: 'user',
+                    label: '🔒 Pesan Sistem (User ID)',
+                    content: data[userID]
+                });
+            }
+
+            if (items.length === 0) return;
+            items.sort((a, b) => b.priority - a.priority);
+
+            let html = '';
+            items.forEach((item, index) => {
+                const badgeClass = item.type === 'user' ? 'user' : 'all';
+                const badgeLabel = item.type === 'user' ? '👤 Personal' : '🌐 Semua';
+                const priorityLabel = (item.type === 'all' && item.priority > 0) ? ` #${item.priority}` : '';
+
+                html += `
+                    <div class="announce-item" style="animation-delay: ${index * 0.05}s;">
+                        <span class="item-label">
+                            ${item.label}${priorityLabel}
+                            <span class="badge ${badgeClass}">${badgeLabel}</span>
+                        </span>
+                        ${item.content}
+                    </div>
+                `;
+            });
+
+            body.innerHTML = html;
+            announcementCount = items.length;
+            countEl.textContent = announcementCount;
+            dropdown.classList.add('show');
+
+            if (announcementCount > 3) toggleAnnouncement(true);
+        } catch (e) {
+            console.log('ℹ️ Gagal memuat pengumuman:', e.message);
+        }
+    }
+
+    function toggleAnnouncement(forceOpen) {
+        const body = document.getElementById('dropdownBody');
+        const arrow = document.getElementById('dropdownArrow');
+        if (!body || !arrow) return;
+
+        if (forceOpen === true) {
+            body.classList.add('open');
+            arrow.classList.add('open');
+            isDropdownOpen = true;
+            return;
+        }
+        if (forceOpen === false) {
+            body.classList.remove('open');
+            arrow.classList.remove('open');
+            isDropdownOpen = false;
+            return;
+        }
+
+        if (isDropdownOpen) {
+            body.classList.remove('open');
+            arrow.classList.remove('open');
+            isDropdownOpen = false;
+        } else {
+            body.classList.add('open');
+            arrow.classList.add('open');
+            isDropdownOpen = true;
+        }
+    }
+
+    // ============================================================
+    // 🔥 HEALTH CHECK PROVIDER (CEK SALDO)
+    // ============================================================
+    const PROVIDERS = {
+        lollipop: { endpoint: '/api/lollipop-services', btn: 'btnSosmed1', badge: 'badgeSosmed1', label: 'Sosmed 1' },
+        fayupedia: { endpoint: '/api/fayupedia-services', btn: 'btnSosmed2', badge: 'badgeSosmed2', label: 'Sosmed 2' },
+        indosmm: { endpoint: '/api/indosmm-services', btn: 'btnSosmed3', badge: 'badgeSosmed3', label: 'Sosmed 3' }
+    };
+
+    function setBadge(badgeId, text, type) {
+        const el = document.getElementById(badgeId);
+        if (!el) return;
+        el.textContent = text;
+        el.className = 'badge-status ' + (type || '');
+    }
+
+    function disableBtn(btnId) {
+        const btn = document.getElementById(btnId);
+        if (btn) btn.disabled = true;
+    }
+
+    function enableBtn(btnId) {
+        const btn = document.getElementById(btnId);
+        if (btn) btn.disabled = false;
+    }
+
+    async function checkProviderHealth(providerKey) {
+        const prov = PROVIDERS[providerKey];
+        if (!prov) return;
+
+        const btn = document.getElementById(prov.btn);
+        if (btn) btn.classList.add('checking');
+        setBadge(prov.badge, 'CEK...', 'checking-badge');
+
+        try {
+            let balance = 0;
+
+            // ===== LOLLIPOP: POST action:balance =====
+            if (providerKey === 'lollipop') {
+                const res = await fetch(prov.endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'balance' })
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    balance = Number(data.balance) || 0;
+                }
+            }
+            // ===== FAYUPEDIA: GET ?action=balance =====
+            else if (providerKey === 'fayupedia') {
+                const res = await fetch(prov.endpoint + '?action=balance&t=' + Date.now(), { cache: 'no-store' });
+                if (res.ok) {
+                    const data = await res.json();
+                    balance = Number(data.balance) || 0;
+                }
+            }
+            // ===== INDOSMM: POST action:balance =====
+            else if (providerKey === 'indosmm') {
+                const res = await fetch(prov.endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'balance' })
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    // indosmm return balance di root (bukan di data.balance)
+                    balance = Number(data.balance) || 0;
+                }
+            }
+
+            if (btn) btn.classList.remove('checking');
+
+            if (balance < MIN_BALANCE) {
+                setBadge(prov.badge, 'GANGGUAN', 'gangguan');
+                disableBtn(prov.btn);
+                console.log(`⚠️ ${prov.label}: GANGGUAN (saldo: ${balance})`);
+            } else {
+                setBadge(prov.badge, 'OK', 'ok-badge');
+                enableBtn(prov.btn);
+                console.log(`✅ ${prov.label}: OK (saldo: ${balance})`);
+            }
+
+        } catch (err) {
+            console.error(`❌ Error cek ${prov.label}:`, err);
+            if (btn) btn.classList.remove('checking');
+            setBadge(prov.badge, 'GANGGUAN', 'gangguan');
+            disableBtn(prov.btn);
+        }
+    }
+
+    async function checkAllProviders() {
+        await Promise.all([
+            checkProviderHealth('lollipop'),
+            checkProviderHealth('fayupedia'),
+            checkProviderHealth('indosmm')
+        ]);
+    }
+
+    // ============================================================
+    // 🔥 CEK & MINTA GMAIL
+    // ============================================================
+    async function ensureGmail() {
+        if (gmailPromptActive || isBanned) return false;
+        const gmail = getStoredGmail();
+
+        if (gmail && validateEmail(gmail)) {
+            const bannedData = await checkGmailBanned(gmail);
+            if (bannedData) {
+                showBannedPage(bannedData, gmail);
+                return false;
+            }
+            updateGmailDisplay();
             return true;
         }
 
-        // ==================== Card Renderers ====================
-        function createOrderCard(id, data) {
-            const isFound = data.status && !String(data.msg || '').toLowerCase().includes('tidak ditemukan');
-            const status = data.status || 'Tidak Ditemukan';
-            const statusClass = getStatusClass(status);
-            const statusIcon = getStatusIcon(status);
+        gmailPromptActive = true;
 
-            return `
-                <div class="bg-white rounded-3xl shadow-lg shadow-gray-200/50 border border-gray-100 p-5 card-hover fade-in">
-                    <div class="flex items-start justify-between mb-4">
-                        <div>
-                            <p class="text-[11px] text-gray-400 uppercase tracking-wider font-semibold mb-0.5">Order ID</p>
-                            <p class="text-xl font-extrabold text-gray-900">#${id}</p>
-                        </div>
-                        <span class="status-badge ${statusClass}">
-                            <i class="fas ${statusIcon} mr-1"></i>${status}
-                        </span>
-                    </div>
-                    
-                    ${isFound ? `
-                        <div class="grid grid-cols-2 gap-3 mt-1 pt-4 border-t border-gray-100">
-                            <div class="bg-gray-50 rounded-xl p-3">
-                                <p class="text-[11px] text-gray-400 mb-0.5">Charge</p>
-                                <p class="font-bold text-gray-800 text-sm">Rp ${formatNumber(data.charge)}</p>
-                            </div>
-                            <div class="bg-gray-50 rounded-xl p-3">
-                                <p class="text-[11px] text-gray-400 mb-0.5">Start Count</p>
-                                <p class="font-bold text-gray-800 text-sm">${formatNumber(data.start_count)}</p>
-                            </div>
-                            <div class="bg-gray-50 rounded-xl p-3">
-                                <p class="text-[11px] text-gray-400 mb-0.5">Remains</p>
-                                <p class="font-bold text-gray-800 text-sm">${formatNumber(data.remains)}</p>
-                            </div>
-                            <div class="bg-gray-50 rounded-xl p-3">
-                                <p class="text-[11px] text-gray-400 mb-0.5">Pesan</p>
-                                <p class="font-medium text-gray-600 text-xs leading-snug">${data.msg || '-'}</p>
-                            </div>
-                        </div>
-                    ` : `
-                        <div class="mt-2 pt-3 border-t border-gray-100">
-                            <p class="text-sm text-red-500 flex items-center gap-1.5">
-                                <i class="fas fa-info-circle"></i>
-                                ${data.msg || 'Pesanan tidak ditemukan.'}
-                            </p>
-                        </div>
-                    `}
-                </div>
-            `;
-        }
-
-        function createRefillResultCard(id, data, isRequest = false) {
-            if (isRequest) {
-                const success = data.status === true;
-                return `
-                    <div class="bg-white rounded-3xl shadow-lg shadow-gray-200/50 border border-gray-100 p-5 card-hover fade-in">
-                        <div class="flex items-start justify-between mb-3">
-                            <div>
-                                <p class="text-[11px] text-gray-400 uppercase tracking-wider font-semibold mb-0.5">Order ID</p>
-                                <p class="text-xl font-extrabold text-gray-900">#${id}</p>
-                            </div>
-                            <span class="status-badge ${success ? 'status-success' : 'status-error'}">
-                                <i class="fas ${success ? 'fa-check-circle' : 'fa-times-circle'} mr-1"></i>
-                                ${success ? 'Berhasil' : 'Gagal'}
-                            </span>
-                        </div>
-                        <div class="mt-2 pt-3 border-t border-gray-100">
-                            <p class="text-sm ${success ? 'text-emerald-600' : 'text-red-500'} flex items-start gap-1.5">
-                                <i class="fas ${success ? 'fa-info-circle' : 'fa-exclamation-circle'} mt-0.5"></i>
-                                <span>${data.msg || (success ? 'Refill berhasil dibuat.' : 'Gagal membuat refill.')}</span>
-                            </p>
-                            ${success && data.data?.refill ? `
-                                <div class="mt-3 bg-gradient-to-r from-emerald-50 to-teal-50 rounded-2xl p-4 border border-emerald-100">
-                                    <p class="text-[11px] text-emerald-600 font-semibold mb-1">ID Refill</p>
-                                    <p class="font-extrabold text-emerald-800 text-xl">#${data.data.refill}</p>
-                                    <p class="text-xs text-emerald-500 mt-1.5">Gunakan ID ini di tab <strong>Status Refill</strong></p>
-                                </div>
-                            ` : ''}
-                        </div>
-                    </div>
-                `;
+        const result = await Swal.fire({
+            title: '📧 Wajib Login Terlebih Dahulu',
+            text: 'Masukkan Gmail untuk melanjutkan. Hal ini dilakukan agar mempermudah pelacakan transaksi Anda.',
+            input: 'email',
+            inputPlaceholder: 'contoh: email@gmail.com',
+            inputAttributes: { autocomplete: 'email' },
+            showCancelButton: true,
+            cancelButtonText: '❌ Batal',
+            confirmButtonText: '✅ Simpan',
+            confirmButtonColor: '#4fc3f7',
+            cancelButtonColor: '#666',
+            allowOutsideClick: false,
+            background: '#1a0e2e',
+            color: '#fff',
+            preConfirm: (email) => {
+                if (!validateEmail(email)) {
+                    Swal.showValidationMessage('⚠️ Format Gmail tidak valid!');
+                    return false;
+                }
+                return email;
             }
+        });
 
-            const isFound = data.status === true && data.data;
-            const refillStatus = data.data?.refill_status || 'Tidak Ditemukan';
-            const statusClass = getStatusClass(refillStatus);
-            const statusIcon = getStatusIcon(refillStatus);
+        gmailPromptActive = false;
+        if (result.isDismissed) return false;
 
-            return `
-                <div class="bg-white rounded-3xl shadow-lg shadow-gray-200/50 border border-gray-100 p-5 card-hover fade-in">
-                    <div class="flex items-start justify-between mb-4">
-                        <div>
-                            <p class="text-[11px] text-gray-400 uppercase tracking-wider font-semibold mb-0.5">Refill ID</p>
-                            <p class="text-xl font-extrabold text-gray-900">#${data.data?.refill_id || id}</p>
-                        </div>
-                        <span class="status-badge ${statusClass}">
-                            <i class="fas ${statusIcon} mr-1"></i>${refillStatus}
-                        </span>
-                    </div>
-                    <div class="mt-2 pt-3 border-t border-gray-100">
-                        <p class="text-sm ${isFound ? 'text-gray-600' : 'text-red-500'} flex items-center gap-1.5">
-                            <i class="fas fa-info-circle"></i>
-                            ${data.msg || (isFound ? 'Refill ditemukan.' : 'Refill tidak ditemukan.')}
-                        </p>
-                    </div>
-                </div>
-            `;
+        if (result.isConfirmed && result.value) {
+            const newGmail = result.value.trim();
+            const saved = saveGmailToStorage(newGmail);
+            if (saved) {
+                updateGmailDisplay();
+                const processed = await processNewGmail(newGmail);
+                if (!processed) return false;
+                await loadAnnouncement();
+                await Swal.fire({
+                    title: '✅ Gmail Tersimpan!',
+                    text: `Gmail ${newGmail} berhasil disimpan.`,
+                    icon: 'success',
+                    confirmButtonColor: '#4fc3f7',
+                    background: '#1a0e2e',
+                    color: '#fff',
+                    timer: 3000,
+                    timerProgressBar: true
+                });
+                return true;
+            }
         }
+        return false;
+    }
 
-        // ==================== API Calls ====================
-        async function apiPost(url, ids) {
-            const formData = new URLSearchParams();
-            formData.append('api_id', API_ID);
-            formData.append('api_key', API_KEY);
-            formData.append('id', ids.join(','));
-
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: formData
+    // ============================================================
+    // 🔥 UBAH GMAIL DENGAN PASSWORD
+    // ============================================================
+    async function changeGmailWithPassword() {
+        if (isBanned) {
+            Swal.fire({
+                title: '🚫 Akun Diblokir',
+                text: 'Anda tidak dapat mengubah Gmail karena akun sedang dibanned.',
+                icon: 'error',
+                confirmButtonColor: '#ff4444',
+                background: '#1a0e2e',
+                color: '#fff'
             });
-
-            if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
-            return await response.json();
+            return;
         }
 
-        async function cekStatus() {
-            if (!ensureConfig()) return;
-
-            const orderInput = document.getElementById('orderId').value.trim();
-            const resultsDiv = document.getElementById('results');
-
-            if (!orderInput) {
-                showError('Input Kosong', 'Silakan masukkan minimal satu ID pesanan.');
-                return;
+        const currentGmail = getStoredGmail();
+        let correctPassword = '';
+        try {
+            const res = await fetch('/pass.json?t=' + Date.now());
+            if (res.ok) {
+                const data = await res.json();
+                correctPassword = data.password || '';
             }
+        } catch (e) {}
 
-            const ids = parseIds(orderInput);
-            if (ids.length === 0) {
-                showError('Input Tidak Valid', 'Tidak ada ID pesanan yang valid.');
-                return;
-            }
+        if (!correctPassword) correctPassword = 'ALb17';
 
-            setButtonLoading('cekBtn', 'btnIcon', 'btnText', true, 'Cek Status', 'fa-search');
-            showLoading('Sedang mengecek status pesanan...');
-
-            try {
-                const data = await apiPost(ENDPOINTS.status, ids);
-                hideLoading();
-
-                if (data.status === false && !data.orders) {
-                    resultsDiv.innerHTML = createOrderCard(ids[0], { msg: data.msg, status: null });
-                } else if (data.orders) {
-                    let html = '';
-                    for (const [orderId, orderData] of Object.entries(data.orders)) {
-                        html += createOrderCard(orderId, orderData);
-                    }
-                    resultsDiv.innerHTML = html;
-                } else if (data.status === true && data.data) {
-                    resultsDiv.innerHTML = createOrderCard(data.data.id || ids[0], {
-                        ...data.data,
-                        msg: data.msg
-                    });
-                } else {
-                    showError('Respon Tidak Dikenal', JSON.stringify(data));
+        const { value: password } = await Swal.fire({
+            title: '🔑 Verifikasi Password',
+            text: 'Masukkan password yang diberikan admin untuk mengubah Gmail:',
+            input: 'password',
+            inputPlaceholder: 'Masukkan password...',
+            showCancelButton: true,
+            confirmButtonText: '✅ Verifikasi',
+            cancelButtonText: '❌ Batal',
+            confirmButtonColor: '#4fc3f7',
+            cancelButtonColor: '#666',
+            background: '#1a0e2e',
+            color: '#fff',
+            preConfirm: (pass) => {
+                if (!pass || pass.trim() === '') {
+                    Swal.showValidationMessage('⚠️ Password tidak boleh kosong!');
+                    return false;
                 }
-            } catch (err) {
-                hideLoading();
-                showError('Gagal Terhubung', err.message || 'Tidak dapat terhubung ke server.');
-            } finally {
-                setButtonLoading('cekBtn', 'btnIcon', 'btnText', false, 'Cek Status', 'fa-search');
-            }
-        }
-
-        async function refillOrder() {
-            if (!ensureConfig()) return;
-
-            const orderInput = document.getElementById('orderId').value.trim();
-            const resultsDiv = document.getElementById('results');
-
-            if (!orderInput) {
-                showError('Input Kosong', 'Silakan masukkan minimal satu ID pesanan untuk di-refill.');
-                return;
-            }
-
-            const ids = parseIds(orderInput);
-            if (ids.length === 0) {
-                showError('Input Tidak Valid', 'Tidak ada ID pesanan yang valid.');
-                return;
-            }
-
-            setButtonLoading('refillBtn', 'refillBtnIcon', 'refillBtnText', true, 'Refill Pesanan', 'fa-sync-alt');
-            showLoading('Sedang meminta refill...');
-
-            try {
-                let html = '';
-                let hasSuccess = false;
-
-                const data = await apiPost(ENDPOINTS.refill, ids);
-                hideLoading();
-
-                if (data.status === true && data.data) {
-                    html = createRefillResultCard(ids[0], data, true);
-                    hasSuccess = true;
-                    showSuccess('Refill Berhasil', data.msg || `Refill #${data.data.refill} berhasil dibuat.`);
-                } else if (data.orders || data.data?.orders) {
-                    const orders = data.orders || data.data.orders;
-                    for (const [orderId, orderData] of Object.entries(orders)) {
-                        html += createRefillResultCard(orderId, orderData, true);
-                        if (orderData.status === true) hasSuccess = true;
-                    }
-                } else if (data.status === false) {
-                    html = createRefillResultCard(ids[0], data, true);
-                } else {
-                    if (ids.length > 1) {
-                        for (const id of ids) {
-                            try {
-                                const singleData = await apiPost(ENDPOINTS.refill, [id]);
-                                html += createRefillResultCard(id, singleData, true);
-                                if (singleData.status === true) hasSuccess = true;
-                            } catch (e) {
-                                html += createRefillResultCard(id, { status: false, msg: e.message }, true);
-                            }
-                        }
-                    } else {
-                        html = createRefillResultCard(ids[0], data, true);
-                    }
-                }
-
-                resultsDiv.innerHTML = html;
-            } catch (err) {
-                hideLoading();
-                if (ids.length > 1) {
-                    let html = '';
-                    for (const id of ids) {
-                        try {
-                            const singleData = await apiPost(ENDPOINTS.refill, [id]);
-                            html += createRefillResultCard(id, singleData, true);
-                        } catch (e) {
-                            html += createRefillResultCard(id, { status: false, msg: e.message }, true);
-                        }
-                    }
-                    resultsDiv.innerHTML = html;
-                } else {
-                    showError('Gagal Terhubung', err.message || 'Tidak dapat terhubung ke server.');
-                }
-            } finally {
-                setButtonLoading('refillBtn', 'refillBtnIcon', 'refillBtnText', false, 'Refill Pesanan', 'fa-sync-alt');
-            }
-        }
-
-        async function cekRefillStatus() {
-            if (!ensureConfig()) return;
-
-            const refillInput = document.getElementById('refillId').value.trim();
-            const resultsDiv = document.getElementById('results');
-
-            if (!refillInput) {
-                showError('Input Kosong', 'Silakan masukkan minimal satu ID Refill.');
-                return;
-            }
-
-            const ids = parseIds(refillInput);
-            if (ids.length === 0) {
-                showError('Input Tidak Valid', 'Tidak ada ID Refill yang valid.');
-                return;
-            }
-
-            setButtonLoading('cekRefillBtn', 'cekRefillBtnIcon', 'cekRefillBtnText', true, 'Cek Status Refill', 'fa-search');
-            showLoading('Sedang mengecek status refill...');
-
-            try {
-                let html = '';
-                const data = await apiPost(ENDPOINTS.refillStatus, ids);
-                hideLoading();
-
-                if (data.status === true && data.data) {
-                    html = createRefillResultCard(ids[0], data, false);
-                } else if (data.orders || (data.data && typeof data.data === 'object' && !data.data.refill_id)) {
-                    const orders = data.orders || data.data;
-                    for (const [rid, rdata] of Object.entries(orders)) {
-                        html += createRefillResultCard(rid, rdata.status !== undefined ? rdata : { status: true, data: rdata, msg: rdata.msg }, false);
-                    }
-                } else if (data.status === false) {
-                    html = createRefillResultCard(ids[0], data, false);
-                } else {
-                    for (const id of ids) {
-                        try {
-                            const single = await apiPost(ENDPOINTS.refillStatus, [id]);
-                            html += createRefillResultCard(id, single, false);
-                        } catch (e) {
-                            html += createRefillResultCard(id, { status: false, msg: e.message }, false);
-                        }
-                    }
-                }
-
-                resultsDiv.innerHTML = html || '<p class="text-center text-gray-400 text-sm py-6">Tidak ada data.</p>';
-            } catch (err) {
-                hideLoading();
-                if (ids.length > 1) {
-                    let html = '';
-                    for (const id of ids) {
-                        try {
-                            const single = await apiPost(ENDPOINTS.refillStatus, [id]);
-                            html += createRefillResultCard(id, single, false);
-                        } catch (e) {
-                            html += createRefillResultCard(id, { status: false, msg: e.message }, false);
-                        }
-                    }
-                    resultsDiv.innerHTML = html;
-                } else {
-                    showError('Gagal Terhubung', err.message || 'Tidak dapat terhubung ke server.');
-                }
-            } finally {
-                setButtonLoading('cekRefillBtn', 'cekRefillBtnIcon', 'cekRefillBtnText', false, 'Cek Status Refill', 'fa-search');
-            }
-        }
-
-        // Enter key support
-        document.getElementById('orderId').addEventListener('keydown', function(e) {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                cekStatus();
+                return pass.trim();
             }
         });
 
-        document.getElementById('refillId').addEventListener('keydown', function(e) {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                cekRefillStatus();
+        if (!password) return;
+
+        if (password !== correctPassword) {
+            Swal.fire({
+                title: '❌ Password Salah!',
+                text: 'Password yang Anda masukkan tidak valid.',
+                icon: 'error',
+                confirmButtonColor: '#ff4444',
+                background: '#1a0e2e',
+                color: '#fff'
+            });
+            return;
+        }
+
+        const { value: newGmail } = await Swal.fire({
+            title: '📧 Ganti Gmail',
+            text: `Gmail saat ini: ${currentGmail || 'Belum diatur'}`,
+            input: 'email',
+            inputPlaceholder: 'Masukkan Gmail baru...',
+            inputValue: currentGmail || '',
+            showCancelButton: true,
+            confirmButtonText: '✅ Ganti',
+            cancelButtonText: '❌ Batal',
+            confirmButtonColor: '#4fc3f7',
+            cancelButtonColor: '#666',
+            background: '#1a0e2e',
+            color: '#fff',
+            preConfirm: (email) => {
+                if (!validateEmail(email)) {
+                    Swal.showValidationMessage('⚠️ Format Gmail tidak valid!');
+                    return false;
+                }
+                return email.trim();
             }
         });
+
+        if (newGmail && newGmail !== currentGmail) {
+            const bannedData = await checkGmailBanned(newGmail);
+            if (bannedData) {
+                showBannedPage(bannedData, newGmail);
+                return;
+            }
+            const saved = saveGmailToStorage(newGmail);
+            if (saved) {
+                updateGmailDisplay();
+                await loadAnnouncement();
+                await processNewGmail(newGmail);
+                Swal.fire({
+                    title: '✅ Gmail Diubah!',
+                    text: `Gmail berhasil diubah menjadi: ${newGmail}`,
+                    icon: 'success',
+                    confirmButtonColor: '#4fc3f7',
+                    background: '#1a0e2e',
+                    color: '#fff',
+                    timer: 2000,
+                    timerProgressBar: true
+                });
+            }
+        }
+    }
+
+    // ============================================================
+    // 🔥 HANDLE BUTTON CLICK
+    // ============================================================
+    async function handleButtonClick(url) {
+        if (isBanned) {
+            Swal.fire({
+                title: '🚫 Akun Diblokir',
+                text: 'Anda tidak dapat mengakses menu karena akun sedang dibanned.',
+                icon: 'error',
+                confirmButtonColor: '#ff4444',
+                background: '#1a0e2e',
+                color: '#fff'
+            });
+            return;
+        }
+
+        // Cek dulu apakah tombol disabled (karena GANGGUAN)
+        const clickedBtn = event && event.currentTarget;
+        if (clickedBtn && clickedBtn.disabled) {
+            Swal.fire({
+                title: '⚠️ Layanan Gangguan',
+                text: 'Provider ini sedang dalam gangguan (saldo tidak mencukupi). Silakan coba layanan lain.',
+                icon: 'warning',
+                confirmButtonColor: '#ffaa00',
+                background: '#1a0e2e',
+                color: '#fff'
+            });
+            return;
+        }
+
+        const gmailOk = await ensureGmail();
+        if (!gmailOk && !getStoredGmail()) return;
+        if (isBanned) return;
+
+        if (url) {
+            if (url.startsWith('http://') || url.startsWith('https://')) {
+                window.open(url, '_blank');
+            } else {
+                window.location.href = url;
+            }
+        }
+    }
+
+    // ============================================================
+    // 🔥 ANTI INSPECT
+    // ============================================================
+    document.addEventListener("contextmenu", e => e.preventDefault());
+    document.addEventListener("keydown", function(e) {
+        const key = e.key.toLowerCase();
+        if (e.key === "F12") e.preventDefault();
+        if (e.ctrlKey && e.shiftKey && ["i", "c", "j"].includes(key)) e.preventDefault();
+        if (e.ctrlKey && key === "u") e.preventDefault();
+    });
+
+    // ============================================================
+    // 🔥 INIT
+    // ============================================================
+    window.addEventListener('load', async function() {
+        const gmail = getStoredGmail();
+
+        if (gmail && validateEmail(gmail)) {
+            const bannedData = await checkGmailBanned(gmail);
+            if (bannedData) {
+                showBannedPage(bannedData, gmail);
+                updateGmailDisplay();
+                return;
+            }
+            await processNewGmail(gmail);
+        }
+
+        updateGmailDisplay();
+        await loadAnnouncement();
+
+        // 🔥 CEK HEALTH SEMUA PROVIDER SETELAH UI SIAP
+        checkAllProviders();
+
+        // 🔥 RE-CHECK TIAP 60 DETIK BIAR REAL-TIME
+        setInterval(checkAllProviders, 60000);
+    });
+
+    document.getElementById('changeGmailBtn').addEventListener('click', changeGmailWithPassword);
     </script>
+
 </body>
 </html>
