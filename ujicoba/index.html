@@ -1,1254 +1,1958 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Shine Shop</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0f172a">
+<title>Shine Shop - SMM Panel</title>
+<style>
+:root {
+  --bg: #0f172a;
+  --bg-card: #1e293b;
+  --bg-input: #0f172a;
+  --bg-hover: #273449;
+  --border: #334155;
+  --border-light: #475569;
+  --accent: #3b82f6;
+  --accent-hover: #2563eb;
+  --accent-soft: rgba(59, 130, 246, 0.12);
+  --text: #e2e8f0;
+  --text-dim: #94a3b8;
+  --text-muted: #64748b;
+  --danger: #ef4444;
+  --danger-soft: rgba(239, 68, 68, 0.1);
+  --success: #10b981;
+  --success-soft: rgba(16, 185, 129, 0.1);
+  --warning: #f59e0b;
+  --warning-soft: rgba(245, 158, 11, 0.1);
+  --radius: 10px;
+  --radius-sm: 8px;
+  --shadow: 0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
+  --header-h: 56px;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  color: var(--text);
+  background: var(--bg);
+  min-height: 100vh;
+  line-height: 1.5;
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  padding-top: var(--header-h);
+  overflow-x: hidden;
+}
 
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+/* ===== HEADER ===== */
+.header {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: var(--header-h);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  background: #1e293b;
+  border-bottom: 1px solid var(--border);
+  z-index: 80;
+}
+.brand { display: flex; align-items: center; gap: 10px; }
+.logo {
+  width: 32px; height: 32px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.logo img { width: 100%; height: 100%; object-fit: cover; }
+.brand-text { display: flex; flex-direction: column; line-height: 1.2; }
+.brand-text h1 {
+  font-size: 15px;
+  font-weight: 600;
+  color: #f1f5f9;
+  letter-spacing: -0.2px;
+}
+.brand-text span {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.hamburger-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  padding: 7px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  transition: background 0.15s, border-color 0.15s;
+}
+.hamburger-btn:hover { background: var(--bg-hover); border-color: var(--border-light); }
+.hamburger-icon span {
+  display: block;
+  height: 2px;
+  width: 18px;
+  background: #cbd5e1;
+  border-radius: 2px;
+  transition: transform 0.25s, opacity 0.2s;
+}
+.hamburger-btn.active .hamburger-icon span:nth-child(1) { transform: translateY(6px) rotate(45deg); }
+.hamburger-btn.active .hamburger-icon span:nth-child(2) { opacity: 0; }
+.hamburger-btn.active .hamburger-icon span:nth-child(3) { transform: translateY(-6px) rotate(-45deg); }
 
-    <style>
-    *{
-        box-sizing: border-box;
-        margin: 0;
-        padding: 0;
-    }
+/* ===== OFFCANVAS ===== */
+.offcanvas {
+  position: fixed;
+  top: 0; left: 0;
+  width: 270px;
+  height: 100%;
+  background: #1e293b;
+  padding: 20px 16px;
+  z-index: 100;
+  border-right: 1px solid var(--border);
+  transform: translateX(-105%);
+  transition: transform 0.28s cubic-bezier(0.4,0,0.2,1);
+  overflow-y: auto;
+}
+.offcanvas.open { transform: translateX(0); }
+.offcanvas-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+}
+.offcanvas-header strong { font-size: 14px; font-weight: 600; color: var(--text); }
+.close-offcanvas {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  width: 32px; height: 32px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 16px;
+  display: grid; place-items: center;
+  transition: background 0.15s, color 0.15s;
+}
+.close-offcanvas:hover { background: var(--bg-hover); color: var(--text); }
+.menu-list { list-style: none; }
+.menu-list li { margin-bottom: 6px; }
+.menu-list a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 13px;
+  border-radius: 8px;
+  color: var(--text-dim);
+  text-decoration: none;
+  font-size: 13.5px;
+  font-weight: 500;
+  transition: background 0.15s, color 0.15s;
+}
+.menu-list a:hover { background: var(--bg-hover); color: var(--text); }
+.menu-list a::before {
+  content: '';
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex-shrink: 0;
+}
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 90;
+  transition: opacity 0.25s;
+}
+.overlay.show { opacity: 1; pointer-events: auto; }
 
-    body{
-        font-family: 'Poppins', sans-serif;
-        min-height: 100vh;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        background:
-            linear-gradient(rgba(0,0,0,0.75), rgba(0,0,0,0.75)),
-            url('/home/logo.png') center/cover no-repeat fixed;
-        color: white;
-        padding: 20px;
-    }
+/* ===== CONTAINER ===== */
+.container {
+  max-width: 640px;
+  margin: 16px auto 32px;
+  padding: 20px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+}
+.page-title {
+  text-align: center;
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+.page-subtitle {
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
 
-    :root{
-        --border: rgba(255,255,255,0.15);
-    }
+/* ===== FORM ===== */
+label {
+  display: block;
+  margin-top: 14px;
+  margin-bottom: 5px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text-dim);
+}
+input[type="text"],
+input[type="number"],
+input[type="search"],
+select,
+textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-input);
+  color: var(--text);
+  font-size: 14px;
+  font-family: inherit;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  -webkit-appearance: none;
+  appearance: none;
+}
+input::placeholder, textarea::placeholder { color: var(--text-muted); }
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+select {
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2394a3b8' d='M2.5 4.5L6 8l3.5-3.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 11px;
+  padding-right: 34px;
+  min-height: 42px;
+}
+select option { background: #1e293b; color: var(--text); }
+textarea { resize: vertical; min-height: 90px; line-height: 1.5; }
 
-    .container{
-        width: 100%;
-        max-width: 480px;
-        background: rgba(255,255,255,0.05);
-        backdrop-filter: blur(10px);
-        -webkit-backdrop-filter: blur(10px);
-        border-radius: 18px;
-        padding: 35px 25px;
-        text-align: center;
-        border: 1px solid rgba(255,255,255,0.1);
-    }
+/* ===== INFO BOX ===== */
+.info-box {
+  margin-top: 8px;
+  padding: 10px 12px;
+  background: var(--bg-input);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  font-size: 12.5px;
+  color: var(--text-dim);
+  line-height: 1.55;
+}
+.info-box b { color: var(--text); font-weight: 600; }
+.info-box .price-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 2px;
+}
+.strike { text-decoration: line-through; color: var(--text-muted); }
+.price-hi { color: var(--success); font-weight: 600; }
+.badge-discount {
+  display: inline-block;
+  background: var(--warning);
+  color: #1a1a1a;
+  padding: 1px 7px;
+  border-radius: 4px;
+  font-weight: 700;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
 
-    h1{
-        font-size: 22px;
-        font-weight: 600;
-        margin-bottom: 30px;
-        letter-spacing: 1px;
-    }
+/* ===== MODE TOGGLE ===== */
+.mode-toggle {
+  display: flex;
+  gap: 4px;
+  margin-top: 16px;
+  background: var(--bg-input);
+  border-radius: var(--radius-sm);
+  padding: 4px;
+  border: 1px solid var(--border);
+}
+.mode-btn {
+  flex: 1;
+  padding: 9px 12px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  font-weight: 500;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  font-family: inherit;
+}
+.mode-btn.active { background: var(--accent); color: white; }
+.mode-btn:not(.active):hover { background: var(--bg-hover); color: var(--text); }
 
-    .gmail-display {
-        background: rgba(255,255,255,0.05);
-        border: 1px solid rgba(255,255,255,0.1);
-        border-radius: 10px;
-        padding: 10px 14px;
-        margin: 10px 0 16px 0;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        flex-wrap: wrap;
-        gap: 6px;
-        font-size: 13px;
-    }
+/* ===== PRICE DISPLAY ===== */
+.price-display {
+  margin-top: 10px;
+  padding: 12px 14px;
+  background: var(--bg-input);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  display: none;
+}
+.price-display.show { display: block; }
+.price-display .label-sm { color: var(--text-dim); font-size: 12px; }
+.price-display .amount {
+  display: block;
+  font-size: 20px;
+  font-weight: 700;
+  color: #60a5fa;
+  margin-top: 2px;
+}
+.price-display .amount .currency { font-size: 13px; color: var(--text-muted); font-weight: 500; }
+.price-display .detail { font-size: 11.5px; color: var(--text-muted); margin-top: 4px; }
 
-    .gmail-display .label {
-        color: #aaa;
-        font-weight: 400;
-    }
+/* ===== BALANCE WARNING ===== */
+.balance-warning {
+  display: none;
+  margin-top: 10px;
+  padding: 11px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--danger-soft);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #fca5a5;
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+.balance-warning.show { display: block; }
+.balance-warning strong { color: #f87171; font-weight: 700; }
+.balance-info {
+  display: none;
+  margin-top: 8px;
+  padding: 7px 12px;
+  border-radius: 6px;
+  background: var(--success-soft);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  font-size: 11.5px;
+  color: #6ee7b7;
+  text-align: center;
+}
+.balance-info.show { display: block; }
+.balance-info.danger {
+  background: var(--danger-soft);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: #f87171;
+}
 
-    .gmail-display .value {
-        color: #4fc3f7;
-        font-weight: 500;
-        word-break: break-all;
-        flex: 1;
-        text-align: left;
-        padding: 0 8px;
-    }
+/* ===== COMMENT INFO ===== */
+.comment-info {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: var(--bg-input);
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--text-dim);
+  display: none;
+}
+.comment-info.show { display: block; }
+.comment-info .count { color: var(--accent); font-weight: 600; }
 
-    .gmail-display .value.not-set {
-        color: #ff6666;
-        font-style: italic;
-        font-weight: 400;
-    }
+/* ===== BUTTONS ===== */
+.btn-primary {
+  width: 100%;
+  padding: 12px 18px;
+  margin-top: 18px;
+  border-radius: var(--radius-sm);
+  border: none;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  background: var(--accent);
+  color: white;
+  transition: background 0.15s, opacity 0.15s;
+  font-family: inherit;
+}
+.btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-secondary {
+  width: 100%;
+  padding: 10px 16px;
+  margin-top: 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-input);
+  color: var(--text);
+  font-weight: 500;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  font-family: inherit;
+}
+.btn-secondary:hover { background: var(--bg-hover); border-color: var(--border-light); }
 
-    .gmail-display .btn-change {
-        background: rgba(255,255,255,0.08);
-        border: 1px solid rgba(255,255,255,0.1);
-        color: #fff;
-        padding: 4px 14px;
-        border-radius: 8px;
-        font-size: 11px;
-        cursor: pointer;
-        transition: 0.3s;
-        font-family: 'Poppins', sans-serif;
-    }
+/* ===== FILTER ROW ===== */
+.filter-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 4px;
+}
+.filter-item label { margin-top: 0; }
 
-    .gmail-display .btn-change:hover {
-        background: rgba(255,255,255,0.15);
-    }
+/* ===== CUSTOM SELECT ===== */
+.cselect { position: relative; margin-top: 0; width: 100%; }
+.cselect-trigger {
+  width: 100%;
+  min-height: 42px;
+  padding: 10px 34px 10px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-input);
+  color: var(--text);
+  font-size: 14px;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  position: relative;
+}
+.cselect-trigger:hover { border-color: var(--border-light); }
+.cselect-trigger:focus,
+.cselect.open .cselect-trigger {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.cselect-value {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+  font-size: 13.5px;
+}
+.cselect-value.placeholder { color: var(--text-muted); }
+.cselect-arrow {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 11px; height: 11px;
+  pointer-events: none;
+  transition: transform 0.2s;
+}
+.cselect.open .cselect-arrow { transform: translateY(-50%) rotate(180deg); }
+.cselect-arrow svg { display: block; width: 11px; height: 11px; }
 
-    /* ===== DROPDOWN PENGUMUMAN ===== */
-    .announcement-dropdown {
-        background: rgba(255, 215, 0, 0.06);
-        border: 1px solid rgba(255, 215, 0, 0.12);
-        border-radius: 14px;
-        margin: 8px 0 14px 0;
-        overflow: hidden;
-        display: none;
-    }
+.cselect-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 200;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+}
+.cselect-backdrop.show { opacity: 1; pointer-events: auto; }
+.cselect-panel {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  z-index: 210;
+  background: #1e293b;
+  border-radius: 16px 16px 0 0;
+  border: 1px solid var(--border);
+  border-bottom: none;
+  max-height: min(75vh, 540px);
+  display: flex;
+  flex-direction: column;
+  transform: translateY(105%);
+  transition: transform 0.28s cubic-bezier(0.4,0,0.2,1);
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+.cselect-panel.open { transform: translateY(0); }
+.cselect-panel-header {
+  padding: 12px 16px 10px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.cselect-handle {
+  width: 32px; height: 3px;
+  background: var(--border-light);
+  border-radius: 3px;
+  margin: 0 auto 10px;
+}
+.cselect-panel-title {
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+  margin-bottom: 10px;
+  color: var(--text);
+}
+.cselect-search {
+  width: 100%;
+  padding: 9px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-input);
+  color: var(--text);
+  font-size: 14px;
+  font-family: inherit;
+  margin: 0;
+}
+.cselect-search:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.cselect-list {
+  list-style: none;
+  overflow-y: auto;
+  flex: 1;
+  -webkit-overflow-scrolling: touch;
+  padding: 6px 8px 16px;
+}
+.cselect-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 11px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  color: var(--text);
+  font-size: 13.5px;
+  line-height: 1.45;
+  transition: background 0.12s;
+  user-select: none;
+}
+.cselect-item:hover, .cselect-item:active { background: var(--bg-hover); }
+.cselect-item.selected { background: var(--accent-soft); }
+.cselect-radio {
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  border: 2px solid var(--border-light);
+  flex-shrink: 0;
+  margin-top: 2px;
+  display: grid;
+  place-items: center;
+  transition: border-color 0.12s, background 0.12s;
+}
+.cselect-item.selected .cselect-radio { border-color: var(--accent); background: var(--accent); }
+.cselect-item.selected .cselect-radio::after {
+  content: '';
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: white;
+}
+.cselect-item-text { flex: 1; min-width: 0; word-break: break-word; }
+.cselect-item-meta {
+  display: block;
+  font-size: 11.5px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+.cselect-item .badge {
+  display: inline-block;
+  font-size: 9.5px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 4px;
+  margin-left: 5px;
+  vertical-align: middle;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+.badge-diskon { background: var(--warning); color: #1a1a1a; }
+.badge-komentar { background: var(--accent); color: white; }
+.cselect-empty {
+  text-align: center;
+  padding: 28px 16px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
 
-    .announcement-dropdown.show {
-        display: block;
-        animation: fadeSlide 0.5s ease both;
-    }
+@media (min-width: 640px) {
+  .cselect-panel {
+    position: absolute;
+    left: 0; right: 0;
+    bottom: auto;
+    top: calc(100% + 4px);
+    max-height: 300px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    transform: translateY(-4px);
+    opacity: 0;
+    pointer-events: none;
+    transition: transform 0.15s, opacity 0.15s;
+    padding-bottom: 0;
+  }
+  .cselect-panel.open { transform: translateY(0); opacity: 1; pointer-events: auto; }
+  .cselect-handle { display: none; }
+  .cselect-panel-title { display: none; }
+}
 
-    @keyframes fadeSlide {
-        from { opacity: 0; transform: translateY(-8px); }
-        to { opacity: 1; transform: translateY(0); }
-    }
+/* ===== ORDER ITEM ===== */
+.order-item {
+  background: var(--bg-input);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  margin-bottom: 8px;
+  border: 1px solid var(--border);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: flex-start;
+}
+.order-item .order-info { flex: 1; min-width: 150px; }
+.order-item .order-info .row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12.5px;
+  padding: 2px 0;
+  gap: 8px;
+}
+.order-item .order-info .row .label-sm {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+.order-item .order-info .row .value {
+  color: var(--text);
+  font-weight: 500;
+  text-align: right;
+  word-break: break-all;
+}
+.order-index {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  min-width: 24px;
+}
+.btn-remove {
+  background: var(--danger-soft);
+  color: #f87171;
+  border: 1px solid rgba(239,68,68,0.25);
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background 0.15s;
+  font-family: inherit;
+}
+.btn-remove:hover { background: rgba(239,68,68,0.2); }
+.order-summary {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px 16px;
+  margin: 10px 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.order-summary .total { font-size: 17px; font-weight: 700; color: #60a5fa; }
+.order-summary .count { color: var(--text-muted); font-size: 12.5px; }
+.order-summary .count strong { color: var(--text); }
 
-    .announcement-dropdown .dropdown-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 12px 16px;
-        cursor: pointer;
-        user-select: none;
-        transition: 0.3s;
-        border-bottom: 1px solid transparent;
-    }
+/* ===== ALERT ===== */
+.alert {
+  margin-top: 14px;
+  padding: 12px 14px;
+  background: var(--warning-soft);
+  border-radius: var(--radius-sm);
+  border-left: 3px solid var(--warning);
+  font-size: 12.5px;
+  color: #fcd34d;
+  line-height: 1.6;
+}
+.alert strong { color: #fbbf24; }
 
-    .announcement-dropdown .dropdown-header:hover {
-        background: rgba(255, 215, 0, 0.05);
-    }
+/* ===== TERMS ===== */
+.terms-container {
+  margin-top: 16px;
+  padding: 14px;
+  background: var(--bg-input);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  transition: border-color 0.2s;
+}
+.terms-container.terms-ok { border-color: rgba(16,185,129,0.4); }
+.terms-header { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; user-select: none; }
+.terms-check {
+  position: relative;
+  flex-shrink: 0;
+  width: 22px; height: 22px;
+  margin-top: 1px;
+}
+.terms-check input[type="checkbox"] {
+  position: absolute;
+  opacity: 0;
+  width: 100%; height: 100%;
+  margin: 0;
+  cursor: pointer;
+  z-index: 2;
+}
+.terms-check-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px; height: 22px;
+  border-radius: 6px;
+  border: 2px solid var(--border-light);
+  background: var(--bg);
+  transition: border-color 0.15s, background 0.15s;
+  pointer-events: none;
+}
+.terms-check-box svg {
+  width: 13px; height: 13px;
+  opacity: 0;
+  transform: scale(0.5);
+  transition: opacity 0.12s, transform 0.12s;
+}
+.terms-check input:checked + .terms-check-box {
+  border-color: var(--success);
+  background: var(--success);
+}
+.terms-check input:checked + .terms-check-box svg { opacity: 1; transform: scale(1); }
+.terms-header label {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text);
+  cursor: pointer;
+  line-height: 1.45;
+  flex: 1;
+}
+.terms-link {
+  color: var(--accent);
+  text-decoration: underline;
+  font-weight: 500;
+  cursor: pointer;
+}
+.terms-link:hover { color: #60a5fa; }
+.terms-content {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.35s;
+}
+.terms-content.open { max-height: 300px; }
+.terms-content-inner {
+  margin-top: 10px;
+  padding: 12px 14px;
+  background: var(--bg);
+  border-radius: var(--radius-sm);
+  font-size: 12.5px;
+  color: var(--text-dim);
+  line-height: 1.7;
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+}
+.terms-toggle {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 8px 0 0;
+  margin-top: 4px;
+  text-decoration: underline;
+  font-family: inherit;
+}
+.terms-toggle:hover { color: var(--text); }
+.terms-error {
+  color: #f87171;
+  font-size: 12px;
+  margin-top: 8px;
+  display: none;
+}
+.terms-error.show { display: block; }
 
-    .announcement-dropdown .dropdown-header .title {
-        font-size: 13px;
-        font-weight: 700;
-        color: #ffd54f;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-    }
+/* ===== EMPTY STATE ===== */
+.empty-state {
+  text-align: center;
+  padding: 24px 16px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+.empty-state .icon { font-size: 28px; display: block; margin-bottom: 6px; opacity: 0.5; }
 
-    .announcement-dropdown .dropdown-header .title .icon {
-        font-size: 16px;
-    }
+/* ===== RESPONSIVE ===== */
+@media (max-width: 639px) {
+  .container {
+    padding: 16px 14px;
+    margin: 10px 8px 24px;
+    border-radius: 10px;
+  }
+  .filter-row { grid-template-columns: 1fr; gap: 8px; }
+  .cselect-trigger { font-size: 13px; }
+  .cselect-value { font-size: 13px; }
+  .cselect-panel { max-height: 70vh; }
+  input, select, textarea { font-size: 14px; }
+  .btn-primary { font-size: 13.5px; padding: 11px 16px; }
+  .order-item .order-info .row { font-size: 12px; }
+}
 
-    .announcement-dropdown .dropdown-header .badge-count {
-        background: #ffd54f;
-        color: #1a0e2e;
-        font-size: 10px;
-        font-weight: 700;
-        padding: 1px 10px;
-        border-radius: 30px;
-        margin-left: 6px;
-    }
+@media (max-width: 360px) {
+  .container { padding: 14px 10px; margin: 8px 6px 20px; }
+  .brand-text h1 { font-size: 14px; }
+  .price-display .amount { font-size: 18px; }
+}
 
-    .announcement-dropdown .dropdown-header .arrow {
-        font-size: 14px;
-        color: #6b4a7a;
-        transition: transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-    }
-
-    .announcement-dropdown .dropdown-header .arrow.open {
-        transform: rotate(180deg);
-    }
-
-    .announcement-dropdown .dropdown-body {
-        max-height: 0;
-        overflow: hidden;
-        transition: max-height 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-        padding: 0 16px;
-    }
-
-    .announcement-dropdown .dropdown-body.open {
-        max-height: 600px;
-        padding: 0 16px 16px 16px;
-        overflow-y: auto;
-    }
-
-    .announcement-dropdown .dropdown-body::-webkit-scrollbar {
-        width: 4px;
-    }
-
-    .announcement-dropdown .dropdown-body::-webkit-scrollbar-track {
-        background: transparent;
-    }
-
-    .announcement-dropdown .dropdown-body::-webkit-scrollbar-thumb {
-        background: #ffd54f55;
-        border-radius: 10px;
-    }
-
-    .announcement-dropdown .dropdown-body .announce-item {
-        padding: 12px 14px;
-        margin-top: 10px;
-        background: rgba(255, 255, 255, 0.04);
-        border-radius: 10px;
-        border-left: 3px solid #ffd54f;
-        font-size: 13px;
-        color: #e8d5f0;
-        line-height: 1.7;
-        transition: 0.3s;
-    }
-
-    .announcement-dropdown .dropdown-body .announce-item:first-child {
-        margin-top: 6px;
-    }
-
-    .announcement-dropdown .dropdown-body .announce-item:hover {
-        background: rgba(255, 255, 255, 0.07);
-    }
-
-    .announcement-dropdown .dropdown-body .announce-item a {
-        color: #4fc3f7;
-        text-decoration: none;
-        font-weight: 600;
-    }
-
-    .announcement-dropdown .dropdown-body .announce-item a:hover {
-        text-decoration: underline;
-    }
-
-    .announcement-dropdown .dropdown-body .announce-item .item-label {
-        font-size: 10px;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        color: #ffd54f;
-        font-weight: 700;
-        display: block;
-        margin-bottom: 4px;
-    }
-
-    .announcement-dropdown .dropdown-body .announce-item .item-label .badge {
-        background: rgba(255, 215, 0, 0.2);
-        padding: 0 8px;
-        border-radius: 4px;
-        font-size: 9px;
-    }
-
-    .announcement-dropdown .dropdown-body .announce-item .item-label .badge.all {
-        color: #ffd54f;
-    }
-
-    .announcement-dropdown .dropdown-body .announce-item .item-label .badge.user {
-        color: #ffaa00;
-        background: rgba(255, 170, 0, 0.2);
-    }
-
-    .note-box {
-        font-family: Arial, sans-serif;
-        font-size: 13px;
-        line-height: 1.6;
-        color: #1a202c;
-        background-color: #ebf8ff;
-        border-left: 4px solid #3182ce;
-        padding: 12px 14px;
-        border-radius: 4px;
-        margin: 12px 0;
-        text-align: left;
-    }
-
-    .note-box strong {
-        color: #2b6cb0;
-    }
-
-    /* ===== NAV BUTTONS ===== */
-    .nav-btn{
-        width: 100%;
-        padding: 14px;
-        margin: 10px 0;
-        border-radius: 12px;
-        border: 1px solid rgba(255,255,255,0.15);
-        background: rgba(255,255,255,0.08);
-        color: white;
-        font-size: 14px;
-        font-weight: 500;
-        cursor: pointer;
-        transition: 0.25s;
-        font-family: 'Poppins', sans-serif;
-        position: relative;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 8px;
-    }
-
-    .nav-btn:hover:not(:disabled){
-        background: rgba(255,255,255,0.18);
-    }
-
-    .nav-btn:disabled {
-        opacity: 0.55;
-        cursor: not-allowed;
-        background: rgba(255,255,255,0.04);
-    }
-
-    .nav-btn.checking {
-        cursor: wait;
-        opacity: 0.75;
-    }
-
-    /* ===== BADGE GANGGUAN ===== */
-    .nav-btn .badge-status {
-        font-size: 9px;
-        font-weight: 700;
-        padding: 3px 8px;
-        border-radius: 20px;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        margin-left: 6px;
-        animation: pulseBadge 1.6s ease-in-out infinite;
-    }
-
-    .nav-btn .badge-status.gangguan {
-        background: rgba(239,68,68,0.2);
-        color: #ff6b6b;
-        border: 1px solid rgba(239,68,68,0.4);
-    }
-
-    .nav-btn .badge-status.checking-badge {
-        background: rgba(255,255,255,0.08);
-        color: #94a3b8;
-        border: 1px solid rgba(255,255,255,0.1);
-        animation: none;
-    }
-
-    .nav-btn .badge-status.ok-badge {
-        background: rgba(34,197,94,0.15);
-        color: #22c55e;
-        border: 1px solid rgba(34,197,94,0.3);
-        animation: none;
-    }
-
-    @keyframes pulseBadge {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.55; }
-    }
-
-    .footer{
-        margin-top: 25px;
-        font-size: 12px;
-        opacity: 0.6;
-    }
-
-    /* ===== BANNED PAGE ===== */
-    .banned-page {
-        display: none;
-        align-items: center;
-        justify-content: center;
-        min-height: 100vh;
-        padding: 20px;
-        background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
-        color: white;
-        text-align: center;
-        width: 100%;
-    }
-
-    .banned-page.show {
-        display: flex;
-    }
-
-    .banned-card {
-        max-width: 460px;
-        background: rgba(255,255,255,0.06);
-        backdrop-filter: blur(20px);
-        padding: 40px 30px;
-        border-radius: 24px;
-        border: 1px solid rgba(255,68,68,0.3);
-        box-shadow: 0 0 60px rgba(255,68,68,0.1);
-        width: 100%;
-    }
-
-    .banned-card .icon {
-        font-size: 64px;
-        display: block;
-        margin-bottom: 16px;
-    }
-
-    .banned-card h1 {
-        color: #ff4444;
-        font-size: 28px;
-        margin-bottom: 8px;
-    }
-
-    .banned-card .banned-gmail {
-        color: #00ffaa;
-        font-size: 16px;
-        font-weight: 600;
-        word-break: break-all;
-        margin: 8px 0;
-    }
-
-    .banned-card .banned-reason {
-        color: #f1f5f9;
-        font-size: 14px;
-        line-height: 1.8;
-        background: rgba(255,68,68,0.08);
-        padding: 14px 18px;
-        border-radius: 12px;
-        border-left: 3px solid #ff4444;
-        text-align: left;
-        margin: 12px 0;
-    }
-
-    .banned-card .banned-until {
-        color: #ffaa00;
-        font-size: 13px;
-        font-weight: 600;
-        margin: 8px 0;
-    }
-
-    .banned-card .banned-current-time {
-        color: #94a3b8;
-        font-size: 12px;
-        margin: 4px 0 16px 0;
-    }
-
-    .banned-card .btn-appeal {
-        display: inline-block;
-        background: #ffaa0044;
-        color: #ffaa00;
-        border: 1px solid #ffaa0055;
-        padding: 12px 30px;
-        border-radius: 30px;
-        text-decoration: none;
-        font-weight: 600;
-        font-size: 14px;
-        transition: 0.3s;
-        font-family: 'Poppins', sans-serif;
-        margin-top: 8px;
-        cursor: pointer;
-    }
-
-    .banned-card .btn-appeal:hover {
-        background: #ffaa0066;
-        transform: scale(1.02);
-    }
-
-    .banned-card .banned-id {
-        color: #666;
-        font-size: 11px;
-        margin-top: 12px;
-        word-break: break-all;
-    }
-
-    .container.hidden {
-        display: none !important;
-    }
-
-    @media (max-width: 480px) {
-        .container { padding: 24px 16px; }
-        h1 { font-size: 18px; }
-        .gmail-display { font-size: 12px; }
-        .note-box { font-size: 12px; }
-        .banned-card { padding: 28px 20px; }
-        .banned-card h1 { font-size: 22px; }
-        .announcement-dropdown .dropdown-body .announce-item {
-            font-size: 12px;
-            padding: 10px 12px;
-        }
-        .nav-btn { font-size: 13px; padding: 12px; }
-        .nav-btn .badge-status { font-size: 8px; padding: 2px 6px; }
-    }
-    </style>
-
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+</style>
 </head>
 <body>
 
-    <!-- ===== BANNED PAGE ===== -->
-    <div class="banned-page" id="bannedPage">
-        <div class="banned-card">
-            <span class="icon">🚫</span>
-            <h1>Akses Diblokir</h1>
-            <p style="color:#94a3b8;font-size:14px;border:none;background:none;padding:0;margin:0;">Akun Anda telah diblokir</p>
-            <div class="banned-gmail" id="bannedGmail">-</div>
-            <div class="banned-reason" id="bannedReason">-</div>
-            <div class="banned-until" id="bannedUntil">-</div>
-            <div class="banned-current-time" id="bannedCurrentTime">-</div>
-            <a href="https://wa.me/6289518103883?text=Halo%20Admin%2C%20saya%20ingin%20mengajukan%20banding%20atas%20ban%20akun%20saya.%20Gmail%3A%20" 
-               target="_blank" 
-               class="btn-appeal">
-               📱 Ajukan Banding
-            </a>
-            <div class="banned-id" id="bannedUserId">-</div>
-        </div>
+<header class="header">
+  <div class="brand">
+    <div class="logo">
+      <img src="/home/logo.png" alt="Shine Shop" width="32" height="32" loading="lazy">
+    </div>
+    <div class="brand-text">
+      <h1>Shine Shop</h1>
+      <span>SMM Panel</span>
+    </div>
+  </div>
+  <button class="hamburger-btn" id="menuToggle" aria-label="Menu" type="button">
+    <div class="hamburger-icon">
+      <span></span>
+      <span></span>
+      <span></span>
+    </div>
+  </button>
+</header>
+
+<div id="menuOverlay" class="overlay"></div>
+
+<nav id="siteMenu" class="offcanvas" aria-label="Menu utama">
+  <div class="offcanvas-header">
+    <strong>Menu</strong>
+    <button class="close-offcanvas" id="menuClose" type="button" aria-label="Tutup">&times;</button>
+  </div>
+  <ul class="menu-list">
+    <li><a href="/sosmed-2/cekstatus">Cek Pesanan</a></li>
+    <li><a href="https://whatsapp.com/channel/0029Vb8pYHd0G0XjnloL680y" target="_blank" rel="noopener">Channel WhatsApp</a></li>
+  </ul>
+</nav>
+
+<main class="container">
+  <h2 class="page-title">Suntik Sosmed 2</h2>
+  <p class="page-subtitle">Pilih layanan, isi target, dan selesaikan pembayaran</p>
+
+  <label for="search">Cari Layanan</label>
+  <input type="search" id="search" placeholder="Nama layanan atau ID..." autocomplete="off">
+
+  <div class="filter-row">
+    <div class="filter-item">
+      <label>Kategori</label>
+      <div class="cselect" id="cselectKategori" data-placeholder="Pilih kategori">
+        <button type="button" class="cselect-trigger" aria-haspopup="listbox" aria-expanded="false">
+          <span class="cselect-value placeholder">Pilih kategori</span>
+          <span class="cselect-arrow" aria-hidden="true">
+            <svg viewBox="0 0 12 12" fill="none"><path d="M2.5 4.5L6 8l3.5-3.5" stroke="#94a3b8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </span>
+        </button>
+        <input type="hidden" id="kategori" value="">
+      </div>
+    </div>
+    <div class="filter-item">
+      <label for="sortHarga">Urutkan</label>
+      <select id="sortHarga">
+        <option value="asc" selected>Termurah</option>
+        <option value="desc">Termahal</option>
+        <option value="default">Default</option>
+      </select>
+    </div>
+  </div>
+
+  <label>Layanan</label>
+  <div class="cselect" id="cselectLayanan" data-placeholder="Pilih layanan">
+    <button type="button" class="cselect-trigger" aria-haspopup="listbox" aria-expanded="false">
+      <span class="cselect-value placeholder">Pilih layanan</span>
+      <span class="cselect-arrow" aria-hidden="true">
+        <svg viewBox="0 0 12 12" fill="none"><path d="M2.5 4.5L6 8l3.5-3.5" stroke="#94a3b8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </span>
+    </button>
+    <input type="hidden" id="layanan" value="">
+  </div>
+
+  <div class="info-box" id="infoLayanan" style="display:none;"></div>
+
+  <label>Estimasi Selesai</label>
+  <div class="info-box" id="average">—</div>
+
+  <div class="mode-toggle">
+    <button class="mode-btn active" data-mode="single" id="modeSingle" type="button">Single Order</button>
+    <button class="mode-btn" data-mode="massal" id="modeMassal" type="button">Massal Order</button>
+  </div>
+
+  <!-- SINGLE -->
+  <div id="singleSection">
+    <label for="jumlah">Jumlah Pesanan</label>
+    <input type="number" id="jumlah" min="1" inputmode="numeric" placeholder="Masukkan jumlah">
+
+    <div class="price-display" id="priceDisplay">
+      <span class="label-sm">Total Harga</span>
+      <span class="amount" id="priceAmount"><span class="currency">Rp</span> 0</span>
+      <div class="detail" id="priceDetail"></div>
     </div>
 
-    <!-- ===== MAIN CONTAINER ===== -->
-    <div class="container" id="mainContainer">
-        <h1>Shine Shop Menu Global</h1>
+    <div class="balance-warning" id="balanceWarning">
+      <strong>Saldo tidak cukup.</strong> Silakan kurangi jumlah atau hubungi admin.
+    </div>
+    <div class="balance-info" id="balanceInfo"></div>
 
-        <!-- GMAIL DISPLAY -->
-        <div class="gmail-display" id="gmailDisplayContainer">
-            <span class="label">📧 Gmail:</span>
-            <span class="value" id="gmailDisplay">Belum diatur</span>
-            <button class="btn-change" id="changeGmailBtn">✏️ Ubah</button>
-        </div>
+    <label for="target">Target / Link</label>
+    <input type="text" id="target" placeholder="Username atau link" autocomplete="off">
 
-        <!-- ===== DROPDOWN PENGUMUMAN ===== -->
-        <div class="announcement-dropdown" id="announcementDropdown">
-            <div class="dropdown-header" id="dropdownHeader" onclick="toggleAnnouncement()">
-                <div class="title">
-                    <span class="icon">📢</span> Pengumuman
-                    <span class="badge-count" id="announcementCount">0</span>
-                </div>
-                <span class="arrow" id="dropdownArrow">▼</span>
-            </div>
-            <div class="dropdown-body" id="dropdownBody">
-                <!-- Diisi dari pesan.json -->
-            </div>
-        </div>
-
-        <!-- NOTE -->
-        <div class="note-box">
-            <strong>📌 Catatan Penting:</strong><br>
-            Status pesanan: Partial / Canceled / Error<br>
-            Silahkan mengajukan refund hubungi Customer Service melalui:<br>
-            WhatsApp: +62 895-1810-3883<br>
-            Instagram: onivla_
-        </div>
-
-        <!-- ===== TOMBOL PROVIDER ===== -->
-        <button class="nav-btn" 
-                id="btnSosmed1" 
-                data-provider="lollipop" 
-                data-endpoint="/api/lollipop-services" 
-                onclick="handleButtonClick('/sosmed-1/')">
-            <span>📱 Suntik Sosmed 1 🫣 ( Layanan Baru )</span>
-            <span class="badge-status checking-badge" id="badgeSosmed1">CEK...</span>
-        </button>
-
-        <button class="nav-btn" 
-                id="btnSosmed2" 
-                data-provider="fayupedia" 
-                data-endpoint="/api/fayupedia-services" 
-                onclick="handleButtonClick('/sosmed-2/')">
-            <span>📱 Suntik Sosmed 2 🔥 (Paling Ramai dipesan)</span>
-            <span class="badge-status checking-badge" id="badgeSosmed2">CEK...</span>
-        </button>
-
-        <button class="nav-btn" 
-                id="btnSosmed3" 
-                data-provider="indosmm" 
-                data-endpoint="/api/indosmm-services" 
-                onclick="handleButtonClick('/sosmed-3/')">
-            <span>📱 Suntik Sosmed 3</span>
-            <span class="badge-status checking-badge" id="badgeSosmed3">CEK...</span>
-        </button>
-
-        <button class="nav-btn" onclick="handleButtonClick('/event/')">
-            💲 Event - Daftar dan jadilah Pemenang 
-        </button>
-
-        <button class="nav-btn" onclick="handleButtonClick('https://wa.me/6289518103883')">
-            🎧 CUSTOMER SERVICE (WhatsApp)
-        </button>
-
-        <div class="footer">
-            &copy; Shine Shop - 2026
-        </div>
+    <div id="commentSection" style="display:none;">
+      <label for="comments">Komentar (1 baris = 1 unit)</label>
+      <textarea id="comments" placeholder="Tulis komentar per baris..."></textarea>
+      <div class="comment-info" id="commentInfo">
+        Komentar: <span class="count" id="commentCount">0</span> / <span id="commentRequired">0</span>
+        <span id="commentStatus"></span>
+      </div>
     </div>
 
-    <script>
-    // ============================================================
-    // 🔒 DRAGON PROTOCOL: GMAIL, BAN, DISCORD, USER ID
-    // ============================================================
+    <button class="btn-primary" id="btnSingleCheckout" type="button">
+      Lanjut ke Pembayaran
+    </button>
+  </div>
 
-    const GMAIL_KEY = 'user_gmail';
-    const USER_ID_KEY = 'user_id';
-    const DISCORD_WEBHOOK = 'https://discord.com/api/webhooks/1519652321661816934/WZPBjYrFhWIhacLctBPNekIFwRx337NORr47uogQdKj0nEkeuVJGSC47NAPvk8X9nURH';
-    const BAN_JSON_URL = '/sosmed-2/payment/gmail.json';
-    const WHATSAPP_NUMBER = '6289518103883';
+  <!-- MASSAL -->
+  <div id="massalSection" style="display:none;">
+    <div class="alert" style="margin-top:12px;">
+      Mode massal: isi jumlah & target, lalu tambahkan ke daftar.
+    </div>
 
-    // ===== MINIMAL SALDO PROVIDER =====
-    const MIN_BALANCE = 5000;
+    <label for="massalJumlah">Jumlah Pesanan</label>
+    <input type="number" id="massalJumlah" min="1" inputmode="numeric" placeholder="Masukkan jumlah">
 
-    let gmailPromptActive = false;
-    let isBanned = false;
-    let userID = localStorage.getItem(USER_ID_KEY);
+    <div class="price-display" id="priceDisplayMassal">
+      <span class="label-sm">Total Harga</span>
+      <span class="amount" id="priceAmountMassal"><span class="currency">Rp</span> 0</span>
+      <div class="detail" id="priceDetailMassal"></div>
+    </div>
 
-    if (!userID) {
-        userID = 'user-' + Math.random().toString(36).substring(2,10) + '-' + Date.now().toString(36);
-        localStorage.setItem(USER_ID_KEY, userID);
+    <div class="balance-warning" id="balanceWarningMassal">
+      <strong>Saldo tidak cukup.</strong> Kurangi jumlah atau hubungi admin.
+    </div>
+    <div class="balance-info" id="balanceInfoMassal"></div>
+
+    <label for="massalTarget">Target / Link</label>
+    <input type="text" id="massalTarget" placeholder="Username atau link" autocomplete="off">
+
+    <button class="btn-secondary" id="btnAddMassal" type="button" style="margin-top:12px;">
+      Tambahkan ke Daftar
+    </button>
+
+    <div id="orderListContainer" style="margin-top:16px;display:none;">
+      <label style="margin-top:0;">Daftar Pesanan (<span id="orderCount">0</span>)</label>
+      <div id="orderList"></div>
+      <div class="order-summary">
+        <span class="count">Total <strong id="orderCountSummary">0</strong> pesanan</span>
+        <span class="total">Rp <span id="orderTotalSummary">0</span></span>
+      </div>
+      <button class="btn-secondary" id="btnClearOrders" type="button">Kosongkan Semua</button>
+      <button class="btn-primary" id="btnMassalCheckout" type="button" style="margin-top:10px;">
+        Checkout Massal
+      </button>
+    </div>
+  </div>
+
+  <label for="total">Total Harga (Rp)</label>
+  <input type="text" id="total" readonly>
+
+  <div class="alert">
+    <strong>Perhatian:</strong><br>
+    TikTok Like/View/Share/Repost isi <b>link postingan</b>, bukan username.<br>
+    Followers & Subscriber isi <b>link atau username akun</b>.<br><br>
+    Ada kendala? Hubungi CS:<br>
+    WhatsApp: <strong>+6289518103883</strong><br>
+    Instagram: <strong>onivla_</strong>
+  </div>
+
+  <div class="terms-container" id="termsContainer">
+    <div class="terms-header" id="termsHeader">
+      <div class="terms-check">
+        <input type="checkbox" id="termsCheckbox" aria-describedby="termsError">
+        <span class="terms-check-box" aria-hidden="true">
+          <svg viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M2.5 7.2L5.5 10.2L11.5 3.8" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </span>
+      </div>
+      <label for="termsCheckbox">
+        Saya menyetujui <span class="terms-link" id="termsLink">Syarat &amp; Ketentuan</span>
+      </label>
+    </div>
+    <div class="terms-content" id="termsContent">
+      <div class="terms-content-inner" id="termsContentInner">
+        <div style="text-align:center;color:#64748b;padding:12px;">Memuat...</div>
+      </div>
+      <button class="terms-toggle" id="termsToggleBtn" type="button">Baca Syarat &amp; Ketentuan</button>
+    </div>
+    <div class="terms-error" id="termsError">Anda harus menyetujui syarat &amp; ketentuan terlebih dahulu.</div>
+  </div>
+</main>
+
+<script>
+(function () {
+  'use strict';
+
+  // ===== MENU =====
+  var toggleBtn = document.getElementById('menuToggle');
+  var closeBtn = document.getElementById('menuClose');
+  var offcanvas = document.getElementById('siteMenu');
+  var overlay = document.getElementById('menuOverlay');
+
+  function openMenu() {
+    offcanvas.classList.add('open');
+    overlay.classList.add('show');
+    toggleBtn.classList.add('active');
+  }
+  function closeMenu() {
+    offcanvas.classList.remove('open');
+    overlay.classList.remove('show');
+    toggleBtn.classList.remove('active');
+  }
+
+  toggleBtn.addEventListener('click', function () {
+    offcanvas.classList.contains('open') ? closeMenu() : openMenu();
+  });
+  closeBtn.addEventListener('click', closeMenu);
+  overlay.addEventListener('click', closeMenu);
+
+  // ===== TERMS =====
+  var termsCheckbox = document.getElementById('termsCheckbox');
+  var termsError = document.getElementById('termsError');
+  var termsContent = document.getElementById('termsContent');
+  var termsContentInner = document.getElementById('termsContentInner');
+  var termsToggleBtn = document.getElementById('termsToggleBtn');
+  var termsLink = document.getElementById('termsLink');
+
+  var isTermsLoaded = false;
+  var requiresComment = false;
+  var selectedService = null;
+  var layananData = {};
+  var isLoading = false;
+  var refreshTimer = null;
+  var currentSort = 'asc';
+  var currentBalance = 0;
+  var isBalanceLoaded = false;
+  var balanceCheckTimeout = null;
+  var orders = [];
+  var currentServiceForOrder = null;
+  var currentMode = 'single';
+
+  termsLink.addEventListener('click', function (e) {
+    e.preventDefault();
+    e.stopPropagation();
+    window.open('/rules/', '_blank');
+  });
+
+  function loadTerms() {
+    fetch('/rules/?t=' + Date.now())
+      .then(function (res) {
+        if (!res.ok) throw new Error('Gagal memuat');
+        return res.text();
+      })
+      .then(function (html) {
+        termsContentInner.innerHTML = html || 'Syarat & ketentuan belum tersedia.';
+        isTermsLoaded = true;
+      })
+      .catch(function (err) {
+        termsContentInner.innerHTML =
+          '<div style="color:#f87171">Gagal memuat. <a href="/rules/" target="_blank" style="color:#3b82f6">Buka di halaman terpisah</a></div>';
+      });
+  }
+
+  function toggleTerms(e) {
+    if (e) e.preventDefault();
+    if (!termsContent.classList.contains('open')) {
+      if (!isTermsLoaded) loadTerms();
+      termsContent.classList.add('open');
+      termsToggleBtn.textContent = 'Sembunyikan';
+    } else {
+      termsContent.classList.remove('open');
+      termsToggleBtn.textContent = 'Baca Syarat & Ketentuan';
     }
+  }
 
-    // ===== UTILITY FUNCTIONS =====
-    function validateEmail(email) {
-        return email && typeof email === 'string' && email.includes('@') && email.includes('.') && email.length > 5;
+  termsToggleBtn.addEventListener('click', toggleTerms);
+
+  function updateTermsUI() {
+    var container = document.getElementById('termsContainer');
+    if (termsCheckbox.checked) {
+      termsError.classList.remove('show');
+      container.classList.add('terms-ok');
+    } else {
+      container.classList.remove('terms-ok');
     }
+  }
 
-    function getWIBTime() {
-        const now = new Date();
-        return new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }));
+  termsCheckbox.addEventListener('change', function () {
+    updateTermsUI();
+    if (this.checked && !termsContent.classList.contains('open') && !isTermsLoaded) {
+      loadTerms();
+      termsContent.classList.add('open');
+      termsToggleBtn.textContent = 'Sembunyikan';
     }
+  });
 
-    function formatWIB(date) {
-        return new Intl.DateTimeFormat('id-ID', {
-            timeZone: 'Asia/Jakarta',
-            day: '2-digit',
-            month: 'long',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-            hour12: false
-        }).format(date);
-    }
+  updateTermsUI();
 
-    function getStoredGmail() {
-        try {
-            return localStorage.getItem(GMAIL_KEY) || null;
-        } catch (e) {
-            console.error('❌ Error get Gmail:', e);
-            return null;
+  // ===== MODE =====
+  var modeSingle = document.getElementById('modeSingle');
+  var modeMassal = document.getElementById('modeMassal');
+  var singleSection = document.getElementById('singleSection');
+  var massalSection = document.getElementById('massalSection');
+
+  function setMode(mode) {
+    currentMode = mode;
+    modeSingle.classList.toggle('active', mode === 'single');
+    modeMassal.classList.toggle('active', mode === 'massal');
+    singleSection.style.display = mode === 'single' ? 'block' : 'none';
+    massalSection.style.display = mode === 'massal' ? 'block' : 'none';
+    if (mode === 'single') { updatePriceDisplay(); checkBalance(); }
+    else { updatePriceDisplayMassal(); checkBalanceMassal(); }
+  }
+
+  modeSingle.addEventListener('click', function () { setMode('single'); });
+  modeMassal.addEventListener('click', function () { setMode('massal'); });
+
+  // ===== DATA =====
+  var SERVICES_ENDPOINT = '/api/fayupedia-services';
+
+  function formatRp(n) { return 'Rp' + Number(n || 0).toLocaleString('id-ID'); }
+  function calcTotal(jumlah, hargaPerThousand) { return Math.round((Number(jumlah) / 1000) * Number(hargaPerThousand)); }
+
+  function getActivePrice(service) {
+    if (!service) return 0;
+    if (service.diskon && service.diskon < service.pricePerFollower) return service.diskon;
+    return service.pricePerFollower;
+  }
+
+  function calcRawTotal(jumlah, service) {
+    if (!service) return 0;
+    var rawPrice = Number(service.rawPricePerFollower) || 0;
+    return Math.round((Number(jumlah) / 1000) * rawPrice);
+  }
+
+  function getSortedServices(services, sortMode) {
+    if (!services || !Array.isArray(services)) return services;
+    var sorted = services.slice();
+    if (sortMode === 'asc') sorted.sort(function (a, b) { return getActivePrice(a) - getActivePrice(b); });
+    else if (sortMode === 'desc') sorted.sort(function (a, b) { return getActivePrice(b) - getActivePrice(a); });
+    return sorted;
+  }
+
+  function fetchBalance() {
+    return fetch(SERVICES_ENDPOINT + '?action=balance&t=' + Date.now())
+      .then(function (res) {
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.json();
+      })
+      .then(function (data) {
+        if (data.status === true) {
+          currentBalance = Number(data.balance) || 0;
+          isBalanceLoaded = true;
+          return currentBalance;
         }
-    }
+        throw new Error(data.msg || 'Gagal');
+      })
+      .catch(function (err) {
+        currentBalance = 0;
+        isBalanceLoaded = false;
+        return 0;
+      });
+  }
 
-    function saveGmailToStorage(newGmail) {
-        try {
-            if (!newGmail || !validateEmail(newGmail)) {
-                console.error('❌ Gmail tidak valid:', newGmail);
-                return false;
-            }
-            localStorage.setItem(GMAIL_KEY, newGmail);
-            console.log('✅ Gmail tersimpan:', newGmail);
-            return true;
-        } catch (e) {
-            console.error('❌ Error simpan Gmail:', e);
-            return false;
-        }
-    }
+  function checkBalance() {
+    if (balanceCheckTimeout) clearTimeout(balanceCheckTimeout);
+    balanceCheckTimeout = setTimeout(function () {
+      var warningEl = document.getElementById('balanceWarning');
+      var infoEl = document.getElementById('balanceInfo');
+      var btn = document.getElementById('btnSingleCheckout');
 
-    function updateGmailDisplay() {
-        try {
-            const gmail = getStoredGmail();
-            const displayEl = document.getElementById('gmailDisplay');
-            if (!displayEl) return;
+      if (!selectedService) {
+        warningEl.classList.remove('show');
+        infoEl.classList.remove('show');
+        btn.disabled = false;
+        return;
+      }
 
-            if (gmail && validateEmail(gmail)) {
-                displayEl.textContent = gmail;
-                displayEl.className = 'value';
-            } else {
-                displayEl.textContent = '⚠️ Wajib diatur!';
-                displayEl.className = 'value not-set';
-            }
-            return true;
-        } catch (e) {
-            console.error('❌ Error update display:', e);
-            return false;
-        }
-    }
+      var jumlah = parseInt(document.getElementById('jumlah').value || '0', 10);
+      if (jumlah < (selectedService.min || 0) || jumlah > (selectedService.max || 0) || jumlah === 0) {
+        warningEl.classList.remove('show');
+        infoEl.classList.remove('show');
+        btn.disabled = false;
+        return;
+      }
 
-    function updateBannedWIBDisplay() {
-        const timeEl = document.getElementById('bannedCurrentTime');
-        if (timeEl && document.getElementById('bannedPage').classList.contains('show')) {
-            timeEl.textContent = '🕐 WIB (GMT+7): ' + formatWIB(getWIBTime());
-        }
-    }
-
-    // ============================================================
-    // 🔥 CEK BANNED GMAIL
-    // ============================================================
-    async function checkGmailBanned(gmail) {
-        if (!gmail || !validateEmail(gmail)) return null;
-        try {
-            const res = await fetch(BAN_JSON_URL + '?t=' + Date.now(), { cache: "no-store" });
-            if (!res.ok) return null;
-            const list = await res.json();
-            if (!Array.isArray(list)) return null;
-
-            const banned = list.find(item => 
-                item.Gmail && item.Gmail.toLowerCase() === gmail.toLowerCase()
-            );
-            if (!banned) return null;
-
-            if (banned["Dibanned sampai"]) {
-                const untilDate = new Date(banned["Dibanned sampai"]);
-                if (isNaN(untilDate.getTime())) return banned;
-                const now = getWIBTime();
-                if (now > untilDate) return null;
-            }
-            return banned;
-        } catch (err) {
-            console.error('❌ Error check banned:', err);
-            return null;
-        }
-    }
-
-    function showBannedPage(bannedData, gmail) {
-        isBanned = true;
-        document.getElementById('bannedPage').classList.add('show');
-        document.getElementById('mainContainer').classList.add('hidden');
-
-        document.getElementById('bannedGmail').textContent = gmail || '-';
-        document.getElementById('bannedReason').textContent = bannedData.Alasan || 'Tidak ada keterangan';
-        document.getElementById('bannedUserId').textContent = '🆔 User ID: ' + userID;
-
-        let untilText = '-';
-        if (bannedData["Dibanned sampai"]) {
-            const d = new Date(bannedData["Dibanned sampai"]);
-            if (!isNaN(d.getTime())) untilText = formatWIB(d);
-        }
-        document.getElementById('bannedUntil').textContent = '⏳ Dibanned sampai: ' + untilText;
-
-        updateBannedWIBDisplay();
-
-        const appealLink = document.querySelector('.btn-appeal');
-        if (appealLink && gmail) {
-            appealLink.href = `https://wa.me/${WHATSAPP_NUMBER}?text=Halo%20Admin%2C%20saya%20ingin%20mengajukan%20banding%20atas%20ban%20akun%20saya.%20Gmail%3A%20${encodeURIComponent(gmail)}%0AUser%20ID%3A%20${encodeURIComponent(userID)}`;
-        }
-
-        if (window.bannedInterval) clearInterval(window.bannedInterval);
-        window.bannedInterval = setInterval(updateBannedWIBDisplay, 1000);
-    }
-
-    // ============================================================
-    // 🔥 KIRIM NOTIFIKASI KE DISCORD
-    // ============================================================
-    async function sendNewUserToDiscord(gmail) {
-        try {
-            const now = getWIBTime();
-            const timestamp = formatWIB(now);
-            const message = `🆕 **USER BARU LOGIN**
-━━━━━━━━━━━━━━━━━━━━━
-📧 **Gmail:** ${gmail}
-🆔 **User ID:** ${userID}
-📅 **Tanggal & Jam Login:** ${timestamp}
-━━━━━━━━━━━━━━━━━━━━━
-✅ **User baru terdaftar!**`;
-
-            const response = await fetch(DISCORD_WEBHOOK, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ content: message })
-            });
-            return response.ok;
-        } catch (err) {
-            console.error('❌ Error kirim ke Discord:', err);
-            return false;
-        }
-    }
-
-    async function processNewGmail(gmail) {
-        if (!gmail || !validateEmail(gmail)) return false;
-        const bannedData = await checkGmailBanned(gmail);
-        if (bannedData) {
-            showBannedPage(bannedData, gmail);
-            return false;
-        }
-
-        const notifKey = `discord_notif_${gmail.toLowerCase()}`;
-        const alreadySent = localStorage.getItem(notifKey) === 'true';
-
-        if (!alreadySent) {
-            const sent = await sendNewUserToDiscord(gmail);
-            if (sent) {
-                try { localStorage.setItem(notifKey, 'true'); } catch (e) {}
-            }
-        }
-        return true;
-    }
-
-    // ============================================================
-    // 🔥 LOAD PENGUMUMAN DROPDOWN
-    // ============================================================
-    let announcementCount = 0;
-    let isDropdownOpen = false;
-
-    async function loadAnnouncement() {
-        const dropdown = document.getElementById('announcementDropdown');
-        const body = document.getElementById('dropdownBody');
-        const countEl = document.getElementById('announcementCount');
-
-        if (!dropdown || !body) return;
-        const gmail = getStoredGmail();
-        if (!gmail || !validateEmail(gmail)) return;
-
-        try {
-            const res = await fetch("/home2/pesan.json?t=" + Date.now(), { cache: "no-store" });
-            if (!res.ok) return;
-
-            const data = await res.json();
-            const items = [];
-            const normalizedGmail = gmail.toLowerCase().trim();
-
-            for (const key in data) {
-                if (key.toLowerCase().trim() === normalizedGmail) {
-                    items.push({
-                        key: key,
-                        priority: 9999,
-                        type: 'user',
-                        label: '📩 Pesan Khusus Untukmu',
-                        content: data[key]
-                    });
-                }
-            }
-
-            for (const key in data) {
-                if (key.startsWith('all')) {
-                    let priority = 0;
-                    if (key === 'all') {
-                        priority = 0;
-                    } else {
-                        const num = parseInt(key.replace('all', ''));
-                        if (!isNaN(num)) priority = num;
-                    }
-                    items.push({
-                        key: key,
-                        priority: priority,
-                        type: 'all',
-                        label: '📢 Pengumuman',
-                        content: data[key]
-                    });
-                }
-            }
-
-            if (data && data[userID]) {
-                items.push({
-                    key: userID,
-                    priority: -1,
-                    type: 'user',
-                    label: '🔒 Pesan Sistem (User ID)',
-                    content: data[userID]
-                });
-            }
-
-            if (items.length === 0) return;
-            items.sort((a, b) => b.priority - a.priority);
-
-            let html = '';
-            items.forEach((item, index) => {
-                const badgeClass = item.type === 'user' ? 'user' : 'all';
-                const badgeLabel = item.type === 'user' ? '👤 Personal' : '🌐 Semua';
-                const priorityLabel = (item.type === 'all' && item.priority > 0) ? ` #${item.priority}` : '';
-
-                html += `
-                    <div class="announce-item" style="animation-delay: ${index * 0.05}s;">
-                        <span class="item-label">
-                            ${item.label}${priorityLabel}
-                            <span class="badge ${badgeClass}">${badgeLabel}</span>
-                        </span>
-                        ${item.content}
-                    </div>
-                `;
-            });
-
-            body.innerHTML = html;
-            announcementCount = items.length;
-            countEl.textContent = announcementCount;
-            dropdown.classList.add('show');
-
-            if (announcementCount > 3) toggleAnnouncement(true);
-        } catch (e) {
-            console.log('ℹ️ Gagal memuat pengumuman:', e.message);
-        }
-    }
-
-    function toggleAnnouncement(forceOpen) {
-        const body = document.getElementById('dropdownBody');
-        const arrow = document.getElementById('dropdownArrow');
-        if (!body || !arrow) return;
-
-        if (forceOpen === true) {
-            body.classList.add('open');
-            arrow.classList.add('open');
-            isDropdownOpen = true;
-            return;
-        }
-        if (forceOpen === false) {
-            body.classList.remove('open');
-            arrow.classList.remove('open');
-            isDropdownOpen = false;
-            return;
-        }
-
-        if (isDropdownOpen) {
-            body.classList.remove('open');
-            arrow.classList.remove('open');
-            isDropdownOpen = false;
+      var proceed = function () {
+        var rawTotal = calcRawTotal(jumlah, selectedService);
+        if (currentBalance < rawTotal) {
+          warningEl.classList.add('show');
+          infoEl.classList.add('show', 'danger');
+          infoEl.innerHTML = 'Saldo: <strong>' + formatRp(currentBalance) + '</strong> · Butuh: ' + formatRp(rawTotal);
+          btn.disabled = true;
+          btn.textContent = 'Saldo Tidak Cukup';
         } else {
-            body.classList.add('open');
-            arrow.classList.add('open');
-            isDropdownOpen = true;
+          warningEl.classList.remove('show');
+          infoEl.classList.add('show');
+          infoEl.classList.remove('danger');
+          infoEl.innerHTML = 'Saldo: <strong>' + formatRp(currentBalance) + '</strong> · Butuh: ' + formatRp(rawTotal);
+          btn.disabled = false;
+          btn.textContent = 'Lanjut ke Pembayaran';
         }
-    }
+      };
 
-    // ============================================================
-    // 🔥 HEALTH CHECK PROVIDER (CEK SALDO)
-    // ============================================================
-    const PROVIDERS = {
-        lollipop: { endpoint: '/api/lollipop-services', btn: 'btnSosmed1', badge: 'badgeSosmed1', label: 'Sosmed 1' },
-        fayupedia: { endpoint: '/api/fayupedia-services', btn: 'btnSosmed2', badge: 'badgeSosmed2', label: 'Sosmed 2' },
-        indosmm: { endpoint: '/api/indosmm-services', btn: 'btnSosmed3', badge: 'badgeSosmed3', label: 'Sosmed 3' }
-    };
+      if (!isBalanceLoaded) fetchBalance().then(proceed);
+      else proceed();
+    }, 300);
+  }
 
-    function setBadge(badgeId, text, type) {
-        const el = document.getElementById(badgeId);
-        if (!el) return;
-        el.textContent = text;
-        el.className = 'badge-status ' + (type || '');
-    }
+  function checkBalanceMassal() {
+    if (balanceCheckTimeout) clearTimeout(balanceCheckTimeout);
+    balanceCheckTimeout = setTimeout(function () {
+      var warningEl = document.getElementById('balanceWarningMassal');
+      var infoEl = document.getElementById('balanceInfoMassal');
 
-    function disableBtn(btnId) {
-        const btn = document.getElementById(btnId);
-        if (btn) btn.disabled = true;
-    }
+      if (!selectedService) {
+        warningEl.classList.remove('show');
+        infoEl.classList.remove('show');
+        return;
+      }
 
-    function enableBtn(btnId) {
-        const btn = document.getElementById(btnId);
-        if (btn) btn.disabled = false;
-    }
+      var jumlah = parseInt(document.getElementById('massalJumlah').value || '0', 10);
+      if (jumlah < (selectedService.min || 0) || jumlah > (selectedService.max || 0) || jumlah === 0) {
+        warningEl.classList.remove('show');
+        infoEl.classList.remove('show');
+        return;
+      }
 
-    async function checkProviderHealth(providerKey) {
-        const prov = PROVIDERS[providerKey];
-        if (!prov) return;
-
-        const btn = document.getElementById(prov.btn);
-        if (btn) btn.classList.add('checking');
-        setBadge(prov.badge, 'CEK...', 'checking-badge');
-
-        try {
-            let balance = 0;
-
-            // ===== LOLLIPOP: POST action:balance =====
-            if (providerKey === 'lollipop') {
-                const res = await fetch(prov.endpoint, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action: 'balance' })
-                });
-                if (res.ok) {
-                    const data = await res.json();
-                    balance = Number(data.balance) || 0;
-                }
-            }
-            // ===== FAYUPEDIA: GET ?action=balance =====
-            else if (providerKey === 'fayupedia') {
-                const res = await fetch(prov.endpoint + '?action=balance&t=' + Date.now(), { cache: 'no-store' });
-                if (res.ok) {
-                    const data = await res.json();
-                    balance = Number(data.balance) || 0;
-                }
-            }
-            // ===== INDOSMM: POST action:balance =====
-            else if (providerKey === 'indosmm') {
-                const res = await fetch(prov.endpoint, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action: 'balance' })
-                });
-                if (res.ok) {
-                    const data = await res.json();
-                    // indosmm return balance di root (bukan di data.balance)
-                    balance = Number(data.balance) || 0;
-                }
-            }
-
-            if (btn) btn.classList.remove('checking');
-
-            if (balance < MIN_BALANCE) {
-                setBadge(prov.badge, 'GANGGUAN', 'gangguan');
-                disableBtn(prov.btn);
-                console.log(`⚠️ ${prov.label}: GANGGUAN (saldo: ${balance})`);
-            } else {
-                setBadge(prov.badge, 'OK', 'ok-badge');
-                enableBtn(prov.btn);
-                console.log(`✅ ${prov.label}: OK (saldo: ${balance})`);
-            }
-
-        } catch (err) {
-            console.error(`❌ Error cek ${prov.label}:`, err);
-            if (btn) btn.classList.remove('checking');
-            setBadge(prov.badge, 'GANGGUAN', 'gangguan');
-            disableBtn(prov.btn);
+      var proceed = function () {
+        var rawTotal = calcRawTotal(jumlah, selectedService);
+        if (currentBalance < rawTotal) {
+          warningEl.classList.add('show');
+          infoEl.classList.add('show', 'danger');
+          infoEl.innerHTML = 'Saldo: <strong>' + formatRp(currentBalance) + '</strong> · Butuh: ' + formatRp(rawTotal);
+        } else {
+          warningEl.classList.remove('show');
+          infoEl.classList.add('show');
+          infoEl.classList.remove('danger');
+          infoEl.innerHTML = 'Saldo: <strong>' + formatRp(currentBalance) + '</strong> · Butuh: ' + formatRp(rawTotal);
         }
+      };
+
+      if (!isBalanceLoaded) fetchBalance().then(proceed);
+      else proceed();
+    }, 300);
+  }
+
+  // ===== CUSTOM SELECT =====
+  var activeCSelect = null;
+  var kategoriItems = [];
+  var layananItems = [];
+
+  function closeAllCSelect() {
+    document.querySelectorAll('.cselect.open').forEach(function (el) {
+      el.classList.remove('open');
+      var trigger = el.querySelector('.cselect-trigger');
+      if (trigger) trigger.setAttribute('aria-expanded', 'false');
+    });
+    document.querySelectorAll('.cselect-panel.open').forEach(function (p) { p.classList.remove('open'); });
+    document.querySelectorAll('.cselect-backdrop.show').forEach(function (b) { b.classList.remove('show'); });
+    setTimeout(function () {
+      document.querySelectorAll('.cselect-panel').forEach(function (p) {
+        if (!p.classList.contains('open') && p.parentNode) p.parentNode.removeChild(p);
+      });
+      document.querySelectorAll('.cselect-backdrop').forEach(function (b) {
+        if (!b.classList.contains('show') && b.parentNode) b.parentNode.removeChild(b);
+      });
+    }, 300);
+    activeCSelect = null;
+    document.body.style.overflow = '';
+  }
+
+  function setTriggerLabel(cselectEl, text, isPlaceholder) {
+    var valEl = cselectEl.querySelector('.cselect-value');
+    if (!valEl) return;
+    valEl.textContent = text;
+    if (isPlaceholder) valEl.classList.add('placeholder');
+    else valEl.classList.remove('placeholder');
+  }
+
+  function renderList(listEl, items, selectedValue, onPick) {
+    listEl.innerHTML = '';
+    if (!items.length) {
+      listEl.innerHTML = '<li class="cselect-empty">Tidak ada hasil</li>';
+      return;
     }
+    items.forEach(function (item) {
+      var li = document.createElement('li');
+      li.className = 'cselect-item' + (String(item.value) === String(selectedValue) ? ' selected' : '');
+      li.setAttribute('role', 'option');
+      li.dataset.value = item.value;
 
-    async function checkAllProviders() {
-        await Promise.all([
-            checkProviderHealth('lollipop'),
-            checkProviderHealth('fayupedia'),
-            checkProviderHealth('indosmm')
-        ]);
-    }
-
-    // ============================================================
-    // 🔥 CEK & MINTA GMAIL
-    // ============================================================
-    async function ensureGmail() {
-        if (gmailPromptActive || isBanned) return false;
-        const gmail = getStoredGmail();
-
-        if (gmail && validateEmail(gmail)) {
-            const bannedData = await checkGmailBanned(gmail);
-            if (bannedData) {
-                showBannedPage(bannedData, gmail);
-                return false;
-            }
-            updateGmailDisplay();
-            return true;
-        }
-
-        gmailPromptActive = true;
-
-        const result = await Swal.fire({
-            title: '📧 Wajib Login Terlebih Dahulu',
-            text: 'Masukkan Gmail untuk melanjutkan. Hal ini dilakukan agar mempermudah pelacakan transaksi Anda.',
-            input: 'email',
-            inputPlaceholder: 'contoh: email@gmail.com',
-            inputAttributes: { autocomplete: 'email' },
-            showCancelButton: true,
-            cancelButtonText: '❌ Batal',
-            confirmButtonText: '✅ Simpan',
-            confirmButtonColor: '#4fc3f7',
-            cancelButtonColor: '#666',
-            allowOutsideClick: false,
-            background: '#1a0e2e',
-            color: '#fff',
-            preConfirm: (email) => {
-                if (!validateEmail(email)) {
-                    Swal.showValidationMessage('⚠️ Format Gmail tidak valid!');
-                    return false;
-                }
-                return email;
-            }
+      var badgesHtml = '';
+      if (item.badges && item.badges.length) {
+        item.badges.forEach(function (b) {
+          badgesHtml += '<span class="badge ' + b.cls + '">' + b.text + '</span>';
         });
+      }
 
-        gmailPromptActive = false;
-        if (result.isDismissed) return false;
+      li.innerHTML =
+        '<span class="cselect-radio"></span>' +
+        '<span class="cselect-item-text">' +
+          item.label + badgesHtml +
+          (item.meta ? '<span class="cselect-item-meta">' + item.meta + '</span>' : '') +
+        '</span>';
 
-        if (result.isConfirmed && result.value) {
-            const newGmail = result.value.trim();
-            const saved = saveGmailToStorage(newGmail);
-            if (saved) {
-                updateGmailDisplay();
-                const processed = await processNewGmail(newGmail);
-                if (!processed) return false;
-                await loadAnnouncement();
-                await Swal.fire({
-                    title: '✅ Gmail Tersimpan!',
-                    text: `Gmail ${newGmail} berhasil disimpan.`,
-                    icon: 'success',
-                    confirmButtonColor: '#4fc3f7',
-                    background: '#1a0e2e',
-                    color: '#fff',
-                    timer: 3000,
-                    timerProgressBar: true
-                });
-                return true;
-            }
-        }
-        return false;
+      li.addEventListener('click', function () {
+        onPick(item);
+        closeAllCSelect();
+      });
+      listEl.appendChild(li);
+    });
+  }
+
+  function openCSelect(cselectEl, title, items, selectedValue, onPick) {
+    closeAllCSelect();
+    var isMobile = window.matchMedia('(max-width: 639px)').matches;
+    var backdrop = document.createElement('div');
+    backdrop.className = 'cselect-backdrop';
+
+    var panel = document.createElement('div');
+    panel.className = 'cselect-panel';
+    panel.innerHTML =
+      '<div class="cselect-panel-header">' +
+        '<div class="cselect-handle"></div>' +
+        '<div class="cselect-panel-title">' + title + '</div>' +
+        '<input type="text" class="cselect-search" placeholder="Cari..." autocomplete="off" inputmode="search">' +
+      '</div>' +
+      '<ul class="cselect-list" role="listbox"></ul>';
+
+    var listEl = panel.querySelector('.cselect-list');
+    var searchEl = panel.querySelector('.cselect-search');
+
+    function filterAndRender(q) {
+      var query = (q || '').toLowerCase().trim();
+      var filtered = !query ? items : items.filter(function (it) {
+        return String(it.label).toLowerCase().indexOf(query) !== -1 ||
+               String(it.value).toLowerCase().indexOf(query) !== -1 ||
+               (it.meta && String(it.meta).toLowerCase().indexOf(query) !== -1);
+      });
+      renderList(listEl, filtered, selectedValue, function (item) {
+        onPick(item);
+        closeAllCSelect();
+      });
     }
 
-    // ============================================================
-    // 🔥 UBAH GMAIL DENGAN PASSWORD
-    // ============================================================
-    async function changeGmailWithPassword() {
-        if (isBanned) {
-            Swal.fire({
-                title: '🚫 Akun Diblokir',
-                text: 'Anda tidak dapat mengubah Gmail karena akun sedang dibanned.',
-                icon: 'error',
-                confirmButtonColor: '#ff4444',
-                background: '#1a0e2e',
-                color: '#fff'
-            });
-            return;
-        }
+    filterAndRender('');
+    searchEl.addEventListener('input', function () { filterAndRender(searchEl.value); });
+    backdrop.addEventListener('click', closeAllCSelect);
 
-        const currentGmail = getStoredGmail();
-        let correctPassword = '';
-        try {
-            const res = await fetch('/pass.json?t=' + Date.now());
-            if (res.ok) {
-                const data = await res.json();
-                correctPassword = data.password || '';
-            }
-        } catch (e) {}
-
-        if (!correctPassword) correctPassword = 'ALb17';
-
-        const { value: password } = await Swal.fire({
-            title: '🔑 Verifikasi Password',
-            text: 'Masukkan password yang diberikan admin untuk mengubah Gmail:',
-            input: 'password',
-            inputPlaceholder: 'Masukkan password...',
-            showCancelButton: true,
-            confirmButtonText: '✅ Verifikasi',
-            cancelButtonText: '❌ Batal',
-            confirmButtonColor: '#4fc3f7',
-            cancelButtonColor: '#666',
-            background: '#1a0e2e',
-            color: '#fff',
-            preConfirm: (pass) => {
-                if (!pass || pass.trim() === '') {
-                    Swal.showValidationMessage('⚠️ Password tidak boleh kosong!');
-                    return false;
-                }
-                return pass.trim();
-            }
-        });
-
-        if (!password) return;
-
-        if (password !== correctPassword) {
-            Swal.fire({
-                title: '❌ Password Salah!',
-                text: 'Password yang Anda masukkan tidak valid.',
-                icon: 'error',
-                confirmButtonColor: '#ff4444',
-                background: '#1a0e2e',
-                color: '#fff'
-            });
-            return;
-        }
-
-        const { value: newGmail } = await Swal.fire({
-            title: '📧 Ganti Gmail',
-            text: `Gmail saat ini: ${currentGmail || 'Belum diatur'}`,
-            input: 'email',
-            inputPlaceholder: 'Masukkan Gmail baru...',
-            inputValue: currentGmail || '',
-            showCancelButton: true,
-            confirmButtonText: '✅ Ganti',
-            cancelButtonText: '❌ Batal',
-            confirmButtonColor: '#4fc3f7',
-            cancelButtonColor: '#666',
-            background: '#1a0e2e',
-            color: '#fff',
-            preConfirm: (email) => {
-                if (!validateEmail(email)) {
-                    Swal.showValidationMessage('⚠️ Format Gmail tidak valid!');
-                    return false;
-                }
-                return email.trim();
-            }
-        });
-
-        if (newGmail && newGmail !== currentGmail) {
-            const bannedData = await checkGmailBanned(newGmail);
-            if (bannedData) {
-                showBannedPage(bannedData, newGmail);
-                return;
-            }
-            const saved = saveGmailToStorage(newGmail);
-            if (saved) {
-                updateGmailDisplay();
-                await loadAnnouncement();
-                await processNewGmail(newGmail);
-                Swal.fire({
-                    title: '✅ Gmail Diubah!',
-                    text: `Gmail berhasil diubah menjadi: ${newGmail}`,
-                    icon: 'success',
-                    confirmButtonColor: '#4fc3f7',
-                    background: '#1a0e2e',
-                    color: '#fff',
-                    timer: 2000,
-                    timerProgressBar: true
-                });
-            }
-        }
+    if (isMobile) {
+      document.body.appendChild(backdrop);
+      document.body.appendChild(panel);
+      document.body.style.overflow = 'hidden';
+    } else {
+      cselectEl.appendChild(panel);
+      document.body.appendChild(backdrop);
     }
 
-    // ============================================================
-    // 🔥 HANDLE BUTTON CLICK
-    // ============================================================
-    async function handleButtonClick(url) {
-        if (isBanned) {
-            Swal.fire({
-                title: '🚫 Akun Diblokir',
-                text: 'Anda tidak dapat mengakses menu karena akun sedang dibanned.',
-                icon: 'error',
-                confirmButtonColor: '#ff4444',
-                background: '#1a0e2e',
-                color: '#fff'
-            });
-            return;
-        }
+    void panel.offsetHeight;
+    requestAnimationFrame(function () {
+      backdrop.classList.add('show');
+      panel.classList.add('open');
+      cselectEl.classList.add('open');
+      cselectEl.querySelector('.cselect-trigger').setAttribute('aria-expanded', 'true');
+      activeCSelect = cselectEl;
+      setTimeout(function () { searchEl.focus(); }, 250);
+    });
+  }
 
-        // Cek dulu apakah tombol disabled (karena GANGGUAN)
-        const clickedBtn = event && event.currentTarget;
-        if (clickedBtn && clickedBtn.disabled) {
-            Swal.fire({
-                title: '⚠️ Layanan Gangguan',
-                text: 'Provider ini sedang dalam gangguan (saldo tidak mencukupi). Silakan coba layanan lain.',
-                icon: 'warning',
-                confirmButtonColor: '#ffaa00',
-                background: '#1a0e2e',
-                color: '#fff'
-            });
-            return;
-        }
+  function populateKategori(keepValue) {
+    var hidden = document.getElementById('kategori');
+    var current = keepValue ? hidden.value : '';
+    var sortedKeys = Object.keys(layananData).sort(function (a, b) { return a.localeCompare(b, 'id'); });
+    kategoriItems = sortedKeys.map(function (k) { return { value: k, label: k }; });
 
-        const gmailOk = await ensureGmail();
-        if (!gmailOk && !getStoredGmail()) return;
-        if (isBanned) return;
+    if (current && layananData[current]) {
+      hidden.value = current;
+      setTriggerLabel(document.getElementById('cselectKategori'), current, false);
+    } else if (!keepValue) {
+      hidden.value = '';
+      var csEl = document.getElementById('cselectKategori');
+      setTriggerLabel(csEl, csEl.dataset.placeholder, true);
+    }
+  }
 
-        if (url) {
-            if (url.startsWith('http://') || url.startsWith('https://')) {
-                window.open(url, '_blank');
-            } else {
-                window.location.href = url;
-            }
-        }
+  function openKategoriPicker() {
+    var hidden = document.getElementById('kategori');
+    openCSelect(
+      document.getElementById('cselectKategori'),
+      'Pilih Kategori',
+      kategoriItems,
+      hidden.value,
+      function (item) {
+        hidden.value = item.value;
+        setTriggerLabel(document.getElementById('cselectKategori'), item.label, false);
+        loadLayanan();
+      }
+    );
+  }
+
+  function loadLayanan() {
+    var kategori = document.getElementById('kategori').value;
+    var hidden = document.getElementById('layanan');
+    var sortMode = document.getElementById('sortHarga').value;
+    currentSort = sortMode;
+
+    layananItems = [];
+    hidden.value = '';
+    var csEl = document.getElementById('cselectLayanan');
+    setTriggerLabel(csEl, csEl.dataset.placeholder, true);
+
+    if (kategori && layananData[kategori]) {
+      var services = getSortedServices(layananData[kategori], sortMode);
+      layananItems = services.map(function (l) {
+        var harga = getActivePrice(l);
+        var badges = [];
+        if (l.diskon && l.diskon < l.pricePerFollower) badges.push({ cls: 'badge-diskon', text: 'Diskon' });
+        if (l.comment === true) badges.push({ cls: 'badge-komentar', text: 'Komentar' });
+        return {
+          value: l.id,
+          label: l.name || ('Layanan #' + l.id),
+          meta: formatRp(harga) + ' / 1rb · ID ' + l.id,
+          badges: badges,
+          service: l
+        };
+      });
+
+      if (layananItems.length > 0) {
+        var first = layananItems[0];
+        hidden.value = first.value;
+        setTriggerLabel(csEl, first.label, false);
+        showInfo();
+        currentServiceForOrder = first.service;
+      }
+    } else {
+      document.getElementById('infoLayanan').style.display = 'none';
+      document.getElementById('average').textContent = '—';
+      selectedService = null;
+      currentServiceForOrder = null;
+      document.getElementById('commentSection').style.display = 'none';
+      requiresComment = false;
+      document.getElementById('priceDisplay').classList.remove('show');
+      document.getElementById('priceDisplayMassal').classList.remove('show');
+    }
+  }
+
+  function openLayananPicker() {
+    var hidden = document.getElementById('layanan');
+    if (!layananItems.length) { alert('Pilih kategori terlebih dahulu.'); return; }
+    openCSelect(
+      document.getElementById('cselectLayanan'),
+      'Pilih Layanan',
+      layananItems,
+      hidden.value,
+      function (item) {
+        hidden.value = item.value;
+        setTriggerLabel(document.getElementById('cselectLayanan'), item.label, false);
+        currentServiceForOrder = item.service;
+        showInfo();
+      }
+    );
+  }
+
+  function showInfo() {
+    var kategori = document.getElementById('kategori').value;
+    var layananID = document.getElementById('layanan').value;
+    if (!kategori || !layananData[kategori]) return;
+
+    selectedService = null;
+    for (var i = 0; i < layananData[kategori].length; i++) {
+      if (String(layananData[kategori][i].id) === String(layananID)) {
+        selectedService = layananData[kategori][i];
+        break;
+      }
+    }
+    if (!selectedService) return;
+    currentServiceForOrder = selectedService;
+
+    var priceDisplay = '';
+    var diskonDisplay = '';
+    if (selectedService.diskon && selectedService.diskon < selectedService.pricePerFollower) {
+      priceDisplay =
+        '<span class="strike">' + formatRp(selectedService.pricePerFollower) + '</span> ' +
+        '<span class="price-hi">' + formatRp(selectedService.diskon) + '</span> ' +
+        '<span class="badge-discount">Diskon</span> <span style="color:#64748b;">/ 1.000</span>';
+      diskonDisplay = 'Hemat ' + formatRp(selectedService.pricePerFollower - selectedService.diskon) + ' per 1.000';
+    } else {
+      priceDisplay = formatRp(selectedService.pricePerFollower) + ' <span style="color:#64748b;">/ 1.000 unit</span>';
     }
 
-    // ============================================================
-    // 🔥 ANTI INSPECT
-    // ============================================================
-    document.addEventListener("contextmenu", e => e.preventDefault());
-    document.addEventListener("keydown", function(e) {
-        const key = e.key.toLowerCase();
-        if (e.key === "F12") e.preventDefault();
-        if (e.ctrlKey && e.shiftKey && ["i", "c", "j"].includes(key)) e.preventDefault();
-        if (e.ctrlKey && key === "u") e.preventDefault();
+    requiresComment = selectedService.comment === true;
+    var commentSection = document.getElementById('commentSection');
+    var commentInfo = document.getElementById('commentInfo');
+
+    if (requiresComment) {
+      commentSection.style.display = 'block';
+      commentInfo.classList.add('show');
+      document.getElementById('commentRequired').textContent = '0';
+      document.getElementById('commentCount').textContent = '0';
+      validateComments();
+    } else {
+      commentSection.style.display = 'none';
+      commentInfo.classList.remove('show');
+    }
+
+    document.getElementById('average').textContent = selectedService.average || '-';
+
+    var infoBox = document.getElementById('infoLayanan');
+    infoBox.style.display = 'block';
+    infoBox.innerHTML =
+      '<b>' + selectedService.name + '</b>' +
+      '<div style="margin-top:4px;font-size:11.5px;color:#64748b;">ID: ' + selectedService.id + '</div>' +
+      '<div class="price-row" style="margin-top:4px;">' + priceDisplay + '</div>' +
+      (diskonDisplay ? '<div style="margin-top:2px;font-size:11.5px;color:#10b981;">' + diskonDisplay + '</div>' : '') +
+      '<div style="margin-top:6px;font-size:11.5px;">Min: ' + selectedService.min.toLocaleString('id-ID') +
+      ' · Max: ' + selectedService.max.toLocaleString('id-ID') + '</div>' +
+      (selectedService.desc ? '<div style="margin-top:6px;font-size:11.5px;color:#94a3b8;">' + selectedService.desc + '</div>' : '');
+
+    if (currentMode === 'single') { updatePriceDisplay(); checkBalance(); }
+    else { updatePriceDisplayMassal(); checkBalanceMassal(); }
+  }
+
+  function updatePriceDisplay() {
+    var displayEl = document.getElementById('priceDisplay');
+    var amountEl = document.getElementById('priceAmount');
+    var detailEl = document.getElementById('priceDetail');
+
+    if (!selectedService) { displayEl.classList.remove('show'); return; }
+    var jumlah = parseInt(document.getElementById('jumlah').value || '0', 10);
+    if (jumlah < selectedService.min || jumlah > selectedService.max || jumlah === 0) {
+      displayEl.classList.remove('show');
+      return;
+    }
+
+    var hargaAktif = getActivePrice(selectedService);
+    var total = calcTotal(jumlah, hargaAktif);
+    displayEl.classList.add('show');
+    amountEl.innerHTML = '<span class="currency">Rp</span> ' + total.toLocaleString('id-ID');
+
+    var detailText = '';
+    if (selectedService.diskon && selectedService.diskon < selectedService.pricePerFollower) {
+      var normal = calcTotal(jumlah, selectedService.pricePerFollower);
+      detailText = 'Harga normal: Rp ' + normal.toLocaleString('id-ID') +
+                   ' · Hemat Rp ' + (normal - total).toLocaleString('id-ID');
+    } else {
+      detailText = 'Harga per 1.000: ' + formatRp(hargaAktif);
+    }
+    detailEl.innerHTML = detailText;
+    document.getElementById('total').value = total;
+  }
+
+  function updatePriceDisplayMassal() {
+    var displayEl = document.getElementById('priceDisplayMassal');
+    var amountEl = document.getElementById('priceAmountMassal');
+    var detailEl = document.getElementById('priceDetailMassal');
+
+    if (!selectedService) { displayEl.classList.remove('show'); return; }
+    var jumlah = parseInt(document.getElementById('massalJumlah').value || '0', 10);
+    if (jumlah < selectedService.min || jumlah > selectedService.max || jumlah === 0) {
+      displayEl.classList.remove('show');
+      return;
+    }
+
+    var hargaAktif = getActivePrice(selectedService);
+    var total = calcTotal(jumlah, hargaAktif);
+    displayEl.classList.add('show');
+    amountEl.innerHTML = '<span class="currency">Rp</span> ' + total.toLocaleString('id-ID');
+
+    var detailText = '';
+    if (selectedService.diskon && selectedService.diskon < selectedService.pricePerFollower) {
+      var normal = calcTotal(jumlah, selectedService.pricePerFollower);
+      detailText = 'Harga normal: Rp ' + normal.toLocaleString('id-ID') +
+                   ' · Hemat Rp ' + (normal - total).toLocaleString('id-ID');
+    } else {
+      detailText = 'Harga per 1.000: ' + formatRp(hargaAktif);
+    }
+    detailEl.innerHTML = detailText;
+  }
+
+  function validateComments() {
+    if (!requiresComment) return;
+    var commentsEl = document.getElementById('comments');
+    var commentCountEl = document.getElementById('commentCount');
+    var commentRequiredEl = document.getElementById('commentRequired');
+    var commentStatusEl = document.getElementById('commentStatus');
+    var jumlah = parseInt(document.getElementById('jumlah').value || '0', 10);
+
+    var lines = commentsEl.value.split('\n').filter(function (line) { return line.trim() !== ''; });
+    var count = lines.length;
+    commentCountEl.textContent = count;
+    commentRequiredEl.textContent = jumlah;
+
+    if (jumlah === 0) {
+      commentStatusEl.innerHTML = ' — isi jumlah dulu';
+      commentStatusEl.style.color = '#f59e0b';
+      return;
+    }
+    if (count === jumlah) {
+      commentStatusEl.innerHTML = ' — sesuai';
+      commentStatusEl.style.color = '#10b981';
+    } else if (count < jumlah) {
+      commentStatusEl.innerHTML = ' — kurang ' + (jumlah - count);
+      commentStatusEl.style.color = '#f59e0b';
+    } else {
+      commentStatusEl.innerHTML = ' — terlalu banyak';
+      commentStatusEl.style.color = '#ef4444';
+    }
+  }
+
+  // ===== CHECKOUT =====
+  function showTermsError() {
+    termsError.classList.add('show');
+    document.getElementById('termsContainer').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setTimeout(function () { termsError.classList.remove('show'); }, 3000);
+  }
+
+  function singleCheckout() {
+    if (!termsCheckbox.checked) { showTermsError(); return; }
+    if (!selectedService) { alert('Pilih layanan terlebih dahulu.'); return; }
+
+    var jumlah = parseInt(document.getElementById('jumlah').value || '0', 10);
+    var target = document.getElementById('target').value.trim();
+
+    if (jumlah < selectedService.min || jumlah > selectedService.max) {
+      alert('Jumlah harus antara ' + selectedService.min + ' dan ' + selectedService.max);
+      return;
+    }
+    if (!target) { alert('Masukkan target / link.'); return; }
+
+    if (requiresComment) {
+      var lines = document.getElementById('comments').value.split('\n').filter(function (line) { return line.trim() !== ''; });
+      if (lines.length === 0) { alert('Layanan ini membutuhkan komentar.'); return; }
+      if (lines.length !== jumlah) { alert('Jumlah komentar (' + lines.length + ') harus sama dengan jumlah pesanan (' + jumlah + ').'); return; }
+    }
+
+    var rawTotal = calcRawTotal(jumlah, selectedService);
+    if (currentBalance < rawTotal) {
+      alert('Saldo tidak cukup.\nSaldo: ' + formatRp(currentBalance) + '\nButuh: ' + formatRp(rawTotal));
+      return;
+    }
+
+    var hargaAktif = getActivePrice(selectedService);
+    var total = calcTotal(jumlah, hargaAktif);
+    var trxID = 'TRX' + Date.now() + Math.floor(Math.random() * 1000);
+
+    var orderData = [{
+      serviceId: selectedService.id,
+      serviceName: selectedService.name,
+      kategori: document.getElementById('kategori').value,
+      jumlah: jumlah,
+      target: target,
+      total: total,
+      comment: requiresComment ? document.getElementById('comments').value : null
+    }];
+
+    window.location.href = 'payment/?trx=' + trxID +
+      '&total=' + total + '&mass=0' +
+      '&orders=' + encodeURIComponent(JSON.stringify(orderData));
+  }
+
+  function addMassalOrder() {
+    if (!selectedService) { alert('Pilih layanan terlebih dahulu.'); return; }
+
+    var jumlah = parseInt(document.getElementById('massalJumlah').value || '0', 10);
+    var target = document.getElementById('massalTarget').value.trim();
+
+    if (jumlah < 1) { alert('Jumlah minimal 1.'); return; }
+    if (!target) { alert('Masukkan target / link.'); return; }
+    if (jumlah < selectedService.min || jumlah > selectedService.max) {
+      alert('Jumlah harus antara ' + selectedService.min + ' dan ' + selectedService.max);
+      return;
+    }
+
+    var rawTotal = calcRawTotal(jumlah, selectedService);
+    if (currentBalance < rawTotal) {
+      alert('Saldo tidak cukup.\nSaldo: ' + formatRp(currentBalance) + '\nButuh: ' + formatRp(rawTotal));
+      return;
+    }
+
+    var hargaAktif = getActivePrice(selectedService);
+    var total = calcTotal(jumlah, hargaAktif);
+
+    orders.push({
+      id: Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+      serviceId: selectedService.id,
+      serviceName: selectedService.name,
+      kategori: document.getElementById('kategori').value,
+      jumlah: jumlah,
+      target: target,
+      total: total,
+      rawTotal: rawTotal,
+      hargaPerUnit: hargaAktif,
+      comment: null
     });
 
-    // ============================================================
-    // 🔥 INIT
-    // ============================================================
-    window.addEventListener('load', async function() {
-        const gmail = getStoredGmail();
+    renderOrders();
+    updateOrderCount();
+    updateMassalTotal();
 
-        if (gmail && validateEmail(gmail)) {
-            const bannedData = await checkGmailBanned(gmail);
-            if (bannedData) {
-                showBannedPage(bannedData, gmail);
-                updateGmailDisplay();
-                return;
-            }
-            await processNewGmail(gmail);
-        }
+    document.getElementById('massalJumlah').value = '';
+    document.getElementById('massalTarget').value = '';
+    document.getElementById('priceDisplayMassal').classList.remove('show');
+    document.getElementById('balanceWarningMassal').classList.remove('show');
+    document.getElementById('balanceInfoMassal').classList.remove('show');
+  }
 
-        updateGmailDisplay();
-        await loadAnnouncement();
+  function removeOrder(index) {
+    orders.splice(index, 1);
+    renderOrders();
+    updateOrderCount();
+    updateMassalTotal();
+  }
 
-        // 🔥 CEK HEALTH SEMUA PROVIDER SETELAH UI SIAP
-        checkAllProviders();
+  function clearOrders() {
+    if (orders.length === 0) return;
+    if (confirm('Kosongkan semua pesanan massal?')) {
+      orders = [];
+      renderOrders();
+      updateOrderCount();
+      updateMassalTotal();
+    }
+  }
 
-        // 🔥 RE-CHECK TIAP 60 DETIK BIAR REAL-TIME
-        setInterval(checkAllProviders, 60000);
+  function renderOrders() {
+    var container = document.getElementById('orderList');
+    var wrapper = document.getElementById('orderListContainer');
+
+    if (orders.length === 0) {
+      container.innerHTML = '<div class="empty-state"><span class="icon">📭</span>Tidak ada pesanan</div>';
+      wrapper.style.display = 'none';
+      return;
+    }
+
+    wrapper.style.display = 'block';
+    var html = '';
+    orders.forEach(function (order, index) {
+      html +=
+        '<div class="order-item">' +
+          '<span class="order-index">#' + (index + 1) + '</span>' +
+          '<div class="order-info">' +
+            '<div class="row"><span class="label-sm">Layanan</span><span class="value">' + order.serviceName + '</span></div>' +
+            '<div class="row"><span class="label-sm">Target</span><span class="value">' + order.target + '</span></div>' +
+            '<div class="row"><span class="label-sm">Jumlah</span><span class="value">' + order.jumlah.toLocaleString('id-ID') + '</span></div>' +
+            '<div class="row"><span class="label-sm">Total</span><span class="value" style="color:#60a5fa;">' + formatRp(order.total) + '</span></div>' +
+          '</div>' +
+          '<div class="order-actions"><button class="btn-remove" onclick="window.removeOrder(' + index + ')">Hapus</button></div>' +
+        '</div>';
+    });
+    container.innerHTML = html;
+  }
+
+  function updateOrderCount() {
+    var count = orders.length;
+    document.getElementById('orderCount').textContent = count;
+    document.getElementById('orderCountSummary').textContent = count;
+  }
+
+  function updateMassalTotal() {
+    var total = orders.reduce(function (sum, o) { return sum + o.total; }, 0);
+    document.getElementById('orderTotalSummary').textContent = total.toLocaleString('id-ID');
+    document.getElementById('total').value = total;
+  }
+
+  window.removeOrder = removeOrder;
+  window.clearOrders = clearOrders;
+
+  function massalCheckout() {
+    if (!termsCheckbox.checked) { showTermsError(); return; }
+    if (orders.length === 0) { alert('Tambahkan pesanan massal terlebih dahulu.'); return; }
+
+    var totalRaw = orders.reduce(function (sum, o) { return sum + (o.rawTotal || 0); }, 0);
+    if (currentBalance < totalRaw) {
+      alert('Saldo tidak cukup.\nSaldo: ' + formatRp(currentBalance) + '\nButuh: ' + formatRp(totalRaw));
+      return;
+    }
+
+    var trxID = 'TRX' + Date.now() + Math.floor(Math.random() * 1000);
+    var totalBayar = orders.reduce(function (sum, o) { return sum + o.total; }, 0);
+
+    var ordersData = orders.map(function (o) {
+      return {
+        serviceId: o.serviceId,
+        serviceName: o.serviceName,
+        kategori: o.kategori,
+        jumlah: o.jumlah,
+        target: o.target,
+        total: o.total,
+        comment: o.comment
+      };
     });
 
-    document.getElementById('changeGmailBtn').addEventListener('click', changeGmailWithPassword);
-    </script>
+    window.location.href = 'payment/?trx=' + trxID +
+      '&total=' + totalBayar + '&mass=1' +
+      '&orders=' + encodeURIComponent(JSON.stringify(ordersData));
+  }
 
+  // ===== SEARCH =====
+  var searchTimer = null;
+  function searchLayanan() {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(function () {
+      var q = document.getElementById('search').value.toLowerCase().trim();
+      if (!q) return;
+
+      for (var k in layananData) {
+        for (var i = 0; i < layananData[k].length; i++) {
+          var l = layananData[k][i];
+          if (l.name.toLowerCase().indexOf(q) !== -1 || String(l.id).indexOf(q) !== -1) {
+            document.getElementById('kategori').value = k;
+            setTriggerLabel(document.getElementById('cselectKategori'), k, false);
+            loadLayanan();
+            document.getElementById('layanan').value = l.id;
+            setTriggerLabel(document.getElementById('cselectLayanan'), l.name, false);
+            currentServiceForOrder = l;
+            showInfo();
+            return;
+          }
+        }
+      }
+    }, 280);
+  }
+
+  // ===== LOAD =====
+  function loadData(silent) {
+    if (isLoading) return;
+    isLoading = true;
+    Promise.allSettled([
+      fetch(SERVICES_ENDPOINT + '?action=services&ts=' + Date.now()),
+      fetch(SERVICES_ENDPOINT + '?action=balance&ts=' + Date.now())
+    ]).then(function (results) {
+      var servicesRes = results[0];
+      var balanceRes = results[1];
+
+      if (servicesRes.status === 'fulfilled' && servicesRes.value.ok) {
+        return servicesRes.value.json().then(function (data) {
+          if (data && data.status === false) throw new Error(data.msg || 'Provider error');
+          layananData = data;
+          populateKategori(true);
+          loadLayanan();
+
+          if (balanceRes.status === 'fulfilled' && balanceRes.value.ok) {
+            return balanceRes.value.json();
+          }
+        }).then(function (balanceData) {
+          if (balanceData && balanceData.status === true) {
+            currentBalance = Number(balanceData.balance) || 0;
+            isBalanceLoaded = true;
+          }
+        });
+      } else {
+        throw new Error('Gagal memuat data layanan');
+      }
+    }).then(function () {
+      if (currentMode === 'single') checkBalance();
+      else checkBalanceMassal();
+    }).catch(function (err) {
+      if (!silent) {
+        console.error(err);
+        alert('Data layanan gagal dimuat.\n' + (err.message || ''));
+      }
+    }).finally(function () {
+      isLoading = false;
+    });
+  }
+
+  function startSmartRefresh() {
+    if (refreshTimer) clearInterval(refreshTimer);
+    refreshTimer = setInterval(function () {
+      if (document.visibilityState === 'visible') loadData(true);
+    }, 60000);
+  }
+
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible') loadData(true);
+  });
+
+  // ===== EVENTS =====
+  document.getElementById('cselectKategori').querySelector('.cselect-trigger')
+    .addEventListener('click', openKategoriPicker);
+  document.getElementById('cselectLayanan').querySelector('.cselect-trigger')
+    .addEventListener('click', openLayananPicker);
+  document.getElementById('sortHarga').addEventListener('change', loadLayanan);
+
+  document.getElementById('jumlah').addEventListener('input', function () {
+    updatePriceDisplay();
+    if (requiresComment) {
+      var jumlah = parseInt(this.value || '0', 10);
+      document.getElementById('commentRequired').textContent = jumlah;
+      validateComments();
+    }
+    checkBalance();
+  });
+
+  document.getElementById('comments').addEventListener('input', validateComments);
+  document.getElementById('btnSingleCheckout').addEventListener('click', singleCheckout);
+
+  document.getElementById('massalJumlah').addEventListener('input', function () {
+    updatePriceDisplayMassal();
+    checkBalanceMassal();
+  });
+  document.getElementById('btnAddMassal').addEventListener('click', addMassalOrder);
+  document.getElementById('btnClearOrders').addEventListener('click', clearOrders);
+  document.getElementById('btnMassalCheckout').addEventListener('click', massalCheckout);
+
+  document.getElementById('search').addEventListener('input', searchLayanan);
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') closeAllCSelect();
+  });
+
+  // ===== INIT =====
+  window.addEventListener('load', function () {
+    loadData(false);
+    startSmartRefresh();
+    loadTerms();
+    renderOrders();
+    updateOrderCount();
+    updateMassalTotal();
+    setMode('single');
+  });
+
+  window.addEventListener('beforeunload', function () {
+    if (refreshTimer) clearInterval(refreshTimer);
+  });
+})();
+</script>
 </body>
 </html>
