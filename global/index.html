@@ -287,6 +287,9 @@
         align-items: center;
         justify-content: center;
         gap: 8px;
+        user-select: none;
+        -webkit-user-select: none;
+        -webkit-tap-highlight-color: transparent;
     }
 
     .nav-btn:hover:not(:disabled){
@@ -299,11 +302,11 @@
         background: rgba(255,255,255,0.04);
     }
 
-    /* ===== CHECKING STATE (LOCK TOTAL) ===== */
+    /* ===== CHECKING STATE (HARD LOCK) ===== */
     .nav-btn.checking {
         cursor: wait !important;
         opacity: 0.75;
-        pointer-events: none;
+        pointer-events: none !important;
     }
 
     /* ===== BADGE STATUS ===== */
@@ -505,7 +508,7 @@
 
         <!-- ===== DROPDOWN PENGUMUMAN ===== -->
         <div class="announcement-dropdown" id="announcementDropdown">
-            <div class="dropdown-header" id="dropdownHeader" onclick="toggleAnnouncement()">
+            <div class="dropdown-header" id="dropdownHeader">
                 <div class="title">
                     <span class="icon">📢</span> Pengumuman
                     <span class="badge-count" id="announcementCount">0</span>
@@ -530,8 +533,7 @@
         <button class="nav-btn" 
                 id="btnSosmed1" 
                 data-provider="lollipop" 
-                data-endpoint="/api/lollipop-services" 
-                onclick="handleButtonClick('/sosmed-1/')">
+                data-url="/sosmed-1/">
             <span>📱 Suntik Sosmed 1 🫣 ( Layanan Baru )</span>
             <span class="badge-status checking-badge" id="badgeSosmed1">CEK...</span>
         </button>
@@ -539,8 +541,7 @@
         <button class="nav-btn" 
                 id="btnSosmed2" 
                 data-provider="fayupedia" 
-                data-endpoint="/api/fayupedia-services" 
-                onclick="handleButtonClick('/sosmed-2/')">
+                data-url="/sosmed-2/">
             <span>📱 Suntik Sosmed 2 🔥 (Paling Ramai dipesan)</span>
             <span class="badge-status checking-badge" id="badgeSosmed2">CEK...</span>
         </button>
@@ -548,17 +549,16 @@
         <button class="nav-btn" 
                 id="btnSosmed3" 
                 data-provider="indosmm" 
-                data-endpoint="/api/indosmm-services" 
-                onclick="handleButtonClick('/sosmed-3/')">
+                data-url="/sosmed-3/">
             <span>📱 Suntik Sosmed 3</span>
             <span class="badge-status checking-badge" id="badgeSosmed3">CEK...</span>
         </button>
 
-        <button class="nav-btn" onclick="handleButtonClick('/event/')">
+        <button class="nav-btn" data-url="/event/">
             💲 Event - Daftar dan jadilah Pemenang 
         </button>
 
-        <button class="nav-btn" onclick="handleButtonClick('https://wa.me/6289518103883')">
+        <button class="nav-btn" data-url="https://wa.me/6289518103883">
             🎧 CUSTOMER SERVICE (WhatsApp)
         </button>
 
@@ -583,6 +583,7 @@
 
     let gmailPromptActive = false;
     let isBanned = false;
+    let isCheckingProviders = false;
     let userID = localStorage.getItem(USER_ID_KEY);
 
     if (!userID) {
@@ -891,8 +892,13 @@
         }
     }
 
+    // Bind header dropdown (event-based, bukan inline)
+    document.getElementById('dropdownHeader').addEventListener('click', function() {
+        toggleAnnouncement();
+    });
+
     // ============================================================
-    // 🔥 HEALTH CHECK PROVIDER (CEK SALDO) — dengan LOCK saat cek
+    // 🔥 HEALTH CHECK PROVIDER (CEK SALDO) — dengan HARD LOCK
     // ============================================================
     const PROVIDERS = {
         lollipop: { endpoint: '/api/lollipop-services', btn: 'btnSosmed1', badge: 'badgeSosmed1', label: 'Sosmed 1' },
@@ -913,10 +919,11 @@
 
         const btn = document.getElementById(prov.btn);
 
-        // 🔥 LOCK: disable tombol selama pengecekan
+        // 🔥 LOCK HARD: disable + class checking + global flag
         if (btn) {
             btn.classList.add('checking');
             btn.disabled = true;
+            btn.setAttribute('aria-disabled', 'true');
         }
         setBadge(prov.badge, 'CEK...', 'checking-badge');
 
@@ -924,7 +931,6 @@
         let checkFailed = false;
 
         try {
-            // ===== LOLLIPOP: POST action:balance =====
             if (providerKey === 'lollipop') {
                 const res = await fetch(prov.endpoint, {
                     method: 'POST',
@@ -937,9 +943,7 @@
                 } else {
                     checkFailed = true;
                 }
-            }
-            // ===== FAYUPEDIA: GET ?action=balance =====
-            else if (providerKey === 'fayupedia') {
+            } else if (providerKey === 'fayupedia') {
                 const res = await fetch(prov.endpoint + '?action=balance&t=' + Date.now(), { cache: 'no-store' });
                 if (res.ok) {
                     const data = await res.json();
@@ -947,9 +951,7 @@
                 } else {
                     checkFailed = true;
                 }
-            }
-            // ===== INDOSMM: POST action:balance =====
-            else if (providerKey === 'indosmm') {
+            } else if (providerKey === 'indosmm') {
                 const res = await fetch(prov.endpoint, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -967,33 +969,44 @@
             checkFailed = true;
         }
 
-        // 🔥 UNLOCK: hapus class checking
+        // 🔥 UNLOCK class checking dulu
         if (btn) btn.classList.remove('checking');
 
         if (checkFailed) {
             setBadge(prov.badge, 'GANGGUAN', 'gangguan');
-            if (btn) btn.disabled = true;
+            if (btn) {
+                btn.disabled = true;
+                btn.setAttribute('aria-disabled', 'true');
+            }
             console.log(`❌ ${prov.label}: GANGGUAN (check failed)`);
             return;
         }
 
         if (balance < MIN_BALANCE) {
             setBadge(prov.badge, 'GANGGUAN', 'gangguan');
-            if (btn) btn.disabled = true;
+            if (btn) {
+                btn.disabled = true;
+                btn.setAttribute('aria-disabled', 'true');
+            }
             console.log(`⚠️ ${prov.label}: GANGGUAN (saldo: ${balance})`);
         } else {
             setBadge(prov.badge, 'OK', 'ok-badge');
-            if (btn) btn.disabled = false;
+            if (btn) {
+                btn.disabled = false;
+                btn.removeAttribute('aria-disabled');
+            }
             console.log(`✅ ${prov.label}: OK (saldo: ${balance})`);
         }
     }
 
     async function checkAllProviders() {
+        isCheckingProviders = true;
         await Promise.all([
             checkProviderHealth('lollipop'),
             checkProviderHealth('fayupedia'),
             checkProviderHealth('indosmm')
         ]);
+        isCheckingProviders = false;
     }
 
     // ============================================================
@@ -1176,9 +1189,10 @@
     }
 
     // ============================================================
-    // 🔥 HANDLE BUTTON CLICK — dengan GUARD saat checking & disabled
+    // 🔥 CORE HANDLE CLICK (dipanggil dari event listener)
     // ============================================================
-    async function handleButtonClick(url) {
+    async function handleButtonClick(url, btnElement) {
+        // Layer 1: banned
         if (isBanned) {
             Swal.fire({
                 title: '🚫 Akun Diblokir',
@@ -1191,42 +1205,55 @@
             return;
         }
 
-        // 🔥 GUARD: cek tombol yang diklik
-        const clickedBtn = (typeof event !== 'undefined' && event) ? event.currentTarget : null;
+        // Layer 2: global check flag
+        if (isCheckingProviders) {
+            Swal.fire({
+                title: '⏳ Sedang Dicek',
+                text: 'Mohon tunggu sebentar, sistem sedang memeriksa status layanan.',
+                icon: 'info',
+                confirmButtonColor: '#4fc3f7',
+                background: '#1a0e2e',
+                color: '#fff',
+                timer: 1800,
+                showConfirmButton: false
+            });
+            return;
+        }
 
-        if (clickedBtn) {
-            if (clickedBtn.disabled) {
-                // Kalo lagi dicek
-                if (clickedBtn.classList.contains('checking')) {
-                    Swal.fire({
-                        title: '⏳ Sedang Dicek',
-                        text: 'Mohon tunggu sebentar, sistem sedang memeriksa status layanan.',
-                        icon: 'info',
-                        confirmButtonColor: '#4fc3f7',
-                        background: '#1a0e2e',
-                        color: '#fff',
-                        timer: 1800,
-                        showConfirmButton: false
-                    });
-                } else {
-                    // Gangguan
-                    Swal.fire({
-                        title: '⚠️ Layanan Gangguan',
-                        text: 'Provider ini sedang dalam gangguan (saldo tidak mencukupi). Silakan coba layanan lain.',
-                        icon: 'warning',
-                        confirmButtonColor: '#ffaa00',
-                        background: '#1a0e2e',
-                        color: '#fff'
-                    });
-                }
+        // Layer 3: tombol state
+        if (btnElement) {
+            if (btnElement.classList.contains('checking')) {
+                Swal.fire({
+                    title: '⏳ Sedang Dicek',
+                    text: 'Mohon tunggu sebentar, sistem sedang memeriksa status layanan.',
+                    icon: 'info',
+                    confirmButtonColor: '#4fc3f7',
+                    background: '#1a0e2e',
+                    color: '#fff',
+                    timer: 1800,
+                    showConfirmButton: false
+                });
+                return;
+            }
+            if (btnElement.disabled) {
+                Swal.fire({
+                    title: '⚠️ Layanan Gangguan',
+                    text: 'Provider ini sedang dalam gangguan. Silakan coba layanan lain.',
+                    icon: 'warning',
+                    confirmButtonColor: '#ffaa00',
+                    background: '#1a0e2e',
+                    color: '#fff'
+                });
                 return;
             }
         }
 
+        // Layer 4: gmail check
         const gmailOk = await ensureGmail();
         if (!gmailOk && !getStoredGmail()) return;
         if (isBanned) return;
 
+        // Eksekusi navigasi
         if (url) {
             if (url.startsWith('http://') || url.startsWith('https://')) {
                 window.open(url, '_blank');
@@ -1234,6 +1261,71 @@
                 window.location.href = url;
             }
         }
+    }
+
+    // ============================================================
+    // 🔥 BIND SEMUA .nav-btn DENGAN CAPTURE PHASE
+    // ============================================================
+    function bindNavButtons() {
+        document.querySelectorAll('.nav-btn').forEach(btn => {
+            if (btn.dataset.bound === 'true') return;
+            btn.dataset.bound = 'true';
+
+            // Capture phase click: block paling awal
+            btn.addEventListener('click', function(e) {
+                // HARD BLOCK jika checking / disabled / global checking
+                if (btn.disabled || btn.classList.contains('checking') || isCheckingProviders) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    e.stopImmediatePropagation();
+
+                    if (btn.classList.contains('checking') || isCheckingProviders) {
+                        Swal.fire({
+                            title: '⏳ Sedang Dicek',
+                            text: 'Mohon tunggu sebentar, sistem sedang memeriksa status layanan.',
+                            icon: 'info',
+                            confirmButtonColor: '#4fc3f7',
+                            background: '#1a0e2e',
+                            color: '#fff',
+                            timer: 1800,
+                            showConfirmButton: false
+                        });
+                    } else {
+                        Swal.fire({
+                            title: '⚠️ Layanan Gangguan',
+                            text: 'Provider ini sedang dalam gangguan. Silakan coba layanan lain.',
+                            icon: 'warning',
+                            confirmButtonColor: '#ffaa00',
+                            background: '#1a0e2e',
+                            color: '#fff'
+                        });
+                    }
+                    return false;
+                }
+
+                // Lolos guard → eksekusi
+                e.preventDefault();
+                const url = btn.dataset.url;
+                if (url) handleButtonClick(url, btn);
+            }, true); // ← CAPTURE PHASE
+
+            // Block keyboard Enter/Space saat disabled/checking
+            btn.addEventListener('keydown', function(e) {
+                if ((e.key === 'Enter' || e.key === ' ') && (btn.disabled || btn.classList.contains('checking') || isCheckingProviders)) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    e.stopImmediatePropagation();
+                }
+            }, true);
+
+            // Block pointerdown saat checking (buat jaga-jaga)
+            btn.addEventListener('pointerdown', function(e) {
+                if (btn.classList.contains('checking') || isCheckingProviders) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }
+            }, true);
+        });
     }
 
     // ============================================================
@@ -1251,6 +1343,13 @@
     // 🔥 INIT
     // ============================================================
     window.addEventListener('load', async function() {
+        // 🔥 BIND TOMBOL PALING AWAL
+        bindNavButtons();
+
+        // Bind tombol ubah gmail
+        document.getElementById('changeGmailBtn').addEventListener('click', changeGmailWithPassword);
+
+        // Cek gmail & banned
         const gmail = getStoredGmail();
 
         if (gmail && validateEmail(gmail)) {
@@ -1266,14 +1365,13 @@
         updateGmailDisplay();
         await loadAnnouncement();
 
-        // 🔥 CEK HEALTH SEMUA PROVIDER SETELAH UI SIAP
+        // 🔥 CEK HEALTH SEMUA PROVIDER
         checkAllProviders();
 
-        // 🔥 RE-CHECK TIAP 60 DETIK BIAR REAL-TIME
+        // Re-check tiap 60 detik
         setInterval(checkAllProviders, 60000);
     });
 
-    document.getElementById('changeGmailBtn').addEventListener('click', changeGmailWithPassword);
     </script>
 
 </body>
