@@ -296,7 +296,7 @@
         background: rgba(255,255,255,0.18);
     }
 
-    /* ===== HARD LOCK STATE — checking + gangguan + disabled = SAMA ===== */
+    /* ===== HARD LOCK STATE ===== */
     .nav-btn.checking,
     .nav-btn[data-locked="true"],
     .nav-btn:disabled {
@@ -327,32 +327,63 @@
         text-transform: uppercase;
         letter-spacing: 0.5px;
         margin-left: 6px;
-        animation: pulseBadge 1.6s ease-in-out infinite;
     }
 
+    /* 🔥 GANGGUAN — lebih terang & nyala */
     .nav-btn .badge-status.gangguan {
-        background: rgba(239,68,68,0.2);
-        color: #ff6b6b;
-        border: 1px solid rgba(239,68,68,0.4);
+        background: #dc2626 !important;
+        color: #ffffff !important;
+        border: 1.5px solid #ffffff !important;
+        text-shadow: 0 0 4px rgba(255, 255, 255, 0.6);
+        box-shadow: 0 0 8px rgba(220, 38, 38, 0.8), 0 0 16px rgba(220, 38, 38, 0.4);
+        animation: pulseGangguan 1.4s ease-in-out infinite;
+        font-weight: 800;
+        opacity: 1 !important;
+        filter: none !important;
     }
 
+    @keyframes pulseGangguan {
+        0%, 100% {
+            box-shadow: 0 0 8px rgba(220, 38, 38, 0.8), 0 0 16px rgba(220, 38, 38, 0.4);
+            transform: scale(1);
+        }
+        50% {
+            box-shadow: 0 0 12px rgba(220, 38, 38, 1), 0 0 24px rgba(220, 38, 38, 0.6);
+            transform: scale(1.05);
+        }
+    }
+
+    /* 🔥 CHECKING / MOHON TUNGGU — kuning nyala */
     .nav-btn .badge-status.checking-badge {
-        background: rgba(255,255,255,0.08);
-        color: #94a3b8;
-        border: 1px solid rgba(255,255,255,0.1);
-        animation: none;
+        background: #f59e0b !important;
+        color: #1a0e2e !important;
+        border: 1.5px solid #fbbf24 !important;
+        text-shadow: none;
+        box-shadow: 0 0 8px rgba(245, 158, 11, 0.6), 0 0 16px rgba(245, 158, 11, 0.3);
+        animation: pulseChecking 1.4s ease-in-out infinite;
+        font-weight: 800;
+        opacity: 1 !important;
+        filter: none !important;
     }
 
+    @keyframes pulseChecking {
+        0%, 100% {
+            box-shadow: 0 0 8px rgba(245, 158, 11, 0.6), 0 0 16px rgba(245, 158, 11, 0.3);
+            transform: scale(1);
+        }
+        50% {
+            box-shadow: 0 0 12px rgba(245, 158, 11, 0.9), 0 0 24px rgba(245, 158, 11, 0.5);
+            transform: scale(1.05);
+        }
+    }
+
+    /* OK — hijau normal */
     .nav-btn .badge-status.ok-badge {
-        background: rgba(34,197,94,0.15);
+        background: rgba(34,197,94,0.2);
         color: #22c55e;
-        border: 1px solid rgba(34,197,94,0.3);
+        border: 1px solid rgba(34,197,94,0.4);
         animation: none;
-    }
-
-    @keyframes pulseBadge {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.55; }
+        font-weight: 700;
     }
 
     .footer{
@@ -478,7 +509,7 @@
             padding: 10px 12px;
         }
         .nav-btn { font-size: 13px; padding: 12px; }
-        .nav-btn .badge-status { font-size: 8px; padding: 2px 6px; }
+        .nav-btn .badge-status { font-size: 8px; padding: 2px 6px; letter-spacing: 0.3px; }
     }
     </style>
 
@@ -539,7 +570,6 @@
         </div>
 
         <!-- ===== TOMBOL PROVIDER ===== -->
-        <!-- 🔒 disabled + data-locked dari HTML parse -->
         <button class="nav-btn" 
                 id="btnSosmed1" 
                 data-provider="lollipop" 
@@ -548,7 +578,7 @@
                 data-locked="true"
                 aria-disabled="true">
             <span>📱 Suntik Sosmed 1 🫣 ( Layanan Baru )</span>
-            <span class="badge-status checking-badge" id="badgeSosmed1">CEK...</span>
+            <span class="badge-status checking-badge" id="badgeSosmed1">MOHON TUNGGU</span>
         </button>
 
         <button class="nav-btn" 
@@ -559,7 +589,7 @@
                 data-locked="true"
                 aria-disabled="true">
             <span>📱 Suntik Sosmed 2 🔥 (Paling Ramai dipesan)</span>
-            <span class="badge-status checking-badge" id="badgeSosmed2">CEK...</span>
+            <span class="badge-status checking-badge" id="badgeSosmed2">MOHON TUNGGU</span>
         </button>
 
         <button class="nav-btn" 
@@ -570,7 +600,7 @@
                 data-locked="true"
                 aria-disabled="true">
             <span>📱 Suntik Sosmed 3</span>
-            <span class="badge-status checking-badge" id="badgeSosmed3">CEK...</span>
+            <span class="badge-status checking-badge" id="badgeSosmed3">MOHON TUNGGU</span>
         </button>
 
         <button class="nav-btn" data-url="/event/">
@@ -609,14 +639,12 @@
     const DEBOUNCE_MS = 800;
     let swalActive = false;
 
-    // 🔒 MUTEX LOCK PER PROVIDER
     const providerLocks = {
         lollipop: false,
         fayupedia: false,
         indosmm: false
     };
 
-    // 🔒 FORCE-LOCK INTERVAL
     let forceLockInterval = null;
 
     let userID = localStorage.getItem(USER_ID_KEY);
@@ -998,8 +1026,8 @@
         swalActive = true;
 
         const config = type === 'checking' ? {
-            title: '⏳ Sedang Dicek',
-            text: 'Mohon tunggu sebentar, sistem sedang memeriksa status layanan.',
+            title: '⏳ Mohon Tunggu',
+            text: 'Sistem sedang memeriksa status layanan. Mohon tunggu sebentar.',
             icon: 'info',
             confirmButtonColor: '#4fc3f7',
             timer: 1500,
@@ -1058,7 +1086,7 @@
         providerLocks[providerKey] = true;
 
         lockBtn(prov.btn);
-        setBadge(prov.badge, 'CEK...', 'checking-badge');
+        setBadge(prov.badge, 'MOHON TUNGGU', 'checking-badge');
 
         let balance = 0;
         let checkFailed = false;
@@ -1376,7 +1404,7 @@
             }
             if (btnElement.getAttribute('data-locked') === 'true') {
                 const badge = btnElement.querySelector('.badge-status');
-                if (badge && badge.textContent.includes('CEK')) {
+                if (badge && badge.textContent.includes('MOHON TUNGGU')) {
                     showLockedAlert('checking');
                 } else {
                     showLockedAlert('gangguan');
@@ -1418,7 +1446,7 @@
                 if (btn.classList.contains('checking')) return 'checking';
                 if (btn.getAttribute('data-locked') === 'true') {
                     const badge = btn.querySelector('.badge-status');
-                    if (badge && badge.textContent.includes('CEK')) return 'checking';
+                    if (badge && badge.textContent.includes('MOHON TUNGGU')) return 'checking';
                     return 'gangguan';
                 }
                 if (isCheckingProviders || globalCheckLock) return 'checking';
