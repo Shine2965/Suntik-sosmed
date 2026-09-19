@@ -302,10 +302,17 @@
         background: rgba(255,255,255,0.04);
     }
 
-    /* ===== CHECKING STATE (HARD LOCK) ===== */
-    .nav-btn.checking {
-        cursor: wait !important;
-        opacity: 0.75;
+    /* ===== HARD LOCK STATE ===== */
+    .nav-btn.checking,
+    .nav-btn[data-locked="true"] {
+        cursor: not-allowed !important;
+        opacity: 0.65;
+        pointer-events: none !important;
+        user-select: none !important;
+    }
+
+    .nav-btn.checking *,
+    .nav-btn[data-locked="true"] * {
         pointer-events: none !important;
     }
 
@@ -581,9 +588,22 @@
     // ===== MINIMAL SALDO PROVIDER =====
     const MIN_BALANCE = 5000;
 
+    // ===== LOCK & GUARD STATE =====
     let gmailPromptActive = false;
     let isBanned = false;
     let isCheckingProviders = false;
+    let globalCheckLock = false;
+    let lastCheckFinishTime = 0;
+    const DEBOUNCE_MS = 800;
+    let swalActive = false;
+
+    // 🔒 MUTEX LOCK PER PROVIDER
+    const providerLocks = {
+        lollipop: false,
+        fayupedia: false,
+        indosmm: false
+    };
+
     let userID = localStorage.getItem(USER_ID_KEY);
 
     if (!userID) {
@@ -892,18 +912,17 @@
         }
     }
 
-    // Bind header dropdown (event-based, bukan inline)
     document.getElementById('dropdownHeader').addEventListener('click', function() {
         toggleAnnouncement();
     });
 
     // ============================================================
-    // 🔥 HEALTH CHECK PROVIDER (CEK SALDO) — dengan HARD LOCK
+    // 🔥 HEALTH CHECK PROVIDER — MUTEX + DEBOUNCE + HARD LOCK
     // ============================================================
     const PROVIDERS = {
-        lollipop: { endpoint: '/api/lollipop-services', btn: 'btnSosmed1', badge: 'badgeSosmed1', label: 'Sosmed 1' },
+        lollipop:  { endpoint: '/api/lollipop-services',  btn: 'btnSosmed1', badge: 'badgeSosmed1', label: 'Sosmed 1' },
         fayupedia: { endpoint: '/api/fayupedia-services', btn: 'btnSosmed2', badge: 'badgeSosmed2', label: 'Sosmed 2' },
-        indosmm: { endpoint: '/api/indosmm-services', btn: 'btnSosmed3', badge: 'badgeSosmed3', label: 'Sosmed 3' }
+        indosmm:   { endpoint: '/api/indosmm-services',   btn: 'btnSosmed3', badge: 'badgeSosmed3', label: 'Sosmed 3' }
     };
 
     function setBadge(badgeId, text, type) {
@@ -913,100 +932,171 @@
         el.className = 'badge-status ' + (type || '');
     }
 
+    function showLockedAlert(type) {
+        if (swalActive) return;
+        if (Swal.isVisible()) return;
+        swalActive = true;
+
+        const config = type === 'checking' ? {
+            title: '⏳ Sedang Dicek',
+            text: 'Mohon tunggu sebentar, sistem sedang memeriksa status layanan.',
+            icon: 'info',
+            confirmButtonColor: '#4fc3f7',
+            timer: 1500,
+            showConfirmButton: false
+        } : {
+            title: '⚠️ Layanan Gangguan',
+            text: 'Provider ini sedang dalam gangguan. Silakan coba layanan lain.',
+            icon: 'warning',
+            confirmButtonColor: '#ffaa00'
+        };
+
+        Swal.fire({
+            ...config,
+            background: '#1a0e2e',
+            color: '#fff'
+        }).then(() => {
+            swalActive = false;
+        });
+    }
+
+    // 🔒 KUNCI TOMBOL TOTAL
+    function lockBtn(btnId) {
+        const btn = document.getElementById(btnId);
+        if (!btn) return;
+        btn.disabled = true;
+        btn.classList.add('checking');
+        btn.setAttribute('data-locked', 'true');
+        btn.setAttribute('aria-disabled', 'true');
+    }
+
+    function unlockBtnOK(btnId) {
+        const btn = document.getElementById(btnId);
+        if (!btn) return;
+        btn.disabled = false;
+        btn.classList.remove('checking');
+        btn.removeAttribute('data-locked');
+        btn.removeAttribute('aria-disabled');
+    }
+
+    function lockBtnGangguan(btnId) {
+        const btn = document.getElementById(btnId);
+        if (!btn) return;
+        btn.disabled = true;
+        btn.classList.remove('checking');
+        btn.setAttribute('data-locked', 'true');
+        btn.setAttribute('aria-disabled', 'true');
+    }
+
     async function checkProviderHealth(providerKey) {
         const prov = PROVIDERS[providerKey];
         if (!prov) return;
 
-        const btn = document.getElementById(prov.btn);
-
-        // 🔥 LOCK HARD: disable + class checking + global flag
-        if (btn) {
-            btn.classList.add('checking');
-            btn.disabled = true;
-            btn.setAttribute('aria-disabled', 'true');
+        // 🔒 MUTEX
+        if (providerLocks[providerKey]) {
+            console.log(`🔒 ${prov.label} masih dicek, skip`);
+            return;
         }
+        providerLocks[providerKey] = true;
+
+        // 🔒 LOCK TOTAL
+        lockBtn(prov.btn);
         setBadge(prov.badge, 'CEK...', 'checking-badge');
 
         let balance = 0;
         let checkFailed = false;
 
+        // 🔥 Minimal loading 800ms biar user liat "CEK..." jelas
+        const minLoadingPromise = new Promise(r => setTimeout(r, 800));
+
         try {
+            let fetchPromise;
+
             if (providerKey === 'lollipop') {
-                const res = await fetch(prov.endpoint, {
+                fetchPromise = fetch(prov.endpoint, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ action: 'balance' })
+                }).then(async res => {
+                    if (res.ok) {
+                        const data = await res.json();
+                        balance = Number(data.balance) || 0;
+                    } else {
+                        checkFailed = true;
+                    }
                 });
-                if (res.ok) {
-                    const data = await res.json();
-                    balance = Number(data.balance) || 0;
-                } else {
-                    checkFailed = true;
-                }
             } else if (providerKey === 'fayupedia') {
-                const res = await fetch(prov.endpoint + '?action=balance&t=' + Date.now(), { cache: 'no-store' });
-                if (res.ok) {
-                    const data = await res.json();
-                    balance = Number(data.balance) || 0;
-                } else {
-                    checkFailed = true;
-                }
+                fetchPromise = fetch(prov.endpoint + '?action=balance&t=' + Date.now(), { cache: 'no-store' })
+                    .then(async res => {
+                        if (res.ok) {
+                            const data = await res.json();
+                            balance = Number(data.balance) || 0;
+                        } else {
+                            checkFailed = true;
+                        }
+                    });
             } else if (providerKey === 'indosmm') {
-                const res = await fetch(prov.endpoint, {
+                fetchPromise = fetch(prov.endpoint, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ action: 'balance' })
+                }).then(async res => {
+                    if (res.ok) {
+                        const data = await res.json();
+                        balance = Number(data.balance) || 0;
+                    } else {
+                        checkFailed = true;
+                    }
                 });
-                if (res.ok) {
-                    const data = await res.json();
-                    balance = Number(data.balance) || 0;
-                } else {
-                    checkFailed = true;
-                }
             }
+
+            await Promise.all([fetchPromise, minLoadingPromise]);
+
         } catch (err) {
             console.error(`❌ Error cek ${prov.label}:`, err);
             checkFailed = true;
+            await minLoadingPromise;
         }
 
-        // 🔥 UNLOCK class checking dulu
-        if (btn) btn.classList.remove('checking');
-
+        // 🔥 Tentukan hasil
         if (checkFailed) {
             setBadge(prov.badge, 'GANGGUAN', 'gangguan');
-            if (btn) {
-                btn.disabled = true;
-                btn.setAttribute('aria-disabled', 'true');
-            }
+            lockBtnGangguan(prov.btn);
             console.log(`❌ ${prov.label}: GANGGUAN (check failed)`);
-            return;
-        }
-
-        if (balance < MIN_BALANCE) {
+        } else if (balance < MIN_BALANCE) {
             setBadge(prov.badge, 'GANGGUAN', 'gangguan');
-            if (btn) {
-                btn.disabled = true;
-                btn.setAttribute('aria-disabled', 'true');
-            }
+            lockBtnGangguan(prov.btn);
             console.log(`⚠️ ${prov.label}: GANGGUAN (saldo: ${balance})`);
         } else {
             setBadge(prov.badge, 'OK', 'ok-badge');
-            if (btn) {
-                btn.disabled = false;
-                btn.removeAttribute('aria-disabled');
-            }
+            unlockBtnOK(prov.btn);
             console.log(`✅ ${prov.label}: OK (saldo: ${balance})`);
         }
+
+        // 🔓 Release mutex
+        providerLocks[providerKey] = false;
     }
 
     async function checkAllProviders() {
+        if (globalCheckLock) {
+            console.log('🔒 Global lock aktif, skip check');
+            return;
+        }
+
+        globalCheckLock = true;
         isCheckingProviders = true;
-        await Promise.all([
-            checkProviderHealth('lollipop'),
-            checkProviderHealth('fayupedia'),
-            checkProviderHealth('indosmm')
-        ]);
-        isCheckingProviders = false;
+
+        try {
+            await Promise.all([
+                checkProviderHealth('lollipop'),
+                checkProviderHealth('fayupedia'),
+                checkProviderHealth('indosmm')
+            ]);
+        } finally {
+            globalCheckLock = false;
+            isCheckingProviders = false;
+            lastCheckFinishTime = Date.now();
+        }
     }
 
     // ============================================================
@@ -1189,71 +1279,72 @@
     }
 
     // ============================================================
-    // 🔥 CORE HANDLE CLICK (dipanggil dari event listener)
+    // 🔥 CORE HANDLE CLICK — MULTI LAYER GUARD
     // ============================================================
     async function handleButtonClick(url, btnElement) {
-        // Layer 1: banned
+        // Layer 0: banned
         if (isBanned) {
-            Swal.fire({
-                title: '🚫 Akun Diblokir',
-                text: 'Anda tidak dapat mengakses menu karena akun sedang dibanned.',
-                icon: 'error',
-                confirmButtonColor: '#ff4444',
-                background: '#1a0e2e',
-                color: '#fff'
-            });
+            if (!Swal.isVisible()) {
+                Swal.fire({
+                    title: '🚫 Akun Diblokir',
+                    text: 'Anda tidak dapat mengakses menu karena akun sedang dibanned.',
+                    icon: 'error',
+                    confirmButtonColor: '#ff4444',
+                    background: '#1a0e2e',
+                    color: '#fff'
+                });
+            }
             return;
         }
 
-        // Layer 2: global check flag
-        if (isCheckingProviders) {
-            Swal.fire({
-                title: '⏳ Sedang Dicek',
-                text: 'Mohon tunggu sebentar, sistem sedang memeriksa status layanan.',
-                icon: 'info',
-                confirmButtonColor: '#4fc3f7',
-                background: '#1a0e2e',
-                color: '#fff',
-                timer: 1800,
-                showConfirmButton: false
-            });
+        // Layer 1: global check lock
+        if (isCheckingProviders || globalCheckLock) {
+            showLockedAlert('checking');
+            return;
+        }
+
+        // Layer 2: debounce setelah cek selesai
+        const timeSinceFinish = Date.now() - lastCheckFinishTime;
+        if (timeSinceFinish < DEBOUNCE_MS && lastCheckFinishTime > 0) {
+            showLockedAlert('checking');
             return;
         }
 
         // Layer 3: tombol state
         if (btnElement) {
-            if (btnElement.classList.contains('checking')) {
-                Swal.fire({
-                    title: '⏳ Sedang Dicek',
-                    text: 'Mohon tunggu sebentar, sistem sedang memeriksa status layanan.',
-                    icon: 'info',
-                    confirmButtonColor: '#4fc3f7',
-                    background: '#1a0e2e',
-                    color: '#fff',
-                    timer: 1800,
-                    showConfirmButton: false
-                });
+            if (btnElement.disabled) {
+                showLockedAlert('gangguan');
                 return;
             }
-            if (btnElement.disabled) {
-                Swal.fire({
-                    title: '⚠️ Layanan Gangguan',
-                    text: 'Provider ini sedang dalam gangguan. Silakan coba layanan lain.',
-                    icon: 'warning',
-                    confirmButtonColor: '#ffaa00',
-                    background: '#1a0e2e',
-                    color: '#fff'
-                });
+            if (btnElement.classList.contains('checking')) {
+                showLockedAlert('checking');
+                return;
+            }
+            if (btnElement.getAttribute('data-locked') === 'true') {
+                const badge = btnElement.querySelector('.badge-status');
+                if (badge && badge.textContent.includes('CEK')) {
+                    showLockedAlert('checking');
+                } else {
+                    showLockedAlert('gangguan');
+                }
                 return;
             }
         }
 
-        // Layer 4: gmail check
+        // Layer 4: gmail
         const gmailOk = await ensureGmail();
         if (!gmailOk && !getStoredGmail()) return;
         if (isBanned) return;
 
-        // Eksekusi navigasi
+        // Layer 5: Re-check sekali lagi setelah await
+        if (btnElement) {
+            if (btnElement.disabled || btnElement.classList.contains('checking') || btnElement.getAttribute('data-locked') === 'true') {
+                showLockedAlert('checking');
+                return;
+            }
+        }
+
+        // ✅ EKSEKUSI
         if (url) {
             if (url.startsWith('http://') || url.startsWith('https://')) {
                 window.open(url, '_blank');
@@ -1264,65 +1355,94 @@
     }
 
     // ============================================================
-    // 🔥 BIND SEMUA .nav-btn DENGAN CAPTURE PHASE
+    // 🔥 BIND ALL NAV BUTTONS — MAX SECURITY
     // ============================================================
     function bindNavButtons() {
         document.querySelectorAll('.nav-btn').forEach(btn => {
             if (btn.dataset.bound === 'true') return;
             btn.dataset.bound = 'true';
 
-            // Capture phase click: block paling awal
+            // 🔒 Guard function
+            function shouldBlock() {
+                if (btn.disabled) return 'gangguan-or-checking';
+                if (btn.classList.contains('checking')) return 'checking';
+                if (btn.getAttribute('data-locked') === 'true') {
+                    const badge = btn.querySelector('.badge-status');
+                    if (badge && badge.textContent.includes('CEK')) return 'checking';
+                    return 'gangguan';
+                }
+                if (isCheckingProviders || globalCheckLock) return 'checking';
+
+                const timeSinceFinish = Date.now() - lastCheckFinishTime;
+                if (timeSinceFinish < DEBOUNCE_MS && lastCheckFinishTime > 0) return 'checking';
+
+                return false;
+            }
+
+            // 🔒 CAPTURE PHASE CLICK
             btn.addEventListener('click', function(e) {
-                // HARD BLOCK jika checking / disabled / global checking
-                if (btn.disabled || btn.classList.contains('checking') || isCheckingProviders) {
+                const blockReason = shouldBlock();
+                if (blockReason) {
                     e.preventDefault();
                     e.stopPropagation();
                     e.stopImmediatePropagation();
 
-                    if (btn.classList.contains('checking') || isCheckingProviders) {
-                        Swal.fire({
-                            title: '⏳ Sedang Dicek',
-                            text: 'Mohon tunggu sebentar, sistem sedang memeriksa status layanan.',
-                            icon: 'info',
-                            confirmButtonColor: '#4fc3f7',
-                            background: '#1a0e2e',
-                            color: '#fff',
-                            timer: 1800,
-                            showConfirmButton: false
-                        });
+                    if (blockReason === 'checking') {
+                        showLockedAlert('checking');
                     } else {
-                        Swal.fire({
-                            title: '⚠️ Layanan Gangguan',
-                            text: 'Provider ini sedang dalam gangguan. Silakan coba layanan lain.',
-                            icon: 'warning',
-                            confirmButtonColor: '#ffaa00',
-                            background: '#1a0e2e',
-                            color: '#fff'
-                        });
+                        showLockedAlert('gangguan');
                     }
                     return false;
                 }
 
-                // Lolos guard → eksekusi
                 e.preventDefault();
                 const url = btn.dataset.url;
                 if (url) handleButtonClick(url, btn);
-            }, true); // ← CAPTURE PHASE
+            }, true);
 
-            // Block keyboard Enter/Space saat disabled/checking
-            btn.addEventListener('keydown', function(e) {
-                if ((e.key === 'Enter' || e.key === ' ') && (btn.disabled || btn.classList.contains('checking') || isCheckingProviders)) {
+            // 🔒 CAPTURE PHASE POINTERDOWN
+            btn.addEventListener('pointerdown', function(e) {
+                const blockReason = shouldBlock();
+                if (blockReason) {
                     e.preventDefault();
                     e.stopPropagation();
                     e.stopImmediatePropagation();
+                    return false;
                 }
             }, true);
 
-            // Block pointerdown saat checking (buat jaga-jaga)
-            btn.addEventListener('pointerdown', function(e) {
-                if (btn.classList.contains('checking') || isCheckingProviders) {
+            // 🔒 TOUCHSTART (mobile)
+            btn.addEventListener('touchstart', function(e) {
+                const blockReason = shouldBlock();
+                if (blockReason) {
                     e.preventDefault();
                     e.stopPropagation();
+                    e.stopImmediatePropagation();
+                    return false;
+                }
+            }, { capture: true, passive: false });
+
+            // 🔒 MOUSEDOWN
+            btn.addEventListener('mousedown', function(e) {
+                const blockReason = shouldBlock();
+                if (blockReason) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    e.stopImmediatePropagation();
+                    return false;
+                }
+            }, true);
+
+            // 🔒 KEYBOARD
+            btn.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    const blockReason = shouldBlock();
+                    if (blockReason) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        e.stopImmediatePropagation();
+                        return false;
+                    }
                 }
             }, true);
         });
@@ -1343,13 +1463,12 @@
     // 🔥 INIT
     // ============================================================
     window.addEventListener('load', async function() {
-        // 🔥 BIND TOMBOL PALING AWAL
+        // 🔒 BIND DULU
         bindNavButtons();
 
         // Bind tombol ubah gmail
         document.getElementById('changeGmailBtn').addEventListener('click', changeGmailWithPassword);
 
-        // Cek gmail & banned
         const gmail = getStoredGmail();
 
         if (gmail && validateEmail(gmail)) {
@@ -1365,8 +1484,10 @@
         updateGmailDisplay();
         await loadAnnouncement();
 
-        // 🔥 CEK HEALTH SEMUA PROVIDER
-        checkAllProviders();
+        // 🔥 CEK HEALTH SEMUA PROVIDER setelah UI settle
+        setTimeout(() => {
+            checkAllProviders();
+        }, 300);
 
         // Re-check tiap 60 detik
         setInterval(checkAllProviders, 60000);
