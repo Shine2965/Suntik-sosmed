@@ -537,10 +537,14 @@
         </div>
 
         <!-- ===== TOMBOL PROVIDER ===== -->
+        <!-- 🔒 disabled + data-locked dari HTML parse — gak nunggu JS -->
         <button class="nav-btn" 
                 id="btnSosmed1" 
                 data-provider="lollipop" 
-                data-url="/sosmed-1/">
+                data-url="/sosmed-1/"
+                disabled
+                data-locked="true"
+                aria-disabled="true">
             <span>📱 Suntik Sosmed 1 🫣 ( Layanan Baru )</span>
             <span class="badge-status checking-badge" id="badgeSosmed1">CEK...</span>
         </button>
@@ -548,7 +552,10 @@
         <button class="nav-btn" 
                 id="btnSosmed2" 
                 data-provider="fayupedia" 
-                data-url="/sosmed-2/">
+                data-url="/sosmed-2/"
+                disabled
+                data-locked="true"
+                aria-disabled="true">
             <span>📱 Suntik Sosmed 2 🔥 (Paling Ramai dipesan)</span>
             <span class="badge-status checking-badge" id="badgeSosmed2">CEK...</span>
         </button>
@@ -556,7 +563,10 @@
         <button class="nav-btn" 
                 id="btnSosmed3" 
                 data-provider="indosmm" 
-                data-url="/sosmed-3/">
+                data-url="/sosmed-3/"
+                disabled
+                data-locked="true"
+                aria-disabled="true">
             <span>📱 Suntik Sosmed 3</span>
             <span class="badge-status checking-badge" id="badgeSosmed3">CEK...</span>
         </button>
@@ -604,12 +614,30 @@
         indosmm: false
     };
 
+    // 🔒 FORCE-LOCK INTERVAL
+    let forceLockInterval = null;
+
     let userID = localStorage.getItem(USER_ID_KEY);
 
     if (!userID) {
         userID = 'user-' + Math.random().toString(36).substring(2,10) + '-' + Date.now().toString(36);
         localStorage.setItem(USER_ID_KEY, userID);
     }
+
+    // ============================================================
+    // 🔥 EKSEKUSI INSTAN — SEBELUM SEMUANYA
+    // ============================================================
+    (function immediatelyLockProviderButtons() {
+        const ids = ['btnSosmed1', 'btnSosmed2', 'btnSosmed3'];
+        ids.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) {
+                el.disabled = true;
+                el.setAttribute('data-locked', 'true');
+                el.setAttribute('aria-disabled', 'true');
+            }
+        });
+    })();
 
     // ===== UTILITY FUNCTIONS =====
     function validateEmail(email) {
@@ -682,6 +710,37 @@
         const timeEl = document.getElementById('bannedCurrentTime');
         if (timeEl && document.getElementById('bannedPage').classList.contains('show')) {
             timeEl.textContent = '🕐 WIB (GMT+7): ' + formatWIB(getWIBTime());
+        }
+    }
+
+    // ============================================================
+    // 🔥 FORCE DISABLE ALL PROVIDER BUTTONS
+    // ============================================================
+    function forceDisableAllProviderButtons() {
+        ['btnSosmed1', 'btnSosmed2', 'btnSosmed3'].forEach(id => {
+            const btn = document.getElementById(id);
+            if (!btn) return;
+            // Hanya lock ulang jika BELUM dinyatakan OK
+            if (btn.getAttribute('data-locked') === 'true') {
+                btn.disabled = true;
+                btn.setAttribute('aria-disabled', 'true');
+            }
+        });
+    }
+
+    function startForceLockInterval() {
+        if (forceLockInterval) clearInterval(forceLockInterval);
+        forceLockInterval = setInterval(() => {
+            if (globalCheckLock || isCheckingProviders) {
+                forceDisableAllProviderButtons();
+            }
+        }, 200);
+    }
+
+    function stopForceLockInterval() {
+        if (forceLockInterval) {
+            clearInterval(forceLockInterval);
+            forceLockInterval = null;
         }
     }
 
@@ -1086,6 +1145,10 @@
         globalCheckLock = true;
         isCheckingProviders = true;
 
+        // 🔥 FORCE LOCK SEMUA TOMBOL SEBELUM CEK
+        forceDisableAllProviderButtons();
+        startForceLockInterval();
+
         try {
             await Promise.all([
                 checkProviderHealth('lollipop'),
@@ -1096,6 +1159,7 @@
             globalCheckLock = false;
             isCheckingProviders = false;
             lastCheckFinishTime = Date.now();
+            stopForceLockInterval();
         }
     }
 
@@ -1400,7 +1464,7 @@
                 if (url) handleButtonClick(url, btn);
             }, true);
 
-            // 🔒 CAPTURE PHASE POINTERDOWN
+            // 🔒 POINTERDOWN
             btn.addEventListener('pointerdown', function(e) {
                 const blockReason = shouldBlock();
                 if (blockReason) {
@@ -1411,7 +1475,7 @@
                 }
             }, true);
 
-            // 🔒 TOUCHSTART (mobile)
+            // 🔒 TOUCHSTART
             btn.addEventListener('touchstart', function(e) {
                 const blockReason = shouldBlock();
                 if (blockReason) {
@@ -1463,7 +1527,10 @@
     // 🔥 INIT
     // ============================================================
     window.addEventListener('load', async function() {
-        // 🔒 BIND DULU
+        // 🔒 FORCE DISABLE SEMUA TOMBOL PROVIDER DULUAN — Layer paling luar
+        forceDisableAllProviderButtons();
+
+        // 🔒 BIND EVENT
         bindNavButtons();
 
         // Bind tombol ubah gmail
