@@ -311,15 +311,11 @@
         transform: none !important;
     }
 
-    /* Khusus checking → cursor tunggu (overrides not-allowed) */
-    .nav-btn.checking {
-        cursor: wait !important;
-    }
-
     .nav-btn.checking *,
     .nav-btn[data-locked="true"] *,
     .nav-btn:disabled * {
         pointer-events: none !important;
+        cursor: not-allowed !important;
     }
 
     /* ===== BADGE STATUS ===== */
@@ -631,7 +627,7 @@
     }
 
     // ============================================================
-    // 🔥 EKSEKUSI INSTAN — SEBELUM SEMUANYA
+    // 🔥 EKSEKUSI INSTAN
     // ============================================================
     (function immediatelyLockProviderButtons() {
         const ids = ['btnSosmed1', 'btnSosmed2', 'btnSosmed3'];
@@ -981,7 +977,7 @@
     });
 
     // ============================================================
-    // 🔥 HEALTH CHECK PROVIDER — MUTEX + DEBOUNCE + HARD LOCK
+    // 🔥 HEALTH CHECK PROVIDER
     // ============================================================
     const PROVIDERS = {
         lollipop:  { endpoint: '/api/lollipop-services',  btn: 'btnSosmed1', badge: 'badgeSosmed1', label: 'Sosmed 1' },
@@ -1024,7 +1020,6 @@
         });
     }
 
-    // 🔒 KUNCI TOMBOL TOTAL
     function lockBtn(btnId) {
         const btn = document.getElementById(btnId);
         if (!btn) return;
@@ -1056,21 +1051,18 @@
         const prov = PROVIDERS[providerKey];
         if (!prov) return;
 
-        // 🔒 MUTEX
         if (providerLocks[providerKey]) {
             console.log(`🔒 ${prov.label} masih dicek, skip`);
             return;
         }
         providerLocks[providerKey] = true;
 
-        // 🔒 LOCK TOTAL
         lockBtn(prov.btn);
         setBadge(prov.badge, 'CEK...', 'checking-badge');
 
         let balance = 0;
         let checkFailed = false;
 
-        // 🔥 Minimal loading 800ms
         const minLoadingPromise = new Promise(r => setTimeout(r, 800));
 
         try {
@@ -1122,7 +1114,6 @@
             await minLoadingPromise;
         }
 
-        // 🔥 Tentukan hasil
         if (checkFailed) {
             setBadge(prov.badge, 'GANGGUAN', 'gangguan');
             lockBtnGangguan(prov.btn);
@@ -1137,7 +1128,6 @@
             console.log(`✅ ${prov.label}: OK (saldo: ${balance})`);
         }
 
-        // 🔓 Release mutex
         providerLocks[providerKey] = false;
     }
 
@@ -1150,7 +1140,6 @@
         globalCheckLock = true;
         isCheckingProviders = true;
 
-        // 🔥 FORCE LOCK SEMUA TOMBOL SEBELUM CEK
         forceDisableAllProviderButtons();
         startForceLockInterval();
 
@@ -1348,7 +1337,7 @@
     }
 
     // ============================================================
-    // 🔥 CORE HANDLE CLICK — MULTI LAYER GUARD
+    // 🔥 CORE HANDLE CLICK
     // ============================================================
     async function handleButtonClick(url, btnElement) {
         if (isBanned) {
@@ -1417,7 +1406,7 @@
     }
 
     // ============================================================
-    // 🔥 BIND ALL NAV BUTTONS — MAX SECURITY
+    // 🔥 BIND ALL NAV BUTTONS
     // ============================================================
     function bindNavButtons() {
         document.querySelectorAll('.nav-btn').forEach(btn => {
