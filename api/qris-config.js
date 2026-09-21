@@ -33,7 +33,7 @@ export default function handler(req, res) {
 
         // ===== FAYUPEDIA CONFIG (TETAP ADA) =====
         const fayupediaApiKey = process.env.FAYUPEDIA_API_KEY || 'fbztdy-mv2vyz-eubpwc-mobrnb-4bqift';
-        const fayupediaApiId = parseInt(process.env.FAYUPEDIA_API_ID) || 287358;
+        const fayupediaApiId = parseInt(process.env.FAYUPEDIA_API_ID) || 5522;
 
         // ===== IRVANKARDE CONFIG =====
         const irvankardeApiKey = process.env.IRVANKARDE_API_KEY || '';
