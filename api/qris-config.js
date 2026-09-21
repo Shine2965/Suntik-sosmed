@@ -1,6 +1,6 @@
-
 // /api/qris-config.js
 // Vercel Serverless Function - Mengambil semua konfigurasi dari Environment Variable
+// ⚠️ PERINGATAN: Endpoint ini mengekspos API Key. Jangan biarkan bisa diakses publik tanpa proteksi.
 
 export default function handler(req, res) {
     // CORS
@@ -32,7 +32,7 @@ export default function handler(req, res) {
         const orderApiKey = process.env.ORDER_API_KEY || process.env.ORDERSOSMED_API_KEY || '23941803d5391da4e45a1bf4ebca52064fa17a53574d1c3655a0173dd7530fb1';
         const orderSecretKey = process.env.ORDER_SECRET_KEY || process.env.ORDERSOSMED_SECRET_KEY || 'Alvino11';
 
-        // ===== FAYUPEDIA CONFIG (TETAP ADA) =====
+        // ===== FAYUPEDIA CONFIG =====
         const fayupediaApiKey = process.env.FAYUPEDIA_API_KEY || 'qzysdo-hzbsqd-iz9ljh-8iozzn-rucfid';
         const fayupediaApiId = parseInt(process.env.FAYUPEDIA_API_ID) || 5522;
 
@@ -46,6 +46,8 @@ export default function handler(req, res) {
         // ===== RESPONSE =====
         return res.status(200).json({
             success: true,
+
+            // ===== QIOSPAY =====
             qiospay_api_key: qiospayApiKey,
             merchant_code: merchantCode,
 
@@ -54,18 +56,21 @@ export default function handler(req, res) {
 
             // ===== LEGACY ORDER SOSMED =====
             order_api_id: orderApiId,
+            order_api_key: orderApiKey,           // ← sebelumnya hilang
+            order_secret_key: orderSecretKey,     // ← sebelumnya hilang
 
             // ===== FAYUPEDIA =====
-            fayupedia_api_key: fayupediaApiKey,
             fayupedia_api_id: fayupediaApiId,
+            fayupedia_api_key: fayupediaApiKey,
 
             // ===== IRVANKARDE =====
-            irvankarde_api_key: irvankardeApiKey,
             irvankarde_api_id: irvankardeApiId,
+            irvankarde_api_key: irvankardeApiKey,
 
             // ===== LOLLIPOP =====
             lollipop_api_key: lollipopApiKey,
 
+            // Info apakah ambil dari environment variable
             from_env: {
                 qiospay: !!process.env.QIOSPAY_API_KEY,
                 indo: !!process.env.INDO_API_KEY,
