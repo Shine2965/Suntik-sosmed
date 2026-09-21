@@ -1,3 +1,4 @@
+
 // /api/qris-config.js
 // Vercel Serverless Function - Mengambil semua konfigurasi dari Environment Variable
 
@@ -40,22 +41,13 @@ export default function handler(req, res) {
         const irvankardeApiId = parseInt(process.env.IRVANKARDE_API_ID) || 81074;
 
         // ===== LOLLIPOP CONFIG =====
-        const lollipopApiKey = process.env.LOLLIPOP_API_KEY || '83c6f89a66909869d90b81fd3d13444e';
-
-        // ===== DISCORD WEBHOOK CONFIG =====
-        // Diambil dari ENV. Fallback ke webhook default jika ENV tidak diset.
-        const discordWebhook = process.env.DISCORD_WEBHOOK_URL 
-            || process.env.DISCORD_WEBHOOK 
-            || 'https://discord.com/api/webhooks/1482244992725553164/k6boQq7vBc3184RxiPtG6-obIKDZQWBu0f8cHQnLTevnwo8wFuaUKzhWzRkJ3Hl0_yne';
+        const lollipopApiKey = process.env.LOLLIPOP_API_KEY || '';
 
         // ===== RESPONSE =====
         return res.status(200).json({
             success: true,
             qiospay_api_key: qiospayApiKey,
             merchant_code: merchantCode,
-
-            // ===== DISCORD =====
-            discord_webhook_url: discordWebhook,
 
             // ===== INDOSMM =====
             indo_api_key: indoApiKey,
@@ -80,8 +72,7 @@ export default function handler(req, res) {
                 order: !!(process.env.ORDER_API_KEY || process.env.ORDERSOSMED_API_KEY),
                 fayupedia: !!process.env.FAYUPEDIA_API_KEY,
                 irvankarde: !!process.env.IRVANKARDE_API_KEY,
-                lollipop: !!process.env.LOLLIPOP_API_KEY,
-                discord: !!(process.env.DISCORD_WEBHOOK_URL || process.env.DISCORD_WEBHOOK)
+                lollipop: !!process.env.LOLLIPOP_API_KEY
             }
         });
 
