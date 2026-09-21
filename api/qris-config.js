@@ -1,4 +1,3 @@
-
 // /api/qris-config.js
 // Vercel Serverless Function - Mengambil semua konfigurasi dari Environment Variable
 
