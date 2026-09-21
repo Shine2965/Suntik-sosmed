@@ -24,7 +24,7 @@ export default function handler(req, res) {
         const merchantCode = process.env.QIOSPAY_MERCHANT_CODE || 'QP052692';
 
         // ===== INDOSMM CONFIG =====
-        const indoApiKey = process.env.INDO_API_KEY || 'a1174c530b97e1bc0a7eec7baff3ac6e';
+        const indoApiKey = process.env.INDO_API_KEY || '4ed44f3cf37683ca04b27636f4a66ca5';
 
         // ===== ORDER SOSMED CONFIG (LEGACY) =====
         const orderApiId = parseInt(process.env.ORDER_API_ID || process.env.ORDERSOSMED_API_ID) || 11313;
