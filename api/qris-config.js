@@ -32,7 +32,7 @@ export default function handler(req, res) {
         const orderSecretKey = process.env.ORDER_SECRET_KEY || process.env.ORDERSOSMED_SECRET_KEY || 'Alvino11';
 
         // ===== FAYUPEDIA CONFIG (TETAP ADA) =====
-        const fayupediaApiKey = process.env.FAYUPEDIA_API_KEY || 'qzysdo-hzbsqd-iz9ljh-8iozzn-rucfid';
+        const fayupediaApiKey = process.env.FAYUPEDIA_API_KEY || 'vxiho0-tldcsq-ouqra0-flb3km-3hlczy';
         const fayupediaApiId = parseInt(process.env.FAYUPEDIA_API_ID) || 287358;
 
         // ===== IRVANKARDE CONFIG =====
