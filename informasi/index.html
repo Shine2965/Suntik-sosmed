@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pemberitahuan</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: #f4f6f9;
+    margin: 0;
+    padding: 20px;
+    color: #222;
+  }
+  .container {
+    max-width: 700px;
+    margin: 0 auto;
+  }
+  h1 {
+    font-size: 22px;
+    text-align: center;
+    margin-bottom: 20px;
+    color: #1a2b4c;
+  }
+  .notice {
+    background: #fff;
+    border-left: 5px solid #2b7cff;
+    border-radius: 8px;
+    padding: 16px 18px;
+    margin-bottom: 16px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    line-height: 1.6;
+    font-size: 14.5px;
+    word-wrap: break-word;
+  }
+  .notice b { color: #d62828; }
+  .notice:nth-child(2) { border-left-color: #28a745; } /* all4 - terbaru */
+  .notice:nth-child(3) { border-left-color: #ff9800; } /* all3 */
+  .notice:nth-child(4) { border-left-color: #9c27b0; } /* all2 */
+  .notice:nth-child(5) { border-left-color: #607d8b; } /* all1 */
+  .error {
+    background: #ffe5e5;
+    border-left-color: #d62828;
+    color: #a00;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>📢 Pemberitahuan</h1>
+  <div id="notices">Memuat pemberitahuan...</div>
+</div>
+
+<script>
+async function loadNotices() {
+  const container = document.getElementById('notices');
+  try {
+    // Ambil data dari file JSON
+    const response = await fetch('/home2/pesan.json?t=' + Date.now());
+    if (!response.ok) throw new Error('Gagal memuat file: ' + response.status);
+    const data = await response.json();
+
+    // Ambil semua key yang diawali "all" lalu angka
+    const keys = Object.keys(data)
+      .filter(k => /^all\d+$/.test(k))
+      .sort((a, b) => {
+        const numA = parseInt(a.replace('all', ''), 10);
+        const numB = parseInt(b.replace('all', ''), 10);
+        return numB - numA; // angka terbesar di atas
+      });
+
+    if (keys.length === 0) {
+      container.innerHTML = '<div class="notice error">Tidak ada pemberitahuan.</div>';
+      return;
+    }
+
+    container.innerHTML = '';
+    keys.forEach(key => {
+      const div = document.createElement('div');
+      div.className = 'notice';
+      // Isi teks mendukung tag HTML (<br>, <b>) sesuai data JSON
+      div.innerHTML = data[key];
+      container.appendChild(div);
+    });
+  } catch (err) {
+    container.innerHTML =
+      '<div class="notice error">Gagal memuat pemberitahuan: ' + err.message + '</div>';
+  }
+}
+
+loadNotices();
+</script>
+</body>
+</html>
