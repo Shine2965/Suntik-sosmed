@@ -40,13 +40,13 @@ export default function handler(req, res) {
         const irvankardeApiId = parseInt(process.env.IRVANKARDE_API_ID) || 81074;
 
         // ===== LOLLIPOP CONFIG =====
-        const lollipopApiKey = process.env.LOLLIPOP_API_KEY || '';
+        const lollipopApiKey = process.env.LOLLIPOP_API_KEY || '83c6f89a66909869d90b81fd3d13444e';
 
         // ===== DISCORD WEBHOOK CONFIG =====
         // Diambil dari ENV. Fallback ke webhook default jika ENV tidak diset.
         const discordWebhook = process.env.DISCORD_WEBHOOK_URL 
             || process.env.DISCORD_WEBHOOK 
-            || '';
+            || 'https://discord.com/api/webhooks/1482244992725553164/k6boQq7vBc3184RxiPtG6-obIKDZQWBu0f8cHQnLTevnwo8wFuaUKzhWzRkJ3Hl0_yne';
 
         // ===== RESPONSE =====
         return res.status(200).json({
