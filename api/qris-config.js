@@ -24,7 +24,7 @@ export default function handler(req, res) {
         const merchantCode = process.env.QIOSPAY_MERCHANT_CODE || 'QP052692';
 
         // ===== INDOSMM CONFIG =====
-        const indoApiKey = process.env.INDO_API_KEY || '4ed44f3cf37683ca04b27636f4a66ca5';
+        const indoApiKey = process.env.INDO_API_KEY || 'f02e52d385961e16764fb7ff248487e7';
 
         // ===== ORDER SOSMED CONFIG (LEGACY) =====
         const orderApiId = parseInt(process.env.ORDER_API_ID || process.env.ORDERSOSMED_API_ID) || 11313;
@@ -40,7 +40,7 @@ export default function handler(req, res) {
         const irvankardeApiId = parseInt(process.env.IRVANKARDE_API_ID) || 81074;
 
         // ===== LOLLIPOP CONFIG =====
-        const lollipopApiKey = process.env.LOLLIPOP_API_KEY || 'f02e52d385961e16764fb7ff248487e7';
+        const lollipopApiKey = process.env.LOLLIPOP_API_KEY || '83c6f89a66909869d90b81fd3d13444e';
 
         // ===== DISCORD WEBHOOK CONFIG =====
         // Diambil dari ENV. Fallback ke webhook default jika ENV tidak diset.
