@@ -215,6 +215,37 @@ h2 {
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
+
+/* ===== LOADING INDICATOR ===== */
+.loading-indicator {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 14px 16px;
+  margin-bottom: 14px;
+  background: rgba(139, 92, 246, 0.08);
+  border: 1px solid rgba(139, 92, 246, 0.2);
+  border-radius: var(--radius-sm);
+  color: #c4b5fd;
+  font-size: 13px;
+  font-weight: 500;
+  animation: fadeSlide 0.3s ease both;
+}
+.loading-indicator.show { display: flex; }
+.loading-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(139, 92, 246, 0.25);
+  border-top-color: #8b5cf6;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 label {
   display: block;
   margin-top: 14px;
@@ -734,6 +765,7 @@ button.primary:disabled { opacity: 0.55; cursor: not-allowed; transform: none !i
   .order-item .order-info .row { font-size: 12px; }
   .order-summary .total { font-size: 16px; }
   .balance-warning { font-size: 12px; padding: 10px 12px; }
+  .loading-indicator { font-size: 12px; padding: 11px 14px; }
 }
 
 @media (max-width: 380px) {
@@ -787,6 +819,12 @@ button.primary:disabled { opacity: 0.55; cursor: not-allowed; transform: none !i
 <!-- FORM -->
 <main class="container">
   <h2>Suntik Sosmed 2 - Shine Shop</h2>
+
+  <!-- 🔥 LOADING INDICATOR -->
+  <div id="loadingIndicator" class="loading-indicator">
+    <div class="loading-spinner"></div>
+    <span>Sedang memuat layanan...</span>
+  </div>
 
   <label for="search">Cari Layanan</label>
   <input type="text" id="search" placeholder="Contoh: Instagram / 14444" autocomplete="off">
@@ -1110,7 +1148,7 @@ button.primary:disabled { opacity: 0.55; cursor: not-allowed; transform: none !i
     return service.pricePerFollower;
   }
 
-  // 🔥 HITUNG TOTAL HARGA ASLI (yang dibayar ke Fayupedia)
+  // 🔥 HITUNG TOTAL HARGA ASLI (yang dibayar ke Shine Shop)
   function calcRawTotal(jumlah, service) {
     if (!service) return 0;
     const rawPrice = Number(service.rawPricePerFollower) || 0;
@@ -1128,8 +1166,18 @@ button.primary:disabled { opacity: 0.55; cursor: not-allowed; transform: none !i
     return sorted;
   }
 
+  // ===== LOADING UI =====
+  function showLoading() {
+    const el = document.getElementById('loadingIndicator');
+    if (el) el.classList.add('show');
+  }
+  function hideLoading() {
+    const el = document.getElementById('loadingIndicator');
+    if (el) el.classList.remove('show');
+  }
+
   // ============================================================
-  // 🔥 FETCH BALANCE DARI FAYUPEDIA
+  // 🔥 FETCH BALANCE DARI SHINE SHOP
   // ============================================================
   async function fetchBalance() {
     try {
@@ -1139,7 +1187,7 @@ button.primary:disabled { opacity: 0.55; cursor: not-allowed; transform: none !i
       if (data.status === true) {
         currentBalance = Number(data.balance) || 0;
         isBalanceLoaded = true;
-        console.log('💰 Saldo Fayupedia: ' + formatRp(currentBalance));
+        console.log('💰 Saldo Shine Shop: ' + formatRp(currentBalance));
         return currentBalance;
       }
       throw new Error(data.msg || 'Gagal ambil saldo');
@@ -1155,7 +1203,6 @@ button.primary:disabled { opacity: 0.55; cursor: not-allowed; transform: none !i
   // 🔥 CHECK BALANCE (SINGLE)
   // ============================================================
   function checkBalance() {
-    // Debounce biar ga spam API
     if (balanceCheckTimeout) clearTimeout(balanceCheckTimeout);
 
     balanceCheckTimeout = setTimeout(async () => {
@@ -1179,16 +1226,13 @@ button.primary:disabled { opacity: 0.55; cursor: not-allowed; transform: none !i
         return;
       }
 
-      // Pastikan balance udah load
       if (!isBalanceLoaded) {
         await fetchBalance();
       }
 
-      // Hitung harga ASLI (yang dibayar ke Fayupedia)
       const rawTotal = calcRawTotal(jumlah, selectedService);
 
       if (currentBalance < rawTotal) {
-        // ❌ SALDO GA CUKUP
         warningEl.classList.add('show');
         infoEl.classList.add('show');
         infoEl.classList.add('danger');
@@ -1196,7 +1240,6 @@ button.primary:disabled { opacity: 0.55; cursor: not-allowed; transform: none !i
         btn.disabled = true;
         btn.textContent = '🚫 Saldo Tidak Cukup';
       } else {
-        // ✅ SALDO CUKUP
         warningEl.classList.remove('show');
         infoEl.classList.add('show');
         infoEl.classList.remove('danger');
@@ -1241,12 +1284,12 @@ button.primary:disabled { opacity: 0.55; cursor: not-allowed; transform: none !i
         warningEl.classList.add('show');
         infoEl.classList.add('show');
         infoEl.classList.add('danger');
-        infoEl.innerHTML = `💳 Saldo: <strong style="color:#ef4444;">${formatRp(currentBalance)}</strong> · Butuh: ${formatRp(rawTotal)}`;
+        infoEl.innerHTML = `💳 Saldo Shine Shop: <strong style="color:#ef4444;">${formatRp(currentBalance)}</strong> · Butuh: ${formatRp(rawTotal)}`;
       } else {
         warningEl.classList.remove('show');
         infoEl.classList.add('show');
         infoEl.classList.remove('danger');
-        infoEl.innerHTML = `💳 Saldo: <strong style="color:#34d399;">${formatRp(currentBalance)}</strong> · Butuh: ${formatRp(rawTotal)}`;
+        infoEl.innerHTML = `💳 Saldo Shine Shop: <strong style="color:#34d399;">${formatRp(currentBalance)}</strong> · Butuh: ${formatRp(rawTotal)}`;
       }
     }, 300);
   }
@@ -2013,6 +2056,10 @@ button.primary:disabled { opacity: 0.55; cursor: not-allowed; transform: none !i
   async function loadData(silent) {
     if (isLoading) return;
     isLoading = true;
+
+    // 🔥 Tampilkan loading hanya kalau bukan silent refresh
+    if (!silent) showLoading();
+
     try {
       // Load services & balance parallel
       const [servicesRes, balanceRes] = await Promise.allSettled([
@@ -2024,7 +2071,7 @@ button.primary:disabled { opacity: 0.55; cursor: not-allowed; transform: none !i
       if (servicesRes.status === 'fulfilled' && servicesRes.value.ok) {
         const data = await servicesRes.value.json();
         if (data && data.status === false) {
-          throw new Error(data.msg || 'Provider error');
+          throw new Error(data.msg || 'Gagal memuat layanan Shine Shop');
         }
         layananData = data;
         populateKategori(true);
@@ -2044,7 +2091,7 @@ button.primary:disabled { opacity: 0.55; cursor: not-allowed; transform: none !i
           }
         }
       } else {
-        throw new Error('Gagal memuat data layanan');
+        throw new Error('Gagal memuat data layanan Shine Shop');
       }
 
       // Parse balance
@@ -2053,7 +2100,7 @@ button.primary:disabled { opacity: 0.55; cursor: not-allowed; transform: none !i
         if (balanceData.status === true) {
           currentBalance = Number(balanceData.balance) || 0;
           isBalanceLoaded = true;
-          console.log('💰 Saldo Fayupedia: ' + formatRp(currentBalance));
+          console.log('💰 Saldo Shine Shop: ' + formatRp(currentBalance));
         }
       }
 
@@ -2064,10 +2111,12 @@ button.primary:disabled { opacity: 0.55; cursor: not-allowed; transform: none !i
     } catch (err) {
       if (!silent) {
         console.error(err);
-        alert('Data layanan gagal dimuat.\n' + (err.message || ''));
+        alert('Data layanan gagal dimuat.\n' + (err.message || 'Silakan coba lagi.'));
       }
     } finally {
       isLoading = false;
+      // 🔥 Sembunyikan loading setelah selesai
+      if (!silent) hideLoading();
     }
   }
 
