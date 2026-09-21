@@ -200,6 +200,21 @@ h2{
   0%,100%{opacity:1}
   50%{opacity:0.3}
 }
+
+/* ✅ TAMBAHAN: Info no refund */
+.no-refund-info{
+  margin:6px 0 10px 0;
+  padding:10px 14px;
+  border-radius:12px;
+  background:rgba(239,68,68,0.08);
+  border:1px solid rgba(239,68,68,0.25);
+  color:#fca5a5;
+  font-size:12px;
+  line-height:1.6;
+  text-align:center;
+}
+.no-refund-info strong{color:#ff6b6b}
+
 .details{
   font-size:13.5px;
   line-height:1.8;
@@ -573,6 +588,11 @@ p{
     ⏳ Sisa Waktu: <span class="time" id="timerTime">59:59</span>
   </div>
   
+  <!-- ✅ TAMBAHAN: Info tidak ada refund saat QRIS expired -->
+  <div class="no-refund-info">
+    ⚠️ <strong>PERHATIAN:</strong> Jika QRIS sudah expired, pembayaran yang sudah dilakukan <strong>TIDAK DAPAT DIREFUND</strong>. Pastikan Anda membayar sebelum waktu habis.
+  </div>
+  
   <div class="unique-code" id="uniqueCodeContainer">🔑 Kode Unik: <span id="uniqueCode">-</span></div>
    
   <!-- TOMBOL REGENERATE -->
@@ -608,7 +628,10 @@ p{
 <script>
 
 // ===================== KONFIGURASI =====================
-const discordWebhook = "https://discord.com/api/webhooks/1482244992725553164/k6boQq7vBc3184RxiPtG6-obIKDZQWBu0f8cHQnLTevnwo8wFuaUKzhWzRkJ3Hl0_yne";
+// ✅ Discord Webhook diambil dari ENV (di-load di fetchConfigFromEnv).
+// Fallback default di bawah ini dipakai jika ENV tidak tersedia.
+let discordWebhook = "https://discord.com/api/webhooks/1482244992725553164/k6boQq7vBc3184RxiPtG6-obIKDZQWBu0f8cHQnLTevnwo8wFuaUKzhWzRkJ3Hl0_yne";
+
 const GMAIL_BAN_URL = "/sosmed-2/payment/gmail.json";
 const WHATSAPP_NUMBER = "6289518103883";
 const MERCHANT_CODE = "QP052692";
@@ -622,7 +645,7 @@ let FAYUPEDIA_API_KEY = '';
 let QIOSPAY_API_KEY = '';
 const ADMIN_FEE_PERCENT = 2;
 const ADMIN_FEE_THRESHOLD = 500000;
-const QRIS_EXPIRY_MINUTES = 30; // 1 JAM
+const QRIS_EXPIRY_MINUTES = 30; // 30 MENIT
 
 // ===== AMBIL PARAMETER DARI URL =====
 const p = new URLSearchParams(location.search);
@@ -800,6 +823,30 @@ function markDiscordSent() {
   }
 }
 
+// ✅ TAMBAHAN: Flag untuk mencegah spam laporan expired ke Discord
+function getExpiredReportKey() {
+  return `expired_reported_${trx}`;
+}
+
+function isExpiredAlreadyReported() {
+  try {
+    return localStorage.getItem(getExpiredReportKey()) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+function markExpiredReported() {
+  try {
+    localStorage.setItem(getExpiredReportKey(), 'true');
+    console.log('📨 Laporan expired ditandai terkirim');
+    return true;
+  } catch (e) {
+    console.warn('Gagal mark expired reported:', e);
+    return false;
+  }
+}
+
 // ===== ORDER FAYUPEDIA =====
 function getOrderSentKey() {
   return `order_sent_${trx}`;
@@ -887,6 +934,12 @@ async function fetchConfigFromEnv() {
       if (data.fayupedia_api_id) {
         FAYUPEDIA_API_ID = data.fayupedia_api_id;
         console.log('✅ FAYUPEDIA API ID dari ENV');
+      }
+      
+      // ✅ TAMBAHAN: Discord Webhook dari ENV
+      if (data.discord_webhook_url) {
+        discordWebhook = data.discord_webhook_url;
+        console.log('✅ Discord Webhook dari ENV');
       }
       
       return true;
@@ -1197,6 +1250,67 @@ function updateTimerDisplay() {
   }
 }
 
+// ✅ TAMBAHAN: Kirim laporan expired ke Discord (1x per transaksi)
+async function reportExpiredToDiscord() {
+  if (isExpiredAlreadyReported()) {
+    console.log('⏭️ Laporan expired sudah dikirim sebelumnya, skip.');
+    return;
+  }
+  
+  try {
+    const gmail = getStoredGmail() || '-';
+    const userID = await getUserID();
+    const refCode = localStorage.getItem('referral_code') || '-';
+    const totalDenganUnik = finalTotal + uniqueCode + adminFee;
+    
+    let orderList = '';
+    if (isMass && ordersData.length > 0) {
+      ordersData.forEach((o, i) => {
+        orderList += `\n  ${i+1}. ${o.serviceName} (ID: ${o.serviceId}) x${o.jumlah} → ${o.target}`;
+      });
+    } else if (!isMass && ordersData.length === 1) {
+      const o = ordersData[0];
+      orderList = `\n  ${o.serviceName} (ID: ${o.serviceId}) x${o.jumlah} → ${o.target}`;
+    }
+    
+    const message = `⏰ **QRIS EXPIRED - TIDAK ADA REFUND**
+━━━━━━━━━━━━━━━━━━━━━
+🆔 **ID Transaksi:** ${trx}
+📊 **Jenis:** ${isMass ? 'MASSAL ('+ordersData.length+' pesanan)' : 'Single'}
+💵 **Total Tagihan:** Rp ${totalDenganUnik.toLocaleString('id-ID')}
+🔑 **Kode Unik:** ${uniqueCode}
+🎫 **Voucher:** ${appliedVoucher || '-'}
+📉 **Diskon:** ${appliedVoucher ? `Rp ${appliedDiscount.toLocaleString('id-ID')}` : '-'}
+📧 **Gmail:** ${gmail}
+🆔 **User ID:** ${userID}
+🔗 **Referral:** ${refCode}
+🔄 **Regenerasi Ke:** ${qrisRegenerationCount}
+📅 **Waktu Expired:** ${formatWIB(new Date())}
+━━━━━━━━━━━━━━━━━━━━━
+📋 **Detail Pesanan:**
+${orderList || '  -'}
+━━━━━━━━━━━━━━━━━━━━━
+⚠️ **Status: EXPIRED**
+💡 Pembayaran setelah expired **TIDAK DAPAT DIREFUND**.
+User dapat melakukan generate ulang QRIS.`;
+
+    const response = await fetch(discordWebhook, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: message })
+    });
+    
+    if (response.ok) {
+      markExpiredReported();
+      console.log('✅ Laporan expired terkirim ke Discord');
+    } else {
+      console.error('❌ Gagal kirim laporan expired:', response.status);
+    }
+  } catch (err) {
+    console.error('❌ Error kirim laporan expired:', err);
+  }
+}
+
 function expireQris() {
   isQrisExpired = true;
   document.getElementById('qrOverlay').style.display = 'flex';
@@ -1214,6 +1328,24 @@ function expireQris() {
   statusEl.className = 'payment-status failed';
   statusEl.textContent = '⏰ QRIS telah expired. Silakan generate ulang.';
   statusEl.style.display = 'block';
+  
+  // ✅ TAMBAHAN: Kirim laporan otomatis ke Discord saat QRIS expired
+  reportExpiredToDiscord();
+  
+  // ✅ TAMBAHAN: Notifikasi user bahwa tidak ada refund
+  Swal.fire({
+    title: '⏰ QRIS Expired!',
+    html: `
+      <div style="text-align:left;color:#ddd;font-size:14px;">
+        <p style="color:#ff6b6b;font-weight:700;">⚠️ Waktu pembayaran telah habis!</p>
+        <p style="margin-top:8px;">Jika Anda sudah melakukan pembayaran setelah QRIS expired, <b style="color:#ff6b6b;">pembayaran TIDAK DAPAT DIREFUND</b>.</p>
+        <p style="margin-top:8px;">Silakan klik tombol <b>"Generate Ulang QRIS"</b> untuk membuat QRIS baru.</p>
+      </div>
+    `,
+    icon: 'warning',
+    confirmButtonColor: '#f59e0b',
+    confirmButtonText: '✅ Mengerti'
+  });
 }
 
 function regenerateQris() {
@@ -1248,6 +1380,11 @@ function regenerateQris() {
   // Reset order sent
   try {
     localStorage.removeItem(`order_sent_${trx}`);
+  } catch(e) {}
+  
+  // ✅ Reset flag laporan expired supaya bisa dilaporkan lagi jika expired lagi
+  try {
+    localStorage.removeItem(getExpiredReportKey());
   } catch(e) {}
   
   // Reset UI
@@ -1287,7 +1424,7 @@ function regenerateQris() {
         <p>QRIS baru telah dibuat dengan:</p>
         <p><b>🔑 Kode Unik:</b> ${uniqueCode}</p>
         <p><b>💰 Total Bayar:</b> Rp ${(finalTotal + uniqueCode + adminFee).toLocaleString('id-ID')}</p>
-        <p style="margin-top:8px;color:#ffaa00;">⏳ QRIS berlaku 1 jam</p>
+        <p style="margin-top:8px;color:#ffaa00;">⏳ QRIS berlaku 30 menit</p>
       </div>
     `,
     icon: 'success',
@@ -2066,10 +2203,10 @@ document.getElementById('regenerateBtn').onclick = function() {
         <p>Generate ulang akan membuat:</p>
         <ul style="margin-left:20px;margin-top:8px;">
           <li>🔑 Kode unik <b>BARU</b></li>
-          <li>⏳ QRIS berlaku <b>1 jam</b> lagi</li>
+          <li>⏳ QRIS berlaku <b>30 menit</b> lagi</li>
           <li>💰 Nominal tetap <b>Rp ${(finalTotal + adminFee).toLocaleString('id-ID')} + kode unik</b></li>
         </ul>
-        <p style="margin-top:8px;color:#ffaa00;">📌 Kode unik akan berbeda dari sebelumnya</p>
+        <p style="margin-top:8px;color:#ff6b6b;">⚠️ Pembayaran setelah expired <b>tidak dapat direfund</b>.</p>
       </div>
     `,
     icon: 'warning',
@@ -2226,6 +2363,7 @@ console.log('✅ Auto-verifikasi QRIS aktif (cek setiap 10 detik)');
 console.log('⏳ QRIS Expiry:', QRIS_EXPIRY_MINUTES, 'menit');
 console.log('🔄 Regenerate QRIS tersedia setelah expired');
 console.log('💾 URL params & Order IDs tersimpan di localStorage');
+console.log('🔔 Auto-report expired ke Discord AKTIF');
 </script>
 </body>
 </html>
