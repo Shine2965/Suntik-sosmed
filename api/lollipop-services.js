@@ -21,7 +21,7 @@ export default async function handler(req, res) {
 
     try {
         // ===== API KEY =====
-        const apiKey = process.env.LOLLIPOP_API_KEY || '83c6f89a66909869d90b81fd3d13444e';
+        const apiKey = process.env.LOLLIPOP_API_KEY || '8c2ed537ebc1125e55be03cf722a8e0b';
 
         if (!apiKey) {
             console.error('❌ LOLLIPOP_API_KEY tidak ditemukan di environment');
