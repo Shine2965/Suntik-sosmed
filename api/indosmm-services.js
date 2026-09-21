@@ -20,7 +20,7 @@ export default async function handler(req, res) {
 
     try {
         // ===== AMBIL API KEY DARI ENV =====
-        const apiKey = process.env.INDO_API_KEY || 'a1174c530b97e1bc0a7eec7baff3ac6e';
+        const apiKey = process.env.INDO_API_KEY || '4ed44f3cf37683ca04b27636f4a66ca5';
 
         if (!apiKey) {
             console.error('❌ INDO_API_KEY tidak ditemukan di environment');
