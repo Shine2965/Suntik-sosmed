@@ -1,6 +1,6 @@
+
 // /api/qris-config.js
 // Vercel Serverless Function - Mengambil semua konfigurasi dari Environment Variable
-// ⚠️ PERINGATAN: Endpoint ini mengekspos API Key. Jangan biarkan bisa diakses publik tanpa proteksi.
 
 export default function handler(req, res) {
     // CORS
@@ -32,22 +32,20 @@ export default function handler(req, res) {
         const orderApiKey = process.env.ORDER_API_KEY || process.env.ORDERSOSMED_API_KEY || '23941803d5391da4e45a1bf4ebca52064fa17a53574d1c3655a0173dd7530fb1';
         const orderSecretKey = process.env.ORDER_SECRET_KEY || process.env.ORDERSOSMED_SECRET_KEY || 'Alvino11';
 
-        // ===== FAYUPEDIA CONFIG =====
-        const fayupediaApiKey = process.env.FAYUPEDIA_API_KEY || 'qzysdo-hzbsqd-iz9ljh-8iozzn-rucfid';
-        const fayupediaApiId = parseInt(process.env.FAYUPEDIA_API_ID) || 5522;
+        // ===== FAYUPEDIA CONFIG (TETAP ADA) =====
+        const fayupediaApiKey = process.env.FAYUPEDIA_API_KEY || '6mnjom-ing8mx-a4csgp-6bwv4c-4zdv1l';
+        const fayupediaApiId = parseInt(process.env.FAYUPEDIA_API_ID) || 287358;
 
         // ===== IRVANKARDE CONFIG =====
         const irvankardeApiKey = process.env.IRVANKARDE_API_KEY || '';
         const irvankardeApiId = parseInt(process.env.IRVANKARDE_API_ID) || 81074;
 
         // ===== LOLLIPOP CONFIG =====
-        const lollipopApiKey = process.env.LOLLIPOP_API_KEY || '';
+        const lollipopApiKey = process.env.LOLLIPOP_API_KEY || '83c6f89a66909869d90b81fd3d13444e';
 
         // ===== RESPONSE =====
         return res.status(200).json({
             success: true,
-
-            // ===== QIOSPAY =====
             qiospay_api_key: qiospayApiKey,
             merchant_code: merchantCode,
 
@@ -56,21 +54,18 @@ export default function handler(req, res) {
 
             // ===== LEGACY ORDER SOSMED =====
             order_api_id: orderApiId,
-            order_api_key: orderApiKey,           // ← sebelumnya hilang
-            order_secret_key: orderSecretKey,     // ← sebelumnya hilang
 
             // ===== FAYUPEDIA =====
-            fayupedia_api_id: fayupediaApiId,
             fayupedia_api_key: fayupediaApiKey,
+            fayupedia_api_id: fayupediaApiId,
 
             // ===== IRVANKARDE =====
-            irvankarde_api_id: irvankardeApiId,
             irvankarde_api_key: irvankardeApiKey,
+            irvankarde_api_id: irvankardeApiId,
 
             // ===== LOLLIPOP =====
             lollipop_api_key: lollipopApiKey,
 
-            // Info apakah ambil dari environment variable
             from_env: {
                 qiospay: !!process.env.QIOSPAY_API_KEY,
                 indo: !!process.env.INDO_API_KEY,
