@@ -14,7 +14,7 @@ export default async function handler(req, res) {
 
   try {
     const apiId = parseInt(process.env.FAYUPEDIA_API_ID) || 5522;
-    const apiKey = process.env.FAYUPEDIA_API_KEY || '6mnjom-ing8mx-a4csgp-6bwv4c-4zdv1l';
+    const apiKey = process.env.FAYUPEDIA_API_KEY || 'fbztdy-mv2vyz-eubpwc-mobrnb-4bqift';
 
     if (!apiKey) {
       return res.status(500).json({
