@@ -20,7 +20,7 @@ export default function handler(req, res) {
 
     try {
         // ===== QIOSPAY CONFIG =====
-        const qiospayApiKey = process.env.QIOSPAY_API_KEY || '';
+        const qiospayApiKey = process.env.QIOSPAY_API_KEY || '3b44218e0fddd55b592fc57fa2773ae18982478f568eefcf1cd3f4104132fad8';
         const merchantCode = process.env.QIOSPAY_MERCHANT_CODE || 'QP052692';
 
         // ===== INDOSMM CONFIG =====
