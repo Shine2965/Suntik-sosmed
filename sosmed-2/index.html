@@ -5,8 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#0b1220">
 <title>Shine Shop - SMM</title>
-<!-- SweetAlert2 -->
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <style>
 :root {
   --bg: #0b1220;
@@ -218,6 +216,7 @@ h2 {
   background-clip: text;
 }
 
+/* ===== LOADING INDICATOR ===== */
 .loading-indicator {
   display: none;
   align-items: center;
@@ -347,6 +346,7 @@ textarea { resize: vertical; min-height: 100px; line-height: 1.5; }
 .price-display .detail .highlight { color: var(--warning); font-weight: 600; }
 .price-display .detail .discount-text { color: var(--success); font-weight: 600; }
 
+/* ===== BALANCE WARNING ===== */
 .balance-warning {
   display: none;
   margin-top: 12px;
@@ -369,6 +369,25 @@ textarea { resize: vertical; min-height: 100px; line-height: 1.5; }
   0%, 100% { transform: translateX(0); }
   25% { transform: translateX(-4px); }
   75% { transform: translateX(4px); }
+}
+
+/* Balance info kecil di bawah */
+.balance-info {
+  display: none;
+  margin-top: 8px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: rgba(52, 211, 153, 0.06);
+  border: 1px solid rgba(52, 211, 153, 0.15);
+  font-size: 11px;
+  color: #34d399;
+  text-align: center;
+}
+.balance-info.show { display: block; }
+.balance-info.danger {
+  background: rgba(239, 68, 68, 0.06);
+  border-color: rgba(239, 68, 68, 0.15);
+  color: #f87171;
 }
 
 .mode-toggle {
@@ -1015,7 +1034,7 @@ button.primary:disabled { opacity: 0.55; cursor: not-allowed; transform: none !i
   let refreshTimer = null;
   let currentSort = 'asc';
 
-  // ===== BALANCE (internal only, tidak ditampilkan) =====
+  // ===== BALANCE =====
   let currentBalance = 0;
   let isBalanceLoaded = false;
   let balanceCheckTimeout = null;
@@ -1123,18 +1142,17 @@ button.primary:disabled { opacity: 0.55; cursor: not-allowed; transform: none !i
 
   function getActivePrice(service) {
     if (!service) return 0;
-    return Number(service.pricePerFollower) || 0;
+    if (service.diskon && service.diskon < service.pricePerFollower) {
+      return service.diskon;
+    }
+    return service.pricePerFollower;
   }
 
-  function calcUserTotal(jumlah, service) {
+  // 🔥 HITUNG TOTAL HARGA ASLI (yang dibayar ke Shine Shop)
+  function calcRawTotal(jumlah, service) {
     if (!service) return 0;
-    return calcTotal(jumlah, getActivePrice(service));
-  }
-
-  function calcProviderTotal(jumlah, service) {
-    if (!service) return 0;
-    const raw = Number(service.rawPricePerFollower) || 0;
-    return calcTotal(jumlah, raw);
+    const rawPrice = Number(service.rawPricePerFollower) || 0;
+    return Math.round((Number(jumlah) / 1000) * rawPrice);
   }
 
   function getSortedServices(services, sortMode) {
@@ -1148,6 +1166,7 @@ button.primary:disabled { opacity: 0.55; cursor: not-allowed; transform: none !i
     return sorted;
   }
 
+  // ===== LOADING UI =====
   function showLoading() {
     const el = document.getElementById('loadingIndicator');
     if (el) el.classList.add('show');
@@ -1158,7 +1177,7 @@ button.primary:disabled { opacity: 0.55; cursor: not-allowed; transform: none !i
   }
 
   // ============================================================
-  // 🔥 FETCH BALANCE (internal only)
+  // 🔥 FETCH BALANCE DARI SHINE SHOP
   // ============================================================
   async function fetchBalance() {
     try {
@@ -1168,6 +1187,7 @@ button.primary:disabled { opacity: 0.55; cursor: not-allowed; transform: none !i
       if (data.status === true) {
         currentBalance = Number(data.balance) || 0;
         isBalanceLoaded = true;
+        console.log('💰 Saldo Shine Shop: ' + formatRp(currentBalance));
         return currentBalance;
       }
       throw new Error(data.msg || 'Gagal ambil saldo');
@@ -1180,17 +1200,19 @@ button.primary:disabled { opacity: 0.55; cursor: not-allowed; transform: none !i
   }
 
   // ============================================================
-  // 🔥 CHECK BALANCE (SINGLE) - Hanya show/hide warning, tanpa info saldo
+  // 🔥 CHECK BALANCE (SINGLE)
   // ============================================================
   function checkBalance() {
     if (balanceCheckTimeout) clearTimeout(balanceCheckTimeout);
 
     balanceCheckTimeout = setTimeout(async () => {
       const warningEl = document.getElementById('balanceWarning');
+      const infoEl = document.getElementById('balanceInfo');
       const btn = document.getElementById('btnSingleCheckout');
 
       if (!selectedService) {
         warningEl.classList.remove('show');
+        infoEl.classList.remove('show');
         btn.disabled = false;
         return;
       }
@@ -1199,22 +1221,29 @@ button.primary:disabled { opacity: 0.55; cursor: not-allowed; transform: none !i
 
       if (jumlah < (selectedService.min || 0) || jumlah > (selectedService.max || 0) || jumlah === 0) {
         warningEl.classList.remove('show');
+        infoEl.classList.remove('show');
         btn.disabled = false;
         return;
       }
-
-      const providerTotal = calcProviderTotal(jumlah, selectedService);
 
       if (!isBalanceLoaded) {
         await fetchBalance();
       }
 
-      if (currentBalance < providerTotal) {
+      const rawTotal = calcRawTotal(jumlah, selectedService);
+
+      if (currentBalance < rawTotal) {
         warningEl.classList.add('show');
+        infoEl.classList.add('show');
+        infoEl.classList.add('danger');
+        infoEl.innerHTML = `💳 Saldo Shine Shop: <strong style="color:#ef4444;">${formatRp(currentBalance)}</strong> · Butuh: ${formatRp(rawTotal)}`;
         btn.disabled = true;
         btn.textContent = '🚫 Saldo Tidak Cukup';
       } else {
         warningEl.classList.remove('show');
+        infoEl.classList.add('show');
+        infoEl.classList.remove('danger');
+        infoEl.innerHTML = `💳 Saldo Shine Shop: <strong style="color:#34d399;">${formatRp(currentBalance)}</strong> · Butuh: ${formatRp(rawTotal)}`;
         btn.disabled = false;
         btn.textContent = '💳 Lanjut ke Pembayaran (Single)';
       }
@@ -1229,9 +1258,11 @@ button.primary:disabled { opacity: 0.55; cursor: not-allowed; transform: none !i
 
     balanceCheckTimeout = setTimeout(async () => {
       const warningEl = document.getElementById('balanceWarningMassal');
+      const infoEl = document.getElementById('balanceInfoMassal');
 
       if (!selectedService) {
         warningEl.classList.remove('show');
+        infoEl.classList.remove('show');
         return;
       }
 
@@ -1239,19 +1270,26 @@ button.primary:disabled { opacity: 0.55; cursor: not-allowed; transform: none !i
 
       if (jumlah < (selectedService.min || 0) || jumlah > (selectedService.max || 0) || jumlah === 0) {
         warningEl.classList.remove('show');
+        infoEl.classList.remove('show');
         return;
       }
-
-      const providerTotal = calcProviderTotal(jumlah, selectedService);
 
       if (!isBalanceLoaded) {
         await fetchBalance();
       }
 
-      if (currentBalance < providerTotal) {
+      const rawTotal = calcRawTotal(jumlah, selectedService);
+
+      if (currentBalance < rawTotal) {
         warningEl.classList.add('show');
+        infoEl.classList.add('show');
+        infoEl.classList.add('danger');
+        infoEl.innerHTML = `💳 Saldo Shine Shop: <strong style="color:#ef4444;">${formatRp(currentBalance)}</strong> · Butuh: ${formatRp(rawTotal)}`;
       } else {
         warningEl.classList.remove('show');
+        infoEl.classList.add('show');
+        infoEl.classList.remove('danger');
+        infoEl.innerHTML = `💳 Saldo Shine Shop: <strong style="color:#34d399;">${formatRp(currentBalance)}</strong> · Butuh: ${formatRp(rawTotal)}`;
       }
     }, 300);
   }
@@ -1392,6 +1430,7 @@ button.primary:disabled { opacity: 0.55; cursor: not-allowed; transform: none !i
     });
   }
 
+  // ===== KATEGORI =====
   function populateKategori(keepValue) {
     const hidden = document.getElementById('kategori');
     const current = keepValue ? hidden.value : '';
@@ -1431,6 +1470,7 @@ button.primary:disabled { opacity: 0.55; cursor: not-allowed; transform: none !i
     );
   }
 
+  // ===== LAYANAN =====
   function loadLayanan() {
     const kategori = document.getElementById('kategori').value;
     const hidden = document.getElementById('layanan');
@@ -1452,6 +1492,9 @@ button.primary:disabled { opacity: 0.55; cursor: not-allowed; transform: none !i
       layananItems = sortedServices.map(function (l) {
         const harga = getActivePrice(l);
         const badges = [];
+        if (l.diskon && l.diskon < l.pricePerFollower) {
+          badges.push({ cls: 'badge-discount', text: 'Diskon' });
+        }
         if (l.comment === true) {
           badges.push({ cls: 'badge-comment', text: 'Komentar' });
         }
@@ -1503,6 +1546,7 @@ button.primary:disabled { opacity: 0.55; cursor: not-allowed; transform: none !i
     );
   }
 
+  // ===== SHOW INFO =====
   function showInfo() {
     const kategori = document.getElementById('kategori').value;
     const layananID = document.getElementById('layanan').value;
@@ -1512,8 +1556,19 @@ button.primary:disabled { opacity: 0.55; cursor: not-allowed; transform: none !i
     if (!selectedService) return;
     currentServiceForOrder = selectedService;
 
-    const hargaAktif = getActivePrice(selectedService);
-    const priceDisplay = formatRp(hargaAktif) + ' <span class="text-muted">/ 1.000 unit</span>';
+    let priceDisplay = '';
+    let diskonDisplay = '';
+    if (selectedService.diskon && selectedService.diskon < selectedService.pricePerFollower) {
+      priceDisplay =
+        '<span class="price-strike">' + formatRp(selectedService.pricePerFollower) + '</span> ' +
+        '<span class="price-discount">' + formatRp(selectedService.diskon) + '</span> ' +
+        '<span class="discount-badge">Diskon</span> <span class="text-muted">/ 1.000</span>';
+      diskonDisplay =
+        '<br>Harga Diskon: ' + formatRp(selectedService.diskon) +
+        ' / 1.000 (hemat ' + formatRp(selectedService.pricePerFollower - selectedService.diskon) + ')';
+    } else {
+      priceDisplay = formatRp(selectedService.pricePerFollower) + ' <span class="text-muted">/ 1.000 unit</span>';
+    }
 
     requiresComment = selectedService.comment === true;
     const commentSection = document.getElementById('commentSection');
@@ -1534,9 +1589,10 @@ button.primary:disabled { opacity: 0.55; cursor: not-allowed; transform: none !i
     document.getElementById('infoLayanan').innerHTML =
       '<b>' + selectedService.name + '</b><br>' +
       'ID Produk: ' + selectedService.id + '<br>' +
-      'Harga: ' + priceDisplay + '<br><br>' +
-      'Min: ' + (selectedService.min || 0).toLocaleString('id-ID') +
-      ' | Max: ' + (selectedService.max || 0).toLocaleString('id-ID') + '<br>' +
+      'Harga: ' + priceDisplay + '<br>' +
+      diskonDisplay + '<br><br>' +
+      'Min: ' + selectedService.min.toLocaleString('id-ID') +
+      ' | Max: ' + selectedService.max.toLocaleString('id-ID') + '<br>' +
       (selectedService.desc || '');
 
     if (currentMode === 'single') {
@@ -1548,6 +1604,7 @@ button.primary:disabled { opacity: 0.55; cursor: not-allowed; transform: none !i
     }
   }
 
+  // ===== PRICE DISPLAY SINGLE =====
   function updatePriceDisplay() {
     const displayEl = document.getElementById('priceDisplay');
     const amountEl = document.getElementById('priceAmount');
@@ -1562,7 +1619,6 @@ button.primary:disabled { opacity: 0.55; cursor: not-allowed; transform: none !i
 
     if (jumlah < selectedService.min || jumlah > selectedService.max || jumlah === 0) {
       displayEl.classList.remove('show');
-      document.getElementById('total').value = '';
       return;
     }
 
@@ -1572,14 +1628,25 @@ button.primary:disabled { opacity: 0.55; cursor: not-allowed; transform: none !i
     displayEl.classList.add('show');
     amountEl.innerHTML = '<span class="currency">Rp</span> ' + total.toLocaleString('id-ID');
 
-    detailEl.innerHTML = 'Harga per 1.000: ' + formatRp(hargaAktif);
-    document.getElementById('total').value = total.toLocaleString('id-ID');
+    let detailText = '';
+    if (selectedService.diskon && selectedService.diskon < selectedService.pricePerFollower) {
+      const normal = calcTotal(jumlah, selectedService.pricePerFollower);
+      const hemat = normal - total;
+      detailText = '💡 Harga normal: Rp ' + normal.toLocaleString('id-ID') + 
+                   ' | <span class="discount-text">Diskon: Rp ' + hemat.toLocaleString('id-ID') + '</span>';
+    } else {
+      detailText = 'Harga per 1.000: ' + formatRp(hargaAktif);
+    }
+
+    detailEl.innerHTML = detailText;
+    document.getElementById('total').value = total;
   }
 
   function hidePriceDisplay() {
     document.getElementById('priceDisplay').classList.remove('show');
   }
 
+  // ===== PRICE DISPLAY MASSAL =====
   function updatePriceDisplayMassal() {
     const displayEl = document.getElementById('priceDisplayMassal');
     const amountEl = document.getElementById('priceAmountMassal');
@@ -1603,13 +1670,24 @@ button.primary:disabled { opacity: 0.55; cursor: not-allowed; transform: none !i
     displayEl.classList.add('show');
     amountEl.innerHTML = '<span class="currency">Rp</span> ' + total.toLocaleString('id-ID');
 
-    detailEl.innerHTML = 'Harga per 1.000: ' + formatRp(hargaAktif);
+    let detailText = '';
+    if (selectedService.diskon && selectedService.diskon < selectedService.pricePerFollower) {
+      const normal = calcTotal(jumlah, selectedService.pricePerFollower);
+      const hemat = normal - total;
+      detailText = '💡 Harga normal: Rp ' + normal.toLocaleString('id-ID') + 
+                   ' | <span class="discount-text">Diskon: Rp ' + hemat.toLocaleString('id-ID') + '</span>';
+    } else {
+      detailText = 'Harga per 1.000: ' + formatRp(hargaAktif);
+    }
+
+    detailEl.innerHTML = detailText;
   }
 
   function hidePriceDisplayMassal() {
     document.getElementById('priceDisplayMassal').classList.remove('show');
   }
 
+  // ===== VALIDATE COMMENTS =====
   function validateComments() {
     if (!requiresComment) return;
 
@@ -1643,6 +1721,7 @@ button.primary:disabled { opacity: 0.55; cursor: not-allowed; transform: none !i
     }
   }
 
+  // ===== SINGLE CHECKOUT =====
   function singleCheckout() {
     if (!termsCheckbox.checked) {
       termsError.classList.add('show');
@@ -1685,14 +1764,16 @@ button.primary:disabled { opacity: 0.55; cursor: not-allowed; transform: none !i
       }
     }
 
-    // ✅ Cek saldo internal (tanpa tampilkan nominal)
-    const providerTotal = calcProviderTotal(jumlah, selectedService);
-    if (currentBalance < providerTotal) {
+    // ✅ CEK SALDO SEBELUM CHECKOUT
+    const rawTotal = calcRawTotal(jumlah, selectedService);
+    if (currentBalance < rawTotal) {
       Swal.fire({
         title: '🚫 Saldo Tidak Cukup',
         html: `
           <div style="text-align:left;color:#ddd;font-size:14px;">
-            <p><strong style="color:#ef4444;">Maaf Saldo Shine Shop tidak cukup</strong> untuk memproses pesanan ini.</p>
+            <p><strong style="color:#ef4444;">Maaf Saldo Shine Shop tidak cukup</strong></p>
+            <p>Saldo saat ini: <b>${formatRp(currentBalance)}</b></p>
+            <p>Butuh: <b>${formatRp(rawTotal)}</b></p>
             <p style="margin-top:8px;color:#ffaa00;">💡 Silakan kurangi jumlah atau hubungi admin</p>
           </div>
         `,
@@ -1725,6 +1806,7 @@ button.primary:disabled { opacity: 0.55; cursor: not-allowed; transform: none !i
     window.location.href = url;
   }
 
+  // ===== MASSAL - TAMBAH ORDER =====
   function addMassalOrder() {
     if (!selectedService) {
       alert('Pilih layanan terlebih dahulu!');
@@ -1749,14 +1831,16 @@ button.primary:disabled { opacity: 0.55; cursor: not-allowed; transform: none !i
       return;
     }
 
-    const providerTotal = calcProviderTotal(jumlah, selectedService);
-    if (currentBalance < providerTotal) {
+    // ✅ CEK SALDO SEBELUM TAMBAH
+    const rawTotal = calcRawTotal(jumlah, selectedService);
+    if (currentBalance < rawTotal) {
       Swal.fire({
         title: '🚫 Saldo Tidak Cukup',
         html: `
           <div style="text-align:left;color:#ddd;font-size:14px;">
-            <p><strong style="color:#ef4444;">Maaf Saldo Shine Shop tidak cukup</strong> untuk memproses pesanan ini.</p>
-            <p style="margin-top:8px;color:#ffaa00;">💡 Silakan kurangi jumlah atau hubungi admin</p>
+            <p><strong style="color:#ef4444;">Maaf Saldo Shine Shop tidak cukup</strong></p>
+            <p>Saldo saat ini: <b>${formatRp(currentBalance)}</b></p>
+            <p>Butuh: <b>${formatRp(rawTotal)}</b></p>
           </div>
         `,
         icon: 'error',
@@ -1776,7 +1860,7 @@ button.primary:disabled { opacity: 0.55; cursor: not-allowed; transform: none !i
       jumlah: jumlah,
       target: target,
       total: total,
-      providerTotal: providerTotal,
+      rawTotal: rawTotal,
       hargaPerUnit: hargaAktif,
       comment: null
     });
@@ -1789,6 +1873,7 @@ button.primary:disabled { opacity: 0.55; cursor: not-allowed; transform: none !i
     document.getElementById('massalTarget').value = '';
     hidePriceDisplayMassal();
     document.getElementById('balanceWarningMassal').classList.remove('show');
+    document.getElementById('balanceInfoMassal').classList.remove('show');
 
     Swal.fire({
       title: '✅ Ditambahkan!',
@@ -1881,12 +1966,13 @@ button.primary:disabled { opacity: 0.55; cursor: not-allowed; transform: none !i
   function updateMassalTotal() {
     const total = orders.reduce((sum, o) => sum + o.total, 0);
     document.getElementById('orderTotalSummary').textContent = total.toLocaleString('id-ID');
-    document.getElementById('total').value = total.toLocaleString('id-ID');
+    document.getElementById('total').value = total;
   }
 
   window.removeOrder = removeOrder;
   window.clearOrders = clearOrders;
 
+  // ===== MASSAL CHECKOUT =====
   function massalCheckout() {
     if (!termsCheckbox.checked) {
       termsError.classList.add('show');
@@ -1900,13 +1986,16 @@ button.primary:disabled { opacity: 0.55; cursor: not-allowed; transform: none !i
       return;
     }
 
-    const totalProvider = orders.reduce((sum, o) => sum + (o.providerTotal || 0), 0);
-    if (currentBalance < totalProvider) {
+    // ✅ CEK TOTAL SALDO MASSAL
+    const totalRaw = orders.reduce((sum, o) => sum + (o.rawTotal || 0), 0);
+    if (currentBalance < totalRaw) {
       Swal.fire({
         title: '🚫 Saldo Tidak Cukup',
         html: `
           <div style="text-align:left;color:#ddd;font-size:14px;">
-            <p><strong style="color:#ef4444;">Maaf Saldo Shine Shop tidak cukup</strong> untuk memproses pesanan ini.</p>
+            <p><strong style="color:#ef4444;">Maaf Saldo Shine Shop tidak cukup</strong></p>
+            <p>Saldo saat ini: <b>${formatRp(currentBalance)}</b></p>
+            <p>Total butuh: <b>${formatRp(totalRaw)}</b></p>
             <p style="margin-top:8px;color:#ffaa00;">💡 Silakan kurangi jumlah pesanan</p>
           </div>
         `,
@@ -1937,6 +2026,7 @@ button.primary:disabled { opacity: 0.55; cursor: not-allowed; transform: none !i
     window.location.href = url;
   }
 
+  // ===== SEARCH =====
   let searchTimer = null;
   function searchLayanan() {
     clearTimeout(searchTimer);
@@ -1945,7 +2035,6 @@ button.primary:disabled { opacity: 0.55; cursor: not-allowed; transform: none !i
       if (!q) return;
 
       for (const k in layananData) {
-        if (!Array.isArray(layananData[k])) continue;
         for (let i = 0; i < layananData[k].length; i++) {
           const l = layananData[k][i];
           if (l.name.toLowerCase().includes(q) || String(l.id).includes(q)) {
@@ -1963,18 +2052,22 @@ button.primary:disabled { opacity: 0.55; cursor: not-allowed; transform: none !i
     }, 280);
   }
 
+  // ===== LOAD DATA =====
   async function loadData(silent) {
     if (isLoading) return;
     isLoading = true;
 
+    // 🔥 Tampilkan loading hanya kalau bukan silent refresh
     if (!silent) showLoading();
 
     try {
+      // Load services & balance parallel
       const [servicesRes, balanceRes] = await Promise.allSettled([
         fetch(SERVICES_ENDPOINT + '?action=services&ts=' + Date.now()),
         fetch(SERVICES_ENDPOINT + '?action=balance&ts=' + Date.now())
       ]);
 
+      // Parse services
       if (servicesRes.status === 'fulfilled' && servicesRes.value.ok) {
         const data = await servicesRes.value.json();
         if (data && data.status === false) {
@@ -2001,14 +2094,17 @@ button.primary:disabled { opacity: 0.55; cursor: not-allowed; transform: none !i
         throw new Error('Gagal memuat data layanan Shine Shop');
       }
 
+      // Parse balance
       if (balanceRes.status === 'fulfilled' && balanceRes.value.ok) {
         const balanceData = await balanceRes.value.json();
         if (balanceData.status === true) {
           currentBalance = Number(balanceData.balance) || 0;
           isBalanceLoaded = true;
+          console.log('💰 Saldo Shine Shop: ' + formatRp(currentBalance));
         }
       }
 
+      // Trigger balance check setelah data dimuat
       if (currentMode === 'single') checkBalance();
       else checkBalanceMassal();
 
@@ -2019,6 +2115,7 @@ button.primary:disabled { opacity: 0.55; cursor: not-allowed; transform: none !i
       }
     } finally {
       isLoading = false;
+      // 🔥 Sembunyikan loading setelah selesai
       if (!silent) hideLoading();
     }
   }
@@ -2038,12 +2135,14 @@ button.primary:disabled { opacity: 0.55; cursor: not-allowed; transform: none !i
     }
   });
 
+  // ===== EVENT BINDING =====
   document.getElementById('cselectKategori').querySelector('.cselect-trigger')
     .addEventListener('click', openKategoriPicker);
   document.getElementById('cselectLayanan').querySelector('.cselect-trigger')
     .addEventListener('click', openLayananPicker);
   document.getElementById('sortHarga').addEventListener('change', loadLayanan);
 
+  // Single events
   document.getElementById('jumlah').addEventListener('input', function() {
     updatePriceDisplay();
     if (requiresComment) {
@@ -2056,6 +2155,7 @@ button.primary:disabled { opacity: 0.55; cursor: not-allowed; transform: none !i
   document.getElementById('comments').addEventListener('input', validateComments);
   document.getElementById('btnSingleCheckout').addEventListener('click', singleCheckout);
 
+  // Massal events
   document.getElementById('massalJumlah').addEventListener('input', function() {
     updatePriceDisplayMassal();
     checkBalanceMassal();
@@ -2070,6 +2170,7 @@ button.primary:disabled { opacity: 0.55; cursor: not-allowed; transform: none !i
     if (e.key === 'Escape') closeAllCSelect();
   });
 
+  // ===== INIT =====
   window.addEventListener('load', function () {
     loadData(false);
     startSmartRefresh();
