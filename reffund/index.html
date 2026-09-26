@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🔍 Cek Refund Pesanan</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    }
+    body {
+      background: linear-gradient(145deg, #f6f9fc 0%, #e9f1f8 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0;
+      padding: 16px;
+    }
+    .card {
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border-radius: 36px;
+      padding: 32px 28px;
+      max-width: 700px;
+      width: 100%;
+      box-shadow: 0 25px 50px -8px rgba(0, 20, 30, 0.25), 
+                  inset 0 1px 2px rgba(255,255,255,0.7);
+      border: 1px solid rgba(255,255,255,0.6);
+      transition: all 0.2s ease;
+    }
+    h2 {
+      margin: 0 0 8px 0;
+      font-weight: 600;
+      font-size: 1.9rem;
+      letter-spacing: -0.02em;
+      color: #0b2a3c;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    h2 span {
+      background: #0b2a3c;
+      color: white;
+      font-size: 1.4rem;
+      padding: 6px 12px;
+      border-radius: 60px;
+      font-weight: 500;
+    }
+    .subhead {
+      color: #426577;
+      margin-bottom: 24px;
+      font-size: 1rem;
+      font-weight: 400;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px dashed #b8d0dd;
+      padding-bottom: 12px;
+    }
+    .badge {
+      background: #d4e6f1;
+      color: #0b2a3c;
+      padding: 4px 12px;
+      border-radius: 40px;
+      font-size: 0.85rem;
+      font-weight: 500;
+    }
+    .input-group {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    .input-group input {
+      flex: 1 1 200px;
+      background: white;
+      border: 1.5px solid #cbdde8;
+      border-radius: 80px;
+      padding: 16px 22px;
+      font-size: 1rem;
+      outline: none;
+      transition: all 0.2s;
+      font-weight: 500;
+      color: #0b2a3c;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.02);
+    }
+    .input-group input:focus {
+      border-color: #1e7e9c;
+      box-shadow: 0 0 0 4px rgba(30, 126, 156, 0.15);
+    }
+    .input-group button {
+      background: #0f3b4f;
+      border: none;
+      border-radius: 80px;
+      padding: 16px 28px;
+      font-size: 1rem;
+      font-weight: 600;
+      color: white;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s;
+      box-shadow: 0 8px 16px -6px rgba(15, 59, 79, 0.3);
+      white-space: nowrap;
+    }
+    .input-group button:hover {
+      background: #1c5771;
+      transform: scale(1.02);
+    }
+    .input-group button:active {
+      transform: scale(0.98);
+      box-shadow: 0 2px 6px rgba(15, 59, 79, 0.3);
+    }
+    .hint {
+      color: #617e8f;
+      font-size: 0.85rem;
+      margin-top: -8px;
+      margin-bottom: 22px;
+      padding-left: 12px;
+    }
+    .result-container {
+      background: #ffffffd9;
+      border-radius: 28px;
+      padding: 10px 8px;
+      min-height: 120px;
+      max-height: 380px;
+      overflow-y: auto;
+      box-shadow: inset 0 2px 8px rgba(0,0,0,0.02), 0 6px 12px -6px rgba(0,0,0,0.1);
+      border: 1px solid #fff;
+    }
+    .result-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding: 8px;
+    }
+    .result-item {
+      background: #f5faff;
+      padding: 14px 18px;
+      border-radius: 18px;
+      font-size: 1rem;
+      border-left: 6px solid #3a9fc9;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.02);
+      transition: 0.1s;
+      word-break: break-word;
+    }
+    .result-item.refund {
+      border-left-color: #2b8c5e;
+      background: #f0faf4;
+    }
+    .result-item.no-refund {
+      border-left-color: #c94a4a;
+      background: #fef5f5;
+    }
+    .result-icon {
+      font-size: 1.4rem;
+      line-height: 1;
+    }
+    .result-text {
+      flex: 1;
+    }
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 36px 20px;
+      color: #7a9aab;
+      text-align: center;
+      font-style: italic;
+      gap: 8px;
+    }
+    .empty-state span {
+      font-size: 2rem;
+      font-style: normal;
+      opacity: 0.7;
+    }
+    .footer-note {
+      margin-top: 16px;
+      font-size: 0.8rem;
+      color: #6b8b9c;
+      text-align: center;
+      letter-spacing: 0.2px;
+    }
+    .clear-btn {
+      background: transparent;
+      border: 1px solid #bdd3e0;
+      color: #3d6377;
+      border-radius: 40px;
+      padding: 6px 16px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: 0.15s;
+    }
+    .clear-btn:hover {
+      background: #e6f0f6;
+      border-color: #8aaec2;
+    }
+  </style>
+</head>
+<body>
+<div class="card">
+  <h2>
+    💸 Cek Refund
+    <span>JSON</span>
+  </h2>
+  <div class="subhead">
+    <span>🔎 Pencarian ID pesanan</span>
+    <span class="badge" id="refundCount">0 refund</span>
+  </div>
+
+  <div class="input-group">
+    <input type="text" id="searchInput" placeholder="Ketik ID pesanan (pisahkan dengan spasi/koma)" autofocus>
+    <button id="searchBtn">
+      <span>🔍</span> Cari
+    </button>
+  </div>
+  <div class="hint">
+    ⚡ Bisa multiple: <strong>11111 22222</strong> atau <strong>11111, 22222, 33333</strong>
+  </div>
+
+  <div class="result-container" id="resultContainer">
+    <div class="empty-state">
+      <span>📋</span>
+      Masukkan ID pesanan lalu tekan Cari
+    </div>
+  </div>
+
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 14px;">
+    <button class="clear-btn" id="clearBtn">↺ Bersihkan</button>
+    <div class="footer-note">refund.json · data pengembalian dana</div>
+  </div>
+</div>
+
+<script>
+  // ========== SIMULASI refund.json ==========
+  // Data id yang SUDAH melakukan refund (seperti di file refund.json)
+  const refundJSON = [
+    "11111",
+    "22222",
+    "33333",
+    "55555",
+    "88888"
+  ];
+
+  // Konversi ke Set untuk pencarian cepat (O(1))
+  const refundSet = new Set(refundJSON);
+
+  // Update badge jumlah refund
+  document.getElementById('refundCount').textContent = `${refundSet.size} refund`;
+
+  // DOM elements
+  const searchInput = document.getElementById('searchInput');
+  const searchBtn = document.getElementById('searchBtn');
+  const resultContainer = document.getElementById('resultContainer');
+  const clearBtn = document.getElementById('clearBtn');
+
+  // ========== Fungsi untuk memproses pencarian ==========
+  function performSearch() {
+    const rawInput = searchInput.value.trim();
+
+    // Jika input kosong, tampilkan empty state
+    if (rawInput === '') {
+      resultContainer.innerHTML = `
+        <div class="empty-state">
+          <span>📋</span>
+          Masukkan ID pesanan lalu tekan Cari
+        </div>
+      `;
+      return;
+    }
+
+    // Pisahkan berdasarkan spasi, koma, atau titik koma
+    // Contoh: "11111 22222,33333;44444" -> ["11111","22222","33333","44444"]
+    const ids = rawInput
+      .split(/[\s,;]+/)            // split oleh spasi, koma, titik koma
+      .map(id => id.trim())        // hilangkan spasi ekstra
+      .filter(id => id !== '');    // buang string kosong
+
+    // Jika setelah difilter tidak ada ID yang valid
+    if (ids.length === 0) {
+      resultContainer.innerHTML = `
+        <div class="empty-state">
+          <span>⚠️</span>
+          Tidak ada ID yang valid. Masukkan angka/teks.
+        </div>
+      `;
+      return;
+    }
+
+    // Bangun tampilan hasil
+    let html = '<div class="result-list">';
+
+    ids.forEach(id => {
+      const isRefunded = refundSet.has(id);  // cek ke refund.json (Set)
+
+      if (isRefunded) {
+        // Ditemukan di refund.json
+        html += `
+          <div class="result-item refund">
+            <div class="result-icon">✅</div>
+            <div class="result-text">
+              Pesanan dengan id <strong>${escapeHtml(id)}</strong> telah melakukan pengembalian dana
+            </div>
+          </div>
+        `;
+      } else {
+        // Tidak ditemukan
+        html += `
+          <div class="result-item no-refund">
+            <div class="result-icon">❌</div>
+            <div class="result-text">
+              ID pesanan <strong>${escapeHtml(id)}</strong> Belum melakukan pengembalian dana
+            </div>
+          </div>
+        `;
+      }
+    });
+
+    html += '</div>';
+    resultContainer.innerHTML = html;
+  }
+
+  // ========== Fungsi bantu: escape HTML (biar aman dari karakter aneh) ==========
+  function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  // ========== Event listener ==========
+  searchBtn.addEventListener('click', performSearch);
+
+  // Enter di input field juga memicu pencarian
+  searchInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      performSearch();
+    }
+  });
+
+  // Tombol clear: kosongkan input, reset hasil, dan fokus ke input
+  clearBtn.addEventListener('click', () => {
+    searchInput.value = '';
+    resultContainer.innerHTML = `
+      <div class="empty-state">
+        <span>📋</span>
+        Masukkan ID pesanan lalu tekan Cari
+      </div>
+    `;
+    searchInput.focus();
+  });
+
+  // Fokus otomatis saat halaman dimuat
+  window.addEventListener('load', () => {
+    searchInput.focus();
+  });
+</script>
+</body>
+</html>
