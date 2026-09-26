@@ -26,10 +26,9 @@
       padding: 32px 28px;
       max-width: 700px;
       width: 100%;
-      box-shadow: 0 25px 50px -8px rgba(0, 20, 30, 0.25), 
+      box-shadow: 0 25px 50px -8px rgba(0, 20, 30, 0.25),
                   inset 0 1px 2px rgba(255,255,255,0.7);
       border: 1px solid rgba(255,255,255,0.6);
-      transition: all 0.2s ease;
     }
     h2 {
       margin: 0 0 8px 0;
@@ -53,12 +52,13 @@
       color: #426577;
       margin-bottom: 24px;
       font-size: 1rem;
-      font-weight: 400;
       display: flex;
       justify-content: space-between;
       align-items: center;
       border-bottom: 1px dashed #b8d0dd;
       padding-bottom: 12px;
+      flex-wrap: wrap;
+      gap: 8px;
     }
     .badge {
       background: #d4e6f1;
@@ -67,6 +67,14 @@
       border-radius: 40px;
       font-size: 0.85rem;
       font-weight: 500;
+    }
+    .badge.loading {
+      background: #fff3cd;
+      color: #856404;
+    }
+    .badge.error {
+      background: #f8d7da;
+      color: #721c24;
     }
     .input-group {
       display: flex;
@@ -107,13 +115,17 @@
       box-shadow: 0 8px 16px -6px rgba(15, 59, 79, 0.3);
       white-space: nowrap;
     }
-    .input-group button:hover {
+    .input-group button:hover:not(:disabled) {
       background: #1c5771;
       transform: scale(1.02);
     }
-    .input-group button:active {
+    .input-group button:active:not(:disabled) {
       transform: scale(0.98);
-      box-shadow: 0 2px 6px rgba(15, 59, 79, 0.3);
+    }
+    .input-group button:disabled {
+      background: #7a97a6;
+      cursor: not-allowed;
+      opacity: 0.7;
     }
     .hint {
       color: #617e8f;
@@ -148,7 +160,6 @@
       align-items: center;
       gap: 12px;
       box-shadow: 0 2px 6px rgba(0,0,0,0.02);
-      transition: 0.1s;
       word-break: break-word;
     }
     .result-item.refund {
@@ -203,6 +214,18 @@
       background: #e6f0f6;
       border-color: #8aaec2;
     }
+    .spinner {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border: 2px solid rgba(255,255,255,0.4);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
   </style>
 </head>
 <body>
@@ -213,12 +236,12 @@
   </h2>
   <div class="subhead">
     <span>🔎 Pencarian ID pesanan</span>
-    <span class="badge" id="refundCount">0 refund</span>
+    <span class="badge loading" id="refundCount">⏳ Memuat...</span>
   </div>
 
   <div class="input-group">
     <input type="text" id="searchInput" placeholder="Ketik ID pesanan (pisahkan dengan spasi/koma)" autofocus>
-    <button id="searchBtn">
+    <button id="searchBtn" disabled>
       <span>🔍</span> Cari
     </button>
   </div>
@@ -228,45 +251,104 @@
 
   <div class="result-container" id="resultContainer">
     <div class="empty-state">
-      <span>📋</span>
-      Masukkan ID pesanan lalu tekan Cari
+      <span>⏳</span>
+      Memuat data refund...
     </div>
   </div>
 
   <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 14px;">
     <button class="clear-btn" id="clearBtn">↺ Bersihkan</button>
-    <div class="footer-note">refund.json · data pengembalian dana</div>
+    <div class="footer-note">Sumber: refund.json</div>
   </div>
 </div>
 
 <script>
-  // ========== SIMULASI refund.json ==========
-  // Data id yang SUDAH melakukan refund (seperti di file refund.json)
-  const refundJSON = [
-    "11111",
-    "22222",
-    "33333",
-    "55555",
-    "88888"
-  ];
-
-  // Konversi ke Set untuk pencarian cepat (O(1))
-  const refundSet = new Set(refundJSON);
-
-  // Update badge jumlah refund
-  document.getElementById('refundCount').textContent = `${refundSet.size} refund`;
+  // ========== State global ==========
+  let refundSet = new Set();
+  let isReady = false;
 
   // DOM elements
   const searchInput = document.getElementById('searchInput');
   const searchBtn = document.getElementById('searchBtn');
   const resultContainer = document.getElementById('resultContainer');
   const clearBtn = document.getElementById('clearBtn');
+  const refundCount = document.getElementById('refundCount');
 
-  // ========== Fungsi untuk memproses pencarian ==========
+  // ========== Load refund.json ==========
+  async function loadRefundData() {
+    try {
+      const response = await fetch('refund.json');
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+      const data = await response.json();
+
+      // Dukung 3 format:
+      // 1) ["11111","22222"]                 -> array of strings
+      // 2) [{id:"11111",...},{id:"22222"}]   -> array of objects
+      // 3) { refunded_ids: [...] }           -> object wrapper
+      let ids = [];
+      if (Array.isArray(data)) {
+        if (data.length === 0) {
+          ids = [];
+        } else if (typeof data[0] === 'string') {
+          ids = data;
+        } else if (typeof data[0] === 'object' && data[0] !== null) {
+          ids = data.map(item => item.id).filter(Boolean);
+        }
+      } else if (data && Array.isArray(data.refunded_ids)) {
+        ids = data.refunded_ids;
+      } else {
+        throw new Error('Format refund.json tidak dikenali');
+      }
+
+      refundSet = new Set(ids);
+      isReady = true;
+
+      // Update badge
+      refundCount.textContent = `✅ ${refundSet.size} refund`;
+      refundCount.classList.remove('loading', 'error');
+
+      // Aktifkan tombol
+      searchBtn.disabled = false;
+
+      // Reset tampilan
+      resultContainer.innerHTML = `
+        <div class="empty-state">
+          <span>📋</span>
+          Masukkan ID pesanan lalu tekan Cari
+        </div>
+      `;
+
+      console.log('✅ Refund data loaded:', ids);
+
+    } catch (error) {
+      console.error('❌ Error load refund.json:', error);
+      refundCount.textContent = '❌ Gagal memuat';
+      refundCount.classList.remove('loading');
+      refundCount.classList.add('error');
+
+      resultContainer.innerHTML = `
+        <div class="empty-state">
+          <span>⚠️</span>
+          Gagal memuat <strong>refund.json</strong><br>
+          <small>${escapeHtml(error.message)}</small><br>
+          <small style="margin-top:8px;color:#c94a4a;">
+            Pastikan file ada di folder yang sama & akses via server (Live Server / python -m http.server)
+          </small>
+        </div>
+      `;
+    }
+  }
+
+  // ========== Fungsi pencarian ==========
   function performSearch() {
+    if (!isReady) {
+      alert('Data refund belum siap, tunggu sebentar...');
+      return;
+    }
+
     const rawInput = searchInput.value.trim();
 
-    // Jika input kosong, tampilkan empty state
     if (rawInput === '') {
       resultContainer.innerHTML = `
         <div class="empty-state">
@@ -278,31 +360,27 @@
     }
 
     // Pisahkan berdasarkan spasi, koma, atau titik koma
-    // Contoh: "11111 22222,33333;44444" -> ["11111","22222","33333","44444"]
     const ids = rawInput
-      .split(/[\s,;]+/)            // split oleh spasi, koma, titik koma
-      .map(id => id.trim())        // hilangkan spasi ekstra
-      .filter(id => id !== '');    // buang string kosong
+      .split(/[\s,;]+/)
+      .map(id => id.trim())
+      .filter(id => id !== '');
 
-    // Jika setelah difilter tidak ada ID yang valid
     if (ids.length === 0) {
       resultContainer.innerHTML = `
         <div class="empty-state">
           <span>⚠️</span>
-          Tidak ada ID yang valid. Masukkan angka/teks.
+          Tidak ada ID yang valid.
         </div>
       `;
       return;
     }
 
-    // Bangun tampilan hasil
     let html = '<div class="result-list">';
 
     ids.forEach(id => {
-      const isRefunded = refundSet.has(id);  // cek ke refund.json (Set)
+      const isRefunded = refundSet.has(id);
 
       if (isRefunded) {
-        // Ditemukan di refund.json
         html += `
           <div class="result-item refund">
             <div class="result-icon">✅</div>
@@ -312,7 +390,6 @@
           </div>
         `;
       } else {
-        // Tidak ditemukan
         html += `
           <div class="result-item no-refund">
             <div class="result-icon">❌</div>
@@ -328,7 +405,7 @@
     resultContainer.innerHTML = html;
   }
 
-  // ========== Fungsi bantu: escape HTML (biar aman dari karakter aneh) ==========
+  // ========== Helper escape HTML ==========
   function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
@@ -338,7 +415,6 @@
   // ========== Event listener ==========
   searchBtn.addEventListener('click', performSearch);
 
-  // Enter di input field juga memicu pencarian
   searchInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
       e.preventDefault();
@@ -346,7 +422,6 @@
     }
   });
 
-  // Tombol clear: kosongkan input, reset hasil, dan fokus ke input
   clearBtn.addEventListener('click', () => {
     searchInput.value = '';
     resultContainer.innerHTML = `
@@ -358,8 +433,9 @@
     searchInput.focus();
   });
 
-  // Fokus otomatis saat halaman dimuat
+  // ========== Jalankan ==========
   window.addEventListener('load', () => {
+    loadRefundData();
     searchInput.focus();
   });
 </script>
