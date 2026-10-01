@@ -631,6 +631,13 @@ let total = Number(p.get("total") || 0);
 let isMass = p.get("mass") === "1";
 let ordersData = [];
 
+// ================= PEMBULATAN OTOMATIS =================
+// Fungsi untuk membulatkan nilai desimal (koma) ke bilangan bulat terdekat
+function roundAmount(amount) {
+  if (typeof amount !== 'number' || isNaN(amount)) return 0;
+  return Math.round(amount);
+}
+
 // ================= PERSISTENT URL PARAMS =================
 function getUrlParamsKey(trxId) {
   return `url_params_${trxId}`;
@@ -915,8 +922,9 @@ function maskID(id) {
   return id.slice(0, 2) + "**" + id.slice(-2);
 }
 
-let originalTotal = total;
-let finalTotal = total;
+// ===== PEMBULATAN AWAL =====
+let originalTotal = roundAmount(total);
+let finalTotal = roundAmount(total);
 let appliedVoucher = null;
 let appliedDiscount = 0;
 let uniqueCode = 0;
@@ -988,6 +996,7 @@ function regenerateUniqueCode() {
   return newCode;
 }
 
+// ===== HITUNG BIAYA ADMIN (DIBULATKAN) =====
 function calculateAdminFee(amount) {
   if (amount > ADMIN_FEE_THRESHOLD) {
     return Math.round(amount * (ADMIN_FEE_PERCENT / 100));
@@ -1280,13 +1289,16 @@ function regenerateQris() {
     verificationInterval = setInterval(checkPaymentStatus, 10000);
   }, 2000);
   
+  // ===== PEMBULATAN OTOMATIS =====
+  const totalRegenerated = roundAmount(finalTotal + uniqueCode + adminFee);
+  
   Swal.fire({
     title: '🔄 QRIS Regenerated!',
     html: `
       <div style="text-align:left;color:#ddd;font-size:14px;">
         <p>QRIS baru telah dibuat dengan:</p>
         <p><b>🔑 Kode Unik:</b> ${uniqueCode}</p>
-        <p><b>💰 Total Bayar:</b> Rp ${(finalTotal + uniqueCode + adminFee).toLocaleString('id-ID')}</p>
+        <p><b>💰 Total Bayar:</b> Rp ${totalRegenerated.toLocaleString('id-ID')}</p>
         <p style="margin-top:8px;color:#ffaa00;">⏳ QRIS berlaku 1 jam</p>
       </div>
     `,
@@ -1399,7 +1411,7 @@ async function sendMassOrdersToFayupedia() {
       `;
       
       markOrderSent();
-      saveOrderIds(orderIds); // <-- SIMPAN ORDER IDS KE LOCALSTORAGE
+      saveOrderIds(orderIds);
       isSendingOrder = false;
       await sendMassOrderNotificationToDiscord(orderIds, successCount, failedOrders);
       
@@ -1437,7 +1449,6 @@ async function sendMassOrdersToFayupedia() {
         <span style="font-size:11px;color:#f87171;">Gagal: ${failedMsg}</span>
       `;
       
-      // Simpan order IDs yang berhasil saja
       if (orderIds.length > 0) {
         saveOrderIds(orderIds);
       }
@@ -1555,7 +1566,8 @@ async function sendToDiscord(gmail, userID) {
   isSendingDiscord = true;
   
   try {
-    const totalDenganUnik = finalTotal + uniqueCode + adminFee;
+    // ===== PEMBULATAN OTOMATIS =====
+    const totalDenganUnik = roundAmount(finalTotal + uniqueCode + adminFee);
     const refCode = localStorage.getItem('referral_code') || "-";
     
     let orderList = '';
@@ -1619,6 +1631,10 @@ function isTransactionValid(transaction, targetAmount) {
   let rawAmount = String(transaction.amount || '');
   let cleanAmount = rawAmount.replace(/[^0-9]/g, '');
   let amountNumber = parseInt(cleanAmount) || 0;
+  
+  // ===== PEMBULATAN OTOMATIS UNTUK NOMINAL TRANSAKSI =====
+  amountNumber = roundAmount(amountNumber);
+  targetAmount = roundAmount(targetAmount);
   
   if (amountNumber !== targetAmount) {
     console.log('❌ Nominal tidak match:', amountNumber, 'vs', targetAmount);
@@ -1755,10 +1771,11 @@ async function checkPaymentStatus() {
       return;
     }
     
-    const totalBayar = finalTotal + uniqueCode + adminFee;
+    // ===== PEMBULATAN OTOMATIS UNTUK TOTAL PEMBAYARAN =====
+    const totalBayar = roundAmount(finalTotal + uniqueCode + adminFee);
     currentTotalBayar = totalBayar;
     
-    console.log('💰 Nominal yang dicek ke QIOSPAY:', totalBayar);
+    console.log('💰 Nominal yang dicek ke QIOSPAY (bulat):', totalBayar);
     
     const url = QIOSPAY_MUTASI_URL();
     console.log('📡 Fetching mutasi dari QIOSPAY...');
@@ -1902,9 +1919,15 @@ function updateDisplay(){
   uniqueCode = generateUniqueCode();
   document.getElementById('uniqueCode').textContent = uniqueCode;
   
+  // ===== PEMBULATAN OTOMATIS =====
+  // Bulatkan semua nilai yang mungkin memiliki desimal
+  originalTotal = roundAmount(originalTotal);
+  finalTotal = roundAmount(finalTotal);
+  
   adminFee = calculateAdminFee(originalTotal);
   
-  const totalDenganUnik = finalTotal + uniqueCode + adminFee;
+  // Pastikan total dengan unik juga bulat
+  const totalDenganUnik = roundAmount(finalTotal + uniqueCode + adminFee);
   currentTotalBayar = totalDenganUnik;
   
   let detailHtml = `
@@ -1962,7 +1985,7 @@ function updateDisplay(){
     };
   });
   
-  console.log('🔄 QRIS & nominal cek di-update ke:', totalDenganUnik);
+  console.log('🔄 QRIS & nominal cek di-update ke (bulat):', totalDenganUnik);
 }
 
 // ================= LOAD VOUCHER =================
@@ -2018,13 +2041,19 @@ document.getElementById('applyVoucher').onclick = async function() {
   }
   
   discount = Math.max(0, discount);
-  finalTotal = Math.max(originalTotal - discount, 0);
+  
+  // ===== PEMBULATAN OTOMATIS =====
+  // Bulatkan discount ke bilangan bulat
+  appliedDiscount = roundAmount(discount);
+  
+  // Bulatkan finalTotal ke bilangan bulat
+  finalTotal = roundAmount(Math.max(originalTotal - appliedDiscount, 0));
+  
   appliedVoucher = v.code;
-  appliedDiscount = Math.round(discount);
   
   markVoucherUsed(v.code);
   
-  let discountText = `Rp ${discount.toLocaleString("id-ID")}`;
+  let discountText = `Rp ${appliedDiscount.toLocaleString("id-ID")}`;
   if (v.type === "percent") {
     discountText += ` (${v.value}% dari total)`;
   }
@@ -2040,12 +2069,13 @@ document.getElementById('applyVoucher').onclick = async function() {
   
   const statusEl = document.getElementById('paymentStatus');
   if (statusEl.className === 'payment-status loading') {
-    statusEl.textContent = `⏳ Mengecek pembayaran Rp ${(finalTotal + uniqueCode + adminFee).toLocaleString('id-ID')}...`;
+    const totalSetelahVoucher = roundAmount(finalTotal + uniqueCode + adminFee);
+    statusEl.textContent = `⏳ Mengecek pembayaran Rp ${totalSetelahVoucher.toLocaleString('id-ID')}...`;
   }
   
   Swal.fire({
     title: "✅ Berhasil!",
-    html: `Voucher <b>${v.code}</b> berhasil digunakan!<br>Diskon: <b>${discountText}</b><br><span style="color:#888;font-size:12px;">QRIS & nominal cek otomatis diperbarui.</span>`,
+    html: `Voucher <b>${v.code}</b> berhasil digunakan!<br>Diskon: <b>${discountText}</b><br><span style="color:#888;font-size:12px;">QRIS & nominal cek otomatis diperbarui (dibulatkan).</span>`,
     icon: "success",
     confirmButtonColor: "#22c55e"
   });
@@ -2058,6 +2088,9 @@ document.getElementById('confirmBtn').onclick = function() {
 
 // ================= REGENERATE BUTTON =================
 document.getElementById('regenerateBtn').onclick = function() {
+  // ===== PEMBULATAN OTOMATIS =====
+  const totalRegen = roundAmount(finalTotal + adminFee);
+  
   Swal.fire({
     title: '🔄 Generate Ulang QRIS?',
     html: `
@@ -2067,7 +2100,7 @@ document.getElementById('regenerateBtn').onclick = function() {
         <ul style="margin-left:20px;margin-top:8px;">
           <li>🔑 Kode unik <b>BARU</b></li>
           <li>⏳ QRIS berlaku <b>1 jam</b> lagi</li>
-          <li>💰 Nominal tetap <b>Rp ${(finalTotal + adminFee).toLocaleString('id-ID')} + kode unik</b></li>
+          <li>💰 Nominal tetap <b>Rp ${totalRegen.toLocaleString('id-ID')} + kode unik</b></li>
         </ul>
         <p style="margin-top:8px;color:#ffaa00;">📌 Kode unik akan berbeda dari sebelumnya</p>
       </div>
@@ -2118,7 +2151,6 @@ document.getElementById('regenerateBtn').onclick = function() {
         savePaymentState(savedState);
       }
       
-      // Tampilkan order IDs yang sudah tersimpan
       displayStoredOrderIds();
       return;
     } else {
@@ -2166,10 +2198,10 @@ document.getElementById('regenerateBtn').onclick = function() {
   
   console.log('📦 Orders data:', ordersData);
   console.log('📊 Is Mass:', isMass);
+  console.log('💰 Total asli (bulat):', roundAmount(total));
   
   updateDisplay();
   
-  // TAMPILKAN ORDER IDS YANG SUDAH TERSIMPAN (JIKA ADA)
   displayStoredOrderIds();
   
   // START QRIS TIMER
@@ -2226,6 +2258,7 @@ console.log('✅ Auto-verifikasi QRIS aktif (cek setiap 10 detik)');
 console.log('⏳ QRIS Expiry:', QRIS_EXPIRY_MINUTES, 'menit');
 console.log('🔄 Regenerate QRIS tersedia setelah expired');
 console.log('💾 URL params & Order IDs tersimpan di localStorage');
+console.log('🔢 PEMBULATAN OTOMATIS AKTIF: Semua nilai desimal dibulatkan ke bilangan bulat');
 </script>
 </body>
 </html>
