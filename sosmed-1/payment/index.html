@@ -617,10 +617,18 @@ const ADMIN_FEE_PERCENT = 1;
 const ADMIN_FEE_THRESHOLD = 500000;
 const QRIS_EXPIRY_MINUTES = 10;
 
+// ===== ROUNDING HELPER =====
+// Normalisasi total bayar agar selalu integer (bulat ke atas, tanpa koma/desimal)
+function normalizeTotal(amount) {
+  const n = Number(amount) || 0;
+  return Math.ceil(n);
+}
+
 // ===== AMBIL PARAMETER DARI URL =====
 const p = new URLSearchParams(location.search);
 const trx = p.get("trx") || "-";
-const total = Number(p.get("total") || 0);
+// ✅ Pastikan total dari URL selalu integer
+const total = normalizeTotal(p.get("total") || 0);
 const isMass = p.get("mass") === "1";
 let ordersData = [];
 let layanan = "-";
@@ -1035,13 +1043,16 @@ function regenerateQris() {
     verificationInterval = setInterval(checkPaymentStatus, 10000);
   }, 2000);
   
+  // ✅ Total bayar dijamin integer
+  const totalBaru = normalizeTotal(finalTotal + uniqueCode + adminFee);
+  
   Swal.fire({
     title: '🔄 QRIS Regenerated!',
     html: `
       <div style="text-align:left;color:#ddd;font-size:14px;">
         <p>QRIS baru telah dibuat dengan:</p>
         <p><b>🔑 Kode Unik:</b> ${uniqueCode}</p>
-        <p><b>💰 Total Bayar:</b> Rp ${(finalTotal + uniqueCode + adminFee).toLocaleString('id-ID')}</p>
+        <p><b>💰 Total Bayar:</b> Rp ${totalBaru.toLocaleString('id-ID')}</p>
         <p style="margin-top:8px;color:#ffaa00;">⏳ QRIS berlaku 1 jam</p>
       </div>
     `,
@@ -1090,7 +1101,6 @@ async function sendOrdersToLollipop() {
         if (comments) payloadData.comments = comments;
       }
       
-      // Request ke serverless endpoint /api/lollipop-services (all-in-one)
       const response = await fetch('/api/lollipop-services', {
         method: 'POST',
         headers: {
@@ -1257,7 +1267,8 @@ async function sendToDiscord(gmail, userID) {
   isSendingDiscord = true;
   
   try {
-    const totalDenganUnik = finalTotal + uniqueCode + adminFee;
+    // ✅ Total bayar dijamin integer
+    const totalDenganUnik = normalizeTotal(finalTotal + uniqueCode + adminFee);
     const refCode = localStorage.getItem('referral_code') || "-";
     
     let orderList = '';
@@ -1311,6 +1322,9 @@ ${orderList || '  -'}
 }
 
 function isTransactionValid(transaction, targetAmount) {
+  // ✅ Pastikan target selalu integer
+  targetAmount = Math.ceil(Number(targetAmount) || 0);
+  
   let rawAmount = String(transaction.amount || '');
   let amountNumber = parseInt(rawAmount.replace(/[^0-9]/g, ''), 10) || 0;
   
@@ -1407,8 +1421,11 @@ async function checkPaymentStatus() {
       return;
     }
     
-    const totalBayar = finalTotal + uniqueCode + adminFee;
+    // ✅ Total yang dicek = sudah dibulatkan integer
+    const totalBayar = normalizeTotal(finalTotal + uniqueCode + adminFee);
     currentTotalBayar = totalBayar;
+    
+    console.log('💰 Nominal yang dicek ke QIOSPAY:', totalBayar);
     
     const res = await fetch(QIOSPAY_MUTASI_URL() + '?t=' + Date.now());
     if (!res.ok) throw new Error('Gagal koneksi mutasi: ' + res.status);
@@ -1531,14 +1548,18 @@ function updateDisplay(){
   uniqueCode = generateUniqueCode();
   document.getElementById('uniqueCode').textContent = uniqueCode;
   
+  // ✅ Bulatkan finalTotal & adminFee agar selalu integer
+  finalTotal = normalizeTotal(finalTotal);
   adminFee = calculateAdminFee(originalTotal);
-  const totalDenganUnik = finalTotal + uniqueCode + adminFee;
+  
+  // ✅ Total bayar dijamin integer
+  const totalDenganUnik = normalizeTotal(finalTotal + uniqueCode + adminFee);
   currentTotalBayar = totalDenganUnik;
   
   let detailHtml = `
   <strong>ID Transaksi:</strong> ${trx}<br>
   <strong>Tipe:</strong> ${isMass ? '📦 MASSAL ('+ordersData.length+' pesanan)' : '📋 Single'}<br>
-  <strong>Total:</strong> <s>Rp ${originalTotal.toLocaleString("id-ID")}</s><br>
+  <strong>Total:</strong> <s>Rp ${normalizeTotal(originalTotal).toLocaleString("id-ID")}</s><br>
   `;
   
   if (isMass && ordersData.length > 0) {
@@ -1583,6 +1604,8 @@ function updateDisplay(){
       ctx.drawImage(logo,x,y,size,size);
     };
   });
+  
+  console.log('🔄 QRIS & nominal cek di-update ke:', totalDenganUnik);
 }
 
 async function loadVoucher(){
@@ -1632,18 +1655,32 @@ document.getElementById('applyVoucher').onclick = async function() {
     return Swal.fire("❌ Tipe voucher tidak valid","","error");
   }
   
-  discount = Math.max(0, discount);
-  finalTotal = Math.max(originalTotal - discount, 0);
+  // ✅ BULATKAN DISKON KE ATAS (hilangkan koma)
+  discount = Math.ceil(Math.max(0, discount));
+  finalTotal = Math.max(normalizeTotal(originalTotal) - discount, 0);
   appliedVoucher = v.code;
-  appliedDiscount = Math.round(discount);
+  appliedDiscount = discount;
   
   markVoucherUsed(v.code);
   
-  document.getElementById('voucherStatus').innerHTML = `<span class="active">✅ Voucher ${v.code} berhasil digunakan!</span>`;
+  document.getElementById('voucherStatus').innerHTML = `<span class="active">✅ Voucher ${v.code} berhasil digunakan! Diskon: Rp ${discount.toLocaleString('id-ID')}</span>`;
   document.getElementById('voucherInput').disabled = true;
   this.disabled = true;
   
   updateDisplay();
+  
+  // Update text status loading agar nominalnya sinkron
+  const statusEl = document.getElementById('paymentStatus');
+  if (statusEl.className === 'payment-status loading') {
+    statusEl.textContent = `⏳ Mengecek pembayaran Rp ${normalizeTotal(finalTotal + uniqueCode + adminFee).toLocaleString('id-ID')}...`;
+  }
+  
+  Swal.fire({
+    title: "✅ Berhasil!",
+    html: `Voucher <b>${v.code}</b> berhasil digunakan!<br>Diskon: <b>Rp ${discount.toLocaleString('id-ID')}</b><br><span style="color:#888;font-size:12px;">QRIS & nominal cek otomatis diperbarui.</span>`,
+    icon: "success",
+    confirmButtonColor: "#22c55e"
+  });
 };
 
 document.getElementById('confirmBtn').onclick = function() {
@@ -1653,7 +1690,17 @@ document.getElementById('confirmBtn').onclick = function() {
 document.getElementById('regenerateBtn').onclick = function() {
   Swal.fire({
     title: '🔄 Generate Ulang QRIS?',
-    text: 'Akan membuat QRIS baru dengan sisa waktu 1 jam.',
+    html: `
+      <div style="text-align:left;color:#ddd;font-size:14px;">
+        <p>QRIS saat ini sudah expired.</p>
+        <p>Generate ulang akan membuat:</p>
+        <ul style="margin-left:20px;margin-top:8px;">
+          <li>🔑 Kode unik <b>BARU</b></li>
+          <li>⏳ QRIS berlaku <b>1 jam</b> lagi</li>
+          <li>💰 Nominal tetap <b>Rp ${normalizeTotal(finalTotal + adminFee).toLocaleString('id-ID')} + kode unik</b></li>
+        </ul>
+      </div>
+    `,
     icon: 'warning',
     showCancelButton: true,
     confirmButtonText: '✅ Ya, Generate Ulang',
