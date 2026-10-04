@@ -1,8 +1,7 @@
 /* ============================================
    DESKTOP CSS — Shine Shop SMM
    Target: min-width 768px (tablet & desktop)
-   Fokus: layout lebih lega, dropdown desktop,
-   hover states, kursor, scrollbar tebal
+   FIXED: Trigger cselect bisa diklik (backdrop tidak menutupi)
 ============================================ */
 
 :root {
@@ -22,7 +21,6 @@
   --discount-bg: #f59e0b;
   --discount-text: #0b1220;
 
-  /* Desktop: radius & shadow lebih besar */
   --radius: 18px;
   --radius-sm: 13px;
   --shadow: 0 14px 48px rgba(0, 0, 0, 0.4);
@@ -31,12 +29,10 @@
   --header-height: 64px;
 }
 
-/* Layar sangat besar */
 @media (min-width: 1280px) {
   :root { --container-max: 940px; }
 }
 
-/* ===== RESET (mengulang karena CSS terpisah) ===== */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 html {
@@ -69,7 +65,6 @@ body::before {
   z-index: 0;
 }
 
-/* Scrollbar desktop lebih tebal & jelas */
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.02); }
 ::-webkit-scrollbar-thumb {
@@ -155,7 +150,7 @@ h1 {
 .hamburger-btn.active .hamburger-icon span:nth-child(2) { opacity: 0; transform: scaleX(0); }
 .hamburger-btn.active .hamburger-icon span:nth-child(3) { transform: translateY(-6px) rotate(-45deg); }
 
-/* ===== OFFCANVAS MENU (desktop: lebih lebar) ===== */
+/* ===== OFFCANVAS MENU ===== */
 .offcanvas {
   position: fixed;
   top: 0; left: 0;
@@ -279,7 +274,7 @@ label {
   text-transform: uppercase;
 }
 
-/* ===== FORM ELEMENTS (desktop-optimized) ===== */
+/* ===== FORM ELEMENTS ===== */
 input, select, textarea {
   width: 100%;
   padding: 13px 16px;
@@ -579,7 +574,7 @@ textarea {
   transform: translateY(-1px);
 }
 
-/* ===== FILTER ROW (2 kolom di desktop besar) ===== */
+/* ===== FILTER ROW ===== */
 .filter-row {
   display: flex;
   flex-wrap: wrap;
@@ -607,8 +602,24 @@ textarea {
   .filter-row .filter-item { min-width: unset; }
 }
 
-/* ===== CUSTOM SELECT (desktop dropdown, bukan bottom sheet) ===== */
-.cselect { position: relative; margin-top: 6px; width: 100%; }
+/* ============================================
+   CUSTOM SELECT — DESKTOP (FIXED)
+   Panel muncul sebagai dropdown di bawah trigger
+   Backdrop transparan & tidak menghalangi klik
+============================================ */
+
+.cselect {
+  position: relative;
+  margin-top: 6px;
+  width: 100%;
+  /* Pastikan container punya stacking context sendiri */
+  z-index: 1;
+}
+
+/* Saat cselect terbuka, naikkan z-index agar panel & trigger tidak ketutup */
+.cselect.open {
+  z-index: 250;
+}
 
 .cselect-trigger {
   width: 100%;
@@ -628,6 +639,9 @@ textarea {
   transition: border-color var(--transition), box-shadow var(--transition), background var(--transition);
   line-height: 1.4;
   position: relative;
+  /* Pastikan trigger selalu bisa diklik */
+  z-index: 2;
+  pointer-events: auto;
 }
 
 .cselect-trigger:hover {
@@ -662,28 +676,32 @@ textarea {
 .cselect.open .cselect-arrow { transform: translateY(-50%) rotate(180deg); }
 .cselect-arrow svg { display: block; width: 12px; height: 12px; }
 
+/* 🔧 BACKDROP DESKTOP: TRANSPARAN & TIDAK MENGHALANGI KLIK TRIGGER */
 .cselect-backdrop {
   position: fixed;
   inset: 0;
-  background: transparent;
-  z-index: 200;
+  background: transparent; /* <- tidak ada warna overlay */
+  z-index: 150; /* <- di bawah .cselect.open (250) */
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.25s ease;
+  transition: opacity 0.2s ease;
 }
 
 .cselect-backdrop.show {
   opacity: 1;
+  /* Ini yang penting: backdrop hanya menangkap klik di area LUAR,
+     trigger & panel tetap menerima klik karena z-index lebih tinggi */
   pointer-events: auto;
 }
 
-/* Desktop: panel muncul sebagai dropdown di bawah trigger */
+/* 🔧 PANEL DESKTOP */
 .cselect-panel {
   position: absolute;
-  left: 0; right: 0;
-  bottom: auto;
+  left: 0;
+  right: 0;
   top: calc(100% + 8px);
-  z-index: 210;
+  bottom: auto;
+  z-index: 260; /* <- di atas backdrop & trigger */
   background: #111827;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
@@ -695,6 +713,8 @@ textarea {
   opacity: 0;
   pointer-events: none;
   transition: transform 0.2s ease, opacity 0.2s ease;
+  /* Mencegah panel terpotong di parent yang overflow hidden */
+  will-change: transform, opacity;
 }
 
 .cselect-panel.open {
@@ -977,7 +997,7 @@ textarea {
 .text-muted { color: var(--text-muted); }
 #commentSection { display: none; }
 
-/* ===== TABLET (768–1023px): sedikit lebih kecil dari desktop besar ===== */
+/* ===== TABLET ===== */
 @media (min-width: 768px) and (max-width: 1023px) {
   :root { --container-max: 720px; }
   .container {
