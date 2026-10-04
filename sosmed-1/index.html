@@ -646,10 +646,20 @@ textarea {
   letter-spacing: 0.5px;
 }
 
+/* ============================================
+   CUSTOM SELECT — DESKTOP FIX
+   Desktop (≥640px): dropdown tanpa backdrop fixed
+============================================ */
 .cselect {
   position: relative;
   margin-top: 5px;
   width: 100%;
+  z-index: 1;
+}
+
+/* Saat terbuka, naikkan z-index container */
+.cselect.open {
+  z-index: 250;
 }
 
 .cselect-trigger {
@@ -670,6 +680,8 @@ textarea {
   transition: border-color var(--transition), box-shadow var(--transition), background var(--transition);
   line-height: 1.4;
   position: relative;
+  z-index: 2;
+  pointer-events: auto;
 }
 
 .cselect-trigger:hover {
@@ -718,6 +730,7 @@ textarea {
   height: 12px;
 }
 
+/* Backdrop — hanya dipakai di MOBILE bottom sheet */
 .cselect-backdrop {
   position: fixed;
   inset: 0;
@@ -733,6 +746,7 @@ textarea {
   pointer-events: auto;
 }
 
+/* Panel default = MOBILE bottom sheet */
 .cselect-panel {
   position: fixed;
   left: 0;
@@ -896,21 +910,24 @@ textarea {
   font-size: 14px;
 }
 
+/* ===== DESKTOP (≥640px): dropdown di bawah trigger ===== */
 @media (min-width: 640px) {
   .cselect-panel {
     position: absolute;
     left: 0;
     right: 0;
-    bottom: auto;
     top: calc(100% + 6px);
-    max-height: 320px;
+    bottom: auto;
+    z-index: 260;
+    max-height: 340px;
     border-radius: var(--radius-sm);
     border: 1px solid var(--border);
-    box-shadow: var(--shadow);
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55);
     transform: translateY(-8px) scale(0.98);
     opacity: 0;
     pointer-events: none;
     transition: transform 0.2s ease, opacity 0.2s ease;
+    padding-bottom: 0;
   }
 
   .cselect-panel.open {
@@ -920,7 +937,14 @@ textarea {
   }
 
   .cselect-handle { display: none; }
-  .cselect-panel-title { display: none; }
+  .cselect-panel-title {
+    text-align: left;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.7px;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+  }
 }
 
 .terms-container {
@@ -1158,14 +1182,14 @@ button.primary:disabled {
   .logo { width: 32px; height: 32px; }
   input, select, textarea {
     padding: 10px 12px;
-    font-size: 13px;
+    font-size: 16px; /* cegah auto-zoom iOS */
     min-height: 40px;
   }
   select { min-height: 40px; padding-right: 32px; background-position: right 10px center; }
   .cselect-trigger {
     min-height: 40px;
     padding: 10px 36px 10px 12px;
-    font-size: 13px;
+    font-size: 15px;
   }
   .cselect-panel { max-height: 70vh; }
   .cselect-item { padding: 11px 12px; font-size: 13px; }
@@ -1194,8 +1218,8 @@ button.primary:disabled {
 @media (max-width: 380px) {
   .container { padding: 12px 8px 16px; margin: 8px 4px 16px; border-radius: 12px; }
   h2 { font-size: 16px; margin-bottom: 12px; }
-  input, select, textarea { font-size: 12px; padding: 8px 10px; min-height: 36px; }
-  .cselect-trigger { min-height: 36px; padding: 8px 32px 8px 10px; font-size: 12px; }
+  input, select, textarea { font-size: 16px; padding: 8px 10px; min-height: 36px; }
+  .cselect-trigger { min-height: 36px; padding: 8px 32px 8px 10px; font-size: 14px; }
   button.primary, .btn-primary { font-size: 12px; padding: 10px 14px; }
   .single-checkout-btn { font-size: 12px; padding: 10px 14px; }
   .desc, .aver { font-size: 11px; padding: 8px 10px; }
@@ -1440,7 +1464,7 @@ cekAkses();
   'use strict';
 
   // ===== SALDO PROVIDER STATE =====
-  let providerBalance = 0; // Menyimpan saldo provider real-time
+  let providerBalance = 0;
 
   // ===== MENU =====
   const toggleBtn = document.getElementById('menuToggle');
@@ -1596,12 +1620,10 @@ cekAkses();
     return sorted;
   }
 
-  // ===== BALANCE CHECK ENGINE =====
   function checkBalanceAndToggleButtons() {
     const btnSingle = document.getElementById('btnSingleCheckout');
     const btnMassal = document.getElementById('btnMassalCheckout');
 
-    // Hitung Modal Modal yang dibutuhkan (berdasarkan rate Lollipop tanpa markup)
     let singleCostRaw = 0;
     if (selectedService && currentMode === 'single') {
       const jumlah = parseInt(document.getElementById('jumlah').value || '0', 10);
@@ -1617,7 +1639,6 @@ cekAkses();
       }, 0);
     }
 
-    // 1. Cek Single Checkout
     if (btnSingle) {
       if (singleCostRaw > providerBalance) {
         btnSingle.disabled = true;
@@ -1628,7 +1649,6 @@ cekAkses();
       }
     }
 
-    // 2. Cek Massal Checkout
     if (btnMassal) {
       if (massalCostRaw > providerBalance) {
         btnMassal.disabled = true;
@@ -1640,12 +1660,31 @@ cekAkses();
     }
   }
 
-  // ===== CUSTOM SELECT ENGINE =====
+  /* ============================================================
+     CUSTOM SELECT ENGINE — FIXED
+     Desktop (≥640px): dropdown tanpa backdrop.
+     Close-outside via document click listener.
+     Mobile (<640px): bottom sheet + backdrop.
+  ============================================================ */
   let activeCSelect = null;
   let kategoriItems = [];
   let layananItems = [];
+  let outsideClickHandler = null;
+
+  function isMobileViewport() {
+    return window.matchMedia('(max-width: 639px)').matches;
+  }
+
+  function cleanupOutsideListener() {
+    if (outsideClickHandler) {
+      document.removeEventListener('click', outsideClickHandler, true);
+      outsideClickHandler = null;
+    }
+  }
 
   function closeAllCSelect() {
+    cleanupOutsideListener();
+
     document.querySelectorAll('.cselect.open').forEach(function (el) {
       el.classList.remove('open');
       const trigger = el.querySelector('.cselect-trigger');
@@ -1657,6 +1696,7 @@ cekAkses();
     document.querySelectorAll('.cselect-backdrop.show').forEach(function (b) {
       b.classList.remove('show');
     });
+
     setTimeout(function () {
       document.querySelectorAll('.cselect-panel').forEach(function (p) {
         if (!p.classList.contains('open') && p.parentNode) p.parentNode.removeChild(p);
@@ -1665,8 +1705,12 @@ cekAkses();
         if (!b.classList.contains('show') && b.parentNode) b.parentNode.removeChild(b);
       });
     }, 320);
+
     activeCSelect = null;
-    document.body.style.overflow = '';
+
+    if (isMobileViewport()) {
+      document.body.style.overflow = '';
+    }
   }
 
   function setTriggerLabel(cselectEl, text, isPlaceholder) {
@@ -1703,7 +1747,8 @@ cekAkses();
           (item.meta ? '<span class="cselect-item-meta">' + item.meta + '</span>' : '') +
         '</span>';
 
-      li.addEventListener('click', function () {
+      li.addEventListener('click', function (e) {
+        e.stopPropagation();
         onPick(item);
         closeAllCSelect();
       });
@@ -1712,11 +1757,15 @@ cekAkses();
   }
 
   function openCSelect(cselectEl, title, items, selectedValue, onPick) {
+    // Toggle behavior
+    if (activeCSelect === cselectEl && cselectEl.classList.contains('open')) {
+      closeAllCSelect();
+      return;
+    }
+
     closeAllCSelect();
 
-    const isMobile = window.matchMedia('(max-width: 639px)').matches;
-    const backdrop = document.createElement('div');
-    backdrop.className = 'cselect-backdrop';
+    const mobile = isMobileViewport();
 
     const panel = document.createElement('div');
     panel.className = 'cselect-panel';
@@ -1730,6 +1779,11 @@ cekAkses();
 
     const listEl = panel.querySelector('.cselect-list');
     const searchEl = panel.querySelector('.cselect-search');
+
+    // Cegah klik di dalam panel menutup dropdown
+    panel.addEventListener('click', function (e) {
+      e.stopPropagation();
+    });
 
     function filterAndRender(q) {
       const query = (q || '').toLowerCase().trim();
@@ -1754,26 +1808,48 @@ cekAkses();
       filterAndRender(searchEl.value);
     });
 
-    backdrop.addEventListener('click', closeAllCSelect);
+    if (mobile) {
+      // ===== MOBILE: bottom sheet + backdrop =====
+      const backdrop = document.createElement('div');
+      backdrop.className = 'cselect-backdrop';
+      backdrop.addEventListener('click', closeAllCSelect);
 
-    if (isMobile) {
       document.body.appendChild(backdrop);
       document.body.appendChild(panel);
       document.body.style.overflow = 'hidden';
-    } else {
-      cselectEl.appendChild(panel);
-      document.body.appendChild(backdrop);
-    }
 
-    void panel.offsetHeight;
-    requestAnimationFrame(function () {
-      backdrop.classList.add('show');
-      panel.classList.add('open');
-      cselectEl.classList.add('open');
-      cselectEl.querySelector('.cselect-trigger').setAttribute('aria-expanded', 'true');
-      activeCSelect = cselectEl;
-      setTimeout(function () { searchEl.focus(); }, 280);
-    });
+      void panel.offsetHeight;
+      requestAnimationFrame(function () {
+        backdrop.classList.add('show');
+        panel.classList.add('open');
+        cselectEl.classList.add('open');
+        cselectEl.querySelector('.cselect-trigger').setAttribute('aria-expanded', 'true');
+        activeCSelect = cselectEl;
+        setTimeout(function () { searchEl.focus(); }, 280);
+      });
+    } else {
+      // ===== DESKTOP: dropdown inline, tanpa backdrop =====
+      cselectEl.appendChild(panel);
+
+      void panel.offsetHeight;
+      requestAnimationFrame(function () {
+        panel.classList.add('open');
+        cselectEl.classList.add('open');
+        cselectEl.querySelector('.cselect-trigger').setAttribute('aria-expanded', 'true');
+        activeCSelect = cselectEl;
+        searchEl.focus();
+      });
+
+      // Click-outside untuk desktop
+      setTimeout(function () {
+        outsideClickHandler = function (e) {
+          if (activeCSelect && !activeCSelect.contains(e.target)) {
+            closeAllCSelect();
+          }
+        };
+        document.addEventListener('click', outsideClickHandler, true);
+      }, 0);
+    }
   }
 
   // ===== KATEGORI =====
@@ -1801,7 +1877,11 @@ cekAkses();
     }
   }
 
-  function openKategoriPicker() {
+  function openKategoriPicker(e) {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     const hidden = document.getElementById('kategori');
     openCSelect(
       document.getElementById('cselectKategori'),
@@ -1872,7 +1952,11 @@ cekAkses();
     }
   }
 
-  function openLayananPicker() {
+  function openLayananPicker(e) {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     const hidden = document.getElementById('layanan');
     if (!layananItems.length) {
       alert('Pilih kategori terlebih dahulu!');
@@ -1987,7 +2071,6 @@ cekAkses();
     detailEl.innerHTML = detailText;
     document.getElementById('total').value = total;
 
-    // Cek kecukupan saldo
     checkBalanceAndToggleButtons();
   }
 
@@ -2098,7 +2181,6 @@ cekAkses();
       return;
     }
 
-    // Pengecekan saldo sebelum checkout
     const rawRate = selectedService.rawRate || selectedService.rate || 0;
     const singleCostRaw = calcTotal(jumlah, rawRate);
     if (singleCostRaw > providerBalance) {
@@ -2409,7 +2491,6 @@ cekAkses();
         throw new Error(resJson.msg || 'Provider error');
       }
 
-      // Update Saldo Provider Realtime
       if (typeof resJson.balance !== 'undefined') {
         providerBalance = Number(resJson.balance) || 0;
       }
