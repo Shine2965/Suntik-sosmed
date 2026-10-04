@@ -10,16 +10,8 @@
 <meta name="mobile-web-app-capable" content="yes">
 <title>Shine Shop - SMM</title>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-
-<!-- CSS Mobile (default, diprioritaskan untuk semua device) -->
 <link rel="stylesheet" href="mobile.css" media="screen and (max-width: 767px)">
-<!-- CSS Desktop (tablet & desktop) -->
 <link rel="stylesheet" href="desktop.css" media="screen and (min-width: 768px)">
-
-<!-- Fallback: jika media query tidak didukung, tetap load mobile.css -->
-<noscript>
-  <link rel="stylesheet" href="mobile.css">
-</noscript>
 </head>
 <body>
 
@@ -99,13 +91,11 @@
   <label>Waktu rata-rata selesai</label>
   <div class="aver" id="average">—</div>
 
-  <!-- MODE TOGGLE -->
   <div class="mode-toggle">
     <button class="mode-btn active" data-mode="single" id="modeSingle">📋 Single Order</button>
     <button class="mode-btn" data-mode="massal" id="modeMassal">📦 Massal Order</button>
   </div>
 
-  <!-- SINGLE SECTION -->
   <div id="singleSection">
     <label for="jumlah">Jumlah Pesanan</label>
     <input type="number" id="jumlah" min="1" inputmode="numeric" placeholder="Masukkan jumlah">
@@ -136,7 +126,6 @@
     </div>
   </div>
 
-  <!-- MASSAL SECTION -->
   <div id="massalSection" style="display:none;margin-top:12px;">
     <div class="alert" style="border-left-color:var(--warning);color:var(--warning);background:rgba(251,191,36,0.06);">
       📦 Mode Massal: Isi jumlah dan target, lalu klik "Tambahkan" untuk menambah ke daftar.
@@ -186,7 +175,6 @@
     Instagram: <strong>onivla_</strong>
   </div>
 
-  <!-- SYARAT & KETENTUAN -->
   <div class="terms-container" id="termsContainer">
     <div class="terms-header" id="termsHeader">
       <div class="terms-check">
@@ -345,7 +333,6 @@
   modeSingle.addEventListener('click', () => setMode('single'));
   modeMassal.addEventListener('click', () => setMode('massal'));
 
-  // ===== ENDPOINT =====
   const SERVICES_ENDPOINT = '/api/fayupedia-services';
 
   function formatRp(n) {
@@ -416,12 +403,31 @@
     }
   }
 
-  // ===== CUSTOM SELECT ENGINE =====
+  /* ============================================================
+     CUSTOM SELECT ENGINE — FIXED
+     Desktop: tanpa backdrop. Close via document click listener.
+     Mobile: pakai backdrop + bottom sheet.
+  ============================================================ */
   let activeCSelect = null;
   let kategoriItems = [];
   let layananItems = [];
+  let outsideClickHandler = null;
+
+  function isMobileViewport() {
+    return window.matchMedia('(max-width: 767px)').matches;
+  }
+
+  function cleanupOutsideListener() {
+    if (outsideClickHandler) {
+      document.removeEventListener('click', outsideClickHandler, true);
+      outsideClickHandler = null;
+    }
+  }
 
   function closeAllCSelect() {
+    // hapus listener click-outside
+    cleanupOutsideListener();
+
     document.querySelectorAll('.cselect.open').forEach(function (el) {
       el.classList.remove('open');
       const trigger = el.querySelector('.cselect-trigger');
@@ -433,6 +439,7 @@
     document.querySelectorAll('.cselect-backdrop.show').forEach(function (b) {
       b.classList.remove('show');
     });
+
     setTimeout(function () {
       document.querySelectorAll('.cselect-panel').forEach(function (p) {
         if (!p.classList.contains('open') && p.parentNode) p.parentNode.removeChild(p);
@@ -441,8 +448,13 @@
         if (!b.classList.contains('show') && b.parentNode) b.parentNode.removeChild(b);
       });
     }, 320);
+
     activeCSelect = null;
-    document.body.style.overflow = '';
+
+    // hanya reset overflow untuk mobile
+    if (isMobileViewport()) {
+      document.body.style.overflow = '';
+    }
   }
 
   function setTriggerLabel(cselectEl, text, isPlaceholder) {
@@ -479,7 +491,8 @@
           (item.meta ? '<span class="cselect-item-meta">' + item.meta + '</span>' : '') +
         '</span>';
 
-      li.addEventListener('click', function () {
+      li.addEventListener('click', function (e) {
+        e.stopPropagation();
         onPick(item);
         closeAllCSelect();
       });
@@ -488,11 +501,15 @@
   }
 
   function openCSelect(cselectEl, title, items, selectedValue, onPick) {
+    // Kalau cselect yang sama sudah terbuka → tutup saja (toggle)
+    if (activeCSelect === cselectEl && cselectEl.classList.contains('open')) {
+      closeAllCSelect();
+      return;
+    }
+
     closeAllCSelect();
 
-    const isMobile = window.matchMedia('(max-width: 767px)').matches;
-    const backdrop = document.createElement('div');
-    backdrop.className = 'cselect-backdrop';
+    const mobile = isMobileViewport();
 
     const panel = document.createElement('div');
     panel.className = 'cselect-panel';
@@ -506,6 +523,11 @@
 
     const listEl = panel.querySelector('.cselect-list');
     const searchEl = panel.querySelector('.cselect-search');
+
+    // Cegah klik di dalam panel menutup dropdown
+    panel.addEventListener('click', function (e) {
+      e.stopPropagation();
+    });
 
     function filterAndRender(q) {
       const query = (q || '').toLowerCase().trim();
@@ -530,28 +552,51 @@
       filterAndRender(searchEl.value);
     });
 
-    backdrop.addEventListener('click', closeAllCSelect);
+    if (mobile) {
+      // ===== MOBILE: bottom sheet + backdrop =====
+      const backdrop = document.createElement('div');
+      backdrop.className = 'cselect-backdrop';
+      backdrop.addEventListener('click', closeAllCSelect);
 
-    if (isMobile) {
       document.body.appendChild(backdrop);
       document.body.appendChild(panel);
       document.body.style.overflow = 'hidden';
-    } else {
-      cselectEl.appendChild(panel);
-      document.body.appendChild(backdrop);
-    }
 
-    void panel.offsetHeight;
-    requestAnimationFrame(function () {
-      backdrop.classList.add('show');
-      panel.classList.add('open');
-      cselectEl.classList.add('open');
-      cselectEl.querySelector('.cselect-trigger').setAttribute('aria-expanded', 'true');
-      activeCSelect = cselectEl;
-      setTimeout(function () { searchEl.focus(); }, 280);
-    });
+      void panel.offsetHeight;
+      requestAnimationFrame(function () {
+        backdrop.classList.add('show');
+        panel.classList.add('open');
+        cselectEl.classList.add('open');
+        cselectEl.querySelector('.cselect-trigger').setAttribute('aria-expanded', 'true');
+        activeCSelect = cselectEl;
+        setTimeout(function () { searchEl.focus(); }, 280);
+      });
+    } else {
+      // ===== DESKTOP: dropdown, tanpa backdrop =====
+      cselectEl.appendChild(panel);
+
+      void panel.offsetHeight;
+      requestAnimationFrame(function () {
+        panel.classList.add('open');
+        cselectEl.classList.add('open');
+        cselectEl.querySelector('.cselect-trigger').setAttribute('aria-expanded', 'true');
+        activeCSelect = cselectEl;
+        searchEl.focus();
+      });
+
+      // Listener click-outside: tutup hanya kalau klik di luar cselect & panel
+      setTimeout(function () {
+        outsideClickHandler = function (e) {
+          if (activeCSelect && !activeCSelect.contains(e.target)) {
+            closeAllCSelect();
+          }
+        };
+        document.addEventListener('click', outsideClickHandler, true);
+      }, 0);
+    }
   }
 
+  // ===== KATEGORI =====
   function populateKategori(keepValue) {
     const hidden = document.getElementById('kategori');
     const current = keepValue ? hidden.value : '';
@@ -576,7 +621,11 @@
     }
   }
 
-  function openKategoriPicker() {
+  function openKategoriPicker(e) {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     const hidden = document.getElementById('kategori');
     openCSelect(
       document.getElementById('cselectKategori'),
@@ -591,6 +640,7 @@
     );
   }
 
+  // ===== LAYANAN =====
   function loadLayanan() {
     const kategori = document.getElementById('kategori').value;
     const hidden = document.getElementById('layanan');
@@ -644,7 +694,11 @@
     }
   }
 
-  function openLayananPicker() {
+  function openLayananPicker(e) {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     const hidden = document.getElementById('layanan');
     if (!layananItems.length) {
       alert('Pilih kategori terlebih dahulu!');
@@ -664,6 +718,7 @@
     );
   }
 
+  // ===== SHOW INFO =====
   function showInfo() {
     const kategori = document.getElementById('kategori').value;
     const layananID = document.getElementById('layanan').value;
@@ -1197,10 +1252,16 @@
     }
   });
 
-  document.getElementById('cselectKategori').querySelector('.cselect-trigger')
+  // ===== EVENT BINDING TRIGGER =====
+  // Pakai e.preventDefault + stopPropagation agar tidak bentrok dengan listener click-outside
+  document.getElementById('cselectKategori')
+    .querySelector('.cselect-trigger')
     .addEventListener('click', openKategoriPicker);
-  document.getElementById('cselectLayanan').querySelector('.cselect-trigger')
+
+  document.getElementById('cselectLayanan')
+    .querySelector('.cselect-trigger')
     .addEventListener('click', openLayananPicker);
+
   document.getElementById('sortHarga').addEventListener('change', loadLayanan);
 
   document.getElementById('jumlah').addEventListener('input', function() {
