@@ -26,6 +26,9 @@ export default function handler(req, res) {
         // ===== INDOSMM CONFIG =====
         const indoApiKey = process.env.INDO_API_KEY || '4ed44f3cf37683ca04b27636f4a66ca5';
 
+        // ===== JURAGAN SOSMED CONFIG (BARU) =====
+        const juraganApiKey = process.env.JURAGAN_API_KEY || '5a675b8b637f08969edd6322edc4dd2a';
+
         // ===== ORDER SOSMED CONFIG (LEGACY) =====
         const orderApiId = parseInt(process.env.ORDER_API_ID || process.env.ORDERSOSMED_API_ID) || 11313;
         const orderApiKey = process.env.ORDER_API_KEY || process.env.ORDERSOSMED_API_KEY || '23941803d5391da4e45a1bf4ebca52064fa17a53574d1c3655a0173dd7530fb1';
@@ -51,6 +54,9 @@ export default function handler(req, res) {
             // ===== INDOSMM =====
             indo_api_key: indoApiKey,
 
+            // ===== JURAGAN SOSMED (BARU) =====
+            juragan_api_key: juraganApiKey,
+
             // ===== LEGACY ORDER SOSMED =====
             order_api_id: orderApiId,
 
@@ -68,6 +74,7 @@ export default function handler(req, res) {
             from_env: {
                 qiospay: !!process.env.QIOSPAY_API_KEY,
                 indo: !!process.env.INDO_API_KEY,
+                juragan: !!process.env.JURAGAN_API_KEY,
                 order: !!(process.env.ORDER_API_KEY || process.env.ORDERSOSMED_API_KEY),
                 fayupedia: !!process.env.FAYUPEDIA_API_KEY,
                 irvankarde: !!process.env.IRVANKARDE_API_KEY,
