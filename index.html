@@ -257,6 +257,11 @@ body::before{
   border-radius:20px;
   padding:18px 20px;
   position:relative;overflow:hidden;
+  transition:all 0.3s ease;
+}
+.balance-card.minus{
+  background:linear-gradient(135deg,rgba(255,68,68,0.15),rgba(180,20,20,0.08));
+  border-color:rgba(255,68,68,0.4);
 }
 .balance-card::before{
   content:'';position:absolute;top:-40%;right:-15%;
@@ -264,11 +269,15 @@ body::before{
   background:radial-gradient(circle,rgba(255,215,0,0.2),transparent 70%);
   pointer-events:none;
 }
+.balance-card.minus::before{
+  background:radial-gradient(circle,rgba(255,68,68,0.2),transparent 70%);
+}
 .balance-label{
   font-size:10.5px;font-weight:700;
   text-transform:uppercase;letter-spacing:1.5px;
   color:#ffd700;
 }
+.balance-card.minus .balance-label{color:#ff6666}
 .balance-value{
   font-size:32px;font-weight:900;
   font-family:'Poppins',sans-serif;
@@ -278,10 +287,9 @@ body::before{
   line-height:1.2;margin-top:4px;
 }
 .balance-value.minus{
-  background:linear-gradient(135deg,#ff4444,#ff8080) !important;
-  -webkit-background-clip:text !important;
-  -webkit-text-fill-color:transparent !important;
-  background-clip:text !important;
+  background:linear-gradient(135deg,#ff4444,#ff8080);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  background-clip:text;
 }
 .balance-actions{
   display:flex;gap:10px;margin-top:16px;
@@ -732,18 +740,6 @@ body::before{
   background:rgba(255,255,255,0.02);
   border-radius:12px;
   border:1px dashed rgba(255,255,255,0.1);
-}
-.refund-badge-pending{
-  display:inline-flex;
-  align-items:center;
-  padding:2px 8px;
-  background:rgba(250,204,21,0.2);
-  color:#facc15;
-  border:1px solid rgba(250,204,21,0.4);
-  border-radius:10px;
-  font-size:9px;
-  font-weight:800;
-  animation:badgePulse 1.5s ease-in-out infinite;
 }
 
 /* ============ BOTTOM NAV ============ */
@@ -1654,8 +1650,8 @@ body.chat-open .cs-bubble-container{
           💰 Saldo
           <div class="line"></div>
         </div>
-        <div class="balance-card">
-          <div class="balance-label">Saldo Tersedia</div>
+        <div class="balance-card" id="balanceCard">
+          <div class="balance-label" id="balanceLabel">Saldo Tersedia</div>
           <div class="balance-value" id="balanceValue">Rp 0</div>
           <div class="balance-actions">
             <button class="balance-btn deposit" onclick="openDepositDialog()">
@@ -2608,9 +2604,8 @@ async function updateAuthUI(user) {
       document.getElementById('adminIcon').textContent = role === 'owner' ? '👑' : '🛡️';
       loadMemberList();
       loadChatStats();
-      loadPendingRefunds(); // 🔥 Auto load refund pending
+      loadPendingRefunds();
       
-      // 🔥 Auto refresh refund pending setiap 30 detik
       if (refundAutoRefreshInterval) clearInterval(refundAutoRefreshInterval);
       refundAutoRefreshInterval = setInterval(() => {
         if (isAdminOrOwner && !document.hidden && currentUser) {
@@ -2645,15 +2640,28 @@ async function updateAuthUI(user) {
 }
 
 // ============================================================
-// BALANCE
+// BALANCE (support MINUS)
 // ============================================================
 function updateBalanceDisplay(balance) {
   const val = document.getElementById('balanceValue');
+  const card = document.getElementById('balanceCard');
+  const label = document.getElementById('balanceLabel');
   if (!val) return;
+  
   const num = parseFloat(balance) || 0;
   const isMinus = num < 0;
+  
   val.textContent = (isMinus ? '-Rp ' : 'Rp ') + Math.abs(num).toLocaleString('id-ID');
   val.className = 'balance-value' + (isMinus ? ' minus' : '');
+  
+  if (card) {
+    if (isMinus) card.classList.add('minus');
+    else card.classList.remove('minus');
+  }
+  
+  if (label) {
+    label.textContent = isMinus ? '⚠️ Saldo MINUS' : 'Saldo Tersedia';
+  }
 }
 
 async function refreshBalance() {
@@ -2665,10 +2673,10 @@ async function refreshBalance() {
     const num = parseFloat(profile.balance) || 0;
     const isMinus = num < 0;
     Swal.fire({ 
-      title: '✅ Diperbarui', 
+      title: isMinus ? '⚠️ Saldo MINUS' : '✅ Diperbarui', 
       html: `Saldo: <b style="color:${isMinus ? '#ff4444' : '#ffd700'};">${isMinus ? '-' : ''}Rp ${Math.abs(num).toLocaleString('id-ID')}</b>`,
-      icon: 'success', 
-      confirmButtonColor: '#ff6b9d', 
+      icon: isMinus ? 'warning' : 'success', 
+      confirmButtonColor: isMinus ? '#ff4444' : '#ff6b9d', 
       background: '#1a0e2e', 
       color: '#fff', 
       timer: 1500, 
@@ -3104,7 +3112,7 @@ async function loadMemberList() {
 }
 
 // ============================================================
-// 💰 REFUND PENDING MANAGEMENT
+// 💰 REFUND PENDING
 // ============================================================
 async function loadPendingRefunds() {
   const container = document.getElementById('refundPendingContainer');
@@ -3318,7 +3326,7 @@ async function rejectRefund(refundId, btnElement) {
 }
 
 // ============================================================
-// BAN USER / UNBAN / ROLE / MUTE
+// BAN/UNBAN/ROLE/MUTE
 // ============================================================
 async function banUserPrompt(email) {
   const { value: formValues } = await Swal.fire({
@@ -3367,15 +3375,20 @@ async function unbanUser(email) {
 }
 
 // ============================================================
-// 💰 UBAH SALDO — Support MINUS (SET atau ADJUST)
+// 💰 EDIT SALDO — Support MINUS
 // ============================================================
 async function editBalancePrompt(email, currentBalance) {
+  const currentNum = parseFloat(currentBalance) || 0;
+  const isCurrentMinus = currentNum < 0;
+  
   const { value: formValues } = await Swal.fire({
     title: '💰 Ubah Saldo User',
     html: `
       <div style="text-align:left;font-size:12px;color:#b39ddb;margin-bottom:10px;">
         Target: <b style="color:#ff6b9d;">${email}</b><br>
-        Saldo saat ini: <b style="color:${(parseFloat(currentBalance)||0) < 0 ? '#ff4444' : '#facc15'};">${(parseFloat(currentBalance)||0) < 0 ? '-' : ''}Rp ${Math.abs(parseFloat(currentBalance)||0).toLocaleString('id-ID')}</b>
+        Saldo saat ini: <b style="color:${isCurrentMinus ? '#ff4444' : '#facc15'};">
+          ${isCurrentMinus ? '-' : ''}Rp ${Math.abs(currentNum).toLocaleString('id-ID')}
+        </b>
       </div>
       
       <div style="text-align:left;font-size:11.5px;color:#94a3b8;line-height:1.6;background:rgba(0,198,255,0.06);padding:10px;border-radius:10px;margin-bottom:12px;border-left:3px solid #00c6ff;">
@@ -3415,14 +3428,11 @@ async function editBalancePrompt(email, currentBalance) {
       const updatePreview = () => {
         const val = parseFloat(input.value) || 0;
         const isAdjust = checkbox.checked;
-        const base = parseFloat(currentBalance) || 0;
+        const base = currentNum;
         let result;
         
-        if (isAdjust) {
-          result = base + val;
-        } else {
-          result = val;
-        }
+        if (isAdjust) result = base + val;
+        else result = val;
         
         const diff = result - base;
         const diffText = diff >= 0 
@@ -3444,11 +3454,8 @@ async function editBalancePrompt(email, currentBalance) {
       
       input.addEventListener('input', updatePreview);
       checkbox.addEventListener('change', () => {
-        if (checkbox.checked) {
-          input.value = '0';
-        } else {
-          input.value = currentBalance || 0;
-        }
+        if (checkbox.checked) input.value = '0';
+        else input.value = currentBalance || 0;
         updatePreview();
       });
       
@@ -3611,7 +3618,7 @@ async function unmuteUserChat(targetUserId, targetEmail) {
 }
 
 // ============================================================
-// USER PRESENCE v2 - REALTIME via Supabase Presence
+// USER PRESENCE v2 - REALTIME
 // ============================================================
 async function upsertLastSeen() {
   if (!chatClient || !currentUser) return;
@@ -3674,7 +3681,6 @@ function initRealtimePresence() {
       updateOnlineCounter();
     })
     .subscribe(async (status) => {
-      console.log('📡 Realtime Presence:', status);
       if (status === 'SUBSCRIBED') {
         await presenceChannelRealtime.track({
           user_id: currentUser.id,
@@ -3868,7 +3874,6 @@ async function initPresence() {
     refreshPresenceUI();
     updateOnlineCounter();
   }, 5000);
-  console.log('👥 Presence initialized (REALTIME)');
 }
 
 function cleanupPresence() {
