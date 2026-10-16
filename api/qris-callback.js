@@ -12,7 +12,7 @@ export default async function handler(req, res) {
     if (req.method !== 'POST') return res.status(405).json({ success: false, message: 'Method not allowed' });
 
     try {
-        const secret = process.env.CALLBACK_SECRET_KEY || 'shine_secret_2024';
+        const secret = process.env.CALLBACK_SECRET_KEY || 'Alvino11';
         
         // Verifikasi secret dari query atau header
         const providedSecret = req.query.secret || req.headers['x-secret-key'];
