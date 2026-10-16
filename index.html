@@ -144,6 +144,11 @@ body::before{
   background:radial-gradient(circle,rgba(255,107,157,0.2),transparent 70%);
   pointer-events:none;
 }
+.profile-avatar-wrapper{
+  position:relative;
+  display:inline-block;
+  flex-shrink:0;
+}
 .profile-avatar{
   width:56px;height:56px;border-radius:50%;
   background:linear-gradient(135deg,#ff6b9d,#ff4080);
@@ -177,6 +182,79 @@ body::before{
 .profile-role.admin{background:linear-gradient(135deg,#b388ff,#8b5cf6);color:#fff}
 .profile-role.cs{background:linear-gradient(135deg,#00c6ff,#0072ff);color:#fff}
 .profile-role.user{background:rgba(100,255,200,0.15);color:#64ffc8;border:1px solid rgba(100,255,200,0.3)}
+
+/* ============ ONLINE/OFFLINE STATUS ============ */
+.status-indicator{
+  position:absolute;
+  bottom:2px;right:2px;
+  width:14px;height:14px;
+  border-radius:50%;
+  border:2.5px solid #1a0e2e;
+  transition:all 0.3s ease;
+  z-index:2;
+}
+.status-indicator.online{
+  background:#00ff88;
+  box-shadow:0 0 8px #00ff88, 0 0 16px rgba(0,255,136,0.5);
+  animation:onlinePulse 2s ease-in-out infinite;
+}
+.status-indicator.offline{
+  background:#6b4a7a;
+}
+.status-indicator.away{
+  background:#ffaa00;
+  box-shadow:0 0 6px #ffaa00;
+}
+@keyframes onlinePulse{
+  0%,100%{transform:scale(1);box-shadow:0 0 8px #00ff88, 0 0 0 0 rgba(0,255,136,0.7)}
+  50%{transform:scale(1.1);box-shadow:0 0 12px #00ff88, 0 0 0 6px rgba(0,255,136,0)}
+}
+
+.online-text{
+  font-size:10.5px;
+  font-weight:700;
+  display:inline-flex;
+  align-items:center;
+  gap:4px;
+  margin-top:4px;
+}
+.online-text.online{color:#00ff88}
+.online-text.offline{color:#94a3b8}
+.online-text.away{color:#ffaa00}
+.online-text .online-dot{
+  width:6px;height:6px;border-radius:50%;
+  background:currentColor;
+  animation:onlinePulse 2s ease-in-out infinite;
+}
+
+.online-counter{
+  display:inline-flex;align-items:center;gap:5px;
+  padding:2px 10px;
+  background:rgba(0,255,136,0.12);
+  border:1px solid rgba(0,255,136,0.3);
+  border-radius:20px;
+  font-size:10px;font-weight:800;
+  color:#00ff88;text-transform:uppercase;
+  letter-spacing:0.5px;
+}
+.online-counter .online-dot{
+  width:6px;height:6px;border-radius:50%;
+  background:#00ff88;
+  box-shadow:0 0 6px #00ff88;
+  animation:onlinePulse 2s ease-in-out infinite;
+}
+
+.presence-badge{
+  display:inline-flex;align-items:center;gap:3px;
+  padding:1px 6px;border-radius:8px;
+  font-size:8.5px;font-weight:800;
+  text-transform:uppercase;letter-spacing:0.3px;
+}
+.presence-badge.online{background:rgba(0,255,136,0.15);color:#00ff88;border:1px solid rgba(0,255,136,0.3)}
+.presence-badge.offline{background:rgba(148,163,184,0.15);color:#94a3b8;border:1px solid rgba(148,163,184,0.3)}
+.presence-badge.away{background:rgba(255,170,0,0.15);color:#ffaa00;border:1px solid rgba(255,170,0,0.3)}
+.presence-badge .dot{width:5px;height:5px;border-radius:50%;background:currentColor}
+.presence-badge.online .dot{box-shadow:0 0 4px currentColor;animation:onlinePulse 2s ease-in-out infinite}
 
 /* ============ BALANCE CARD ============ */
 .balance-card{
@@ -422,14 +500,16 @@ body::before{
   background:linear-gradient(135deg,rgba(0,198,255,0.25),rgba(0,114,255,0.15));
   border:1px solid rgba(0,198,255,0.3);
   display:flex;align-items:center;justify-content:center;
-  font-size:18px;flex-shrink:0;
+  font-size:16px;flex-shrink:0;
   font-weight:900;color:#00c6ff;
+  position:relative;
 }
 .cs-folder-info{flex:1;min-width:0}
 .cs-folder-email{
   font-size:12.5px;font-weight:700;color:#f1e6f5;
   word-break:break-all;
   display:flex;align-items:center;gap:6px;
+  flex-wrap:wrap;
 }
 .cs-folder-preview{
   font-size:11px;color:#b39ddb;margin-top:3px;
@@ -488,10 +568,12 @@ body::before{
   background:linear-gradient(135deg,#ff6b9d,#ff4080);
   display:flex;align-items:center;justify-content:center;
   font-size:13px;font-weight:900;color:#fff;flex-shrink:0;
+  position:relative;
 }
 .member-avatar.owner{background:linear-gradient(135deg,#ffd700,#ffb300);color:#1a0e2e}
 .member-avatar.admin{background:linear-gradient(135deg,#b388ff,#8b5cf6)}
 .member-avatar.cs{background:linear-gradient(135deg,#00c6ff,#0072ff)}
+.member-avatar .status-indicator{width:11px;height:11px;border-width:2px}
 .member-info{flex:1;min-width:0}
 .member-email{
   font-size:11.5px;font-weight:700;color:#f1e6f5;
@@ -568,9 +650,6 @@ body::before{
   border:2px solid #140a28;
 }
 .nav-item .nav-badge:empty{display:none}
-.nav-item .nav-badge.pulse{
-  animation:badgePulse 1.2s ease-in-out infinite;
-}
 
 /* ============ AUTH SCREEN ============ */
 .auth-screen{
@@ -751,6 +830,7 @@ body::before{
 .chat-topbar .chat-subtitle{
   font-size:10.5px;font-weight:400;color:#b39ddb;
   display:flex;align-items:center;gap:6px;
+  flex-wrap:wrap;
 }
 .live-badge{
   display:inline-flex;align-items:center;gap:4px;
@@ -993,11 +1073,14 @@ body::before{
   background:linear-gradient(135deg,#00c6ff,#0072ff);
   display:flex;align-items:center;justify-content:center;
   font-size:14px;font-weight:900;color:#fff;flex-shrink:0;
+  position:relative;
 }
 .support-user-info{flex:1;min-width:0}
 .support-user-email{
   font-size:12px;font-weight:700;color:#f1e6f5;
   word-break:break-all;
+  display:flex;align-items:center;gap:6px;
+  flex-wrap:wrap;
 }
 .support-user-preview{
   font-size:11px;color:#b39ddb;margin-top:3px;
@@ -1222,7 +1305,7 @@ body::before{
   position:fixed;
   right:16px;
   bottom:calc(90px + env(safe-area-inset-bottom, 0px));
-  z-index:150;
+  z-index:9999;
   display:flex;
   flex-direction:column;
   gap:10px;
@@ -1231,11 +1314,11 @@ body::before{
 }
 
 .cs-bubble{
-  background:linear-gradient(135deg,rgba(0,198,255,0.95),rgba(0,114,255,0.95));
-  border:1.5px solid rgba(255,255,255,0.25);
+  background:linear-gradient(135deg,rgba(0,198,255,0.98),rgba(0,114,255,0.98));
+  border:1.5px solid rgba(255,255,255,0.3);
   border-radius:16px;
   padding:12px 14px;
-  box-shadow:0 12px 40px rgba(0,114,255,0.5), 0 0 0 0 rgba(0,198,255,0.7);
+  box-shadow:0 12px 40px rgba(0,114,255,0.6), 0 0 0 0 rgba(0,198,255,0.7);
   display:flex;
   align-items:flex-start;
   gap:10px;
@@ -1269,7 +1352,7 @@ body::before{
 }
 .cs-bubble:hover{
   transform:translateY(-2px);
-  box-shadow:0 16px 50px rgba(0,114,255,0.7);
+  box-shadow:0 16px 50px rgba(0,114,255,0.8);
 }
 .cs-bubble:active{transform:scale(0.98)}
 
@@ -1384,7 +1467,7 @@ body::before{
 }
 
 body.chat-open .cs-bubble-container{
-  display:none;
+  display:none !important;
 }
 </style>
 </head>
@@ -1414,7 +1497,9 @@ body.chat-open .cs-bubble-container{
     <div class="page active" id="page-home">
 
       <div class="profile-card" style="margin-bottom:16px;">
-        <div class="profile-avatar" id="homeAvatar">U</div>
+        <div class="profile-avatar-wrapper">
+          <div class="profile-avatar" id="homeAvatar">U</div>
+        </div>
         <div class="profile-info">
           <div class="profile-name" id="homeName">User</div>
           <div class="profile-email" id="homeEmail">-</div>
@@ -1585,7 +1670,6 @@ body.chat-open .cs-bubble-container{
     <!-- ============ PAGE: CHAT ============ -->
     <div class="page" id="page-chat">
 
-      <!-- New Chat Box (khusus staff) -->
       <div class="section" id="newChatBoxSection" style="display:none;">
         <div class="section-title">
           ✉️ Mulai Chat Baru
@@ -1600,7 +1684,6 @@ body.chat-open .cs-bubble-container{
         </div>
       </div>
 
-      <!-- DAFTAR FOLDER CHAT CS (khusus staff) -->
       <div class="section" id="csFolderSection" style="display:none;">
         <div class="section-title">
           📁 Folder Chat Customer Service
@@ -1663,7 +1746,9 @@ body.chat-open .cs-bubble-container{
     <div class="page" id="page-profile">
 
       <div class="profile-card" style="margin-bottom:16px;">
-        <div class="profile-avatar" id="profileAvatar">U</div>
+        <div class="profile-avatar-wrapper">
+          <div class="profile-avatar" id="profileAvatar">U</div>
+        </div>
         <div class="profile-info">
           <div class="profile-name" id="profileName">User</div>
           <div class="profile-email" id="profileEmail">-</div>
@@ -1820,6 +1905,10 @@ body.chat-open .cs-bubble-container{
         <span id="chatHubTitle">Global Chat</span>
         <div class="chat-subtitle" id="chatHubSub">
           <span class="live-badge"><span class="dot"></span>LIVE</span>
+          <span class="online-counter" id="onlineCounter">
+            <span class="online-dot"></span>
+            <span id="onlineCounterText">0 Online</span>
+          </span>
           <span id="chatHubSubText">Semua user</span>
         </div>
       </div>
@@ -1974,11 +2063,19 @@ let cachedGlobalMessages = [];
 // Bubble state
 let csBubbleChannel = null;
 let activeBubbles = {};
-let lastSeenMessageTime = null;
 let csPollingInterval = null;
 let lastPolledTime = null;
 const CS_BUBBLE_DURATION = 10000;
 const CS_BUBBLE_MAX = 3;
+
+// Presence state
+let presenceChannel = null;
+let heartbeatInterval = null;
+let presenceUsersCache = {};
+let onlineUsersCount = 0;
+const HEARTBEAT_INTERVAL = 30000;
+const AWAY_THRESHOLD = 5 * 60 * 1000;
+const OFFLINE_THRESHOLD = 2 * 60 * 1000;
 
 try {
   supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
@@ -2164,6 +2261,9 @@ async function handleLogout() {
     const container = document.getElementById('csBubbleContainer');
     if (container) container.innerHTML = '';
     activeBubbles = {};
+    
+    // Cleanup presence
+    cleanupPresence();
     
     if (globalChatChannel) { globalChatChannel.unsubscribe(); globalChatChannel = null; }
     if (supportChatChannel) { supportChatChannel.unsubscribe(); supportChatChannel = null; }
@@ -2453,7 +2553,7 @@ function renderQrisToCanvas(qrisString) {
 }
 
 // ============================================================
-// PARSER AMOUNT ROBUST
+// PARSER AMOUNT
 // ============================================================
 function parseAmount(rawAmount) {
   if (rawAmount === null || rawAmount === undefined) return 0;
@@ -2506,24 +2606,12 @@ async function openDepositDialog() {
   if (!currentUser) return;
   const { value: amountInput } = await Swal.fire({
     title: '💵 Deposit Saldo',
-    html: `
-      <div style="text-align:left;font-size:12.5px;color:#b39ddb;line-height:1.6;">
-        <p style="margin-bottom:6px;">Minimal <b style="color:#ffd700;">Rp 1.000</b></p>
-        <p style="font-size:11px;color:#94a3b8;">
-          💡 Bebas nominal apa saja (contoh: <b style="color:#ffd700;">1500</b>, <b style="color:#ffd700;">10250</b>, <b style="color:#ffd700;">7777</b>) — tidak harus kelipatan 1.000
-        </p>
-      </div>
-    `,
-    input: 'number',
-    inputPlaceholder: 'Contoh: 10000',
+    html: `<div style="text-align:left;font-size:12.5px;color:#b39ddb;line-height:1.6;"><p style="margin-bottom:6px;">Minimal <b style="color:#ffd700;">Rp 1.000</b></p><p style="font-size:11px;color:#94a3b8;">💡 Bebas nominal apa saja</p></div>`,
+    input: 'number', inputPlaceholder: 'Contoh: 10000',
     inputAttributes: { min: 1000, step: 1, inputmode: 'numeric', style: 'color:#fff;background:rgba(255,255,255,0.05);border:1.5px solid rgba(255,107,157,0.3);' },
-    showCancelButton: true,
-    confirmButtonText: '💳 Buat QRIS',
-    cancelButtonText: '❌ Batal',
-    confirmButtonColor: '#ffd700',
-    cancelButtonColor: '#6b4a7a',
-    background: '#1a0e2e',
-    color: '#fff',
+    showCancelButton: true, confirmButtonText: '💳 Buat QRIS', cancelButtonText: '❌ Batal',
+    confirmButtonColor: '#ffd700', cancelButtonColor: '#6b4a7a',
+    background: '#1a0e2e', color: '#fff',
     preConfirm: (val) => {
       const num = parseInt(val);
       if (!num || isNaN(num)) { Swal.showValidationMessage('⚠️ Masukkan nominal yang valid'); return false; }
@@ -2542,28 +2630,20 @@ async function createDeposit(amount) {
     Swal.fire({ title: '❌ Nominal Tidak Valid', text: 'Minimal deposit Rp 1.000.', icon: 'error', confirmButtonColor: '#ff4444', background: '#1a0e2e', color: '#fff' });
     return;
   }
-
   const uniqueCode = generateUniqueCode();
   const totalAmount = amount + uniqueCode;
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
-
   try {
     const { data, error } = await supabaseClient.from('deposits').insert({
-      user_id: currentUser.id,
-      email: currentUser.email,
-      amount: amount,
-      unique_code: uniqueCode,
-      total_amount: totalAmount,
-      status: 'pending',
-      expires_at: expiresAt.toISOString()
+      user_id: currentUser.id, email: currentUser.email,
+      amount: amount, unique_code: uniqueCode, total_amount: totalAmount,
+      status: 'pending', expires_at: expiresAt.toISOString()
     }).select().single();
     if (error) throw error;
     currentDeposit = data;
-
     const qrisString = buildDynamicQris(QRIS_CRC, totalAmount);
     document.getElementById('qrisAmount').textContent = 'Rp ' + totalAmount.toLocaleString('id-ID');
     document.getElementById('qrisAmountDetail').innerHTML = `Nominal: Rp ${amount.toLocaleString('id-ID')} + Kode Unik: <b style="color:#ffd700;">${uniqueCode}</b>`;
-
     document.getElementById('qrisModal').classList.add('show');
     setTimeout(() => renderQrisToCanvas(qrisString), 100);
     startDepositTimer(expiresAt);
@@ -2600,15 +2680,13 @@ function startDepositTimer(expiresAt) {
 function startDepositPolling(targetAmount) {
   if (depositPollingInterval) clearInterval(depositPollingInterval);
   let attempts = 0;
-
   async function checkMutation() {
     attempts++;
     try {
       const res = await fetch(`/api/mutasi?amount=${targetAmount}&t=${Date.now()}`);
-      if (!res.ok) { console.warn(`[POLL #${attempts}] HTTP ${res.status}`); return; }
+      if (!res.ok) return;
       const json = await res.json();
-      if (!json.success) { console.warn(`[POLL #${attempts}] API error:`, json.message); return; }
-
+      if (!json.success) return;
       const raw = json.raw || {};
       let mutasiList = [];
       if (raw.status === 'success' && Array.isArray(raw.data)) mutasiList = raw.data;
@@ -2617,9 +2695,7 @@ function startDepositPolling(targetAmount) {
       else if (Array.isArray(raw?.mutasi)) mutasiList = raw.mutasi;
       else if (Array.isArray(raw?.result)) mutasiList = raw.result;
       else if (Array.isArray(raw)) mutasiList = raw;
-
       if (mutasiList.length === 0) return;
-
       for (const m of mutasiList) {
         const check = isTransactionMatch(m, targetAmount);
         if (check.match) {
@@ -2629,9 +2705,8 @@ function startDepositPolling(targetAmount) {
           return;
         }
       }
-    } catch (err) { console.warn(`[POLL #${attempts}] error:`, err.message); }
+    } catch (err) {}
   }
-
   checkMutation();
   depositPollingInterval = setInterval(checkMutation, 5000);
 }
@@ -2676,24 +2751,19 @@ async function manualCheckPayment() {
     Swal.fire({ title: '⏰ QRIS Expired', text: 'Waktu pembayaran sudah habis. Silakan buat deposit baru.', icon: 'error', confirmButtonColor: '#ff4444', background: '#1a0e2e', color: '#fff' });
     return;
   }
-
   const btn = document.getElementById('qrisCheckBtn');
   const statusEl = document.getElementById('qrisStatus');
   const statusTextEl = document.getElementById('qrisStatusText');
-
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span> Memeriksa...';
   statusEl.className = 'qris-status waiting';
   statusTextEl.textContent = 'Memeriksa mutasi pembayaran...';
-
   try {
     const targetAmount = currentDeposit.total_amount;
     const res = await fetch(`/api/mutasi?amount=${targetAmount}&t=${Date.now()}`);
     if (!res.ok) throw new Error(`Gagal fetch mutasi (HTTP ${res.status})`);
-
     const json = await res.json();
     if (!json.success) throw new Error(json.message || 'Gagal mengambil data mutasi');
-
     const raw = json.raw || {};
     let mutasiList = [];
     if (raw.status === 'success' && Array.isArray(raw.data)) mutasiList = raw.data;
@@ -2708,7 +2778,6 @@ async function manualCheckPayment() {
       const check = isTransactionMatch(m, targetAmount);
       if (check.match) { found = m; break; }
     }
-
     if (found) {
       statusEl.className = 'qris-status';
       statusTextEl.textContent = '✅ Pembayaran ditemukan!';
@@ -2720,47 +2789,19 @@ async function manualCheckPayment() {
     } else {
       statusEl.className = 'qris-status waiting';
       statusTextEl.textContent = 'Belum ada pembayaran yang cocok';
-
-      let debugHtml = '';
-      if (mutasiList.length > 0) {
-        const samples = mutasiList.slice(0, 3).map(m => {
-          const amt = parseAmount(m.amount ?? m.nominal ?? m.total ?? 0);
-          return `<div style="font-size:11px;color:#94a3b8;padding:4px 0;">• Rp ${amt.toLocaleString('id-ID')} <span style="color:#6b4a7a;">(${m.type || m.status || '-'})</span></div>`;
-        }).join('');
-        debugHtml = `<div style="background:rgba(0,198,255,0.08);padding:10px 12px;border-radius:8px;margin-top:12px;border-left:3px solid #00c6ff;"><div style="font-size:11px;color:#00c6ff;font-weight:700;margin-bottom:6px;">📋 3 Mutasi Terakhir:</div>${samples}</div>`;
-      }
-
       await Swal.fire({
         title: '⏳ Belum Ada Pembayaran',
-        html: `<div style="text-align:left;color:#ddd;font-size:13px;line-height:1.7;">
-          <p>Belum ditemukan pembayaran dengan nominal:</p>
-          <div style="background:rgba(255,215,0,0.1);padding:10px 14px;border-radius:10px;margin:10px 0;text-align:center;border:1px dashed rgba(255,215,0,0.4);">
-            <b style="color:#ffd700;font-size:18px;">Rp ${targetAmount.toLocaleString('id-ID')}</b>
-          </div>
-          ${debugHtml}
-          <p style="font-size:12px;color:#94a3b8;margin-top:10px;">
-            💡 Pastikan:<br>• Anda transfer <b>tepat</b> sesuai nominal<br>• Sudah menunggu 1-2 menit setelah transfer<br>• Screenshot bukti transfer jika ada kendala
-          </p>
-        </div>`,
-        icon: 'info',
-        confirmButtonColor: '#00c6ff',
-        confirmButtonText: '✅ OK',
+        html: `<div style="text-align:left;color:#ddd;font-size:13px;line-height:1.7;"><p>Belum ditemukan pembayaran:</p><div style="background:rgba(255,215,0,0.1);padding:10px 14px;border-radius:10px;margin:10px 0;text-align:center;"><b style="color:#ffd700;font-size:18px;">Rp ${targetAmount.toLocaleString('id-ID')}</b></div></div>`,
+        icon: 'info', confirmButtonColor: '#00c6ff', confirmButtonText: '✅ OK',
         background: '#1a0e2e', color: '#fff'
       });
-
       btn.disabled = false;
       btn.innerHTML = '🔍 Cek Status Pembayaran';
     }
   } catch (err) {
     statusEl.className = 'qris-status expired';
     statusTextEl.textContent = 'Gagal cek pembayaran';
-    await Swal.fire({
-      title: '❌ Gagal Cek Pembayaran',
-      text: err.message || 'Terjadi kesalahan. Coba lagi nanti.',
-      icon: 'error',
-      confirmButtonColor: '#ff4444',
-      background: '#1a0e2e', color: '#fff'
-    });
+    Swal.fire({ title: '❌ Gagal Cek Pembayaran', text: err.message || 'Coba lagi nanti.', icon: 'error', confirmButtonColor: '#ff4444', background: '#1a0e2e', color: '#fff' });
     btn.disabled = false;
     btn.innerHTML = '🔍 Cek Status Pembayaran';
   }
@@ -2781,12 +2822,11 @@ async function loadChatStats() {
     const { count: totalMessages } = await chatClient.from('global_messages').select('*', { count: 'exact', head: true });
     const { count: totalMuted } = await chatClient.from('chat_mutes').select('*', { count: 'exact', head: true }).gt('muted_until', new Date().toISOString());
     const { count: totalPinned } = await chatClient.from('global_messages').select('*', { count: 'exact', head: true }).eq('pinned', true);
-
     document.getElementById('statTotalUsers').textContent = totalUsers || 0;
     document.getElementById('statTotalMessages').textContent = totalMessages || 0;
     document.getElementById('statTotalMuted').textContent = totalMuted || 0;
     document.getElementById('statTotalPinned').textContent = totalPinned || 0;
-  } catch (e) { console.error('Load stats error:', e); }
+  } catch (e) {}
 }
 
 // ============================================================
@@ -2810,6 +2850,15 @@ async function loadMemberList() {
       mutedList = mutes || [];
     } catch(e) {}
 
+    // Fetch presence
+    const memberUserIds = data.map(m => m.id).filter(Boolean);
+    if (memberUserIds.length > 0) {
+      try {
+        const { data: presenceData } = await chatClient.from('user_presence').select('*').in('user_id', memberUserIds);
+        (presenceData || []).forEach(p => { presenceUsersCache[p.user_id] = p; });
+      } catch(e) {}
+    }
+
     const isOwner = currentProfile.role === 'owner';
     let html = '';
     data.forEach(m => {
@@ -2824,6 +2873,9 @@ async function loadMemberList() {
       const bannedTag = m.banned ? '<span class="member-role-tag banned">BANNED</span>' : '';
       const muted = mutedList.find(mu => mu.email === m.email);
       const mutedTag = muted ? '<span class="member-role-tag muted">MUTED</span>' : '';
+      const presence = presenceUsersCache[m.id];
+      const presenceBadge = getPresenceBadgeHTML(presence);
+      const presenceDot = getStatusIndicatorHTML(presence);
 
       let actions = '';
       if (isOwner) {
@@ -2846,10 +2898,13 @@ async function loadMemberList() {
       }
 
       html += `
-        <div class="member-item ${m.banned ? 'banned' : ''} ${muted ? 'muted' : ''}">
-          <div class="member-avatar ${avatarClass}">${initial}</div>
+        <div class="member-item ${m.banned ? 'banned' : ''} ${muted ? 'muted' : ''}" data-user-id="${m.id}">
+          <div class="member-avatar ${avatarClass}">${initial}${presenceDot}</div>
           <div class="member-info">
-            <div class="member-email">${m.email || '-'} ${roleTag} ${bannedTag} ${mutedTag}</div>
+            <div class="member-email">
+              ${m.email || '-'} ${roleTag} ${bannedTag} ${mutedTag}
+              <span class="presence-badge-container">${presenceBadge}</span>
+            </div>
             <div class="member-meta">💰 Rp ${(m.balance || 0).toLocaleString('id-ID')}${m.banned_until ? ' · ⏰ s.d. ' + new Date(m.banned_until).toLocaleDateString('id-ID') : ''}</div>
           </div>
           <div class="member-actions">${actions}</div>
@@ -3003,6 +3058,272 @@ async function unmuteUserChat(targetUserId, targetEmail) {
 }
 
 // ============================================================
+// USER PRESENCE (ONLINE/OFFLINE)
+// ============================================================
+function computePresenceStatus(presence) {
+  if (!presence) return 'offline';
+  if (!presence.is_online) return 'offline';
+  const lastActive = new Date(presence.last_active || presence.last_seen).getTime();
+  const diff = Date.now() - lastActive;
+  if (diff > OFFLINE_THRESHOLD) return 'offline';
+  if (diff > AWAY_THRESHOLD) return 'away';
+  return 'online';
+}
+
+async function updateMyPresence(isOnline = true) {
+  if (!chatClient || !currentUser) return;
+  try {
+    const chatUserId = await getChatUserId();
+    if (!chatUserId) return;
+    const now = new Date().toISOString();
+    const { error } = await chatClient
+      .from('user_presence')
+      .upsert({
+        user_id: chatUserId,
+        email: currentUser.email,
+        role: currentProfile?.role || 'user',
+        is_online: isOnline,
+        last_seen: now,
+        last_active: now,
+        updated_at: now
+      }, { onConflict: 'user_id' });
+    if (error && error.code !== '42P01') {
+      console.warn('Presence update error:', error.message);
+    }
+  } catch(e) {
+    console.warn('Presence update failed:', e.message);
+  }
+}
+
+async function setMyPresenceOffline() {
+  if (!chatClient || !currentUser) return;
+  try {
+    const chatUserId = await getChatUserId();
+    if (!chatUserId) return;
+    const now = new Date().toISOString();
+    await chatClient
+      .from('user_presence')
+      .update({ is_online: false, last_seen: now, updated_at: now })
+      .eq('user_id', chatUserId);
+  } catch(e) {}
+}
+
+function startHeartbeat() {
+  if (heartbeatInterval) clearInterval(heartbeatInterval);
+  updateMyPresence(true);
+  heartbeatInterval = setInterval(() => { updateMyPresence(true); }, HEARTBEAT_INTERVAL);
+  ['mousemove', 'keydown', 'click', 'touchstart', 'scroll'].forEach(evt => {
+    document.addEventListener(evt, throttledActivity, { passive: true });
+  });
+}
+
+let activityThrottle = 0;
+function throttledActivity() {
+  const now = Date.now();
+  if (now - activityThrottle < 20000) return;
+  activityThrottle = now;
+  updateMyPresence(true);
+}
+
+function stopHeartbeat() {
+  if (heartbeatInterval) { clearInterval(heartbeatInterval); heartbeatInterval = null; }
+  setMyPresenceOffline();
+}
+
+async function fetchAllPresence() {
+  if (!chatClient) return {};
+  try {
+    const { data, error } = await chatClient
+      .from('user_presence')
+      .select('*')
+      .order('last_seen', { ascending: false })
+      .limit(500);
+    if (error) {
+      if (error.code === '42P01') {
+        console.warn('⚠️ Tabel user_presence belum dibuat.');
+        return {};
+      }
+      throw error;
+    }
+    const map = {};
+    (data || []).forEach(p => { map[p.user_id] = p; });
+    presenceUsersCache = map;
+    onlineUsersCount = Object.values(map).filter(p => computePresenceStatus(p) === 'online').length;
+    return map;
+  } catch(e) {
+    console.warn('Fetch presence error:', e.message);
+    return {};
+  }
+}
+
+async function getPresence(userId) {
+  if (!chatClient || !userId) return null;
+  if (presenceUsersCache[userId]) return presenceUsersCache[userId];
+  try {
+    const { data, error } = await chatClient.from('user_presence').select('*').eq('user_id', userId).maybeSingle();
+    if (error || !data) return null;
+    presenceUsersCache[userId] = data;
+    return data;
+  } catch(e) { return null; }
+}
+
+function updateOnlineCounter() {
+  const el = document.getElementById('onlineCounterText');
+  if (el) el.textContent = `${onlineUsersCount} Online`;
+}
+
+function getStatusIndicatorHTML(presence) {
+  const status = computePresenceStatus(presence);
+  const cls = status === 'online' ? 'online' : (status === 'away' ? 'away' : 'offline');
+  return `<span class="status-indicator ${cls}"></span>`;
+}
+
+function getPresenceBadgeHTML(presence) {
+  const status = computePresenceStatus(presence);
+  if (status === 'online') return `<span class="presence-badge online"><span class="dot"></span>Online</span>`;
+  if (status === 'away') return `<span class="presence-badge away"><span class="dot"></span>Away</span>`;
+  const lastSeen = presence ? formatTimeAgo(presence.last_seen) : 'lama';
+  return `<span class="presence-badge offline"><span class="dot"></span>${lastSeen}</span>`;
+}
+
+function getOnlineTextHTML(presence) {
+  const status = computePresenceStatus(presence);
+  if (status === 'online') return `<div class="online-text online"><span class="online-dot"></span>Online sekarang</div>`;
+  if (status === 'away') return `<div class="online-text away"><span class="online-dot"></span>Sedang tidak aktif</div>`;
+  const lastSeen = presence ? formatTimeAgo(presence.last_seen) : 'lama';
+  return `<div class="online-text offline">Terakhir dilihat ${lastSeen}</div>`;
+}
+
+function subscribePresence() {
+  if (presenceChannel) { try { presenceChannel.unsubscribe(); } catch(e) {} presenceChannel = null; }
+  if (!chatClient || !currentUser) return;
+  presenceChannel = chatClient
+    .channel('presence_changes_' + Date.now())
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'user_presence' }, (payload) => {
+      const updated = payload.new;
+      if (updated && updated.user_id) {
+        presenceUsersCache[updated.user_id] = updated;
+        onlineUsersCount = Object.values(presenceUsersCache).filter(p => computePresenceStatus(p) === 'online').length;
+        refreshPresenceUI();
+      }
+    })
+    .subscribe((status) => {
+      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+        setTimeout(subscribePresence, 3000);
+      }
+    });
+}
+
+function refreshPresenceUI() {
+  updateOnlineCounter();
+  
+  // Update home & profile presence indicator
+  const chatUserId = currentUser?.id;
+  if (chatUserId && presenceUsersCache[chatUserId]) {
+    const presence = presenceUsersCache[chatUserId];
+    ['homeAvatar', 'profileAvatar'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el && el.parentElement) {
+        const wrapper = el.parentElement;
+        if (!wrapper.classList.contains('profile-avatar-wrapper')) wrapper.classList.add('profile-avatar-wrapper');
+        const old = wrapper.querySelector('.status-indicator');
+        if (old) old.remove();
+        const tmp = document.createElement('div');
+        tmp.innerHTML = getStatusIndicatorHTML(presence);
+        const ind = tmp.firstChild;
+        if (ind) wrapper.appendChild(ind);
+      }
+    });
+  }
+  
+  // Update member list
+  document.querySelectorAll('.member-item[data-user-id]').forEach(el => {
+    const uid = el.dataset.userId;
+    const presence = presenceUsersCache[uid];
+    const badgeContainer = el.querySelector('.presence-badge-container');
+    if (badgeContainer) badgeContainer.innerHTML = getPresenceBadgeHTML(presence);
+    const avatar = el.querySelector('.member-avatar');
+    if (avatar) {
+      const old = avatar.querySelector('.status-indicator');
+      if (old) old.remove();
+      const tmp = document.createElement('div');
+      tmp.innerHTML = getStatusIndicatorHTML(presence);
+      const ind = tmp.firstChild;
+      if (ind) avatar.appendChild(ind);
+    }
+  });
+  
+  // Update CS folders
+  document.querySelectorAll('.cs-folder-item[data-user-id]').forEach(el => {
+    const uid = el.dataset.userId;
+    const presence = presenceUsersCache[uid];
+    const badgeContainer = el.querySelector('.presence-badge-container');
+    if (badgeContainer) badgeContainer.innerHTML = getPresenceBadgeHTML(presence);
+    const icon = el.querySelector('.cs-folder-icon');
+    if (icon) {
+      const old = icon.querySelector('.status-indicator');
+      if (old) old.remove();
+      const tmp = document.createElement('div');
+      tmp.innerHTML = getStatusIndicatorHTML(presence);
+      const ind = tmp.firstChild;
+      if (ind) icon.appendChild(ind);
+    }
+  });
+  
+  // Update support user list
+  document.querySelectorAll('.support-user-item[data-user-id]').forEach(el => {
+    const uid = el.dataset.userId;
+    const presence = presenceUsersCache[uid];
+    const badgeContainer = el.querySelector('.presence-badge-container');
+    if (badgeContainer) badgeContainer.innerHTML = getPresenceBadgeHTML(presence);
+    const avatar = el.querySelector('.support-user-avatar');
+    if (avatar) {
+      const old = avatar.querySelector('.status-indicator');
+      if (old) old.remove();
+      const tmp = document.createElement('div');
+      tmp.innerHTML = getStatusIndicatorHTML(presence);
+      const ind = tmp.firstChild;
+      if (ind) avatar.appendChild(ind);
+    }
+  });
+}
+
+async function initPresence() {
+  if (!chatClient || !currentUser) return;
+  await fetchAllPresence();
+  await updateMyPresence(true);
+  startHeartbeat();
+  subscribePresence();
+  refreshPresenceUI();
+  updateOnlineCounter();
+  console.log('👥 Presence ready. Online:', onlineUsersCount);
+}
+
+function cleanupPresence() {
+  stopHeartbeat();
+  if (presenceChannel) { try { presenceChannel.unsubscribe(); } catch(e) {} presenceChannel = null; }
+}
+
+window.addEventListener('beforeunload', () => {
+  if (chatClient && currentUser) {
+    const chatUserId = currentUser?.id;
+    if (chatUserId) {
+      chatClient.from('user_presence')
+        .update({ is_online: false, last_seen: new Date().toISOString() })
+        .eq('user_id', chatUserId).then(() => {}).catch(() => {});
+    }
+  }
+});
+
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && currentUser) updateMyPresence(true);
+});
+
+window.addEventListener('focus', () => {
+  if (currentUser) updateMyPresence(true);
+});
+
+// ============================================================
 // CHAT SYSTEM
 // ============================================================
 async function initChat() {
@@ -3013,6 +3334,7 @@ async function initChat() {
   subscribeUserSupportChat();
   initCSBubbleChannel();
   startCSPolling();
+  initPresence();
 }
 
 async function getChatUserId() {
@@ -3108,30 +3430,20 @@ function updateGlobalSubtitle() {
   if (el && currentChatTab === 'global') {
     const totalMsg = cachedGlobalMessages.length;
     const pinnedCount = cachedGlobalMessages.filter(m => m.pinned && !m.deleted).length;
-    if (pinnedCount > 0) {
-      el.textContent = `Semua user · ${totalMsg} pesan · ${pinnedCount} pinned`;
-    } else {
-      el.textContent = `Semua user · ${totalMsg} pesan`;
-    }
+    if (pinnedCount > 0) el.textContent = `Semua user · ${totalMsg} pesan · ${pinnedCount} pinned`;
+    else el.textContent = `Semua user · ${totalMsg} pesan`;
   }
+  updateOnlineCounter();
 }
 
 function renderPinnedMessages(messages) {
   const container = document.getElementById('globalChatPinned');
   const list = document.getElementById('pinnedList');
   const pinned = messages.filter(m => m.pinned && !m.deleted);
-
-  if (pinned.length === 0) {
-    container.classList.remove('show');
-    return;
-  }
+  if (pinned.length === 0) { container.classList.remove('show'); return; }
   container.classList.add('show');
-
   const label = container.querySelector('.pinned-label');
-  if (label) {
-    label.innerHTML = `📌 ${pinned.length} Pesan Di-pin <span style="font-size:9px;color:#94a3b8;font-weight:400;text-transform:none;letter-spacing:0;">(klik untuk lihat)</span>`;
-  }
-
+  if (label) label.innerHTML = `📌 ${pinned.length} Pesan Di-pin <span style="font-size:9px;color:#94a3b8;font-weight:400;text-transform:none;letter-spacing:0;">(klik untuk lihat)</span>`;
   let html = '';
   pinned.forEach(m => {
     const preview = m.message.substring(0, 60) + (m.message.length > 60 ? '...' : '');
@@ -3148,28 +3460,14 @@ function renderPinnedMessages(messages) {
 function scrollToMessage(msgId) {
   const chatBody = document.getElementById('globalChatBody');
   if (!chatBody) return;
-
   const targetMsg = chatBody.querySelector(`.chat-msg[data-id="${msgId}"]`);
-  
   if (!targetMsg) {
-    Swal.fire({
-      title: '⚠️ Pesan Tidak Ditemukan',
-      text: 'Pesan mungkin sudah dihapus atau di luar 200 pesan terbaru.',
-      icon: 'warning',
-      confirmButtonColor: '#ffd700',
-      background: '#1a0e2e',
-      color: '#fff',
-      timer: 2500,
-      timerProgressBar: true,
-      showConfirmButton: false
-    });
+    Swal.fire({ title: '⚠️ Pesan Tidak Ditemukan', text: 'Pesan mungkin sudah dihapus.', icon: 'warning', confirmButtonColor: '#ffd700', background: '#1a0e2e', color: '#fff', timer: 2500, timerProgressBar: true, showConfirmButton: false });
     return;
   }
-
   targetMsg.scrollIntoView({ behavior: 'smooth', block: 'center' });
   targetMsg.classList.add('highlight');
   setTimeout(() => targetMsg.classList.remove('highlight'), 2000);
-
   if (navigator.vibrate) navigator.vibrate(50);
 }
 
@@ -3181,7 +3479,6 @@ function renderGlobalMessages(messages) {
   }
   let html = '';
   const myId = currentUser?.id;
-
   messages.forEach(msg => {
     const isMine = msg.user_id === myId;
     const roleClass = msg.role === 'owner' ? 'owner' : (msg.role === 'admin' ? 'admin' : (msg.role === 'cs' ? 'cs' : ''));
@@ -3192,12 +3489,10 @@ function renderGlobalMessages(messages) {
     const pinTag = msg.pinned ? '<span class="msg-pin-tag">📌</span>' : '';
     const canPin = isAdminOrOwner;
     const canMute = isAdminOrOwner && !isMine;
-
     html += `
       <div class="chat-msg ${isMine ? 'mine' : 'other'} ${roleClass} ${msg.pinned ? 'pinned' : ''} ${canManage ? 'can-manage' : ''}" data-id="${msg.id}">
         <div class="msg-meta">
-          ${roleTag}
-          ${pinTag}
+          ${roleTag}${pinTag}
           <span class="msg-email">${escapeHtml(msg.email || 'user')}</span>
           <span class="msg-time">${formatTimeAgo(msg.created_at)}</span>
         </div>
@@ -3217,34 +3512,19 @@ function renderGlobalMessages(messages) {
 }
 
 function subscribeGlobalChat() {
-  if (globalChatChannel) {
-    try { globalChatChannel.unsubscribe(); } catch(e) {}
-    globalChatChannel = null;
-  }
+  if (globalChatChannel) { try { globalChatChannel.unsubscribe(); } catch(e) {} globalChatChannel = null; }
   if (!chatClient) return;
-
   globalChatChannel = chatClient
     .channel('global_chat_' + Date.now())
-    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'global_messages' }, (payload) => {
-      handleGlobalMessageInsert(payload.new);
-    })
-    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'global_messages' }, (payload) => {
-      handleGlobalMessageUpdate(payload.new);
-    })
-    .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'global_messages' }, (payload) => {
-      handleGlobalMessageDelete(payload.old);
-    })
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'global_messages' }, (payload) => handleGlobalMessageInsert(payload.new))
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'global_messages' }, (payload) => handleGlobalMessageUpdate(payload.new))
+    .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'global_messages' }, (payload) => handleGlobalMessageDelete(payload.old))
     .subscribe((status) => {
-      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
-        setTimeout(subscribeGlobalChat, 3000);
-      }
+      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') setTimeout(subscribeGlobalChat, 3000);
     });
-
   if (globalChatPollingInterval) clearInterval(globalChatPollingInterval);
   globalChatPollingInterval = setInterval(() => {
-    if (chatHubOpen && currentChatTab === 'global') {
-      silentRefreshGlobalChat();
-    }
+    if (chatHubOpen && currentChatTab === 'global') silentRefreshGlobalChat();
   }, 5000);
 }
 
@@ -3364,10 +3644,8 @@ async function checkGlobalMute() {
 
 async function deleteGlobalMessageHard(msgId) {
   const { value: reason } = await Swal.fire({
-    title: '🗑️ Hapus Permanen?',
-    input: 'text', inputPlaceholder: 'Alasan (opsional)',
-    showCancelButton: true,
-    confirmButtonText: '🗑️ Hapus', cancelButtonText: '❌ Batal',
+    title: '🗑️ Hapus Permanen?', input: 'text', inputPlaceholder: 'Alasan (opsional)',
+    showCancelButton: true, confirmButtonText: '🗑️ Hapus', cancelButtonText: '❌ Batal',
     confirmButtonColor: '#ff4444', cancelButtonColor: '#6b4a7a',
     background: '#1a0e2e', color: '#fff'
   });
@@ -3393,9 +3671,7 @@ async function togglePinMessage(msgId, pinned) {
   }
 }
 
-async function quickMuteUser(userId, email) {
-  await muteUserChatPrompt(userId, email);
-}
+async function quickMuteUser(userId, email) { await muteUserChatPrompt(userId, email); }
 
 // ================ SUPPORT ================
 function openSupportView() {
@@ -3422,32 +3698,21 @@ async function loadSupportChatForUser(userId) {
 }
 
 function subscribeUserSupportChat(userId) {
-  if (supportChatChannel) {
-    try { supportChatChannel.unsubscribe(); } catch(e) {}
-    supportChatChannel = null;
-  }
+  if (supportChatChannel) { try { supportChatChannel.unsubscribe(); } catch(e) {} supportChatChannel = null; }
   if (!chatClient) return;
   const targetUserId = userId || currentUser?.id;
   if (!targetUserId) return;
-
   supportChatChannel = chatClient
     .channel('support_' + targetUserId + '_' + Date.now())
-    .on('postgres_changes', {
-      event: 'INSERT', schema: 'public', table: 'support_messages',
-      filter: `user_id=eq.${targetUserId}`
-    }, (payload) => {
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'support_messages', filter: `user_id=eq.${targetUserId}` }, (payload) => {
       if (chatHubOpen && currentChatTab === 'support') {
         if (isStaff && currentSupportTarget) loadSupportChatForAdmin(currentSupportTarget.user_id);
         else if (!isStaff) loadSupportChatForUser(targetUserId);
       }
-      if (isStaff) {
-        setTimeout(() => loadCSFolders(), 500);
-      }
+      if (isStaff) setTimeout(() => loadCSFolders(), 500);
     })
     .subscribe((status) => {
-      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
-        setTimeout(() => subscribeUserSupportChat(targetUserId), 3000);
-      }
+      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') setTimeout(() => subscribeUserSupportChat(targetUserId), 3000);
     });
 }
 
@@ -3468,11 +3733,7 @@ function renderSupportMessages(messages, containerId) {
                     (msg.sender_role === 'cs' ? '<span class="msg-role-tag cs">CS</span>' : ''));
     html += `
       <div class="chat-msg ${isMine ? 'mine' : 'other'} ${roleClass}">
-        <div class="msg-meta">
-          ${roleTag}
-          <span class="msg-email">${isMine ? 'Anda' : escapeHtml(msg.email || 'user')}</span>
-          <span class="msg-time">${formatTimeAgo(msg.created_at)}</span>
-        </div>
+        <div class="msg-meta">${roleTag}<span class="msg-email">${isMine ? 'Anda' : escapeHtml(msg.email || 'user')}</span><span class="msg-time">${formatTimeAgo(msg.created_at)}</span></div>
         <div class="msg-bubble">${formatMessageText(msg.message || '')}</div>
       </div>
     `;
@@ -3508,44 +3769,45 @@ async function loadSupportUsers() {
   if (!chatClient) return;
   const listEl = document.getElementById('supportUsersList');
   try { await chatClient.rpc('cleanup_old_support_messages'); } catch(e) {}
-  
   const { data, error } = await chatClient
     .from('support_messages')
     .select('user_id, email, message, created_at, sender_role, sender_id, read_by_admin')
-    .order('created_at', { ascending: false })
-    .limit(1000);
-    
+    .order('created_at', { ascending: false }).limit(1000);
   if (error) return;
-  
   const userMap = {};
   (data || []).forEach(m => {
     if (!userMap[m.user_id]) {
-      userMap[m.user_id] = { 
-        user_id: m.user_id, email: m.email, lastMessage: m.message, lastTime: m.created_at, lastRole: m.sender_role, hasUnread: false
-      };
+      userMap[m.user_id] = { user_id: m.user_id, email: m.email, lastMessage: m.message, lastTime: m.created_at, lastRole: m.sender_role, hasUnread: false };
     }
-    if (m.sender_role === 'user' && !m.read_by_admin) {
-      userMap[m.user_id].hasUnread = true;
-    }
+    if (m.sender_role === 'user' && !m.read_by_admin) userMap[m.user_id].hasUnread = true;
   });
-  
   const users = Object.values(userMap).sort((a, b) => new Date(b.lastTime) - new Date(a.lastTime));
-  
   if (users.length === 0) {
     listEl.innerHTML = `<div class="chat-empty"><span class="icon">📭</span>Belum ada chat dari user</div>`;
     return;
   }
-  
+  // Fetch presence
+  const supportUserIds = users.map(u => u.user_id).filter(Boolean);
+  if (supportUserIds.length > 0) {
+    try {
+      const { data: presenceData } = await chatClient.from('user_presence').select('*').in('user_id', supportUserIds);
+      (presenceData || []).forEach(p => { presenceUsersCache[p.user_id] = p; });
+    } catch(e) {}
+  }
   let html = '';
   users.forEach(u => {
     const initial = (u.email || '?').charAt(0).toUpperCase();
     const unreadClass = u.hasUnread ? 'unread' : '';
     const staffTag = u.lastRole !== 'user' ? '💬 ' : '';
+    const presence = presenceUsersCache[u.user_id];
     html += `
-      <div class="support-user-item ${unreadClass}" onclick="openSupportChatWith('${u.user_id}','${escapeAttr(u.email)}')">
-        <div class="support-user-avatar">${initial}</div>
+      <div class="support-user-item ${unreadClass}" data-user-id="${u.user_id}" onclick="openSupportChatWith('${u.user_id}','${escapeAttr(u.email)}')">
+        <div class="support-user-avatar">${initial}${getStatusIndicatorHTML(presence)}</div>
         <div class="support-user-info">
-          <div class="support-user-email">${escapeHtml(u.email || 'user')}</div>
+          <div class="support-user-email">
+            ${escapeHtml(u.email || 'user')}
+            <span class="presence-badge-container">${getPresenceBadgeHTML(presence)}</span>
+          </div>
           <div class="support-user-preview">${staffTag}${escapeHtml(u.lastMessage || '')}</div>
         </div>
         <div class="support-user-time">${formatTimeAgo(u.lastTime)}</div>
@@ -3562,55 +3824,49 @@ async function loadCSFolders() {
   if (!isStaff || !chatClient) return;
   const listEl = document.getElementById('csFolderList');
   if (!listEl) return;
-  
   listEl.innerHTML = '<div class="loading-box"><span class="spinner"></span><br>Memuat folder...</div>';
-  
   try {
     const { data, error } = await chatClient
       .from('support_messages')
       .select('user_id, email, message, created_at, sender_role, read_by_admin')
-      .order('created_at', { ascending: false })
-      .limit(2000);
-      
+      .order('created_at', { ascending: false }).limit(2000);
     if (error) throw error;
-    
     const userMap = {};
     (data || []).forEach(m => {
       if (!userMap[m.user_id]) {
-        userMap[m.user_id] = {
-          user_id: m.user_id, email: m.email, lastMessage: m.message, lastTime: m.created_at, lastRole: m.sender_role, hasUnread: false, messageCount: 1
-        };
-      } else {
-        userMap[m.user_id].messageCount++;
-      }
-      if (m.sender_role === 'user' && !m.read_by_admin) {
-        userMap[m.user_id].hasUnread = true;
-      }
+        userMap[m.user_id] = { user_id: m.user_id, email: m.email, lastMessage: m.message, lastTime: m.created_at, lastRole: m.sender_role, hasUnread: false, messageCount: 1 };
+      } else userMap[m.user_id].messageCount++;
+      if (m.sender_role === 'user' && !m.read_by_admin) userMap[m.user_id].hasUnread = true;
     });
-    
     const folders = Object.values(userMap).sort((a, b) => new Date(b.lastTime) - new Date(a.lastTime));
     window.csFoldersCache = folders;
-    
     if (folders.length === 0) {
-      listEl.innerHTML = `<div class="chat-empty" style="padding:20px 10px;">
-        <span class="icon">📭</span>Belum ada folder chat<br>
-        <span style="font-size:11px;color:#6b4a7a;">Mulai chat baru dengan Gmail user di atas</span>
-      </div>`;
+      listEl.innerHTML = `<div class="chat-empty" style="padding:20px 10px;"><span class="icon">📭</span>Belum ada folder chat<br><span style="font-size:11px;color:#6b4a7a;">Mulai chat baru dengan Gmail user di atas</span></div>`;
       return;
     }
-    
+    // Fetch presence
+    const folderUserIds = folders.map(f => f.user_id).filter(Boolean);
+    if (folderUserIds.length > 0) {
+      try {
+        const { data: presenceData } = await chatClient.from('user_presence').select('*').in('user_id', folderUserIds);
+        (presenceData || []).forEach(p => { presenceUsersCache[p.user_id] = p; });
+      } catch(e) {}
+    }
     let html = '';
     folders.forEach(f => {
       const initial = (f.email || '?').charAt(0).toUpperCase();
       const unreadClass = f.hasUnread ? 'has-unread' : '';
       const staffTag = f.lastRole !== 'user' ? '💬 ' : '';
+      const presence = presenceUsersCache[f.user_id];
+      const presenceBadge = getPresenceBadgeHTML(presence);
       html += `
-        <div class="cs-folder-item ${unreadClass}" onclick="openCSFolder('${f.user_id}','${escapeAttr(f.email)}')">
-          <div class="cs-folder-icon">${initial}</div>
+        <div class="cs-folder-item ${unreadClass}" data-user-id="${f.user_id}" onclick="openCSFolder('${f.user_id}','${escapeAttr(f.email)}')">
+          <div class="cs-folder-icon">${initial}${getStatusIndicatorHTML(presence)}</div>
           <div class="cs-folder-info">
             <div class="cs-folder-email">
               ${escapeHtml(f.email || 'user')}
               ${f.hasUnread ? '<span class="cs-folder-badge">NEW</span>' : ''}
+              <span class="presence-badge-container">${presenceBadge}</span>
             </div>
             <div class="cs-folder-preview">${staffTag}${escapeHtml((f.lastMessage || '').substring(0, 50))}</div>
           </div>
@@ -3621,9 +3877,7 @@ async function loadCSFolders() {
     listEl.innerHTML = html;
   } catch (err) {
     console.error('Load CS folders error:', err);
-    listEl.innerHTML = `<div class="chat-empty" style="color:#ff8080;padding:20px 10px;">
-      <span class="icon">⚠️</span>Gagal memuat: ${err.message}
-    </div>`;
+    listEl.innerHTML = `<div class="chat-empty" style="color:#ff8080;padding:20px 10px;"><span class="icon">⚠️</span>Gagal memuat: ${err.message}</div>`;
   }
 }
 
@@ -3635,12 +3889,6 @@ async function openCSFolder(userId, email) {
   }, 300);
 }
 
-function refreshCSFoldersIfOpen() {
-  if (chatHubOpen && currentChatTab === 'support' && isStaff) {
-    loadCSFolders();
-  }
-}
-
 // ============================================================
 // START NEW CHAT
 // ============================================================
@@ -3648,30 +3896,20 @@ async function startNewChat() {
   const input = document.getElementById('newChatEmail');
   const btn = document.getElementById('btnStartNewChat');
   const email = input.value.trim().toLowerCase();
-  
   if (!email || !validateEmail(email)) {
     Swal.fire({ title: '⚠️ Email Tidak Valid', text: 'Masukkan alamat Gmail yang valid.', icon: 'warning', confirmButtonColor: '#ff6b9d', background: '#1a0e2e', color: '#fff' });
     return;
   }
-  
   btn.disabled = true;
   btn.innerHTML = '⏳ Cek...';
-  
   try {
-    const { data: profiles, error } = await supabaseClient
-      .from('profiles').select('id, email, role').eq('email', email).limit(1);
-      
+    const { data: profiles, error } = await supabaseClient.from('profiles').select('id, email, role').eq('email', email).limit(1);
     if (error) throw error;
     if (!profiles || profiles.length === 0) throw new Error('User dengan email tersebut tidak ditemukan');
-    
     const target = profiles[0];
     if (target.email === currentProfile.email) throw new Error('Tidak bisa chat dengan diri sendiri');
-    
-    const { data: existingFolder } = await chatClient
-      .from('support_messages').select('id').eq('user_id', target.id).limit(1);
-    
+    const { data: existingFolder } = await chatClient.from('support_messages').select('id').eq('user_id', target.id).limit(1);
     const isNewFolder = !existingFolder || existingFolder.length === 0;
-    
     if (isNewFolder) {
       const chatUserId = await getChatUserId();
       const { error: createErr } = await chatClient.from('support_messages').insert({
@@ -3681,21 +3919,12 @@ async function startNewChat() {
         read_by_admin: true
       });
       if (createErr) console.warn('Gagal buat pesan pembuka:', createErr.message);
-      
-      Swal.fire({
-        title: '📁 Folder Baru Dibuat!',
-        html: `Folder chat untuk <b style="color:#00c6ff;">${email}</b> berhasil dibuat otomatis.`,
-        icon: 'success', confirmButtonColor: '#00c6ff',
-        background: '#1a0e2e', color: '#fff',
-        timer: 2000, timerProgressBar: true, showConfirmButton: false
-      });
+      Swal.fire({ title: '📁 Folder Baru Dibuat!', html: `Folder chat untuk <b style="color:#00c6ff;">${email}</b> berhasil dibuat otomatis.`, icon: 'success', confirmButtonColor: '#00c6ff', background: '#1a0e2e', color: '#fff', timer: 2000, timerProgressBar: true, showConfirmButton: false });
     }
-    
     await openSupportChatWith(target.id, target.email);
     document.getElementById('chatHubTitle').textContent = `Chat dengan ${target.email}`;
     input.value = '';
     setTimeout(() => loadCSFolders(), 500);
-    
   } catch (err) {
     Swal.fire({ title: '❌ Gagal', text: err.message || 'User tidak ditemukan.', icon: 'error', confirmButtonColor: '#ff4444', background: '#1a0e2e', color: '#fff' });
   } finally {
@@ -3710,7 +3939,6 @@ async function openSupportChatWith(userId, email) {
   document.getElementById('supportChatViewAdmin').style.display = 'flex';
   document.getElementById('supportAdminTargetEmail').textContent = email;
   document.getElementById('chatHubTitle').textContent = `Chat - ${email}`;
-  
   await loadSupportChatForAdmin(userId);
   subscribeUserSupportChat(userId);
   await markMessagesAsRead(userId);
@@ -3719,15 +3947,8 @@ async function openSupportChatWith(userId, email) {
 async function markMessagesAsRead(userId) {
   if (!isStaff || !chatClient) return;
   try {
-    await chatClient
-      .from('support_messages')
-      .update({ read_by_admin: true })
-      .eq('user_id', userId)
-      .eq('sender_role', 'user')
-      .eq('read_by_admin', false);
-  } catch(e) {
-    console.warn('Gagal mark read:', e.message);
-  }
+    await chatClient.from('support_messages').update({ read_by_admin: true }).eq('user_id', userId).eq('sender_role', 'user').eq('read_by_admin', false);
+  } catch(e) {}
 }
 
 function backToSupportUsers() {
@@ -3768,17 +3989,20 @@ async function sendSupportReply() {
 }
 
 // ============================================================
-// FLOATING CHAT BUBBLE
+// FLOATING CHAT BUBBLE (FIXED)
 // ============================================================
 function initCSBubbleChannel() {
-  if (!chatClient || !currentUser) return;
+  if (!chatClient || !currentUser) {
+    console.warn('⚠️ Bubble: no chatClient or currentUser');
+    return;
+  }
   
   if (csBubbleChannel) {
     try { csBubbleChannel.unsubscribe(); } catch(e) {}
     csBubbleChannel = null;
   }
   
-  lastSeenMessageTime = new Date().toISOString();
+  lastPolledTime = new Date().toISOString();
   
   csBubbleChannel = chatClient
     .channel('cs_bubble_' + Date.now())
@@ -3787,38 +4011,39 @@ function initCSBubbleChannel() {
       schema: 'public',
       table: 'support_messages'
     }, (payload) => {
+      console.log('📩 Support message baru:', payload.new);
       handleNewSupportMessage(payload.new);
     })
     .subscribe((status) => {
-      console.log('📢 CS Bubble channel:', status);
+      console.log('📢 CS Bubble channel status:', status);
       if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
         setTimeout(initCSBubbleChannel, 3000);
       }
     });
 }
 
-function handleNewSupportMessage(msg) {
+async function handleNewSupportMessage(msg) {
   if (!msg || !currentUser) return;
   if (!msg.sender_role || !msg.created_at) return;
   
+  // Hanya proses pesan dalam 60 detik terakhir
   const msgTime = new Date(msg.created_at).getTime();
   const now = Date.now();
-  if (now - msgTime > 30000) return;
+  if (now - msgTime > 60000) return;
   
+  // HANYA pesan dari STAFF
   const isFromStaff = ['cs', 'admin', 'owner'].includes(msg.sender_role);
   if (!isFromStaff) return;
   
+  // Skip kalau yang login adalah staff
   if (isStaff) return;
+  
+  // Skip kalau chat CS sedang dibuka
   if (chatHubOpen && currentChatTab === 'support') return;
   
-  const chatUserId = currentUser.id;
-  if (msg.user_id !== chatUserId) {
-    getChatUserId().then(cid => {
-      if (msg.user_id !== cid) return;
-      showCSBubble(msg);
-    });
-    return;
-  }
+  // Pastikan pesan untuk user yang login
+  const chatUserId = await getChatUserId();
+  if (!chatUserId || msg.user_id !== chatUserId) return;
   
   showCSBubble(msg);
 }
@@ -3827,8 +4052,12 @@ function showCSBubble(msg) {
   if (activeBubbles[msg.id]) return;
   
   const container = document.getElementById('csBubbleContainer');
-  if (!container) return;
+  if (!container) {
+    console.warn('⚠️ Bubble container not found');
+    return;
+  }
   
+  // Batasi maksimal 3 bubble
   const currentBubbles = container.querySelectorAll('.cs-bubble:not(.removing)');
   if (currentBubbles.length >= CS_BUBBLE_MAX) {
     const oldest = currentBubbles[0];
@@ -3874,12 +4103,15 @@ function showCSBubble(msg) {
   });
   
   container.appendChild(bubble);
+  console.log('✅ Bubble shown for message:', msg.id);
   
+  // Auto-remove setelah durasi
   const timeoutId = setTimeout(() => {
     dismissCSBubble(msg.id);
   }, CS_BUBBLE_DURATION);
   
   activeBubbles[msg.id] = timeoutId;
+  
   playBubbleSound();
   if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
 }
@@ -3913,12 +4145,7 @@ async function openCSBubbleReply(msgId) {
       if (chatUserId) {
         await loadSupportChatForUser(chatUserId);
         try {
-          await chatClient
-            .from('support_messages')
-            .update({ read_by_admin: true })
-            .eq('user_id', chatUserId)
-            .eq('sender_role', 'user')
-            .eq('read_by_admin', false);
+          await chatClient.from('support_messages').update({ read_by_admin: true }).eq('user_id', chatUserId).eq('sender_role', 'user').eq('read_by_admin', false);
         } catch(e) {}
       }
     }, 400);
@@ -3929,34 +4156,25 @@ function playBubbleSound() {
   try {
     const AudioContext = window.AudioContext || window.webkitAudioContext;
     if (!AudioContext) return;
-    
     const ctx = new AudioContext();
     const oscillator = ctx.createOscillator();
     const gainNode = ctx.createGain();
-    
     oscillator.connect(gainNode);
     gainNode.connect(ctx.destination);
-    
     oscillator.type = 'sine';
     oscillator.frequency.setValueAtTime(880, ctx.currentTime);
     oscillator.frequency.setValueAtTime(1100, ctx.currentTime + 0.1);
-    
     gainNode.gain.setValueAtTime(0.15, ctx.currentTime);
     gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
-    
     oscillator.start(ctx.currentTime);
     oscillator.stop(ctx.currentTime + 0.3);
-    
     setTimeout(() => ctx.close(), 500);
-  } catch(e) {
-    console.log('Sound play failed:', e.message);
-  }
+  } catch(e) {}
 }
 
 function toggleBubbleVisibility() {
   const container = document.getElementById('csBubbleContainer');
   if (!container) return;
-  
   if (chatHubOpen && currentChatTab === 'support') {
     container.style.display = 'none';
   } else {
@@ -3965,7 +4183,7 @@ function toggleBubbleVisibility() {
 }
 
 // ============================================================
-// POLLING FALLBACK
+// POLLING FALLBACK (FIXED)
 // ============================================================
 function startCSPolling() {
   if (csPollingInterval) clearInterval(csPollingInterval);
@@ -3997,6 +4215,7 @@ function startCSPolling() {
       
       data.forEach(msg => {
         if (!activeBubbles[msg.id]) {
+          console.log('📩 [Polling] Bubble from:', msg.email);
           showCSBubble(msg);
         }
       });
