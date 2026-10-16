@@ -3,10 +3,11 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Pembayaran QRIS - Shine Shop</title>
+<title>Pembayaran - Shine Shop Sosmed 1</title>
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{
@@ -104,6 +105,109 @@ h2{
   letter-spacing:0.5px;
   margin-top:2px;
 }
+
+/* ========== PAYMENT METHOD SELECTOR ========== */
+.method-selector{
+  display:flex;
+  gap:10px;
+  margin:18px 0 14px 0;
+}
+.method-btn{
+  flex:1;
+  padding:14px 12px;
+  border-radius:16px;
+  border:2px solid rgba(255,255,255,0.08);
+  background:rgba(255,255,255,0.04);
+  color:#94a3b8;
+  font-family:'Poppins',sans-serif;
+  font-size:13px;
+  font-weight:600;
+  cursor:pointer;
+  transition:all 0.3s ease;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:6px;
+  position:relative;
+  overflow:hidden;
+}
+.method-btn .m-icon{font-size:22px}
+.method-btn .m-label{font-size:12px}
+.method-btn .m-sub{font-size:10px;opacity:0.7;font-weight:400}
+.method-btn:hover{
+  background:rgba(255,255,255,0.08);
+  border-color:rgba(255,255,255,0.15);
+  transform:translateY(-2px);
+}
+.method-btn.active{
+  background:linear-gradient(135deg,rgba(0,198,255,0.20),rgba(0,114,255,0.15));
+  border-color:#00c6ff;
+  color:#fff;
+  box-shadow:0 6px 24px rgba(0,198,255,0.25);
+}
+.method-btn.active.saldo{
+  background:linear-gradient(135deg,rgba(250,204,21,0.20),rgba(245,158,11,0.15));
+  border-color:#facc15;
+  box-shadow:0 6px 24px rgba(250,204,21,0.3);
+}
+.method-btn.active.qris{
+  background:linear-gradient(135deg,rgba(0,198,255,0.20),rgba(0,114,255,0.15));
+  border-color:#00c6ff;
+  box-shadow:0 6px 24px rgba(0,198,255,0.3);
+}
+.method-btn:disabled{
+  opacity:0.5;
+  cursor:not-allowed;
+  transform:none !important;
+}
+
+/* ========== SALDO INFO BOX ========== */
+.saldo-info{
+  display:none;
+  background:linear-gradient(135deg,rgba(250,204,21,0.08),rgba(245,158,11,0.04));
+  border:1px solid rgba(250,204,21,0.25);
+  border-radius:16px;
+  padding:16px;
+  margin:12px 0;
+  text-align:left;
+}
+.saldo-info.show{display:block;animation:fadeIn 0.4s ease both;}
+@keyframes fadeIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+.saldo-info .si-label{
+  font-size:11px;
+  text-transform:uppercase;
+  letter-spacing:1.5px;
+  color:#facc15;
+  font-weight:700;
+  margin-bottom:4px;
+}
+.saldo-info .si-value{
+  font-size:24px;
+  font-weight:900;
+  background:linear-gradient(135deg,#facc15,#f59e0b);
+  -webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;
+  background-clip:text;
+  font-family:'Poppins',sans-serif;
+  line-height:1.2;
+}
+.saldo-info .si-row{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-top:10px;
+  padding-top:10px;
+  border-top:1px dashed rgba(250,204,21,0.25);
+  font-size:13px;
+}
+.saldo-info .si-row .si-key{color:#94a3b8;}
+.saldo-info .si-row .si-val{font-weight:700;color:#f8fafc;}
+.saldo-info .si-row .si-val.negative{color:#ef4444;}
+.saldo-info .si-row .si-val.positive{color:#22c55e;}
+
+.qris-section{display:block;}
+.qris-section.hide{display:none;}
+
 .qr-wrapper{
   background:#fff;
   border-radius:20px;
@@ -118,9 +222,7 @@ h2{
   transform:scale(1.02);
   box-shadow:0 12px 40px rgba(0,0,0,0.4);
 }
-.qr-wrapper.expired .qr-overlay{
-  display:flex;
-}
+.qr-wrapper.expired .qr-overlay{display:flex;}
 .qr-wrapper .qr-overlay{
   position:absolute;
   inset:0;
@@ -133,22 +235,10 @@ h2{
   gap:8px;
   backdrop-filter:blur(8px);
 }
-.qr-wrapper .qr-overlay .overlay-icon{
-  font-size:40px;
-}
-.qr-wrapper .qr-overlay .overlay-text{
-  font-size:16px;
-  font-weight:700;
-  color:#ff4444;
-}
-.qr-wrapper .qr-overlay .overlay-sub{
-  font-size:12px;
-  color:#94a3b8;
-}
-#qrisCanvas{
-  display:block;
-  border-radius:12px;
-}
+.qr-wrapper .qr-overlay .overlay-icon{font-size:40px;}
+.qr-wrapper .qr-overlay .overlay-text{font-size:16px;font-weight:700;color:#ff4444;}
+.qr-wrapper .qr-overlay .overlay-sub{font-size:12px;color:#94a3b8;}
+#qrisCanvas{display:block;border-radius:12px;}
 .unique-code{
   background:rgba(30,41,59,0.6);
   backdrop-filter:blur(8px);
@@ -170,10 +260,7 @@ h2{
   background-clip:text;
   font-weight:800;
 }
-.unique-code.expired{
-  opacity:0.4;
-  text-decoration:line-through;
-}
+.unique-code.expired{opacity:0.4;text-decoration:line-through;}
 .timer-display{
   text-align:center;
   font-size:14px;
@@ -184,22 +271,11 @@ h2{
   background:rgba(255,255,255,0.04);
   border:1px solid rgba(255,255,255,0.06);
 }
-.timer-display .time{
-  font-weight:700;
-  font-size:18px;
-  color:#facc15;
-}
-.timer-display .time.warning{
-  color:#ffaa00;
-}
-.timer-display .time.danger{
-  color:#ff4444;
-  animation:blink 1s infinite;
-}
-@keyframes blink{
-  0%,100%{opacity:1}
-  50%{opacity:0.3}
-}
+.timer-display .time{font-weight:700;font-size:18px;color:#facc15;}
+.timer-display .time.warning{color:#ffaa00;}
+.timer-display .time.danger{color:#ff4444;animation:blink 1s infinite;}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0.3}}
+
 .details{
   font-size:13.5px;
   line-height:1.8;
@@ -232,22 +308,9 @@ h2{
   gap:10px;
   flex-wrap:wrap;
 }
-.gmail-display .label{
-  color:#94a3b8;
-  font-size:12px;
-  font-weight:500;
-}
-.gmail-display .value{
-  color:#00ffaa;
-  font-size:14px;
-  font-weight:600;
-  word-break:break-all;
-}
-.gmail-display .value.not-set{
-  color:#ff6666;
-  font-style:italic;
-  font-weight:400;
-}
+.gmail-display .label{color:#94a3b8;font-size:12px;font-weight:500;}
+.gmail-display .value{color:#00ffaa;font-size:14px;font-weight:600;word-break:break-all;}
+.gmail-display .value.not-set{color:#ff6666;font-style:italic;font-weight:400;}
 input{
   width:100%;
   padding:14px 16px;
@@ -305,6 +368,15 @@ p.alert-text{
 }
 .btn:active:not(:disabled){transform:scale(0.97)}
 .btn:disabled{opacity:0.4;cursor:not-allowed;transform:none!important;box-shadow:none!important}
+.btn-saldo{
+  background:linear-gradient(135deg,#facc15,#f59e0b);
+  color:#1a0e2e;
+  box-shadow:0 8px 24px rgba(250,204,21,0.25);
+}
+.btn-saldo:hover:not(:disabled){
+  background:linear-gradient(135deg,#fbbf24,#f59e0b);
+  box-shadow:0 12px 32px rgba(250,204,21,0.4);
+}
 .btn-regenerate{
   background:linear-gradient(135deg,#f59e0b,#d97706);
   box-shadow:0 8px 24px rgba(245,158,11,0.25);
@@ -373,17 +445,8 @@ p.alert-text{
   text-align:left;
   margin:12px 0;
 }
-.banned-card .banned-until{
-  color:#ffaa00;
-  font-size:13px;
-  font-weight:600;
-  margin:8px 0;
-}
-.banned-card .banned-current-time{
-  color:#94a3b8;
-  font-size:12px;
-  margin:4px 0 16px 0;
-}
+.banned-card .banned-until{color:#ffaa00;font-size:13px;font-weight:600;margin:8px 0;}
+.banned-card .banned-current-time{color:#94a3b8;font-size:12px;margin:4px 0 16px 0;}
 .banned-card .btn-appeal{
   display:inline-block;
   background:#ffaa0044;
@@ -398,16 +461,8 @@ p.alert-text{
   font-family:'Poppins',sans-serif;
   margin-top:8px;
 }
-.banned-card .btn-appeal:hover{
-  background:#ffaa0066;
-  transform:scale(1.02);
-}
-.banned-card .banned-id{
-  color:#666;
-  font-size:11px;
-  margin-top:12px;
-  word-break:break-all;
-}
+.banned-card .btn-appeal:hover{background:#ffaa0066;transform:scale(1.02);}
+.banned-card .banned-id{color:#666;font-size:11px;margin-top:12px;word-break:break-all;}
 
 .wib-time-display{
   text-align:center;
@@ -417,15 +472,8 @@ p.alert-text{
   padding:4px 0;
   border-top:1px solid rgba(255,255,255,0.04);
 }
-.wib-time-display .wib-label{
-  color:#666;
-  font-weight:300;
-}
-.wib-time-display .wib-value{
-  color:#00ffaa;
-  font-weight:500;
-  font-variant-numeric:tabular-nums;
-}
+.wib-time-display .wib-label{color:#666;font-weight:300;}
+.wib-time-display .wib-value{color:#00ffaa;font-weight:500;font-variant-numeric:tabular-nums;}
 
 .payment-status{
   margin-top:12px;
@@ -436,24 +484,9 @@ p.alert-text{
   font-weight:600;
   display:none;
 }
-.payment-status.loading{
-  display:block;
-  background:rgba(255,170,0,0.15);
-  color:#ffaa00;
-  border:1px solid rgba(255,170,0,0.3);
-}
-.payment-status.success{
-  display:block;
-  background:rgba(34,197,94,0.15);
-  color:#22c55e;
-  border:1px solid rgba(34,197,94,0.3);
-}
-.payment-status.failed{
-  display:block;
-  background:rgba(239,68,68,0.15);
-  color:#ef4444;
-  border:1px solid rgba(239,68,68,0.3);
-}
+.payment-status.loading{display:block;background:rgba(255,170,0,0.15);color:#ffaa00;border:1px solid rgba(255,170,0,0.3);}
+.payment-status.success{display:block;background:rgba(34,197,94,0.15);color:#22c55e;border:1px solid rgba(34,197,94,0.3);}
+.payment-status.failed{display:block;background:rgba(239,68,68,0.15);color:#ef4444;border:1px solid rgba(239,68,68,0.3);}
 .order-status{
   margin-top:8px;
   padding:10px 14px;
@@ -462,24 +495,9 @@ p.alert-text{
   font-size:12px;
   display:none;
 }
-.order-status.success{
-  display:block;
-  background:rgba(34,197,94,0.12);
-  color:#22c55e;
-  border:1px solid rgba(34,197,94,0.2);
-}
-.order-status.failed{
-  display:block;
-  background:rgba(239,68,68,0.12);
-  color:#ef4444;
-  border:1px solid rgba(239,68,68,0.2);
-}
-.order-status.loading{
-  display:block;
-  background:rgba(255,170,0,0.12);
-  color:#ffaa00;
-  border:1px solid rgba(255,170,0,0.2);
-}
+.order-status.success{display:block;background:rgba(34,197,94,0.12);color:#22c55e;border:1px solid rgba(34,197,94,0.2);}
+.order-status.failed{display:block;background:rgba(239,68,68,0.12);color:#ef4444;border:1px solid rgba(239,68,68,0.2);}
+.order-status.loading{display:block;background:rgba(255,170,0,0.12);color:#ffaa00;border:1px solid rgba(255,170,0,0.2);}
 .order-id-box{
   background:rgba(0,0,0,0.3);
   padding:8px 12px;
@@ -502,9 +520,7 @@ p.alert-text{
   transition:0.3s;
   margin-left:8px;
 }
-.order-id-box .copy-btn:hover{
-  background:rgba(255,170,0,0.4);
-}
+.order-id-box .copy-btn:hover{background:rgba(255,170,0,0.4);}
 
 @media(max-width:480px){
   .card{padding:20px 16px;border-radius:20px}
@@ -517,6 +533,11 @@ p.alert-text{
   .banned-card{padding:28px 20px}
   .banned-card h1{font-size:22px}
   .timer-display .time{font-size:15px}
+  .method-btn{padding:10px 8px}
+  .method-btn .m-icon{font-size:18px}
+  .method-btn .m-label{font-size:11px}
+  .method-btn .m-sub{font-size:9px}
+  .saldo-info .si-value{font-size:20px}
 }
 </style>
 </head>
@@ -545,9 +566,9 @@ p.alert-text{
   </div>
 </div>
 
-<!-- QRIS CARD -->
+<!-- PAYMENT CARD -->
 <div id="qrisCard" class="card">
-  <h2>💳 Pembayaran QRIS</h2>
+  <h2>💳 Pembayaran</h2>
   <p class="alert-text"><b>Jangan tutup halaman saat sedang melakukan pembayaran atau pembayaran terverifikasi sampai muncul pop up id pesanan</b></p>
   
   <div class="subtitle">✦ Shine Shop - Sosmed 1 ✦</div>
@@ -557,28 +578,62 @@ p.alert-text{
     <span class="label">📧 Gmail:</span>
     <span class="value" id="gmailDisplay">Belum diatur</span>
   </div>
-  
-  <!-- QRIS WRAPPER -->
-  <div class="qr-wrapper" id="qrWrapper">
-    <canvas id="qrisCanvas" width="240" height="240"></canvas>
-    <div class="qr-overlay" id="qrOverlay">
-      <span class="overlay-icon">⏰</span>
-      <span class="overlay-text">QRIS Expired</span>
-      <span class="overlay-sub">Klik tombol di bawah untuk generate ulang</span>
+
+  <!-- ========== PAYMENT METHOD SELECTOR ========== -->
+  <div class="method-selector" id="methodSelector">
+    <button class="method-btn active qris" id="btnMethodQris" onclick="selectPaymentMethod('qris')">
+      <span class="m-icon">📱</span>
+      <span class="m-label">QRIS</span>
+      <span class="m-sub">Scan & bayar</span>
+    </button>
+    <button class="method-btn saldo" id="btnMethodSaldo" onclick="selectPaymentMethod('saldo')">
+      <span class="m-icon">💰</span>
+      <span class="m-label">Saldo</span>
+      <span class="m-sub" id="saldoSub">Rp 0</span>
+    </button>
+  </div>
+
+  <!-- ========== SALDO INFO BOX ========== -->
+  <div class="saldo-info" id="saldoInfo">
+    <div class="si-label">💰 Saldo Anda</div>
+    <div class="si-value" id="saldoValue">Rp 0</div>
+    <div class="si-row">
+      <span class="si-key">Total bayar:</span>
+      <span class="si-val" id="saldoTotalBayar">Rp 0</span>
     </div>
+    <div class="si-row">
+      <span class="si-key">Sisa saldo setelah bayar:</span>
+      <span class="si-val" id="saldoSisa">Rp 0</span>
+    </div>
+    <button class="btn btn-saldo" id="btnPaySaldo" onclick="payWithBalance()" style="margin-top:14px;">
+      💰 Bayar dengan Saldo
+    </button>
   </div>
-  
-  <!-- TIMER -->
-  <div class="timer-display" id="timerDisplay">
-    ⏳ Sisa Waktu: <span class="time" id="timerTime">59:59</span>
+
+  <!-- ========== QRIS SECTION ========== -->
+  <div class="qris-section" id="qrisSection">
+    <!-- QRIS WRAPPER -->
+    <div class="qr-wrapper" id="qrWrapper">
+      <canvas id="qrisCanvas" width="240" height="240"></canvas>
+      <div class="qr-overlay" id="qrOverlay">
+        <span class="overlay-icon">⏰</span>
+        <span class="overlay-text">QRIS Expired</span>
+        <span class="overlay-sub">Klik tombol di bawah untuk generate ulang</span>
+      </div>
+    </div>
+    
+    <!-- TIMER -->
+    <div class="timer-display" id="timerDisplay">
+      ⏳ Sisa Waktu: <span class="time" id="timerTime">10:00</span>
+    </div>
+    
+    <div class="unique-code" id="uniqueCodeContainer">🔑 Kode Unik: <span id="uniqueCode">-</span></div>
+    
+    <!-- TOMBOL REGENERATE -->
+    <button class="btn btn-regenerate" id="regenerateBtn" style="display:none;">
+      🔄 Generate Ulang QRIS
+    </button>
   </div>
-  
-  <div class="unique-code" id="uniqueCodeContainer">🔑 Kode Unik: <span id="uniqueCode">-</span></div>
-  
-  <!-- TOMBOL REGENERATE -->
-  <button class="btn btn-regenerate" id="regenerateBtn" style="display:none;">
-    🔄 Generate Ulang QRIS
-  </button>
   
   <div class="details" id="orderDetails"></div>
   
@@ -612,22 +667,37 @@ const GMAIL_BAN_URL = "/sosmed-2/payment/gmail.json";
 const WHATSAPP_NUMBER = "6289518103883";
 const MERCHANT_CODE = "QP052692";
 
+const SUPABASE_URL = 'https://vvzgpbiesvupuhqqoxrg.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ2emdwYmllc3Z1cHVocXFveHJnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIwNzE3MTUsImV4cCI6MjEwNzY0NzcxNX0.W3_Ck8B5Q-nEfNlsyeufJsLsTqbM8xPcAeHoAHfGRwY';
+
+let supabaseClient = null;
+try {
+  supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+      storage: window.localStorage,
+      storageKey: 'shine-shop-auth'
+    }
+  });
+  console.log('✅ Supabase initialized');
+} catch (e) {
+  console.error('❌ Supabase init error:', e);
+}
+
 let QIOSPAY_API_KEY = '';
 const ADMIN_FEE_PERCENT = 1;
 const ADMIN_FEE_THRESHOLD = 500000;
 const QRIS_EXPIRY_MINUTES = 10;
 
-// ===== ROUNDING HELPER =====
-// Normalisasi total bayar agar selalu integer (bulat ke atas, tanpa koma/desimal)
 function normalizeTotal(amount) {
   const n = Number(amount) || 0;
   return Math.ceil(n);
 }
 
-// ===== AMBIL PARAMETER DARI URL =====
 const p = new URLSearchParams(location.search);
 const trx = p.get("trx") || "-";
-// ✅ Pastikan total dari URL selalu integer
 const total = normalizeTotal(p.get("total") || 0);
 const isMass = p.get("mass") === "1";
 let ordersData = [];
@@ -635,6 +705,12 @@ let layanan = "-";
 let target = "-";
 let jumlah = 0;
 let serviceId = null;
+
+// ================= PAYMENT METHOD STATE =================
+let paymentMethod = 'qris';
+let userBalance = 0;
+let userEmail = null;
+let userProfileId = null;
 
 try {
   const ordersParam = p.get("orders");
@@ -659,71 +735,22 @@ if (layanan === "-" || layanan === "") {
   serviceId = p.get("serviceId") || null;
 }
 
-// ===== NOTIFIKASI DISCORD =====
+// ===== DISCORD STATE =====
 function getDiscordSentKey() { return `discord_sent_${trx}`; }
+function isDiscordAlreadySent() { try { return localStorage.getItem(getDiscordSentKey()) === 'true'; } catch { return false; } }
+function markDiscordSent() { try { localStorage.setItem(getDiscordSentKey(), 'true'); return true; } catch { return false; } }
 
-function isDiscordAlreadySent() {
-  try { return localStorage.getItem(getDiscordSentKey()) === 'true'; } 
-  catch { return false; }
-}
-
-function markDiscordSent() {
-  try {
-    localStorage.setItem(getDiscordSentKey(), 'true');
-    return true;
-  } catch (e) {
-    return false;
-  }
-}
-
-// ===== ORDER SENT KEY =====
 function getOrderSentKey() { return `order_sent_${trx}`; }
-
-function isOrderAlreadySent() {
-  try { return localStorage.getItem(getOrderSentKey()) === 'true'; } 
-  catch { return false; }
-}
-
-function markOrderSent() {
-  try {
-    localStorage.setItem(getOrderSentKey(), 'true');
-    return true;
-  } catch (e) {
-    return false;
-  }
-}
+function isOrderAlreadySent() { try { return localStorage.getItem(getOrderSentKey()) === 'true'; } catch { return false; } }
+function markOrderSent() { try { localStorage.setItem(getOrderSentKey(), 'true'); return true; } catch { return false; } }
 
 // ================= PERSISTENT STATE =================
 function getPaymentStateKey() { return `payment_state_${trx}`; }
+function getPaymentState() { try { const d = localStorage.getItem(getPaymentStateKey()); return d ? JSON.parse(d) : null; } catch { return null; } }
+function savePaymentState(state) { try { localStorage.setItem(getPaymentStateKey(), JSON.stringify(state)); return true; } catch { return false; } }
+function clearPaymentState() { try { localStorage.removeItem(getPaymentStateKey()); return true; } catch { return false; } }
 
-function getPaymentState() {
-  try {
-    const data = localStorage.getItem(getPaymentStateKey());
-    return data ? JSON.parse(data) : null;
-  } catch (e) {
-    return null;
-  }
-}
-
-function savePaymentState(state) {
-  try {
-    localStorage.setItem(getPaymentStateKey(), JSON.stringify(state));
-    return true;
-  } catch (e) {
-    return false;
-  }
-}
-
-function clearPaymentState() {
-  try {
-    localStorage.removeItem(getPaymentStateKey());
-    return true;
-  } catch (e) {
-    return false;
-  }
-}
-
-// ================= AMBIL KONFIGURASI DARI ENV =================
+// ================= AMBIL KONFIGURASI =================
 async function fetchConfigFromEnv() {
   try {
     const res = await fetch('/api/qris-config');
@@ -732,9 +759,7 @@ async function fetchConfigFromEnv() {
       if (data.qiospay_api_key) QIOSPAY_API_KEY = data.qiospay_api_key;
       return true;
     }
-  } catch (e) {
-    console.warn('⚠️ Gagal mengambil config dari API server:', e);
-  }
+  } catch (e) { console.warn('⚠️ Gagal ambil config:', e); }
   return false;
 }
 
@@ -763,7 +788,6 @@ let isQrisExpired = false;
 let qrisRegenerationCount = 0;
 
 function getUniqueCodeKey() { return `unique_code_${trx}`; }
-
 function getStoredUniqueCode() {
   try {
     const stored = localStorage.getItem(getUniqueCodeKey());
@@ -774,86 +798,52 @@ function getStoredUniqueCode() {
   } catch (e) {}
   return null;
 }
-
-function saveUniqueCode(code) {
-  try {
-    localStorage.setItem(getUniqueCodeKey(), String(code));
-    return true;
-  } catch (e) { return false; }
-}
-
+function saveUniqueCode(code) { try { localStorage.setItem(getUniqueCodeKey(), String(code)); return true; } catch { return false; } }
 function generateUniqueCode() {
-  const existingCode = getStoredUniqueCode();
-  if (existingCode !== null) return existingCode;
+  const existing = getStoredUniqueCode();
+  if (existing !== null) return existing;
   const newCode = Math.floor(Math.random() * 99) + 1;
   saveUniqueCode(newCode);
   return newCode;
 }
-
 function regenerateUniqueCode() {
   const newCode = Math.floor(Math.random() * 99) + 1;
   saveUniqueCode(newCode);
   return newCode;
 }
-
 function calculateAdminFee(amount) {
-  if (amount > ADMIN_FEE_THRESHOLD) {
-    return Math.round(amount * (ADMIN_FEE_PERCENT / 100));
-  }
+  if (amount > ADMIN_FEE_THRESHOLD) return Math.round(amount * (ADMIN_FEE_PERCENT / 100));
   return 0;
 }
 
-function generateUserID(){
-  return 'user-' + Math.random().toString(36).substring(2,10) + '-' + Date.now().toString(36);
-}
-
+function generateUserID(){ return 'user-' + Math.random().toString(36).substring(2,10) + '-' + Date.now().toString(36); }
 async function getUserID(){
   let id = localStorage.getItem("user_id");
-  if(!id){
-    id = generateUserID();
-    localStorage.setItem("user_id", id);
-  }
+  if(!id){ id = generateUserID(); localStorage.setItem("user_id", id); }
   return id;
 }
 
-function getStoredGmail() {
-  return localStorage.getItem('user_gmail') || null;
-}
-
-function validateEmail(email) {
-  return email && email.includes('@') && email.includes('.') && email.length > 5;
-}
+function getStoredGmail() { return localStorage.getItem('user_gmail') || null; }
+function validateEmail(email) { return email && email.includes('@') && email.includes('.') && email.length > 5; }
 
 function getWIBTime() { return new Date(); }
-
 function formatWIB(date) {
   return new Intl.DateTimeFormat('id-ID', {
     timeZone: 'Asia/Jakarta',
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false
+    day: '2-digit', month: 'long', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
   }).format(date);
 }
-
 function formatWIBTime(date) {
   return new Intl.DateTimeFormat('id-ID', {
     timeZone: 'Asia/Jakarta',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
   }).format(date);
 }
-
 function updateWIBDisplay() {
   const displayEl = document.getElementById('wibTimeDisplay');
   if (displayEl) displayEl.textContent = formatWIBTime(getWIBTime());
 }
-
 function updateBannedWIBDisplay() {
   const timeEl = document.getElementById('bannedCurrentTime');
   const containerEl = document.getElementById('bannedContainer');
@@ -861,7 +851,6 @@ function updateBannedWIBDisplay() {
     timeEl.textContent = '🕐 WIB (GMT+7): ' + formatWIB(getWIBTime());
   }
 }
-
 function startWIBClock() {
   if (window.wibInterval) clearInterval(window.wibInterval);
   if (window.bannedInterval) clearInterval(window.bannedInterval);
@@ -872,14 +861,58 @@ function startWIBClock() {
 }
 startWIBClock();
 
-async function checkGmailBanned(gmail) {
+// ============================================================
+// 🚫 CEK BANNED - SUPABASE + FILE JSON
+// ============================================================
+async function checkSupabaseBanned() {
+  if (!supabaseClient) return null;
+  try {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (!session || !session.user) {
+      console.log('ℹ️ Belum login Supabase, skip cek banned Supabase');
+      return null;
+    }
+
+    const { data, error } = await supabaseClient
+      .from('profiles')
+      .select('banned, banned_reason, banned_until, banned_at, banned_by, email')
+      .eq('id', session.user.id)
+      .single();
+
+    if (error) throw error;
+    if (!data || !data.banned) return null;
+
+    if (data.banned_until) {
+      const untilDate = new Date(data.banned_until);
+      if (new Date() > untilDate) {
+        console.log('ℹ️ Banned Supabase sudah berakhir');
+        return null;
+      }
+    }
+
+    console.log('🚫 User BANNED di Supabase:', data);
+    return {
+      Gmail: data.email,
+      Alasan: data.banned_reason || 'Tidak ada alasan',
+      "Dibanned sampai": data.banned_until || null,
+      source: 'supabase',
+      banned_by: data.banned_by,
+      banned_at: data.banned_at
+    };
+  } catch (err) {
+    console.warn('⚠️ Gagal cek banned Supabase:', err.message);
+    return null;
+  }
+}
+
+async function checkJsonBanned(gmail) {
   if (!gmail || !validateEmail(gmail)) return null;
   try {
     const res = await fetch(GMAIL_BAN_URL + '?t=' + Date.now(), { cache: "no-store" });
     if (!res.ok) return null;
     const list = await res.json();
     if (!Array.isArray(list)) return null;
-    const banned = list.find(item => 
+    const banned = list.find(item =>
       item.Gmail && item.Gmail.toLowerCase() === gmail.toLowerCase()
     );
     if (!banned) return null;
@@ -887,28 +920,87 @@ async function checkGmailBanned(gmail) {
       const untilDate = new Date(banned["Dibanned sampai"]);
       if (getWIBTime() > untilDate) return null;
     }
+    banned.source = 'json';
     return banned;
   } catch (err) {
+    console.warn('⚠️ Gagal cek banned JSON:', err.message);
     return null;
   }
 }
 
+async function checkGmailBanned(gmail) {
+  const supaBanned = await checkSupabaseBanned();
+  if (supaBanned) {
+    console.log('🚫 Banned dari Supabase:', supaBanned.Alasan);
+    return supaBanned;
+  }
+  const jsonBanned = await checkJsonBanned(gmail);
+  if (jsonBanned) {
+    console.log('🚫 Banned dari JSON lokal:', jsonBanned.Alasan);
+    return jsonBanned;
+  }
+  return null;
+}
+
+// ============================================================
+// 🚫 SHOW BANNED PAGE + POPUP
+// ============================================================
 function showBannedPage(bannedData, userID, gmail) {
   document.getElementById('bannedContainer').style.display = 'flex';
   document.getElementById('qrisCard').style.display = 'none';
+  
   document.getElementById('bannedGmail').textContent = gmail || '-';
   document.getElementById('bannedReason').textContent = bannedData.Alasan || 'Tidak ada keterangan';
   document.getElementById('bannedUserId').textContent = '🆔 User ID: ' + (userID || '-');
+  
   let untilText = '-';
   if (bannedData["Dibanned sampai"]) {
     untilText = formatWIB(new Date(bannedData["Dibanned sampai"]));
   }
   document.getElementById('bannedUntil').textContent = '⏳ Dibanned sampai: ' + untilText;
   updateBannedWIBDisplay();
+  
   const appealLink = document.querySelector('.btn-appeal');
   if (appealLink && gmail) {
     appealLink.href = `https://wa.me/${WHATSAPP_NUMBER}?text=Halo%20Admin%2C%20saya%20ingin%20mengajukan%20banding%20atas%20ban%20akun%20saya.%20Gmail%3A%20${encodeURIComponent(gmail)}%0AUser%20ID%3A%20${encodeURIComponent(userID || '-')}`;
   }
+
+  setTimeout(() => {
+    Swal.fire({
+      title: '🚫 Akun Anda Dibanned',
+      html: `
+        <div style="text-align:left;color:#ddd;font-size:14px;line-height:1.7;">
+          <div style="background:rgba(255,68,68,0.1);padding:12px;border-radius:10px;margin-bottom:12px;border-left:3px solid #ff4444;">
+            <b style="color:#ff6666;">📧 Email:</b><br>
+            <span style="color:#00ffaa;font-size:13px;word-break:break-all;">${gmail || '-'}</span>
+          </div>
+          <div style="background:rgba(255,68,68,0.1);padding:12px;border-radius:10px;margin-bottom:12px;border-left:3px solid #ff4444;">
+            <b style="color:#ff6666;">📝 Alasan:</b><br>
+            <span style="font-size:13px;">${bannedData.Alasan || 'Tidak ada keterangan'}</span>
+          </div>
+          <div style="background:rgba(255,170,0,0.1);padding:12px;border-radius:10px;border-left:3px solid #ffaa00;">
+            <b style="color:#ffaa00;">⏳ Dibanned sampai:</b><br>
+            <span style="font-size:13px;color:#ffaa00;">${untilText}</span>
+          </div>
+          <p style="margin-top:12px;font-size:12px;color:#94a3b8;text-align:center;">
+            Silakan hubungi CS untuk mengajukan banding.
+          </p>
+        </div>
+      `,
+      icon: 'error',
+      confirmButtonText: '📱 Ajukan Banding',
+      confirmButtonColor: '#ff4444',
+      showCancelButton: true,
+      cancelButtonText: 'Tutup',
+      cancelButtonColor: '#666',
+      allowOutsideClick: false,
+      allowEscapeKey: false
+    }).then((result) => {
+      if (result.isConfirmed) {
+        window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=Halo%20Admin%2C%20saya%20ingin%20mengajukan%20banding%20atas%20ban%20akun%20saya.%20Gmail%3A%20${encodeURIComponent(gmail || '-')}%0AUser%20ID%3A%20${encodeURIComponent(userID || '-')}`, '_blank');
+      }
+    });
+  }, 300);
 }
 
 async function checkAndHandleBan() {
@@ -924,28 +1016,267 @@ async function checkAndHandleBan() {
       gmailDisplay.className = 'value not-set';
     }
   }
-  if (!gmail || !validateEmail(gmail)) return false;
   const bannedData = await checkGmailBanned(gmail);
   if (bannedData) {
-    showBannedPage(bannedData, userID, gmail);
+    showBannedPage(bannedData, userID, gmail || bannedData.Gmail || '-');
     return true;
   }
   return false;
 }
 
+// ================= LOAD USER BALANCE =================
+async function loadUserBalance() {
+  if (!supabaseClient) return;
+  try {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (!session || !session.user) {
+      console.warn('⚠️ User belum login Supabase');
+      return;
+    }
+    userEmail = session.user.email;
+    userProfileId = session.user.id;
+    
+    const { data, error } = await supabaseClient
+      .from('profiles')
+      .select('balance, email')
+      .eq('id', session.user.id)
+      .single();
+    
+    if (error) throw error;
+    userBalance = parseInt(data.balance) || 0;
+    console.log('💰 Saldo user:', userBalance);
+    updateSaldoDisplay();
+  } catch (err) {
+    console.error('❌ Load balance error:', err);
+  }
+}
+
+function updateSaldoDisplay() {
+  const saldoSub = document.getElementById('saldoSub');
+  const saldoValue = document.getElementById('saldoValue');
+  const saldoTotalBayar = document.getElementById('saldoTotalBayar');
+  const saldoSisa = document.getElementById('saldoSisa');
+  const btnPaySaldo = document.getElementById('btnPaySaldo');
+  
+  if (saldoSub) saldoSub.textContent = 'Rp ' + userBalance.toLocaleString('id-ID');
+  if (saldoValue) saldoValue.textContent = 'Rp ' + userBalance.toLocaleString('id-ID');
+  
+  const totalBayarSaldo = normalizeTotal(finalTotal);
+  if (saldoTotalBayar) saldoTotalBayar.textContent = 'Rp ' + totalBayarSaldo.toLocaleString('id-ID');
+  
+  const sisa = userBalance - totalBayarSaldo;
+  if (saldoSisa) {
+    saldoSisa.textContent = 'Rp ' + sisa.toLocaleString('id-ID');
+    saldoSisa.className = 'si-val ' + (sisa < 0 ? 'negative' : 'positive');
+  }
+  
+  if (btnPaySaldo) {
+    if (sisa < 0) {
+      btnPaySaldo.disabled = true;
+      btnPaySaldo.innerHTML = '❌ Saldo Kurang';
+    } else {
+      btnPaySaldo.disabled = false;
+      btnPaySaldo.innerHTML = '💰 Bayar dengan Saldo';
+    }
+  }
+}
+
+// ================= SELECT METHOD =================
+function selectPaymentMethod(method) {
+  if (isPaymentVerified || transactionLocked) {
+    Swal.fire({
+      title: '🔒 Transaksi Terkunci',
+      text: 'Pembayaran sudah terverifikasi, tidak bisa ubah metode.',
+      icon: 'info',
+      confirmButtonColor: '#00c6ff'
+    });
+    return;
+  }
+  
+  paymentMethod = method;
+  
+  const btnQris = document.getElementById('btnMethodQris');
+  const btnSaldo = document.getElementById('btnMethodSaldo');
+  btnQris.classList.remove('active', 'qris', 'saldo');
+  btnSaldo.classList.remove('active', 'qris', 'saldo');
+  
+  const qrisSection = document.getElementById('qrisSection');
+  const saldoInfo = document.getElementById('saldoInfo');
+  
+  if (method === 'qris') {
+    btnQris.classList.add('active', 'qris');
+    qrisSection.classList.remove('hide');
+    saldoInfo.classList.remove('show');
+    if (!qrisTimerInterval) startQrisTimer();
+    console.log('📱 Metode: QRIS');
+  } else {
+    btnSaldo.classList.add('active', 'saldo');
+    qrisSection.classList.add('hide');
+    saldoInfo.classList.add('show');
+    if (qrisTimerInterval) clearInterval(qrisTimerInterval);
+    updateSaldoDisplay();
+    console.log('💰 Metode: Saldo');
+  }
+}
+
+// ================= PAY WITH BALANCE =================
+async function payWithBalance() {
+  if (!supabaseClient || !userProfileId) {
+    Swal.fire({
+      title: '❌ Tidak Bisa Bayar',
+      text: 'Anda belum login. Silakan login terlebih dahulu.',
+      icon: 'error',
+      confirmButtonColor: '#facc15'
+    });
+    return;
+  }
+  
+  if (isPaymentVerified || transactionLocked) {
+    Swal.fire({
+      title: '🔒 Sudah Dibayar',
+      text: 'Transaksi ini sudah terverifikasi.',
+      icon: 'info',
+      confirmButtonColor: '#00c6ff'
+    });
+    return;
+  }
+  
+  const bannedData = await checkGmailBanned(getStoredGmail());
+  if (bannedData) {
+    showBannedPage(bannedData, await getUserID(), bannedData.Gmail || '-');
+    return;
+  }
+  
+  const totalBayarSaldo = normalizeTotal(finalTotal);
+  await loadUserBalance();
+  
+  if (userBalance < totalBayarSaldo) {
+    Swal.fire({
+      title: '❌ Saldo Tidak Cukup',
+      html: `
+        <div style="text-align:left;color:#ddd;font-size:14px;">
+          <p>Saldo Anda: <b style="color:#facc15;">Rp ${userBalance.toLocaleString('id-ID')}</b></p>
+          <p>Total bayar: <b style="color:#22c55e;">Rp ${totalBayarSaldo.toLocaleString('id-ID')}</b></p>
+          <p style="margin-top:8px;color:#ef4444;">Kurang <b>Rp ${(totalBayarSaldo - userBalance).toLocaleString('id-ID')}</b></p>
+          <p style="margin-top:12px;font-size:12px;color:#94a3b8;">Silakan deposit saldo dulu atau pakai QRIS.</p>
+        </div>
+      `,
+      icon: 'error',
+      confirmButtonColor: '#facc15'
+    });
+    return;
+  }
+  
+  const confirm = await Swal.fire({
+    title: '💰 Bayar dengan Saldo?',
+    html: `
+      <div style="text-align:left;color:#ddd;font-size:14px;">
+        <p>Saldo saat ini: <b style="color:#facc15;">Rp ${userBalance.toLocaleString('id-ID')}</b></p>
+        <p>Total bayar: <b style="color:#22c55e;">Rp ${totalBayarSaldo.toLocaleString('id-ID')}</b></p>
+        <p style="margin-top:8px;">Sisa saldo setelah bayar: <b style="color:#00c6ff;">Rp ${(userBalance - totalBayarSaldo).toLocaleString('id-ID')}</b></p>
+        <p style="margin-top:12px;font-size:12px;color:#ffaa00;">⚠️ Saldo akan langsung terpotong dan tidak bisa dibatalkan.</p>
+      </div>
+    `,
+    icon: 'question',
+    showCancelButton: true,
+    confirmButtonText: '✅ Ya, Bayar Sekarang',
+    cancelButtonText: '❌ Batal',
+    confirmButtonColor: '#facc15',
+    cancelButtonColor: '#666'
+  });
+  
+  if (!confirm.isConfirmed) return;
+  
+  const btn = document.getElementById('btnPaySaldo');
+  btn.disabled = true;
+  btn.innerHTML = '⏳ Memproses...';
+  
+  try {
+    const { data, error } = await supabaseClient.rpc('pay_with_balance', {
+      p_user_id: userProfileId,
+      p_amount: totalBayarSaldo
+    });
+    
+    if (error) throw error;
+    if (!data.success) throw new Error(data.message || 'Gagal potong saldo');
+    
+    console.log('✅ Saldo dipotong. Saldo baru:', data.balance);
+    userBalance = parseInt(data.balance) || 0;
+    
+    isPaymentVerified = true;
+    transactionLocked = true;
+    
+    await supabaseClient.from('orders').insert({
+      user_id: userProfileId,
+      email: userEmail,
+      trx_id: trx,
+      method: 'balance',
+      amount: totalBayarSaldo,
+      status: 'paid',
+      order_count: ordersData.length || 0
+    });
+    
+    updateSaldoDisplay();
+    const statusEl = document.getElementById('paymentStatus');
+    statusEl.className = 'payment-status success';
+    statusEl.textContent = `✅ Pembayaran Rp ${totalBayarSaldo.toLocaleString('id-ID')} via Saldo berhasil!`;
+    statusEl.style.display = 'block';
+    
+    btn.innerHTML = '✅ Sudah Dibayar';
+    btn.disabled = true;
+    
+    const gmail = getStoredGmail();
+    const userID = await getUserID();
+    await sendToDiscordSaldo(gmail, userID, totalBayarSaldo);
+    
+    if (ordersData.length > 0 && !isOrderAlreadySent()) {
+      await sendOrdersToLollipop();
+    }
+    
+    savePaymentState({
+      verified: true,
+      orderSent: isOrderAlreadySent(),
+      verifiedAt: new Date().toISOString(),
+      totalBayar: totalBayarSaldo,
+      method: 'balance'
+    });
+    
+    Swal.fire({
+      title: '🎉 Pembayaran Berhasil!',
+      html: `
+        <div style="text-align:left;color:#ddd;font-size:14px;">
+          <p>✅ Saldo dipotong: <b style="color:#facc15;">Rp ${totalBayarSaldo.toLocaleString('id-ID')}</b></p>
+          <p>💰 Saldo tersisa: <b style="color:#22c55e;">Rp ${userBalance.toLocaleString('id-ID')}</b></p>
+          <p style="margin-top:12px;font-size:12px;color:#94a3b8;">Pesanan sedang diproses...</p>
+        </div>
+      `,
+      icon: 'success',
+      confirmButtonColor: '#facc15'
+    });
+    
+  } catch (err) {
+    console.error('❌ Pay error:', err);
+    btn.disabled = false;
+    btn.innerHTML = '💰 Bayar dengan Saldo';
+    Swal.fire({
+      title: '❌ Pembayaran Gagal',
+      text: err.message || 'Terjadi kesalahan, coba lagi.',
+      icon: 'error',
+      confirmButtonColor: '#ff4444'
+    });
+  }
+}
+
+// ================= QRIS TIMER =================
 function startQrisTimer() {
   if (qrisTimerInterval) clearInterval(qrisTimerInterval);
-  
   qrisExpiryTime = Date.now() + (QRIS_EXPIRY_MINUTES * 60 * 1000);
   isQrisExpired = false;
-  
   document.getElementById('qrOverlay').style.display = 'none';
   document.getElementById('qrWrapper').classList.remove('expired');
   document.getElementById('uniqueCodeContainer').classList.remove('expired');
   document.getElementById('regenerateBtn').style.display = 'none';
-  
   updateTimerDisplay();
-  
   qrisTimerInterval = setInterval(function() {
     const remaining = qrisExpiryTime - Date.now();
     if (remaining <= 0) {
@@ -961,20 +1292,12 @@ function startQrisTimer() {
 function updateTimerDisplay() {
   const timerEl = document.getElementById('timerTime');
   if (!timerEl) return;
-  if (!qrisExpiryTime) {
-    timerEl.textContent = '--:--';
-    return;
-  }
+  if (!qrisExpiryTime) { timerEl.textContent = '--:--'; return; }
   const remaining = qrisExpiryTime - Date.now();
-  if (remaining <= 0) {
-    timerEl.textContent = '00:00';
-    timerEl.className = 'time danger';
-    return;
-  }
+  if (remaining <= 0) { timerEl.textContent = '00:00'; timerEl.className = 'time danger'; return; }
   const minutes = Math.floor(remaining / 60000);
   const seconds = Math.floor((remaining % 60000) / 1000);
   timerEl.textContent = String(minutes).padStart(2, '0') + ':' + String(seconds).padStart(2, '0');
-  
   if (remaining < 60000) timerEl.className = 'time danger';
   else if (remaining < 300000) timerEl.className = 'time warning';
   else timerEl.className = 'time';
@@ -986,12 +1309,7 @@ function expireQris() {
   document.getElementById('qrWrapper').classList.add('expired');
   document.getElementById('uniqueCodeContainer').classList.add('expired');
   document.getElementById('regenerateBtn').style.display = 'block';
-  
-  if (verificationInterval) {
-    clearInterval(verificationInterval);
-    verificationInterval = null;
-  }
-  
+  if (verificationInterval) { clearInterval(verificationInterval); verificationInterval = null; }
   const statusEl = document.getElementById('paymentStatus');
   statusEl.className = 'payment-status failed';
   statusEl.textContent = '⏰ QRIS telah expired. Silakan generate ulang.';
@@ -1001,68 +1319,50 @@ function expireQris() {
 function regenerateQris() {
   uniqueCode = regenerateUniqueCode();
   qrisRegenerationCount++;
-  
   isQrisExpired = false;
   isPaymentVerified = false;
   transactionLocked = false;
   verificationAttempts = 0;
-  
   try {
     const confirmed = JSON.parse(localStorage.getItem('confirmed_transactions') || '[]');
     const index = confirmed.indexOf(trx);
-    if (index > -1) {
-      confirmed.splice(index, 1);
-      localStorage.setItem('confirmed_transactions', JSON.stringify(confirmed));
-    }
+    if (index > -1) { confirmed.splice(index, 1); localStorage.setItem('confirmed_transactions', JSON.stringify(confirmed)); }
   } catch(e) {}
-  
   clearPaymentState();
   try { localStorage.removeItem(`discord_sent_${trx}`); } catch(e) {}
   try { localStorage.removeItem(`order_sent_${trx}`); } catch(e) {}
-  
   document.getElementById('qrOverlay').style.display = 'none';
   document.getElementById('qrWrapper').classList.remove('expired');
   document.getElementById('uniqueCodeContainer').classList.remove('expired');
   document.getElementById('regenerateBtn').style.display = 'none';
-  
   const statusEl = document.getElementById('paymentStatus');
-  statusEl.className = '';
-  statusEl.textContent = '';
-  statusEl.style.display = 'none';
-  
+  statusEl.className = ''; statusEl.textContent = ''; statusEl.style.display = 'none';
   document.getElementById('orderStatus').className = 'order-status';
   document.getElementById('orderStatus').textContent = '';
   document.getElementById('orderStatus').style.display = 'none';
-  
   updateDisplay();
   startQrisTimer();
-  
   if (verificationInterval) clearInterval(verificationInterval);
   setTimeout(() => {
     checkPaymentStatus();
     verificationInterval = setInterval(checkPaymentStatus, 10000);
   }, 2000);
-  
-  // ✅ Total bayar dijamin integer
   const totalBaru = normalizeTotal(finalTotal + uniqueCode + adminFee);
-  
   Swal.fire({
     title: '🔄 QRIS Regenerated!',
-    html: `
-      <div style="text-align:left;color:#ddd;font-size:14px;">
-        <p>QRIS baru telah dibuat dengan:</p>
-        <p><b>🔑 Kode Unik:</b> ${uniqueCode}</p>
-        <p><b>💰 Total Bayar:</b> Rp ${totalBaru.toLocaleString('id-ID')}</p>
-        <p style="margin-top:8px;color:#ffaa00;">⏳ QRIS berlaku 1 jam</p>
-      </div>
-    `,
+    html: `<div style="text-align:left;color:#ddd;font-size:14px;">
+      <p>QRIS baru telah dibuat dengan:</p>
+      <p><b>🔑 Kode Unik:</b> ${uniqueCode}</p>
+      <p><b>💰 Total Bayar:</b> Rp ${totalBaru.toLocaleString('id-ID')}</p>
+      <p style="margin-top:8px;color:#ffaa00;">⏳ QRIS berlaku ${QRIS_EXPIRY_MINUTES} menit</p>
+    </div>`,
     icon: 'success',
     confirmButtonColor: '#f59e0b',
     confirmButtonText: '✅ OK'
   });
 }
 
-// ===== KIRIM ORDER KE LOLLIPOP VIA /api/lollipop-services =====
+// ================= ORDER KE LOLLIPOP =================
 async function sendOrdersToLollipop() {
   if (isOrderAlreadySent()) return true;
   if (isSendingOrder) return false;
@@ -1088,14 +1388,12 @@ async function sendOrdersToLollipop() {
   try {
     for (let i = 0; i < ordersData.length; i++) {
       const order = ordersData[i];
-      
       const payloadData = {
         action: 'add',
         service: parseInt(order.serviceId, 10),
         link: order.target.trim(),
         quantity: parseInt(order.jumlah, 10)
       };
-      
       if (order.comment && order.comment.trim() !== '') {
         const comments = order.comment.split('\n').filter(l => l.trim()).join('\n');
         if (comments) payloadData.comments = comments;
@@ -1103,21 +1401,15 @@ async function sendOrdersToLollipop() {
       
       const response = await fetch('/api/lollipop-services', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payloadData)
       });
       
       let result;
-      try { 
-        result = await response.json(); 
-      } catch (e) {
-        result = { error: 'Invalid JSON response', status: response.status };
-      }
+      try { result = await response.json(); } catch (e) { result = { error: 'Invalid JSON response', status: response.status }; }
       
       const extractedOrderId = result.order || (result.data && result.data.order);
-
+      
       if (extractedOrderId) {
         successCount++;
         orderIds.push(extractedOrderId);
@@ -1128,7 +1420,7 @@ async function sendOrdersToLollipop() {
           error: result.msg || result.error || result.message || ('HTTP ' + response.status)
         });
       }
-      orderStatus.textContent = `⏳ Mengirim ${i+1}/${ordersData.length} pesanan... (${successCount} berhasil)`;
+      orderStatus.textContent = `⏳ Mengirim ${i+1}/${ordersData.length}... (${successCount} berhasil)`;
     }
     
     markOrderSent();
@@ -1136,7 +1428,6 @@ async function sendOrdersToLollipop() {
     if (successCount === ordersData.length) {
       const orderIdStr = orderIds.join(', ');
       orderResultData = { orderIds, message: `${successCount} pesanan berhasil dibuat.` };
-      
       orderStatus.className = 'order-status success';
       orderStatus.innerHTML = `
         ✅ ${successCount} pesanan berhasil dibuat!
@@ -1144,14 +1435,10 @@ async function sendOrdersToLollipop() {
           🆔 ID Pesanan: <strong>${orderIdStr}</strong>
           <button class="copy-btn" onclick="copyOrderId('${orderIdStr}')">📋 Salin</button>
         </div>
-        <div style="margin-top:6px;font-size:11px;color:#888;">
-          ⚠️ Simpan ID pesanan ini untuk cek status order.
-        </div>
+        <div style="margin-top:6px;font-size:11px;color:#888;">⚠️ Simpan ID pesanan ini untuk cek status order.</div>
       `;
-      
       isSendingOrder = false;
       await sendMassOrderNotificationToDiscord(orderIds, successCount, failedOrders);
-      
       await Swal.fire({
         title: '🎉 Pesanan Berhasil Diproses!',
         html: `
@@ -1176,13 +1463,9 @@ async function sendOrdersToLollipop() {
     } else {
       const failedMsg = failedOrders.map(f => `#${f.index+1} ${f.order.serviceName}: ${f.error}`).join('\n');
       orderStatus.className = 'order-status failed';
-      orderStatus.innerHTML = `
-        ❌ ${successCount}/${ordersData.length} pesanan berhasil.<br>
-        <span style="font-size:11px;color:#f87171;">Gagal: ${failedMsg}</span>
-      `;
+      orderStatus.innerHTML = `❌ ${successCount}/${ordersData.length} pesanan berhasil.<br><span style="font-size:11px;color:#f87171;">Gagal: ${failedMsg}</span>`;
       isSendingOrder = false;
       await sendMassOrderNotificationToDiscord(orderIds, successCount, failedOrders);
-      
       Swal.fire({
         title: '⚠️ Sebagian Pesanan Gagal',
         html: `
@@ -1190,8 +1473,7 @@ async function sendOrdersToLollipop() {
             <p>Berhasil: <b>${successCount}</b> dari <b>${ordersData.length}</b> pesanan.</p>
             ${orderIds.length > 0 ? `<p>ID Berhasil: <b style="color:#00ffaa;">${orderIds.join(', ')}</b></p>` : ''}
             <div style="background:rgba(239,68,68,0.1);padding:12px;border-radius:10px;margin:10px 0;border:1px solid rgba(239,68,68,0.3);">
-              <b style="color:#f87171;">Detail Gagal:</b><br>
-              ${failedMsg.replace(/\n/g, '<br>')}
+              <b style="color:#f87171;">Detail Gagal:</b><br>${failedMsg.replace(/\n/g, '<br>')}
             </div>
           </div>
         `,
@@ -1210,15 +1492,7 @@ async function sendOrdersToLollipop() {
 
 window.copyOrderId = function(orderId) {
   navigator.clipboard.writeText(String(orderId)).then(() => {
-    Swal.fire({
-      title: '✅ Berhasil Disalin!',
-      text: `ID Pesanan ${orderId} telah disalin ke clipboard.`,
-      icon: 'success',
-      timer: 2000,
-      showConfirmButton: false,
-      toast: true,
-      position: 'top-end'
-    });
+    Swal.fire({ title: '✅ Berhasil Disalin!', text: `ID Pesanan ${orderId} telah disalin ke clipboard.`, icon: 'success', timer: 2000, showConfirmButton: false, toast: true, position: 'top-end' });
   }).catch(() => {
     const textarea = document.createElement('textarea');
     textarea.value = orderId;
@@ -1232,13 +1506,9 @@ window.copyOrderId = function(orderId) {
 async function sendMassOrderNotificationToDiscord(orderIds, successCount, failedOrders) {
   try {
     let orderList = '';
-    ordersData.forEach((o, i) => {
-      orderList += `\n  ${i+1}. ${o.serviceName} (ID: ${o.serviceId}) x${o.jumlah} → ${o.target}`;
-    });
-    
+    ordersData.forEach((o, i) => { orderList += `\n  ${i+1}. ${o.serviceName} (ID: ${o.serviceId}) x${o.jumlah} → ${o.target}`; });
     const orderIdStr = orderIds.join(', ') || '-';
     const failedMsg = failedOrders.length > 0 ? `\n⚠️ Gagal: ${failedOrders.length} pesanan` : '';
-    
     const message = `📦 **ORDER MASSAL LOLLIPOP**
 ━━━━━━━━━━━━━━━━━━━━━
 🆔 **ID Transaksi:** ${trx}
@@ -1251,7 +1521,6 @@ async function sendMassOrderNotificationToDiscord(orderIds, successCount, failed
 ${orderList}
 ━━━━━━━━━━━━━━━━━━━━━
 ✅ **${successCount === ordersData.length ? 'Semua pesanan berhasil dibuat!' : 'Beberapa pesanan gagal, cek manual.'}**`;
-
     await fetch(discordWebhook, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1260,30 +1529,23 @@ ${orderList}
   } catch (err) {}
 }
 
+// ================= SEND DISCORD (QRIS) =================
 async function sendToDiscord(gmail, userID) {
   if (isDiscordAlreadySent()) return true;
   if (isSendingDiscord) return false;
-  
   isSendingDiscord = true;
-  
   try {
-    // ✅ Total bayar dijamin integer
     const totalDenganUnik = normalizeTotal(finalTotal + uniqueCode + adminFee);
     const refCode = localStorage.getItem('referral_code') || "-";
-    
     let orderList = '';
     if (isMass && ordersData.length > 0) {
-      ordersData.forEach((o, i) => {
-        orderList += `\n  ${i+1}. ${o.serviceName} (ID: ${o.serviceId}) x${o.jumlah} → ${o.target}`;
-      });
+      ordersData.forEach((o, i) => { orderList += `\n  ${i+1}. ${o.serviceName} (ID: ${o.serviceId}) x${o.jumlah} → ${o.target}`; });
     } else if (!isMass && ordersData.length === 1) {
       const o = ordersData[0];
       orderList = `\n  ${o.serviceName} (ID: ${o.serviceId}) x${o.jumlah} → ${o.target}`;
     }
-    
     let adminFeeText = adminFee > 0 ? `\n📊 **Biaya Admin (1%):** Rp ${adminFee.toLocaleString('id-ID')}` : '';
-    
-    const message = `💰 **PEMBAYARAN BERHASIL DIVERIFIKASI**
+    const message = `💰 **PEMBAYARAN QRIS BERHASIL**
 ━━━━━━━━━━━━━━━━━━━━━
 🆔 **ID Transaksi:** ${trx}
 📊 **Jenis:** ${isMass ? 'MASSAL ('+ordersData.length+' pesanan)' : 'Single'}
@@ -1300,37 +1562,60 @@ async function sendToDiscord(gmail, userID) {
 ${orderList || '  -'}
 ━━━━━━━━━━━━━━━━━━━━━
 ✅ **Status: LUNAS**`;
-
     const response = await fetch(discordWebhook, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ content: message })
     });
-    
-    if (response.ok) {
-      markDiscordSent();
-      isSendingDiscord = false;
-      return true;
-    } else {
-      isSendingDiscord = false;
-      return false;
-    }
-  } catch (err) {
+    if (response.ok) { markDiscordSent(); isSendingDiscord = false; return true; }
     isSendingDiscord = false;
     return false;
-  }
+  } catch (err) { isSendingDiscord = false; return false; }
 }
 
+// ================= SEND DISCORD (SALDO) =================
+async function sendToDiscordSaldo(gmail, userID, totalBayar) {
+  try {
+    const refCode = localStorage.getItem('referral_code') || "-";
+    let orderList = '';
+    if (isMass && ordersData.length > 0) {
+      ordersData.forEach((o, i) => { orderList += `\n  ${i+1}. ${o.serviceName} (ID: ${o.serviceId}) x${o.jumlah} → ${o.target}`; });
+    } else if (!isMass && ordersData.length === 1) {
+      const o = ordersData[0];
+      orderList = `\n  ${o.serviceName} (ID: ${o.serviceId}) x${o.jumlah} → ${o.target}`;
+    }
+    const message = `💰 **PEMBAYARAN VIA SALDO BERHASIL**
+━━━━━━━━━━━━━━━━━━━━━
+🆔 **ID Transaksi:** ${trx}
+💳 **Metode:** Saldo
+📊 **Jenis:** ${isMass ? 'MASSAL ('+ordersData.length+' pesanan)' : 'Single'}
+💵 **Total Bayar:** Rp ${totalBayar.toLocaleString('id-ID')}
+🎫 **Voucher:** ${appliedVoucher || "-"}
+📉 **Diskon:** ${appliedVoucher ? `Rp ${appliedDiscount.toLocaleString('id-ID')}` : "-"}
+📧 **Gmail:** ${gmail}
+🆔 **User ID:** ${userID}
+🔗 **Referral:** ${refCode}
+📅 **Waktu:** ${formatWIB(new Date())}
+━━━━━━━━━━━━━━━━━━━━━
+📋 **Detail Pesanan:**
+${orderList || '  -'}
+━━━━━━━━━━━━━━━━━━━━━
+✅ **Status: LUNAS (Saldo)**`;
+    await fetch(discordWebhook, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: message })
+    });
+  } catch (err) {}
+}
+
+// ================= VALIDATE TX =================
 function isTransactionValid(transaction, targetAmount) {
-  // ✅ Pastikan target selalu integer
   targetAmount = Math.ceil(Number(targetAmount) || 0);
-  
   let rawAmount = String(transaction.amount || '');
   let amountNumber = parseInt(rawAmount.replace(/[^0-9]/g, ''), 10) || 0;
-  
   if (amountNumber !== targetAmount) return false;
   if (!['CR', 'credit', 'Credit'].includes(transaction.type)) return false;
-  
   if (transaction.time) {
     try {
       const txTime = new Date(transaction.time);
@@ -1341,8 +1626,10 @@ function isTransactionValid(transaction, targetAmount) {
   return true;
 }
 
+// ================= CHECK PAYMENT (QRIS) =================
 async function checkPaymentStatus() {
   if (isProcessingPayment) return;
+  if (paymentMethod !== 'qris') return;
   
   const statusEl = document.getElementById('paymentStatus');
   const confirmBtn = document.getElementById('confirmBtn');
@@ -1356,9 +1643,7 @@ async function checkPaymentStatus() {
   
   const savedState = getPaymentState();
   if (savedState && savedState.verified === true && savedState.verifiedAt) {
-    const verifiedAt = new Date(savedState.verifiedAt).getTime();
-    const diffMinutes = (Date.now() - verifiedAt) / 1000 / 60;
-    
+    const diffMinutes = (Date.now() - new Date(savedState.verifiedAt).getTime()) / 1000 / 60;
     if (diffMinutes < 60) {
       isPaymentVerified = true;
       transactionLocked = true;
@@ -1367,16 +1652,13 @@ async function checkPaymentStatus() {
       statusEl.style.display = 'block';
       confirmBtn.disabled = true;
       confirmBtn.textContent = '✅ Pembayaran Terverifikasi';
-      
       if (savedState.orderSent === false && ordersData.length > 0) {
         await sendOrdersToLollipop();
         savedState.orderSent = true;
         savePaymentState(savedState);
       }
       return;
-    } else {
-      clearPaymentState();
-    }
+    } else { clearPaymentState(); }
   }
   
   if (isPaymentVerified || checkTransactionLockLocal() || isDiscordAlreadySent()) {
@@ -1411,21 +1693,17 @@ async function checkPaymentStatus() {
     const gmail = getStoredGmail();
     const userID = await getUserID();
     
+    // 🔥 Cek banned realtime
     const bannedData = await checkGmailBanned(gmail);
     if (bannedData) {
-      statusEl.className = 'payment-status failed';
-      statusEl.textContent = '🚫 Akun Anda diblokir!';
-      confirmBtn.disabled = false;
-      confirmBtn.textContent = '✅ Cek Status Pembayaran';
+      showBannedPage(bannedData, userID, gmail || bannedData.Gmail || '-');
       isProcessingPayment = false;
       return;
     }
     
-    // ✅ Total yang dicek = sudah dibulatkan integer
     const totalBayar = normalizeTotal(finalTotal + uniqueCode + adminFee);
     currentTotalBayar = totalBayar;
-    
-    console.log('💰 Nominal yang dicek ke QIOSPAY:', totalBayar);
+    console.log('💰 Nominal cek:', totalBayar);
     
     const res = await fetch(QIOSPAY_MUTASI_URL() + '?t=' + Date.now());
     if (!res.ok) throw new Error('Gagal koneksi mutasi: ' + res.status);
@@ -1436,10 +1714,7 @@ async function checkPaymentStatus() {
     if (data.status === 'success' && data.data) {
       const transactions = Array.isArray(data.data) ? data.data : [data.data];
       for (const t of transactions) {
-        if (isTransactionValid(t, totalBayar)) {
-          foundTransaction = t;
-          break;
-        }
+        if (isTransactionValid(t, totalBayar)) { foundTransaction = t; break; }
       }
     }
     
@@ -1449,31 +1724,19 @@ async function checkPaymentStatus() {
       statusEl.className = 'payment-status success';
       statusEl.textContent = `✅ Pembayaran Rp ${totalBayar.toLocaleString('id-ID')} terverifikasi!`;
       
-      savePaymentState({ 
-        verified: true, 
-        orderSent: false, 
-        verifiedAt: new Date().toISOString(),
-        totalBayar: totalBayar,
-        trx: trx
-      });
+      savePaymentState({ verified: true, orderSent: false, verifiedAt: new Date().toISOString(), totalBayar, trx, method: 'qris' });
       
       const sent = await sendToDiscord(gmail, userID);
       if (sent && ordersData.length > 0) {
         await sendOrdersToLollipop();
         const currentState = getPaymentState();
-        if (currentState) {
-          currentState.orderSent = true;
-          savePaymentState(currentState);
-        }
+        if (currentState) { currentState.orderSent = true; savePaymentState(currentState); }
         saveTransactionLockLocal();
       }
       
       confirmBtn.disabled = true;
       confirmBtn.textContent = '✅ Pembayaran Terverifikasi';
-      if (verificationInterval) {
-        clearInterval(verificationInterval);
-        verificationInterval = null;
-      }
+      if (verificationInterval) { clearInterval(verificationInterval); verificationInterval = null; }
     } else {
       verificationAttempts++;
       statusEl.className = 'payment-status loading';
@@ -1508,31 +1771,21 @@ function saveTransactionLockLocal() {
 }
 
 function getUsedVouchers() {
-  try { return JSON.parse(localStorage.getItem('used_vouchers_' + trx) || '[]'); } 
-  catch { return []; }
+  try { return JSON.parse(localStorage.getItem('used_vouchers_' + trx) || '[]'); } catch { return []; }
 }
-
 function markVoucherUsed(code) {
   try {
     const used = getUsedVouchers();
-    if (!used.includes(code)) {
-      used.push(code);
-      localStorage.setItem('used_vouchers_' + trx, JSON.stringify(used));
-    }
+    if (!used.includes(code)) { used.push(code); localStorage.setItem('used_vouchers_' + trx, JSON.stringify(used)); }
   } catch(e) {}
 }
-
-function isVoucherUsed(code) {
-  return getUsedVouchers().includes(code);
-}
+function isVoucherUsed(code) { return getUsedVouchers().includes(code); }
 
 function crc16(s){
   let c=0xFFFF;
   for(let i=0;i<s.length;i++){
     c^=s.charCodeAt(i)<<8;
-    for(let j=0;j<8;j++){
-      c=c&0x8000?(c<<1)^0x1021:c<<1;
-    }
+    for(let j=0;j<8;j++){ c=c&0x8000?(c<<1)^0x1021:c<<1; }
   }
   return (c&0xFFFF).toString(16).toUpperCase().padStart(4,'0');
 }
@@ -1547,12 +1800,8 @@ function buildQR(a){
 function updateDisplay(){
   uniqueCode = generateUniqueCode();
   document.getElementById('uniqueCode').textContent = uniqueCode;
-  
-  // ✅ Bulatkan finalTotal & adminFee agar selalu integer
   finalTotal = normalizeTotal(finalTotal);
   adminFee = calculateAdminFee(originalTotal);
-  
-  // ✅ Total bayar dijamin integer
   const totalDenganUnik = normalizeTotal(finalTotal + uniqueCode + adminFee);
   currentTotalBayar = totalDenganUnik;
   
@@ -1565,9 +1814,7 @@ function updateDisplay(){
   if (isMass && ordersData.length > 0) {
     detailHtml += `<strong>📋 Detail Pesanan:</strong><br>`;
     ordersData.forEach((o, i) => {
-      detailHtml += `<div class="order-item-detail">
-        ${i+1}. ${o.serviceName} (ID: ${o.serviceId}) x${o.jumlah.toLocaleString('id-ID')} → ${o.target}
-      </div>`;
+      detailHtml += `<div class="order-item-detail">${i+1}. ${o.serviceName} (ID: ${o.serviceId}) x${o.jumlah.toLocaleString('id-ID')} → ${o.target}</div>`;
     });
   } else if (!isMass && ordersData.length === 1) {
     const o = ordersData[0];
@@ -1575,8 +1822,7 @@ function updateDisplay(){
     <strong>Layanan:</strong> ${o.serviceName}<br>
     <strong>Service ID:</strong> ${o.serviceId}<br>
     <strong>Target:</strong> ${o.target}<br>
-    <strong>Jumlah:</strong> ${o.jumlah.toLocaleString('id-ID')}<br>
-    `;
+    <strong>Jumlah:</strong> ${o.jumlah.toLocaleString('id-ID')}<br>`;
   }
   
   if (appliedVoucher) {
@@ -1587,7 +1833,9 @@ function updateDisplay(){
     detailHtml += `<strong>📊 Biaya Admin 1%:</strong> <span class="admin-fee-text">Rp ${adminFee.toLocaleString("id-ID")}</span><br>`;
   }
   
-  detailHtml += `<strong>Total Bayar:</strong> Rp ${totalDenganUnik.toLocaleString("id-ID")}`;
+  detailHtml += `<strong>Total Bayar (QRIS):</strong> Rp ${totalDenganUnik.toLocaleString("id-ID")}<br>
+  <strong style="color:#facc15;">Total Bayar (Saldo):</strong> Rp ${normalizeTotal(finalTotal).toLocaleString("id-ID")}`;
+  
   document.getElementById('orderDetails').innerHTML = detailHtml;
   
   QRCode.toCanvas(document.getElementById('qrisCanvas'), buildQR(totalDenganUnik), { width:240 }, function(err){
@@ -1605,7 +1853,8 @@ function updateDisplay(){
     };
   });
   
-  console.log('🔄 QRIS & nominal cek di-update ke:', totalDenganUnik);
+  updateSaldoDisplay();
+  console.log('🔄 QRIS updated:', totalDenganUnik);
 }
 
 async function loadVoucher(){
@@ -1620,31 +1869,16 @@ async function loadVoucher(){
 document.getElementById('applyVoucher').onclick = async function() {
   const code = document.getElementById('voucherInput').value.trim().toUpperCase();
   if(!code) return Swal.fire("Isi kode voucher","","warning");
-  
   if (isVoucherUsed(code)) {
-    return Swal.fire({
-      title: "❌ Voucher Sudah Dipakai",
-      text: `Kode voucher "${code}" sudah digunakan untuk transaksi ini.`,
-      icon: "error"
-    });
+    return Swal.fire({ title: "❌ Voucher Sudah Dipakai", text: `Kode voucher "${code}" sudah digunakan.`, icon: "error" });
   }
-  
   const list = await loadVoucher();
-  if(!list || list.length === 0) {
-    return Swal.fire("Error", "Gagal memuat data voucher", "error");
-  }
-  
+  if(!list || list.length === 0) return Swal.fire("Error", "Gagal memuat data voucher", "error");
   const v = list.find(x => x.code && x.code.toUpperCase() === code);
   if(!v) return Swal.fire("❌ Voucher tidak valid","","error");
-  
   if (originalTotal < (v.min_purchase || 0)) {
-    return Swal.fire({
-      title: "❌ Minimal Pembelian",
-      text: `Minimal pembelian voucher ini adalah Rp ${(v.min_purchase||0).toLocaleString("id-ID")}`,
-      icon: "warning"
-    });
+    return Swal.fire({ title: "❌ Minimal Pembelian", text: `Minimal Rp ${(v.min_purchase||0).toLocaleString("id-ID")}`, icon: "warning" });
   }
-  
   let discount = 0;
   if (v.type === "percent") {
     discount = originalTotal * (v.value / 100);
@@ -1654,36 +1888,28 @@ document.getElementById('applyVoucher').onclick = async function() {
   } else {
     return Swal.fire("❌ Tipe voucher tidak valid","","error");
   }
-  
-  // ✅ BULATKAN DISKON KE ATAS (hilangkan koma)
   discount = Math.ceil(Math.max(0, discount));
   finalTotal = Math.max(normalizeTotal(originalTotal) - discount, 0);
   appliedVoucher = v.code;
   appliedDiscount = discount;
-  
   markVoucherUsed(v.code);
-  
-  document.getElementById('voucherStatus').innerHTML = `<span class="active">✅ Voucher ${v.code} berhasil digunakan! Diskon: Rp ${discount.toLocaleString('id-ID')}</span>`;
+  document.getElementById('voucherStatus').innerHTML = `<span class="active">✅ Voucher ${v.code} berhasil! Diskon: Rp ${discount.toLocaleString('id-ID')}</span>`;
   document.getElementById('voucherInput').disabled = true;
   this.disabled = true;
-  
   updateDisplay();
-  
-  // Update text status loading agar nominalnya sinkron
-  const statusEl = document.getElementById('paymentStatus');
-  if (statusEl.className === 'payment-status loading') {
-    statusEl.textContent = `⏳ Mengecek pembayaran Rp ${normalizeTotal(finalTotal + uniqueCode + adminFee).toLocaleString('id-ID')}...`;
-  }
-  
   Swal.fire({
     title: "✅ Berhasil!",
-    html: `Voucher <b>${v.code}</b> berhasil digunakan!<br>Diskon: <b>Rp ${discount.toLocaleString('id-ID')}</b><br><span style="color:#888;font-size:12px;">QRIS & nominal cek otomatis diperbarui.</span>`,
+    html: `Voucher <b>${v.code}</b> digunakan!<br>Diskon: <b>Rp ${discount.toLocaleString('id-ID')}</b>`,
     icon: "success",
     confirmButtonColor: "#22c55e"
   });
 };
 
 document.getElementById('confirmBtn').onclick = function() {
+  if (paymentMethod === 'saldo') {
+    Swal.fire({ title: '💰 Metode Saldo', text: 'Klik "Bayar dengan Saldo" di atas untuk melanjutkan.', icon: 'info', confirmButtonColor: '#facc15' });
+    return;
+  }
   checkPaymentStatus();
 };
 
@@ -1693,11 +1919,9 @@ document.getElementById('regenerateBtn').onclick = function() {
     html: `
       <div style="text-align:left;color:#ddd;font-size:14px;">
         <p>QRIS saat ini sudah expired.</p>
-        <p>Generate ulang akan membuat:</p>
         <ul style="margin-left:20px;margin-top:8px;">
           <li>🔑 Kode unik <b>BARU</b></li>
-          <li>⏳ QRIS berlaku <b>1 jam</b> lagi</li>
-          <li>💰 Nominal tetap <b>Rp ${normalizeTotal(finalTotal + adminFee).toLocaleString('id-ID')} + kode unik</b></li>
+          <li>⏳ QRIS berlaku <b>${QRIS_EXPIRY_MINUTES} menit</b> lagi</li>
         </ul>
       </div>
     `,
@@ -1706,17 +1930,23 @@ document.getElementById('regenerateBtn').onclick = function() {
     confirmButtonText: '✅ Ya, Generate Ulang',
     cancelButtonText: '❌ Batal',
     confirmButtonColor: '#f59e0b'
-  }).then((result) => {
-    if (result.isConfirmed) regenerateQris();
-  });
+  }).then((result) => { if (result.isConfirmed) regenerateQris(); });
 };
 
+// ================= INIT =================
 (async function() {
   await fetchConfigFromEnv();
   configLoaded = true;
   
+  // 🔥 CEK BANNED (Supabase + JSON) DI AWAL
   const isBanned = await checkAndHandleBan();
-  if (isBanned) return;
+  if (isBanned) {
+    console.log('🚫 User banned, payment page disabled');
+    return;
+  }
+  
+  // Load saldo user
+  await loadUserBalance();
   
   const savedState = getPaymentState();
   if (savedState && savedState.verified === true && savedState.verifiedAt) {
@@ -1724,11 +1954,29 @@ document.getElementById('regenerateBtn').onclick = function() {
     if ((Date.now() - verifiedAt) / 1000 / 60 < 60) {
       isPaymentVerified = true;
       transactionLocked = true;
-      document.getElementById('confirmBtn').disabled = true;
-      document.getElementById('confirmBtn').textContent = '✅ Pembayaran Terverifikasi';
+      
+      if (savedState.method === 'balance') {
+        paymentMethod = 'balance';
+        document.getElementById('btnMethodQris').classList.remove('active', 'qris');
+        document.getElementById('btnMethodSaldo').classList.add('active', 'saldo');
+        document.getElementById('qrisSection').classList.add('hide');
+        document.getElementById('saldoInfo').classList.add('show');
+        document.getElementById('btnPaySaldo').disabled = true;
+        document.getElementById('btnPaySaldo').innerHTML = '✅ Sudah Dibayar';
+      } else {
+        document.getElementById('confirmBtn').disabled = true;
+        document.getElementById('confirmBtn').textContent = '✅ Pembayaran Terverifikasi';
+      }
+      
       document.getElementById('paymentStatus').className = 'payment-status success';
       document.getElementById('paymentStatus').textContent = '✅ Pembayaran sudah terverifikasi!';
       document.getElementById('paymentStatus').style.display = 'block';
+      
+      if (savedState.orderSent === false && ordersData.length > 0) {
+        await sendOrdersToLollipop();
+        savedState.orderSent = true;
+        savePaymentState(savedState);
+      }
       return;
     } else {
       clearPaymentState();
@@ -1739,8 +1987,10 @@ document.getElementById('regenerateBtn').onclick = function() {
   startQrisTimer();
   
   setTimeout(() => {
-    checkPaymentStatus();
-    verificationInterval = setInterval(checkPaymentStatus, 10000);
+    if (paymentMethod === 'qris') {
+      checkPaymentStatus();
+      verificationInterval = setInterval(checkPaymentStatus, 10000);
+    }
   }, 3000);
 })();
 </script>
