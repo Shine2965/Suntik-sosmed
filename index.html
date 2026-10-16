@@ -1217,6 +1217,141 @@ body::before{
   border-radius:50%;animation:spin 0.8s linear infinite;
 }
 
+/* ============ FLOATING CHAT BUBBLE ============ */
+.cs-bubble-container{
+  position:fixed;
+  right:16px;
+  bottom:calc(90px + env(safe-area-inset-bottom, 0px));
+  z-index:150;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  max-width:340px;
+  pointer-events:none;
+}
+
+.cs-bubble{
+  background:linear-gradient(135deg,rgba(0,198,255,0.95),rgba(0,114,255,0.95));
+  border:1.5px solid rgba(255,255,255,0.25);
+  border-radius:16px;
+  padding:12px 14px;
+  box-shadow:0 12px 40px rgba(0,114,255,0.5), 0 0 0 0 rgba(0,198,255,0.7);
+  display:flex;
+  align-items:flex-start;
+  gap:10px;
+  cursor:pointer;
+  pointer-events:auto;
+  animation:bubbleSlideIn 0.4s cubic-bezier(0.34,1.56,0.64,1) both;
+  position:relative;
+  overflow:hidden;
+  backdrop-filter:blur(10px);
+}
+.cs-bubble::before{
+  content:'';
+  position:absolute;
+  top:0;left:0;right:0;height:3px;
+  background:linear-gradient(90deg,#ffd700,#ff6b9d,#00c6ff);
+  animation:bubbleBar 3s linear infinite;
+}
+@keyframes bubbleBar{
+  0%{transform:translateX(-100%)}
+  100%{transform:translateX(100%)}
+}
+@keyframes bubbleSlideIn{
+  from{opacity:0;transform:translateX(120%) scale(0.8)}
+  to{opacity:1;transform:translateX(0) scale(1)}
+}
+.cs-bubble.removing{
+  animation:bubbleSlideOut 0.3s ease both;
+}
+@keyframes bubbleSlideOut{
+  to{opacity:0;transform:translateX(120%) scale(0.8)}
+}
+.cs-bubble:hover{
+  transform:translateY(-2px);
+  box-shadow:0 16px 50px rgba(0,114,255,0.7);
+}
+.cs-bubble:active{transform:scale(0.98)}
+
+.cs-bubble-icon{
+  width:36px;height:36px;border-radius:10px;
+  background:rgba(255,255,255,0.2);
+  display:flex;align-items:center;justify-content:center;
+  font-size:18px;flex-shrink:0;
+  position:relative;
+}
+.cs-bubble-icon::after{
+  content:'';
+  position:absolute;
+  top:-2px;right:-2px;
+  width:10px;height:10px;border-radius:50%;
+  background:#00ff88;
+  border:2px solid #0072ff;
+  animation:livePulse 1.5s ease-in-out infinite;
+}
+
+.cs-bubble-content{flex:1;min-width:0;position:relative}
+.cs-bubble-sender{
+  font-size:10px;font-weight:800;
+  text-transform:uppercase;letter-spacing:0.5px;
+  color:#ffd700;
+  margin-bottom:3px;
+  display:flex;align-items:center;gap:5px;
+}
+.cs-bubble-sender .cs-role-badge{
+  background:rgba(255,215,0,0.25);
+  color:#ffd700;
+  padding:1px 6px;border-radius:8px;
+  font-size:8px;
+}
+.cs-bubble-message{
+  font-size:12.5px;color:#fff;
+  line-height:1.4;font-weight:500;
+  word-break:break-word;
+  display:-webkit-box;
+  -webkit-line-clamp:3;
+  -webkit-box-orient:vertical;
+  overflow:hidden;
+}
+.cs-bubble-time{
+  font-size:9.5px;color:rgba(255,255,255,0.7);
+  margin-top:4px;
+}
+.cs-bubble-close{
+  position:absolute;
+  top:6px;right:6px;
+  width:20px;height:20px;border-radius:50%;
+  background:rgba(0,0,0,0.25);
+  border:none;color:#fff;
+  font-size:10px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  transition:all 0.2s ease;
+  z-index:2;
+}
+.cs-bubble-close:hover{
+  background:rgba(255,80,80,0.6);
+  transform:scale(1.15);
+}
+.cs-bubble-actions{
+  display:flex;gap:6px;margin-top:8px;
+}
+.cs-bubble-reply{
+  flex:1;
+  padding:6px 10px;border-radius:8px;border:none;
+  background:rgba(255,255,255,0.2);
+  color:#fff;font-family:'Quicksand',sans-serif;
+  font-size:11px;font-weight:800;
+  cursor:pointer;transition:all 0.2s ease;
+  display:flex;align-items:center;justify-content:center;gap:4px;
+}
+.cs-bubble-reply:hover{
+  background:rgba(255,255,255,0.35);
+  transform:translateY(-1px);
+}
+
+.cs-bubble:nth-child(2){animation-delay:0.1s}
+.cs-bubble:nth-child(3){animation-delay:0.2s}
+
 @media (max-width:480px){
   .app{max-width:100%;height:100vh;max-height:none}
   .app-bar{padding:12px 14px}
@@ -1232,6 +1367,24 @@ body::before{
   .ban-box{padding:26px 20px}
   .ban-icon{font-size:52px}
   .ban-title{font-size:20px}
+  .cs-bubble-container{
+    right:10px;
+    left:10px;
+    bottom:calc(85px + env(safe-area-inset-bottom, 0px));
+    max-width:none;
+  }
+  .cs-bubble{
+    padding:10px 12px;
+    border-radius:14px;
+  }
+  .cs-bubble-message{
+    font-size:12px;
+    -webkit-line-clamp:2;
+  }
+}
+
+body.chat-open .cs-bubble-container{
+  display:none;
 }
 </style>
 </head>
@@ -1778,6 +1931,9 @@ body::before{
   </div>
 </div>
 
+<!-- ============ FLOATING CHAT BUBBLE CONTAINER ============ -->
+<div class="cs-bubble-container" id="csBubbleContainer"></div>
+
 <audio id="bgm" preload="auto"></audio>
 
 <script>
@@ -1815,6 +1971,15 @@ let isCS = false;
 let isStaff = false;
 let cachedGlobalMessages = [];
 
+// Bubble state
+let csBubbleChannel = null;
+let activeBubbles = {};
+let lastSeenMessageTime = null;
+let csPollingInterval = null;
+let lastPolledTime = null;
+const CS_BUBBLE_DURATION = 10000;
+const CS_BUBBLE_MAX = 3;
+
 try {
   supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, storage: window.localStorage, storageKey: 'shine-shop-auth' }
@@ -1842,7 +2007,6 @@ function switchPage(pageName) {
   const body = document.querySelector('.app-body');
   if (body) body.scrollTop = 0;
   
-  // Auto-load CS folders saat buka page chat
   if (pageName === 'chat' && isStaff) {
     setTimeout(() => loadCSFolders(), 300);
   }
@@ -1994,6 +2158,13 @@ async function handleLogout() {
   });
   if (!result.isConfirmed) return;
   try {
+    // Cleanup bubble
+    if (csBubbleChannel) { try { csBubbleChannel.unsubscribe(); } catch(e) {} csBubbleChannel = null; }
+    stopCSPolling();
+    const container = document.getElementById('csBubbleContainer');
+    if (container) container.innerHTML = '';
+    activeBubbles = {};
+    
     if (globalChatChannel) { globalChatChannel.unsubscribe(); globalChatChannel = null; }
     if (supportChatChannel) { supportChatChannel.unsubscribe(); supportChatChannel = null; }
     if (globalChatPollingInterval) { clearInterval(globalChatPollingInterval); globalChatPollingInterval = null; }
@@ -2185,19 +2356,11 @@ async function updateAuthUI(user) {
       adminSection.style.display = 'none';
     }
 
-    // Tampilkan Chat Baru + Folder CS untuk staff (admin, owner, cs)
     const newChatSection = document.getElementById('newChatBoxSection');
     const csFolderSection = document.getElementById('csFolderSection');
-    if (newChatSection) {
-      newChatSection.style.display = isStaff ? 'block' : 'none';
-    }
-    if (csFolderSection) {
-      csFolderSection.style.display = isStaff ? 'block' : 'none';
-    }
-    // Load folder list kalau staff
-    if (isStaff) {
-      setTimeout(() => loadCSFolders(), 800);
-    }
+    if (newChatSection) newChatSection.style.display = isStaff ? 'block' : 'none';
+    if (csFolderSection) csFolderSection.style.display = isStaff ? 'block' : 'none';
+    if (isStaff) setTimeout(() => loadCSFolders(), 800);
 
     if (email && email.includes('@')) processGmailUpdate(email);
     await initChat();
@@ -2298,22 +2461,16 @@ function parseAmount(rawAmount) {
   let str = String(rawAmount).trim();
   str = str.replace(/[Rr][Pp]/g, '').replace(/\s/g, '');
   if (str.includes(',') && str.includes('.')) {
-    if (str.lastIndexOf('.') > str.lastIndexOf(',')) {
-      str = str.replace(/,/g, '');
-    } else {
-      str = str.replace(/\./g, '').replace(',', '.');
-    }
+    if (str.lastIndexOf('.') > str.lastIndexOf(',')) str = str.replace(/,/g, '');
+    else str = str.replace(/\./g, '').replace(',', '.');
   } else if (str.includes(',')) {
     const parts = str.split(',');
     if (parts.length === 2 && parts[1].length <= 2) str = str.replace(',', '.');
     else str = str.replace(/,/g, '');
   } else if (str.includes('.')) {
     const parts = str.split('.');
-    if (parts.length === 2 && parts[1].length === 3 && parts[0].length <= 3) {
-      str = str.replace('.', '');
-    } else if (parts.length !== 2 || parts[1].length > 2) {
-      str = str.replace(/\./g, '');
-    }
+    if (parts.length === 2 && parts[1].length === 3 && parts[0].length <= 3) str = str.replace('.', '');
+    else if (parts.length !== 2 || parts[1].length > 2) str = str.replace(/\./g, '');
   }
   const num = parseFloat(str);
   return isNaN(num) ? 0 : Math.floor(num);
@@ -2343,7 +2500,7 @@ function isTransactionMatch(m, targetAmount) {
 }
 
 // ============================================================
-// DEPOSIT (BEBAS MIN 1.000)
+// DEPOSIT
 // ============================================================
 async function openDepositDialog() {
   if (!currentUser) return;
@@ -2461,13 +2618,11 @@ function startDepositPolling(targetAmount) {
       else if (Array.isArray(raw?.result)) mutasiList = raw.result;
       else if (Array.isArray(raw)) mutasiList = raw;
 
-      console.log(`[POLL #${attempts}] ${mutasiList.length} mutasi · cari Rp ${targetAmount.toLocaleString('id-ID')}`);
       if (mutasiList.length === 0) return;
 
       for (const m of mutasiList) {
         const check = isTransactionMatch(m, targetAmount);
         if (check.match) {
-          console.log('✅ [POLL] Cocok!', m);
           clearInterval(depositPollingInterval);
           if (depositTimerInterval) clearInterval(depositTimerInterval);
           await handleDepositSuccess();
@@ -2504,7 +2659,6 @@ function closeQrisModal() {
   if (depositTimerInterval) clearInterval(depositTimerInterval);
   stopDepositPolling();
   currentDeposit = null;
-
   const btn = document.getElementById('qrisCheckBtn');
   if (btn) { btn.disabled = false; btn.innerHTML = '🔍 Cek Status Pembayaran'; }
   const statusEl = document.getElementById('qrisStatus');
@@ -2513,9 +2667,6 @@ function closeQrisModal() {
   if (statusTextEl) statusTextEl.textContent = 'Menunggu pembayaran...';
 }
 
-// ============================================================
-// MANUAL CHECK PAYMENT
-// ============================================================
 async function manualCheckPayment() {
   if (!currentDeposit) {
     Swal.fire({ title: '⚠️ Tidak Ada Deposit', text: 'Tidak ada deposit aktif saat ini.', icon: 'warning', confirmButtonColor: '#ff6b9d', background: '#1a0e2e', color: '#fff' });
@@ -2537,8 +2688,6 @@ async function manualCheckPayment() {
 
   try {
     const targetAmount = currentDeposit.total_amount;
-    console.log('🔍 Manual check untuk amount:', targetAmount);
-
     const res = await fetch(`/api/mutasi?amount=${targetAmount}&t=${Date.now()}`);
     if (!res.ok) throw new Error(`Gagal fetch mutasi (HTTP ${res.status})`);
 
@@ -2554,12 +2703,10 @@ async function manualCheckPayment() {
     else if (Array.isArray(raw?.result)) mutasiList = raw.result;
     else if (Array.isArray(raw)) mutasiList = raw;
 
-    console.log(`📋 ${mutasiList.length} mutasi ditemukan, cari Rp ${targetAmount.toLocaleString('id-ID')}`);
-
     let found = null;
     for (const m of mutasiList) {
       const check = isTransactionMatch(m, targetAmount);
-      if (check.match) { found = m; console.log('✅ Pembayaran ditemukan:', m); break; }
+      if (check.match) { found = m; break; }
     }
 
     if (found) {
@@ -2571,7 +2718,6 @@ async function manualCheckPayment() {
       btn.disabled = false;
       btn.innerHTML = '🔍 Cek Status Pembayaran';
     } else {
-      console.log('❌ Tidak ada mutasi yang cocok');
       statusEl.className = 'qris-status waiting';
       statusTextEl.textContent = 'Belum ada pembayaran yang cocok';
 
@@ -2606,10 +2752,8 @@ async function manualCheckPayment() {
       btn.innerHTML = '🔍 Cek Status Pembayaran';
     }
   } catch (err) {
-    console.error('❌ Manual check error:', err);
     statusEl.className = 'qris-status expired';
     statusTextEl.textContent = 'Gagal cek pembayaran';
-
     await Swal.fire({
       title: '❌ Gagal Cek Pembayaran',
       text: err.message || 'Terjadi kesalahan. Coba lagi nanti.',
@@ -2617,7 +2761,6 @@ async function manualCheckPayment() {
       confirmButtonColor: '#ff4444',
       background: '#1a0e2e', color: '#fff'
     });
-
     btn.disabled = false;
     btn.innerHTML = '🔍 Cek Status Pembayaran';
   }
@@ -2868,6 +3011,8 @@ async function initChat() {
   if (!session || !session.user) return;
   subscribeGlobalChat();
   subscribeUserSupportChat();
+  initCSBubbleChannel();
+  startCSPolling();
 }
 
 async function getChatUserId() {
@@ -2889,16 +3034,20 @@ async function getChatUserId() {
 function openChatHub(tab) {
   if (!currentUser) return;
   document.getElementById('chatHubModal').classList.add('show');
+  document.body.classList.add('chat-open');
   chatHubOpen = true;
   if (tab) currentChatTab = tab;
   if (!globalChatChannel) subscribeGlobalChat();
   if (currentChatTab === 'global') switchChatTab('global');
   else switchChatTab('support');
+  toggleBubbleVisibility();
 }
 
 function closeChatHub() {
   document.getElementById('chatHubModal').classList.remove('show');
+  document.body.classList.remove('chat-open');
   chatHubOpen = false;
+  toggleBubbleVisibility();
 }
 
 function switchChatTab(tab) {
@@ -2935,6 +3084,7 @@ function switchChatTab(tab) {
     subEl.textContent = 'Auto-hapus 24 jam';
     openSupportView();
   }
+  toggleBubbleVisibility();
 }
 
 async function loadGlobalMessages() {
@@ -3290,7 +3440,6 @@ function subscribeUserSupportChat(userId) {
         if (isStaff && currentSupportTarget) loadSupportChatForAdmin(currentSupportTarget.user_id);
         else if (!isStaff) loadSupportChatForUser(targetUserId);
       }
-      // Auto-refresh folder list CS saat ada pesan baru
       if (isStaff) {
         setTimeout(() => loadCSFolders(), 500);
       }
@@ -3372,12 +3521,7 @@ async function loadSupportUsers() {
   (data || []).forEach(m => {
     if (!userMap[m.user_id]) {
       userMap[m.user_id] = { 
-        user_id: m.user_id, 
-        email: m.email, 
-        lastMessage: m.message, 
-        lastTime: m.created_at, 
-        lastRole: m.sender_role,
-        hasUnread: false
+        user_id: m.user_id, email: m.email, lastMessage: m.message, lastTime: m.created_at, lastRole: m.sender_role, hasUnread: false
       };
     }
     if (m.sender_role === 'user' && !m.read_by_admin) {
@@ -3397,7 +3541,6 @@ async function loadSupportUsers() {
     const initial = (u.email || '?').charAt(0).toUpperCase();
     const unreadClass = u.hasUnread ? 'unread' : '';
     const staffTag = u.lastRole !== 'user' ? '💬 ' : '';
-    
     html += `
       <div class="support-user-item ${unreadClass}" onclick="openSupportChatWith('${u.user_id}','${escapeAttr(u.email)}')">
         <div class="support-user-avatar">${initial}</div>
@@ -3413,7 +3556,7 @@ async function loadSupportUsers() {
 }
 
 // ============================================================
-// CS FOLDER LIST - Daftar Chat CS Otomatis
+// CS FOLDER LIST
 // ============================================================
 async function loadCSFolders() {
   if (!isStaff || !chatClient) return;
@@ -3423,7 +3566,6 @@ async function loadCSFolders() {
   listEl.innerHTML = '<div class="loading-box"><span class="spinner"></span><br>Memuat folder...</div>';
   
   try {
-    // Ambil semua pesan support
     const { data, error } = await chatClient
       .from('support_messages')
       .select('user_id, email, message, created_at, sender_role, read_by_admin')
@@ -3432,18 +3574,11 @@ async function loadCSFolders() {
       
     if (error) throw error;
     
-    // Group by user_id
     const userMap = {};
     (data || []).forEach(m => {
       if (!userMap[m.user_id]) {
         userMap[m.user_id] = {
-          user_id: m.user_id,
-          email: m.email,
-          lastMessage: m.message,
-          lastTime: m.created_at,
-          lastRole: m.sender_role,
-          hasUnread: false,
-          messageCount: 1
+          user_id: m.user_id, email: m.email, lastMessage: m.message, lastTime: m.created_at, lastRole: m.sender_role, hasUnread: false, messageCount: 1
         };
       } else {
         userMap[m.user_id].messageCount++;
@@ -3453,11 +3588,7 @@ async function loadCSFolders() {
       }
     });
     
-    const folders = Object.values(userMap).sort((a, b) => 
-      new Date(b.lastTime) - new Date(a.lastTime)
-    );
-    
-    // Simpan ke cache global
+    const folders = Object.values(userMap).sort((a, b) => new Date(b.lastTime) - new Date(a.lastTime));
     window.csFoldersCache = folders;
     
     if (folders.length === 0) {
@@ -3473,7 +3604,6 @@ async function loadCSFolders() {
       const initial = (f.email || '?').charAt(0).toUpperCase();
       const unreadClass = f.hasUnread ? 'has-unread' : '';
       const staffTag = f.lastRole !== 'user' ? '💬 ' : '';
-      
       html += `
         <div class="cs-folder-item ${unreadClass}" onclick="openCSFolder('${f.user_id}','${escapeAttr(f.email)}')">
           <div class="cs-folder-icon">${initial}</div>
@@ -3488,9 +3618,7 @@ async function loadCSFolders() {
         </div>
       `;
     });
-    
     listEl.innerHTML = html;
-    
   } catch (err) {
     console.error('Load CS folders error:', err);
     listEl.innerHTML = `<div class="chat-empty" style="color:#ff8080;padding:20px 10px;">
@@ -3500,17 +3628,13 @@ async function loadCSFolders() {
 }
 
 async function openCSFolder(userId, email) {
-  // Buka chat modal dengan tab support
   openChatHub('support');
-  
-  // Tunggu modal terbuka
   setTimeout(async () => {
     await openSupportChatWith(userId, email);
     await markMessagesAsRead(userId);
   }, 300);
 }
 
-// Refresh folder list saat ada pesan baru masuk
 function refreshCSFoldersIfOpen() {
   if (chatHubOpen && currentChatTab === 'support' && isStaff) {
     loadCSFolders();
@@ -3518,7 +3642,7 @@ function refreshCSFoldersIfOpen() {
 }
 
 // ============================================================
-// START NEW CHAT (Staff bisa chat user manapun) + Auto Create Folder
+// START NEW CHAT
 // ============================================================
 async function startNewChat() {
   const input = document.getElementById('newChatEmail');
@@ -3526,13 +3650,7 @@ async function startNewChat() {
   const email = input.value.trim().toLowerCase();
   
   if (!email || !validateEmail(email)) {
-    Swal.fire({
-      title: '⚠️ Email Tidak Valid',
-      text: 'Masukkan alamat Gmail yang valid.',
-      icon: 'warning',
-      confirmButtonColor: '#ff6b9d',
-      background: '#1a0e2e', color: '#fff'
-    });
+    Swal.fire({ title: '⚠️ Email Tidak Valid', text: 'Masukkan alamat Gmail yang valid.', icon: 'warning', confirmButtonColor: '#ff6b9d', background: '#1a0e2e', color: '#fff' });
     return;
   }
   
@@ -3540,79 +3658,46 @@ async function startNewChat() {
   btn.innerHTML = '⏳ Cek...';
   
   try {
-    // Cari user di profiles
     const { data: profiles, error } = await supabaseClient
-      .from('profiles')
-      .select('id, email, role')
-      .eq('email', email)
-      .limit(1);
+      .from('profiles').select('id, email, role').eq('email', email).limit(1);
       
     if (error) throw error;
-    
-    if (!profiles || profiles.length === 0) {
-      throw new Error('User dengan email tersebut tidak ditemukan');
-    }
+    if (!profiles || profiles.length === 0) throw new Error('User dengan email tersebut tidak ditemukan');
     
     const target = profiles[0];
+    if (target.email === currentProfile.email) throw new Error('Tidak bisa chat dengan diri sendiri');
     
-    if (target.email === currentProfile.email) {
-      throw new Error('Tidak bisa chat dengan diri sendiri');
-    }
-    
-    // AUTO CREATE FOLDER: Cek apakah folder sudah ada
     const { data: existingFolder } = await chatClient
-      .from('support_messages')
-      .select('id')
-      .eq('user_id', target.id)
-      .limit(1);
+      .from('support_messages').select('id').eq('user_id', target.id).limit(1);
     
     const isNewFolder = !existingFolder || existingFolder.length === 0;
     
     if (isNewFolder) {
-      // Buat folder baru dengan pesan pembuka otomatis dari CS
       const chatUserId = await getChatUserId();
       const { error: createErr } = await chatClient.from('support_messages').insert({
-        user_id: target.id,
-        email: target.email,
-        sender_id: chatUserId,
-        sender_role: currentProfile?.role || 'cs',
+        user_id: target.id, email: target.email,
+        sender_id: chatUserId, sender_role: currentProfile?.role || 'cs',
         message: `👋 Halo! Saya ${currentProfile?.role === 'owner' ? 'Owner' : (currentProfile?.role === 'admin' ? 'Admin' : 'Customer Service')} Shine Shop. Ada yang bisa saya bantu?`,
         read_by_admin: true
       });
-      
       if (createErr) console.warn('Gagal buat pesan pembuka:', createErr.message);
       
-      // Notifikasi folder baru dibuat
       Swal.fire({
         title: '📁 Folder Baru Dibuat!',
         html: `Folder chat untuk <b style="color:#00c6ff;">${email}</b> berhasil dibuat otomatis.`,
-        icon: 'success',
-        confirmButtonColor: '#00c6ff',
+        icon: 'success', confirmButtonColor: '#00c6ff',
         background: '#1a0e2e', color: '#fff',
-        timer: 2000,
-        timerProgressBar: true,
-        showConfirmButton: false
+        timer: 2000, timerProgressBar: true, showConfirmButton: false
       });
     }
     
-    // Buka chat dengan user tersebut
     await openSupportChatWith(target.id, target.email);
     document.getElementById('chatHubTitle').textContent = `Chat dengan ${target.email}`;
     input.value = '';
-    
-    // REFRESH folder list agar folder baru muncul
-    setTimeout(() => {
-      loadCSFolders();
-    }, 500);
+    setTimeout(() => loadCSFolders(), 500);
     
   } catch (err) {
-    Swal.fire({
-      title: '❌ Gagal',
-      text: err.message || 'User tidak ditemukan.',
-      icon: 'error',
-      confirmButtonColor: '#ff4444',
-      background: '#1a0e2e', color: '#fff'
-    });
+    Swal.fire({ title: '❌ Gagal', text: err.message || 'User tidak ditemukan.', icon: 'error', confirmButtonColor: '#ff4444', background: '#1a0e2e', color: '#fff' });
   } finally {
     btn.disabled = false;
     btn.innerHTML = '💬 Chat';
@@ -3640,7 +3725,6 @@ async function markMessagesAsRead(userId) {
       .eq('user_id', userId)
       .eq('sender_role', 'user')
       .eq('read_by_admin', false);
-    console.log('✅ Pesan ditandai sudah dibaca untuk:', userId);
   } catch(e) {
     console.warn('Gagal mark read:', e.message);
   }
@@ -3680,6 +3764,252 @@ async function sendSupportReply() {
   } finally {
     input.disabled = false;
     input.focus();
+  }
+}
+
+// ============================================================
+// FLOATING CHAT BUBBLE
+// ============================================================
+function initCSBubbleChannel() {
+  if (!chatClient || !currentUser) return;
+  
+  if (csBubbleChannel) {
+    try { csBubbleChannel.unsubscribe(); } catch(e) {}
+    csBubbleChannel = null;
+  }
+  
+  lastSeenMessageTime = new Date().toISOString();
+  
+  csBubbleChannel = chatClient
+    .channel('cs_bubble_' + Date.now())
+    .on('postgres_changes', {
+      event: 'INSERT',
+      schema: 'public',
+      table: 'support_messages'
+    }, (payload) => {
+      handleNewSupportMessage(payload.new);
+    })
+    .subscribe((status) => {
+      console.log('📢 CS Bubble channel:', status);
+      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+        setTimeout(initCSBubbleChannel, 3000);
+      }
+    });
+}
+
+function handleNewSupportMessage(msg) {
+  if (!msg || !currentUser) return;
+  if (!msg.sender_role || !msg.created_at) return;
+  
+  const msgTime = new Date(msg.created_at).getTime();
+  const now = Date.now();
+  if (now - msgTime > 30000) return;
+  
+  const isFromStaff = ['cs', 'admin', 'owner'].includes(msg.sender_role);
+  if (!isFromStaff) return;
+  
+  if (isStaff) return;
+  if (chatHubOpen && currentChatTab === 'support') return;
+  
+  const chatUserId = currentUser.id;
+  if (msg.user_id !== chatUserId) {
+    getChatUserId().then(cid => {
+      if (msg.user_id !== cid) return;
+      showCSBubble(msg);
+    });
+    return;
+  }
+  
+  showCSBubble(msg);
+}
+
+function showCSBubble(msg) {
+  if (activeBubbles[msg.id]) return;
+  
+  const container = document.getElementById('csBubbleContainer');
+  if (!container) return;
+  
+  const currentBubbles = container.querySelectorAll('.cs-bubble:not(.removing)');
+  if (currentBubbles.length >= CS_BUBBLE_MAX) {
+    const oldest = currentBubbles[0];
+    if (oldest) removeBubble(oldest);
+  }
+  
+  const roleLabel = msg.sender_role === 'owner' ? 'Owner' 
+                  : msg.sender_role === 'admin' ? 'Admin' 
+                  : 'Customer Service';
+  const roleEmoji = msg.sender_role === 'owner' ? '👑' 
+                  : msg.sender_role === 'admin' ? '🛡️' 
+                  : '💼';
+  
+  const bubble = document.createElement('div');
+  bubble.className = 'cs-bubble';
+  bubble.dataset.msgId = msg.id;
+  
+  const preview = (msg.message || '').substring(0, 150);
+  const timeStr = new Date(msg.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+  
+  bubble.innerHTML = `
+    <div class="cs-bubble-icon">📩</div>
+    <div class="cs-bubble-content">
+      <button class="cs-bubble-close" onclick="event.stopPropagation(); dismissCSBubble('${msg.id}')" title="Tutup">✕</button>
+      <div class="cs-bubble-sender">
+        ${roleEmoji} ${escapeHtml(roleLabel)}
+        <span class="cs-role-badge">BARU</span>
+      </div>
+      <div class="cs-bubble-message">${formatMessageText(preview)}</div>
+      <div class="cs-bubble-time">🕐 ${timeStr}</div>
+      <div class="cs-bubble-actions">
+        <button class="cs-bubble-reply" onclick="event.stopPropagation(); openCSBubbleReply('${msg.id}')">
+          💬 Balas Sekarang
+        </button>
+      </div>
+    </div>
+  `;
+  
+  bubble.addEventListener('click', (e) => {
+    if (e.target.closest('.cs-bubble-close')) return;
+    if (e.target.closest('.cs-bubble-reply')) return;
+    openCSBubbleReply(msg.id);
+  });
+  
+  container.appendChild(bubble);
+  
+  const timeoutId = setTimeout(() => {
+    dismissCSBubble(msg.id);
+  }, CS_BUBBLE_DURATION);
+  
+  activeBubbles[msg.id] = timeoutId;
+  playBubbleSound();
+  if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+}
+
+function dismissCSBubble(msgId) {
+  const container = document.getElementById('csBubbleContainer');
+  if (!container) return;
+  const bubble = container.querySelector(`.cs-bubble[data-msg-id="${msgId}"]`);
+  if (bubble) removeBubble(bubble);
+  if (activeBubbles[msgId]) {
+    clearTimeout(activeBubbles[msgId]);
+    delete activeBubbles[msgId];
+  }
+}
+
+function removeBubble(bubbleEl) {
+  if (!bubbleEl) return;
+  bubbleEl.classList.add('removing');
+  setTimeout(() => {
+    if (bubbleEl.parentNode) bubbleEl.parentNode.removeChild(bubbleEl);
+  }, 300);
+}
+
+async function openCSBubbleReply(msgId) {
+  dismissCSBubble(msgId);
+  if (typeof openChatHub === 'function') openChatHub('support');
+  
+  if (!isStaff && currentUser) {
+    setTimeout(async () => {
+      const chatUserId = await getChatUserId();
+      if (chatUserId) {
+        await loadSupportChatForUser(chatUserId);
+        try {
+          await chatClient
+            .from('support_messages')
+            .update({ read_by_admin: true })
+            .eq('user_id', chatUserId)
+            .eq('sender_role', 'user')
+            .eq('read_by_admin', false);
+        } catch(e) {}
+      }
+    }, 400);
+  }
+}
+
+function playBubbleSound() {
+  try {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContext) return;
+    
+    const ctx = new AudioContext();
+    const oscillator = ctx.createOscillator();
+    const gainNode = ctx.createGain();
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(ctx.destination);
+    
+    oscillator.type = 'sine';
+    oscillator.frequency.setValueAtTime(880, ctx.currentTime);
+    oscillator.frequency.setValueAtTime(1100, ctx.currentTime + 0.1);
+    
+    gainNode.gain.setValueAtTime(0.15, ctx.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+    
+    oscillator.start(ctx.currentTime);
+    oscillator.stop(ctx.currentTime + 0.3);
+    
+    setTimeout(() => ctx.close(), 500);
+  } catch(e) {
+    console.log('Sound play failed:', e.message);
+  }
+}
+
+function toggleBubbleVisibility() {
+  const container = document.getElementById('csBubbleContainer');
+  if (!container) return;
+  
+  if (chatHubOpen && currentChatTab === 'support') {
+    container.style.display = 'none';
+  } else {
+    container.style.display = 'flex';
+  }
+}
+
+// ============================================================
+// POLLING FALLBACK
+// ============================================================
+function startCSPolling() {
+  if (csPollingInterval) clearInterval(csPollingInterval);
+  lastPolledTime = new Date().toISOString();
+  
+  csPollingInterval = setInterval(async () => {
+    if (!chatClient || !currentUser) return;
+    if (isStaff) return;
+    if (chatHubOpen && currentChatTab === 'support') return;
+    
+    try {
+      const chatUserId = await getChatUserId();
+      if (!chatUserId) return;
+      
+      const since = lastPolledTime || new Date(Date.now() - 30000).toISOString();
+      
+      const { data, error } = await chatClient
+        .from('support_messages')
+        .select('*')
+        .eq('user_id', chatUserId)
+        .in('sender_role', ['cs', 'admin', 'owner'])
+        .gt('created_at', since)
+        .order('created_at', { ascending: true });
+      
+      if (error) return;
+      if (!data || data.length === 0) return;
+      
+      lastPolledTime = data[data.length - 1].created_at;
+      
+      data.forEach(msg => {
+        if (!activeBubbles[msg.id]) {
+          showCSBubble(msg);
+        }
+      });
+    } catch(e) {
+      console.warn('CS Polling error:', e.message);
+    }
+  }, 8000);
+}
+
+function stopCSPolling() {
+  if (csPollingInterval) {
+    clearInterval(csPollingInterval);
+    csPollingInterval = null;
   }
 }
 
