@@ -384,6 +384,67 @@ body::before{
 .new-chat-box button:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(255,107,157,0.4)}
 .new-chat-box button:disabled{opacity:0.5;cursor:not-allowed}
 
+/* ============ CS FOLDER LIST ============ */
+.cs-folder-item{
+  display:flex;align-items:center;gap:12px;
+  padding:12px 14px;
+  background:rgba(255,255,255,0.04);
+  border:1px solid rgba(255,255,255,0.06);
+  border-radius:14px;
+  cursor:pointer;
+  transition:all 0.3s ease;
+  margin-bottom:8px;
+  position:relative;
+}
+.cs-folder-item:hover{
+  background:rgba(0,198,255,0.1);
+  border-color:rgba(0,198,255,0.3);
+  transform:translateX(4px);
+}
+.cs-folder-item.has-unread{
+  background:linear-gradient(135deg,rgba(0,198,255,0.15),rgba(255,107,157,0.1));
+  border-color:rgba(0,198,255,0.4);
+}
+.cs-folder-item.has-unread::after{
+  content:'';
+  position:absolute;top:10px;right:10px;
+  width:9px;height:9px;border-radius:50%;
+  background:#ff4444;
+  box-shadow:0 0 8px #ff4444;
+  animation:badgePulse 1.2s ease-in-out infinite;
+}
+@keyframes badgePulse{
+  0%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(255,68,68,0.7)}
+  50%{transform:scale(1.15);box-shadow:0 0 0 6px rgba(255,68,68,0)}
+}
+.cs-folder-icon{
+  width:40px;height:40px;border-radius:12px;
+  background:linear-gradient(135deg,rgba(0,198,255,0.25),rgba(0,114,255,0.15));
+  border:1px solid rgba(0,198,255,0.3);
+  display:flex;align-items:center;justify-content:center;
+  font-size:18px;flex-shrink:0;
+  font-weight:900;color:#00c6ff;
+}
+.cs-folder-info{flex:1;min-width:0}
+.cs-folder-email{
+  font-size:12.5px;font-weight:700;color:#f1e6f5;
+  word-break:break-all;
+  display:flex;align-items:center;gap:6px;
+}
+.cs-folder-preview{
+  font-size:11px;color:#b39ddb;margin-top:3px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.cs-folder-time{
+  font-size:10px;color:#6b4a7a;flex-shrink:0;
+}
+.cs-folder-badge{
+  display:inline-flex;align-items:center;
+  padding:2px 7px;border-radius:10px;
+  background:rgba(255,68,68,0.2);color:#ff8080;
+  font-size:9px;font-weight:800;
+}
+
 /* ============ STATS GRID ============ */
 .stats-grid{
   display:grid;
@@ -509,10 +570,6 @@ body::before{
 .nav-item .nav-badge:empty{display:none}
 .nav-item .nav-badge.pulse{
   animation:badgePulse 1.2s ease-in-out infinite;
-}
-@keyframes badgePulse{
-  0%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(255,68,68,0.7)}
-  50%{transform:scale(1.15);box-shadow:0 0 0 6px rgba(255,68,68,0)}
 }
 
 /* ============ AUTH SCREEN ============ */
@@ -1390,6 +1447,19 @@ body::before{
         </div>
       </div>
 
+      <!-- DAFTAR FOLDER CHAT CS (khusus staff) -->
+      <div class="section" id="csFolderSection" style="display:none;">
+        <div class="section-title">
+          📁 Folder Chat Customer Service
+          <div class="line"></div>
+        </div>
+        <div id="csFolderList">
+          <div class="chat-empty" style="padding:20px 10px;">
+            <span class="icon">📭</span>Belum ada folder chat
+          </div>
+        </div>
+      </div>
+
       <div class="section">
         <div class="section-title">
           💬 Pilih Chat
@@ -1771,6 +1841,11 @@ function switchPage(pageName) {
   if (navBtn) navBtn.classList.add('active');
   const body = document.querySelector('.app-body');
   if (body) body.scrollTop = 0;
+  
+  // Auto-load CS folders saat buka page chat
+  if (pageName === 'chat' && isStaff) {
+    setTimeout(() => loadCSFolders(), 300);
+  }
 }
 
 // ============================================================
@@ -2110,10 +2185,18 @@ async function updateAuthUI(user) {
       adminSection.style.display = 'none';
     }
 
-    // Tampilkan Chat Baru untuk staff (admin, owner, cs)
+    // Tampilkan Chat Baru + Folder CS untuk staff (admin, owner, cs)
     const newChatSection = document.getElementById('newChatBoxSection');
+    const csFolderSection = document.getElementById('csFolderSection');
     if (newChatSection) {
       newChatSection.style.display = isStaff ? 'block' : 'none';
+    }
+    if (csFolderSection) {
+      csFolderSection.style.display = isStaff ? 'block' : 'none';
+    }
+    // Load folder list kalau staff
+    if (isStaff) {
+      setTimeout(() => loadCSFolders(), 800);
     }
 
     if (email && email.includes('@')) processGmailUpdate(email);
@@ -2207,7 +2290,7 @@ function renderQrisToCanvas(qrisString) {
 }
 
 // ============================================================
-// PARSER AMOUNT ROBUST (Qiospay format: string angka)
+// PARSER AMOUNT ROBUST
 // ============================================================
 function parseAmount(rawAmount) {
   if (rawAmount === null || rawAmount === undefined) return 0;
@@ -2938,7 +3021,6 @@ function scrollToMessage(msgId) {
   setTimeout(() => targetMsg.classList.remove('highlight'), 2000);
 
   if (navigator.vibrate) navigator.vibrate(50);
-  console.log('📌 Scroll ke pesan:', msgId);
 }
 
 function renderGlobalMessages(messages) {
@@ -3208,6 +3290,10 @@ function subscribeUserSupportChat(userId) {
         if (isStaff && currentSupportTarget) loadSupportChatForAdmin(currentSupportTarget.user_id);
         else if (!isStaff) loadSupportChatForUser(targetUserId);
       }
+      // Auto-refresh folder list CS saat ada pesan baru
+      if (isStaff) {
+        setTimeout(() => loadCSFolders(), 500);
+      }
     })
     .subscribe((status) => {
       if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
@@ -3327,7 +3413,112 @@ async function loadSupportUsers() {
 }
 
 // ============================================================
-// START NEW CHAT (Staff bisa chat user manapun)
+// CS FOLDER LIST - Daftar Chat CS Otomatis
+// ============================================================
+async function loadCSFolders() {
+  if (!isStaff || !chatClient) return;
+  const listEl = document.getElementById('csFolderList');
+  if (!listEl) return;
+  
+  listEl.innerHTML = '<div class="loading-box"><span class="spinner"></span><br>Memuat folder...</div>';
+  
+  try {
+    // Ambil semua pesan support
+    const { data, error } = await chatClient
+      .from('support_messages')
+      .select('user_id, email, message, created_at, sender_role, read_by_admin')
+      .order('created_at', { ascending: false })
+      .limit(2000);
+      
+    if (error) throw error;
+    
+    // Group by user_id
+    const userMap = {};
+    (data || []).forEach(m => {
+      if (!userMap[m.user_id]) {
+        userMap[m.user_id] = {
+          user_id: m.user_id,
+          email: m.email,
+          lastMessage: m.message,
+          lastTime: m.created_at,
+          lastRole: m.sender_role,
+          hasUnread: false,
+          messageCount: 1
+        };
+      } else {
+        userMap[m.user_id].messageCount++;
+      }
+      if (m.sender_role === 'user' && !m.read_by_admin) {
+        userMap[m.user_id].hasUnread = true;
+      }
+    });
+    
+    const folders = Object.values(userMap).sort((a, b) => 
+      new Date(b.lastTime) - new Date(a.lastTime)
+    );
+    
+    // Simpan ke cache global
+    window.csFoldersCache = folders;
+    
+    if (folders.length === 0) {
+      listEl.innerHTML = `<div class="chat-empty" style="padding:20px 10px;">
+        <span class="icon">📭</span>Belum ada folder chat<br>
+        <span style="font-size:11px;color:#6b4a7a;">Mulai chat baru dengan Gmail user di atas</span>
+      </div>`;
+      return;
+    }
+    
+    let html = '';
+    folders.forEach(f => {
+      const initial = (f.email || '?').charAt(0).toUpperCase();
+      const unreadClass = f.hasUnread ? 'has-unread' : '';
+      const staffTag = f.lastRole !== 'user' ? '💬 ' : '';
+      
+      html += `
+        <div class="cs-folder-item ${unreadClass}" onclick="openCSFolder('${f.user_id}','${escapeAttr(f.email)}')">
+          <div class="cs-folder-icon">${initial}</div>
+          <div class="cs-folder-info">
+            <div class="cs-folder-email">
+              ${escapeHtml(f.email || 'user')}
+              ${f.hasUnread ? '<span class="cs-folder-badge">NEW</span>' : ''}
+            </div>
+            <div class="cs-folder-preview">${staffTag}${escapeHtml((f.lastMessage || '').substring(0, 50))}</div>
+          </div>
+          <div class="cs-folder-time">${formatTimeAgo(f.lastTime)}</div>
+        </div>
+      `;
+    });
+    
+    listEl.innerHTML = html;
+    
+  } catch (err) {
+    console.error('Load CS folders error:', err);
+    listEl.innerHTML = `<div class="chat-empty" style="color:#ff8080;padding:20px 10px;">
+      <span class="icon">⚠️</span>Gagal memuat: ${err.message}
+    </div>`;
+  }
+}
+
+async function openCSFolder(userId, email) {
+  // Buka chat modal dengan tab support
+  openChatHub('support');
+  
+  // Tunggu modal terbuka
+  setTimeout(async () => {
+    await openSupportChatWith(userId, email);
+    await markMessagesAsRead(userId);
+  }, 300);
+}
+
+// Refresh folder list saat ada pesan baru masuk
+function refreshCSFoldersIfOpen() {
+  if (chatHubOpen && currentChatTab === 'support' && isStaff) {
+    loadCSFolders();
+  }
+}
+
+// ============================================================
+// START NEW CHAT (Staff bisa chat user manapun) + Auto Create Folder
 // ============================================================
 async function startNewChat() {
   const input = document.getElementById('newChatEmail');
@@ -3349,6 +3540,7 @@ async function startNewChat() {
   btn.innerHTML = '⏳ Cek...';
   
   try {
+    // Cari user di profiles
     const { data: profiles, error } = await supabaseClient
       .from('profiles')
       .select('id, email, role')
@@ -3367,9 +3559,51 @@ async function startNewChat() {
       throw new Error('Tidak bisa chat dengan diri sendiri');
     }
     
+    // AUTO CREATE FOLDER: Cek apakah folder sudah ada
+    const { data: existingFolder } = await chatClient
+      .from('support_messages')
+      .select('id')
+      .eq('user_id', target.id)
+      .limit(1);
+    
+    const isNewFolder = !existingFolder || existingFolder.length === 0;
+    
+    if (isNewFolder) {
+      // Buat folder baru dengan pesan pembuka otomatis dari CS
+      const chatUserId = await getChatUserId();
+      const { error: createErr } = await chatClient.from('support_messages').insert({
+        user_id: target.id,
+        email: target.email,
+        sender_id: chatUserId,
+        sender_role: currentProfile?.role || 'cs',
+        message: `👋 Halo! Saya ${currentProfile?.role === 'owner' ? 'Owner' : (currentProfile?.role === 'admin' ? 'Admin' : 'Customer Service')} Shine Shop. Ada yang bisa saya bantu?`,
+        read_by_admin: true
+      });
+      
+      if (createErr) console.warn('Gagal buat pesan pembuka:', createErr.message);
+      
+      // Notifikasi folder baru dibuat
+      Swal.fire({
+        title: '📁 Folder Baru Dibuat!',
+        html: `Folder chat untuk <b style="color:#00c6ff;">${email}</b> berhasil dibuat otomatis.`,
+        icon: 'success',
+        confirmButtonColor: '#00c6ff',
+        background: '#1a0e2e', color: '#fff',
+        timer: 2000,
+        timerProgressBar: true,
+        showConfirmButton: false
+      });
+    }
+    
+    // Buka chat dengan user tersebut
     await openSupportChatWith(target.id, target.email);
     document.getElementById('chatHubTitle').textContent = `Chat dengan ${target.email}`;
     input.value = '';
+    
+    // REFRESH folder list agar folder baru muncul
+    setTimeout(() => {
+      loadCSFolders();
+    }, 500);
     
   } catch (err) {
     Swal.fire({
