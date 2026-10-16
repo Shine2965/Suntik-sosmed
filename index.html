@@ -290,7 +290,7 @@ h1{font-size:28px;font-weight:900;background:linear-gradient(135deg,#ff6b9d,#ffb
 .chat-empty .icon{font-size:42px;display:block;margin-bottom:10px;opacity:0.5}
 
 .chat-input-area{padding:12px 14px;background:rgba(255,255,255,0.03);border-top:1px solid rgba(255,255,255,0.08);display:flex;gap:8px;align-items:flex-end;flex-shrink:0}
-.chat-input{flex:1;background:rgba(255,255,255,0.06);border:1.5px solid rgba(255,107,157,0.25);border-radius:14px;padding:11px 14px;color:#fff;font-family:'Quicksand',sans-serif;font-size:13px;outline:none;resize:none;height:44px;max-height:150px;transition:border-color 0.3s ease,background 0.3s ease;line-height:1.4;overflow-y:hidden;display:block;box-sizing:border-box}
+.chat-input{flex:1;background:rgba(255,255,255,0.06);border:1.5px solid rgba(255,107,157,0.25);border-radius:14px;padding:11px 14px;color:#fff;font-family:'Quicksand',sans-serif;font-size:13px;outline:none;resize:none;min-height:44px;max-height:150px;transition:border-color 0.3s ease,background 0.3s ease;line-height:1.5;overflow-y:hidden;display:block;box-sizing:border-box;will-change:height}
 .chat-input::-webkit-scrollbar{width:6px}
 .chat-input::-webkit-scrollbar-track{background:transparent}
 .chat-input::-webkit-scrollbar-thumb{background:rgba(255,107,157,0.3);border-radius:10px}
@@ -690,6 +690,28 @@ try {
   });
   console.log('✅ Supabase chat initialized');
 } catch (e) { console.error('❌ Chat Supabase init error:', e); }
+
+// ============================================================
+// AUTO RESIZE TEXTAREA (GLOBAL HELPER)
+// ============================================================
+window.autoResizeTextarea = function(el) {
+  if (!el) return;
+  // Reset height ke 0 dulu supaya layout stabil
+  el.style.height = '0px';
+  // Force reflow — biar browser hitung ulang
+  void el.offsetHeight;
+  // Hitung tinggi sebenarnya
+  const scrollH = el.scrollHeight;
+  const maxH = 150;
+  const finalH = Math.min(scrollH, maxH);
+  el.style.height = finalH + 'px';
+  // Scrollbar kalau lebih dari max
+  if (scrollH > maxH) {
+    el.style.overflowY = 'auto';
+  } else {
+    el.style.overflowY = 'hidden';
+  }
+};
 
 // ============================================================
 // AUTH
@@ -1621,29 +1643,66 @@ function renderGlobalMessages(messages) {
 }
 
 function subscribeGlobalChat() {
-  if (globalChatChannel) { globalChatChannel.unsubscribe(); globalChatChannel = null; }
+  if (globalChatChannel) {
+    try { globalChatChannel.unsubscribe(); } catch(e) {}
+    globalChatChannel = null;
+  }
   if (!chatClient) return;
   globalChatChannel = chatClient
-    .channel('global_chat_realtime_' + Date.now())
+    .channel('global_chat_' + Date.now())
     .on('postgres_changes', {
-      event: '*',
+      event: 'INSERT',
       schema: 'public',
       table: 'global_messages'
     }, (payload) => {
-      console.log('💬 Realtime event:', payload.eventType, payload.new || payload.old);
+      console.log('💬 Realtime INSERT:', payload.new);
+      if (payload.new && !payload.new.deleted) {
+        const exists = cachedGlobalMessages.find(m => m.id === payload.new.id);
+        if (!exists) cachedGlobalMessages.push(payload.new);
+        updateGlobalSubtitle();
+      }
       if (chatHubOpen && currentChatTab === 'global') {
-        loadGlobalMessages();
-      } else {
-        if (payload.eventType === 'INSERT' && payload.new) {
-          cachedGlobalMessages.push(payload.new);
-          updateGlobalSubtitle();
-        }
+        renderGlobalMessages(cachedGlobalMessages);
+        renderPinnedMessages(cachedGlobalMessages);
+        setTimeout(() => scrollChatToBottom('globalChatBody'), 100);
+      }
+    })
+    .on('postgres_changes', {
+      event: 'UPDATE',
+      schema: 'public',
+      table: 'global_messages'
+    }, (payload) => {
+      console.log('💬 Realtime UPDATE:', payload.new);
+      if (payload.new) {
+        const idx = cachedGlobalMessages.findIndex(m => m.id === payload.new.id);
+        if (idx !== -1) cachedGlobalMessages[idx] = payload.new;
+        else cachedGlobalMessages.push(payload.new);
+        updateGlobalSubtitle();
+      }
+      if (chatHubOpen && currentChatTab === 'global') {
+        renderGlobalMessages(cachedGlobalMessages);
+        renderPinnedMessages(cachedGlobalMessages);
+      }
+    })
+    .on('postgres_changes', {
+      event: 'DELETE',
+      schema: 'public',
+      table: 'global_messages'
+    }, (payload) => {
+      console.log('💬 Realtime DELETE:', payload.old);
+      if (payload.old && payload.old.id) {
+        cachedGlobalMessages = cachedGlobalMessages.filter(m => m.id !== payload.old.id);
+        updateGlobalSubtitle();
+      }
+      if (chatHubOpen && currentChatTab === 'global') {
+        renderGlobalMessages(cachedGlobalMessages);
+        renderPinnedMessages(cachedGlobalMessages);
       }
     })
     .subscribe((status) => {
-      console.log('🔔 Global chat subscription status:', status);
-      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-        console.warn('⚠️ Reconnecting global chat in 3s...');
+      console.log('🔔 Global chat status:', status);
+      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+        console.warn('⚠️ Reconnect global chat...');
         setTimeout(subscribeGlobalChat, 3000);
       }
     });
@@ -1671,8 +1730,7 @@ async function sendGlobalMessage() {
     });
     if (error) throw error;
     input.value = '';
-    input.style.height = '44px';
-    input.style.overflowY = 'hidden';
+    window.autoResizeTextarea(input);
   } catch (err) {
     Swal.fire({ title: '❌ Gagal', text: err.message, icon: 'error', confirmButtonColor: '#ff4444', background: '#1a0e2e', color: '#fff' });
   } finally {
@@ -1771,20 +1829,23 @@ async function loadSupportChatForUser(userId) {
 }
 
 function subscribeUserSupportChat(userId) {
-  if (supportChatChannel) { supportChatChannel.unsubscribe(); supportChatChannel = null; }
+  if (supportChatChannel) {
+    try { supportChatChannel.unsubscribe(); } catch(e) {}
+    supportChatChannel = null;
+  }
   if (!chatClient) return;
   const targetUserId = userId || currentUser?.id;
   if (!targetUserId) return;
 
   supportChatChannel = chatClient
-    .channel('support_realtime_' + targetUserId + '_' + Date.now())
+    .channel('support_' + targetUserId + '_' + Date.now())
     .on('postgres_changes', {
-      event: '*',
+      event: 'INSERT',
       schema: 'public',
       table: 'support_messages',
       filter: `user_id=eq.${targetUserId}`
     }, (payload) => {
-      console.log('📩 Support realtime:', payload.eventType);
+      console.log('📩 Support realtime INSERT:', payload.new);
       if (chatHubOpen && currentChatTab === 'support') {
         if (isAdminOrOwner && currentSupportTarget) {
           loadSupportChatForAdmin(currentSupportTarget.user_id);
@@ -1794,8 +1855,8 @@ function subscribeUserSupportChat(userId) {
       }
     })
     .subscribe((status) => {
-      console.log('🔔 Support chat subscription:', status);
-      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+      console.log('🔔 Support status:', status);
+      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
         setTimeout(() => subscribeUserSupportChat(targetUserId), 3000);
       }
     });
@@ -1844,8 +1905,7 @@ async function sendSupportMessage() {
     });
     if (error) throw error;
     input.value = '';
-    input.style.height = '44px';
-    input.style.overflowY = 'hidden';
+    window.autoResizeTextarea(input);
     loadSupportChatForUser(chatUserId);
   } catch (err) {
     Swal.fire({ title: '❌ Gagal', text: err.message, icon: 'error', confirmButtonColor: '#ff4444', background: '#1a0e2e', color: '#fff' });
@@ -1923,8 +1983,7 @@ async function sendSupportReply() {
     });
     if (error) throw error;
     input.value = '';
-    input.style.height = '44px';
-    input.style.overflowY = 'hidden';
+    window.autoResizeTextarea(input);
     loadSupportChatForAdmin(currentSupportTarget.user_id);
   } catch (err) {
     Swal.fire({ title: '❌ Gagal', text: err.message, icon: 'error', confirmButtonColor: '#ff4444', background: '#1a0e2e', color: '#fff' });
@@ -2121,7 +2180,7 @@ window.addEventListener('load', async () => {
   await initAuth();
 
   // Enter = baris baru, Ctrl/Cmd+Enter = kirim, tombol ➤ = kirim
-  // + Auto-resize textarea (menyesuaikan jumlah baris)
+  // + Auto-resize textarea presisi
   ['globalChatInput', 'supportChatInput', 'supportChatInputAdmin'].forEach(id => {
     const el = document.getElementById(id);
     if (el) {
@@ -2133,22 +2192,20 @@ window.addEventListener('load', async () => {
           else if (id === 'supportChatInputAdmin') sendSupportReply();
         }
       });
-      // Auto-resize: reset height ke auto dulu, baru set ke scrollHeight
-      const autoResize = () => {
-        el.style.height = 'auto';
-        const newHeight = Math.min(el.scrollHeight, 150);
-        el.style.height = newHeight + 'px';
-        if (el.scrollHeight > 150) {
-          el.style.overflowY = 'auto';
-        } else {
-          el.style.overflowY = 'hidden';
-        }
-      };
-      el.addEventListener('input', autoResize);
+      // Auto-resize on input
+      el.addEventListener('input', () => window.autoResizeTextarea(el));
+      // Handle Enter/Backspace dengan requestAnimationFrame
       el.addEventListener('keyup', (e) => {
-        if (e.key === 'Enter' || e.key === 'Backspace') autoResize();
+        if (e.key === 'Enter' || e.key === 'Backspace' || e.key === 'Delete') {
+          requestAnimationFrame(() => window.autoResizeTextarea(el));
+        }
       });
-      autoResize();
+      // Handle paste
+      el.addEventListener('paste', () => {
+        setTimeout(() => window.autoResizeTextarea(el), 0);
+      });
+      // Initial resize
+      window.autoResizeTextarea(el);
     }
   });
 
