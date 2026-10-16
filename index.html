@@ -201,10 +201,6 @@ body::before{
 .status-indicator.offline{
   background:#6b4a7a;
 }
-.status-indicator.away{
-  background:#ffaa00;
-  box-shadow:0 0 6px #ffaa00;
-}
 @keyframes onlinePulse{
   0%,100%{transform:scale(1);box-shadow:0 0 8px #00ff88, 0 0 0 0 rgba(0,255,136,0.7)}
   50%{transform:scale(1.1);box-shadow:0 0 12px #00ff88, 0 0 0 6px rgba(0,255,136,0)}
@@ -220,7 +216,6 @@ body::before{
 }
 .online-text.online{color:#00ff88}
 .online-text.offline{color:#94a3b8}
-.online-text.away{color:#ffaa00}
 .online-text .online-dot{
   width:6px;height:6px;border-radius:50%;
   background:currentColor;
@@ -252,7 +247,6 @@ body::before{
 }
 .presence-badge.online{background:rgba(0,255,136,0.15);color:#00ff88;border:1px solid rgba(0,255,136,0.3)}
 .presence-badge.offline{background:rgba(148,163,184,0.15);color:#94a3b8;border:1px solid rgba(148,163,184,0.3)}
-.presence-badge.away{background:rgba(255,170,0,0.15);color:#ffaa00;border:1px solid rgba(255,170,0,0.3)}
 .presence-badge .dot{width:5px;height:5px;border-radius:50%;background:currentColor}
 .presence-badge.online .dot{box-shadow:0 0 4px currentColor;animation:onlinePulse 2s ease-in-out infinite}
 
@@ -2068,14 +2062,12 @@ let lastPolledTime = null;
 const CS_BUBBLE_DURATION = 10000;
 const CS_BUBBLE_MAX = 3;
 
-// Presence state
-let presenceChannel = null;
-let heartbeatInterval = null;
+// Presence state (REALTIME)
+let presenceChannelRealtime = null;
+let lastSeenInterval = null;
+let presenceRefreshInterval = null;
 let presenceUsersCache = {};
-let onlineUsersCount = 0;
-const HEARTBEAT_INTERVAL = 30000;
-const AWAY_THRESHOLD = 5 * 60 * 1000;
-const OFFLINE_THRESHOLD = 2 * 60 * 1000;
+let onlineUsersMap = {};
 
 try {
   supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
@@ -2255,14 +2247,12 @@ async function handleLogout() {
   });
   if (!result.isConfirmed) return;
   try {
-    // Cleanup bubble
     if (csBubbleChannel) { try { csBubbleChannel.unsubscribe(); } catch(e) {} csBubbleChannel = null; }
     stopCSPolling();
     const container = document.getElementById('csBubbleContainer');
     if (container) container.innerHTML = '';
     activeBubbles = {};
     
-    // Cleanup presence
     cleanupPresence();
     
     if (globalChatChannel) { globalChatChannel.unsubscribe(); globalChatChannel = null; }
@@ -2458,7 +2448,9 @@ async function updateAuthUI(user) {
 
     const newChatSection = document.getElementById('newChatBoxSection');
     const csFolderSection = document.getElementById('csFolderSection');
-    if (newChatSection) newChatSection.style.display = isStaff ? 'block' : 'none';
+    // "Mulai Chat Baru" HANYA untuk ADMIN & OWNER (bukan CS)
+    if (newChatSection) newChatSection.style.display = isAdminOrOwner ? 'block' : 'none';
+    // Folder CS untuk semua staff
     if (csFolderSection) csFolderSection.style.display = isStaff ? 'block' : 'none';
     if (isStaff) setTimeout(() => loadCSFolders(), 800);
 
@@ -2850,14 +2842,8 @@ async function loadMemberList() {
       mutedList = mutes || [];
     } catch(e) {}
 
-    // Fetch presence
     const memberUserIds = data.map(m => m.id).filter(Boolean);
-    if (memberUserIds.length > 0) {
-      try {
-        const { data: presenceData } = await chatClient.from('user_presence').select('*').in('user_id', memberUserIds);
-        (presenceData || []).forEach(p => { presenceUsersCache[p.user_id] = p; });
-      } catch(e) {}
-    }
+    await fetchLastSeenMap(memberUserIds);
 
     const isOwner = currentProfile.role === 'owner';
     let html = '';
@@ -2873,7 +2859,7 @@ async function loadMemberList() {
       const bannedTag = m.banned ? '<span class="member-role-tag banned">BANNED</span>' : '';
       const muted = mutedList.find(mu => mu.email === m.email);
       const mutedTag = muted ? '<span class="member-role-tag muted">MUTED</span>' : '';
-      const presence = presenceUsersCache[m.id];
+      const presence = { user_id: m.id, ...(presenceUsersCache[m.id] || {}) };
       const presenceBadge = getPresenceBadgeHTML(presence);
       const presenceDot = getStatusIndicatorHTML(presence);
 
@@ -2990,7 +2976,7 @@ async function changeRolePrompt(email, currentRole) {
     title: '👑 Ubah Role',
     html: `<div style="text-align:left;font-size:12px;color:#b39ddb;margin-bottom:8px;">Target: <b style="color:#ff6b9d;">${email}</b></div>`,
     input: 'select',
-    inputOptions: { user: '👤 User', admin: '🛡️ Admin', cs: '💼 Customer Service', owner: '👑 Owner' },
+    inputOptions: { user: '👤 User', cs: '💼 Customer Service', admin: '🛡️ Admin', owner: '👑 Owner' },
     inputValue: currentRole,
     showCancelButton: true, confirmButtonText: '💾 Simpan', cancelButtonText: '❌ Batal',
     confirmButtonColor: '#b388ff', cancelButtonColor: '#6b4a7a',
@@ -3058,169 +3044,180 @@ async function unmuteUserChat(targetUserId, targetEmail) {
 }
 
 // ============================================================
-// USER PRESENCE (ONLINE/OFFLINE)
+// USER PRESENCE v2 - REALTIME via Supabase Presence
 // ============================================================
-function computePresenceStatus(presence) {
-  if (!presence) return 'offline';
-  if (!presence.is_online) return 'offline';
-  const lastActive = new Date(presence.last_active || presence.last_seen).getTime();
-  const diff = Date.now() - lastActive;
-  if (diff > OFFLINE_THRESHOLD) return 'offline';
-  if (diff > AWAY_THRESHOLD) return 'away';
-  return 'online';
-}
-
-async function updateMyPresence(isOnline = true) {
+async function upsertLastSeen() {
   if (!chatClient || !currentUser) return;
   try {
     const chatUserId = await getChatUserId();
     if (!chatUserId) return;
-    const now = new Date().toISOString();
-    const { error } = await chatClient
-      .from('user_presence')
-      .upsert({
-        user_id: chatUserId,
-        email: currentUser.email,
-        role: currentProfile?.role || 'user',
-        is_online: isOnline,
-        last_seen: now,
-        last_active: now,
-        updated_at: now
-      }, { onConflict: 'user_id' });
-    if (error && error.code !== '42P01') {
-      console.warn('Presence update error:', error.message);
-    }
+    await chatClient.from('user_last_seen').upsert({
+      user_id: chatUserId,
+      email: currentUser.email,
+      role: currentProfile?.role || 'user',
+      last_seen: new Date().toISOString()
+    }, { onConflict: 'user_id' });
   } catch(e) {
-    console.warn('Presence update failed:', e.message);
+    if (e?.code !== '42P01') console.warn('Last seen update:', e.message);
   }
 }
 
-async function setMyPresenceOffline() {
+function initRealtimePresence() {
   if (!chatClient || !currentUser) return;
-  try {
-    const chatUserId = await getChatUserId();
-    if (!chatUserId) return;
-    const now = new Date().toISOString();
-    await chatClient
-      .from('user_presence')
-      .update({ is_online: false, last_seen: now, updated_at: now })
-      .eq('user_id', chatUserId);
-  } catch(e) {}
-}
-
-function startHeartbeat() {
-  if (heartbeatInterval) clearInterval(heartbeatInterval);
-  updateMyPresence(true);
-  heartbeatInterval = setInterval(() => { updateMyPresence(true); }, HEARTBEAT_INTERVAL);
-  ['mousemove', 'keydown', 'click', 'touchstart', 'scroll'].forEach(evt => {
-    document.addEventListener(evt, throttledActivity, { passive: true });
+  
+  if (presenceChannelRealtime) {
+    try { presenceChannelRealtime.unsubscribe(); } catch(e) {}
+    presenceChannelRealtime = null;
+  }
+  
+  presenceChannelRealtime = chatClient.channel('online_users_realtime', {
+    config: { presence: { key: currentUser.id } }
+  });
+  
+  presenceChannelRealtime
+    .on('presence', { event: 'sync' }, () => {
+      const state = presenceChannelRealtime.presenceState();
+      updateOnlineUsersFromPresence(state);
+    })
+    .on('presence', { event: 'join' }, ({ key, newPresences }) => {
+      newPresences.forEach(p => {
+        onlineUsersMap[p.user_id || key] = true;
+        presenceUsersCache[p.user_id || key] = {
+          ...(presenceUsersCache[p.user_id || key] || {}),
+          user_id: p.user_id || key,
+          email: p.email,
+          role: p.role,
+          is_online: true,
+          last_seen: p.joined_at || new Date().toISOString()
+        };
+      });
+      refreshPresenceUI();
+      updateOnlineCounter();
+    })
+    .on('presence', { event: 'leave' }, ({ key, leftPresences }) => {
+      leftPresences.forEach(p => {
+        const uid = p.user_id || key;
+        delete onlineUsersMap[uid];
+        if (presenceUsersCache[uid]) {
+          presenceUsersCache[uid].is_online = false;
+          presenceUsersCache[uid].last_seen = new Date().toISOString();
+        }
+      });
+      refreshPresenceUI();
+      updateOnlineCounter();
+    })
+    .subscribe(async (status) => {
+      console.log('📡 Realtime Presence:', status);
+      if (status === 'SUBSCRIBED') {
+        await presenceChannelRealtime.track({
+          user_id: currentUser.id,
+          email: currentUser.email,
+          role: currentProfile?.role || 'user',
+          joined_at: new Date().toISOString()
+        });
+      } else if (['CHANNEL_ERROR','TIMED_OUT','CLOSED'].includes(status)) {
+        setTimeout(initRealtimePresence, 3000);
+      }
+    });
+  
+  window.addEventListener('focus', () => {
+    if (presenceChannelRealtime) {
+      presenceChannelRealtime.track({
+        user_id: currentUser.id,
+        email: currentUser.email,
+        role: currentProfile?.role || 'user',
+        joined_at: new Date().toISOString()
+      });
+    }
+    upsertLastSeen();
+  });
+  
+  window.addEventListener('beforeunload', () => {
+    if (presenceChannelRealtime) presenceChannelRealtime.untrack();
   });
 }
 
-let activityThrottle = 0;
-function throttledActivity() {
-  const now = Date.now();
-  if (now - activityThrottle < 20000) return;
-  activityThrottle = now;
-  updateMyPresence(true);
+function updateOnlineUsersFromPresence(state) {
+  onlineUsersMap = {};
+  const now = new Date().toISOString();
+  Object.keys(state || {}).forEach(key => {
+    (state[key] || []).forEach(p => {
+      const uid = p.user_id || key;
+      onlineUsersMap[uid] = true;
+      presenceUsersCache[uid] = {
+        ...(presenceUsersCache[uid] || {}),
+        user_id: uid,
+        email: p.email,
+        role: p.role,
+        is_online: true,
+        last_seen: p.joined_at || now
+      };
+    });
+  });
+  refreshPresenceUI();
+  updateOnlineCounter();
 }
 
-function stopHeartbeat() {
-  if (heartbeatInterval) { clearInterval(heartbeatInterval); heartbeatInterval = null; }
-  setMyPresenceOffline();
-}
-
-async function fetchAllPresence() {
-  if (!chatClient) return {};
+async function fetchLastSeenMap(userIds) {
+  if (!chatClient || !userIds || userIds.length === 0) return {};
   try {
     const { data, error } = await chatClient
-      .from('user_presence')
-      .select('*')
-      .order('last_seen', { ascending: false })
-      .limit(500);
+      .from('user_last_seen').select('*').in('user_id', userIds);
     if (error) {
-      if (error.code === '42P01') {
-        console.warn('⚠️ Tabel user_presence belum dibuat.');
-        return {};
-      }
+      if (error.code === '42P01') return {};
       throw error;
     }
     const map = {};
-    (data || []).forEach(p => { map[p.user_id] = p; });
-    presenceUsersCache = map;
-    onlineUsersCount = Object.values(map).filter(p => computePresenceStatus(p) === 'online').length;
+    (data || []).forEach(p => {
+      if (!onlineUsersMap[p.user_id]) {
+        presenceUsersCache[p.user_id] = {
+          user_id: p.user_id, email: p.email, role: p.role,
+          is_online: false, last_seen: p.last_seen
+        };
+      }
+      map[p.user_id] = p;
+    });
     return map;
-  } catch(e) {
-    console.warn('Fetch presence error:', e.message);
-    return {};
-  }
+  } catch(e) { return {}; }
 }
 
-async function getPresence(userId) {
-  if (!chatClient || !userId) return null;
-  if (presenceUsersCache[userId]) return presenceUsersCache[userId];
-  try {
-    const { data, error } = await chatClient.from('user_presence').select('*').eq('user_id', userId).maybeSingle();
-    if (error || !data) return null;
-    presenceUsersCache[userId] = data;
-    return data;
-  } catch(e) { return null; }
+function computePresenceStatus(userId) {
+  if (!userId) return 'offline';
+  return onlineUsersMap[userId] ? 'online' : 'offline';
 }
 
 function updateOnlineCounter() {
   const el = document.getElementById('onlineCounterText');
-  if (el) el.textContent = `${onlineUsersCount} Online`;
+  if (el) el.textContent = `${Object.keys(onlineUsersMap).length} Online`;
 }
 
 function getStatusIndicatorHTML(presence) {
-  const status = computePresenceStatus(presence);
-  const cls = status === 'online' ? 'online' : (status === 'away' ? 'away' : 'offline');
-  return `<span class="status-indicator ${cls}"></span>`;
+  if (!presence) return `<span class="status-indicator offline"></span>`;
+  const status = computePresenceStatus(presence.user_id || presence);
+  return `<span class="status-indicator ${status === 'online' ? 'online' : 'offline'}"></span>`;
 }
 
 function getPresenceBadgeHTML(presence) {
-  const status = computePresenceStatus(presence);
+  if (!presence) return `<span class="presence-badge offline"><span class="dot"></span>Offline</span>`;
+  const status = computePresenceStatus(presence.user_id || presence);
   if (status === 'online') return `<span class="presence-badge online"><span class="dot"></span>Online</span>`;
-  if (status === 'away') return `<span class="presence-badge away"><span class="dot"></span>Away</span>`;
-  const lastSeen = presence ? formatTimeAgo(presence.last_seen) : 'lama';
+  const lastSeen = presence.last_seen ? formatTimeAgo(presence.last_seen) : 'lama';
   return `<span class="presence-badge offline"><span class="dot"></span>${lastSeen}</span>`;
 }
 
 function getOnlineTextHTML(presence) {
-  const status = computePresenceStatus(presence);
+  if (!presence) return `<div class="online-text offline">Offline</div>`;
+  const status = computePresenceStatus(presence.user_id || presence);
   if (status === 'online') return `<div class="online-text online"><span class="online-dot"></span>Online sekarang</div>`;
-  if (status === 'away') return `<div class="online-text away"><span class="online-dot"></span>Sedang tidak aktif</div>`;
-  const lastSeen = presence ? formatTimeAgo(presence.last_seen) : 'lama';
+  const lastSeen = presence.last_seen ? formatTimeAgo(presence.last_seen) : 'lama';
   return `<div class="online-text offline">Terakhir dilihat ${lastSeen}</div>`;
-}
-
-function subscribePresence() {
-  if (presenceChannel) { try { presenceChannel.unsubscribe(); } catch(e) {} presenceChannel = null; }
-  if (!chatClient || !currentUser) return;
-  presenceChannel = chatClient
-    .channel('presence_changes_' + Date.now())
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'user_presence' }, (payload) => {
-      const updated = payload.new;
-      if (updated && updated.user_id) {
-        presenceUsersCache[updated.user_id] = updated;
-        onlineUsersCount = Object.values(presenceUsersCache).filter(p => computePresenceStatus(p) === 'online').length;
-        refreshPresenceUI();
-      }
-    })
-    .subscribe((status) => {
-      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
-        setTimeout(subscribePresence, 3000);
-      }
-    });
 }
 
 function refreshPresenceUI() {
   updateOnlineCounter();
   
-  // Update home & profile presence indicator
-  const chatUserId = currentUser?.id;
-  if (chatUserId && presenceUsersCache[chatUserId]) {
-    const presence = presenceUsersCache[chatUserId];
+  if (currentUser) {
+    const presence = { user_id: currentUser.id, is_online: true, last_seen: new Date().toISOString() };
     ['homeAvatar', 'profileAvatar'].forEach(id => {
       const el = document.getElementById(id);
       if (el && el.parentElement) {
@@ -3234,14 +3231,21 @@ function refreshPresenceUI() {
         if (ind) wrapper.appendChild(ind);
       }
     });
+    ['homeRole', 'profileRole'].forEach(id => {
+      const roleEl = document.getElementById(id);
+      if (roleEl && roleEl.parentElement) {
+        const old = roleEl.parentElement.querySelector('.online-text');
+        if (old) old.remove();
+        roleEl.insertAdjacentHTML('afterend', getOnlineTextHTML(presence));
+      }
+    });
   }
   
-  // Update member list
   document.querySelectorAll('.member-item[data-user-id]').forEach(el => {
     const uid = el.dataset.userId;
-    const presence = presenceUsersCache[uid];
-    const badgeContainer = el.querySelector('.presence-badge-container');
-    if (badgeContainer) badgeContainer.innerHTML = getPresenceBadgeHTML(presence);
+    const presence = { user_id: uid, ...(presenceUsersCache[uid] || {}) };
+    const bc = el.querySelector('.presence-badge-container');
+    if (bc) bc.innerHTML = getPresenceBadgeHTML(presence);
     const avatar = el.querySelector('.member-avatar');
     if (avatar) {
       const old = avatar.querySelector('.status-indicator');
@@ -3253,12 +3257,11 @@ function refreshPresenceUI() {
     }
   });
   
-  // Update CS folders
   document.querySelectorAll('.cs-folder-item[data-user-id]').forEach(el => {
     const uid = el.dataset.userId;
-    const presence = presenceUsersCache[uid];
-    const badgeContainer = el.querySelector('.presence-badge-container');
-    if (badgeContainer) badgeContainer.innerHTML = getPresenceBadgeHTML(presence);
+    const presence = { user_id: uid, ...(presenceUsersCache[uid] || {}) };
+    const bc = el.querySelector('.presence-badge-container');
+    if (bc) bc.innerHTML = getPresenceBadgeHTML(presence);
     const icon = el.querySelector('.cs-folder-icon');
     if (icon) {
       const old = icon.querySelector('.status-indicator');
@@ -3270,12 +3273,11 @@ function refreshPresenceUI() {
     }
   });
   
-  // Update support user list
   document.querySelectorAll('.support-user-item[data-user-id]').forEach(el => {
     const uid = el.dataset.userId;
-    const presence = presenceUsersCache[uid];
-    const badgeContainer = el.querySelector('.presence-badge-container');
-    if (badgeContainer) badgeContainer.innerHTML = getPresenceBadgeHTML(presence);
+    const presence = { user_id: uid, ...(presenceUsersCache[uid] || {}) };
+    const bc = el.querySelector('.presence-badge-container');
+    if (bc) bc.innerHTML = getPresenceBadgeHTML(presence);
     const avatar = el.querySelector('.support-user-avatar');
     if (avatar) {
       const old = avatar.querySelector('.status-indicator');
@@ -3290,38 +3292,28 @@ function refreshPresenceUI() {
 
 async function initPresence() {
   if (!chatClient || !currentUser) return;
-  await fetchAllPresence();
-  await updateMyPresence(true);
-  startHeartbeat();
-  subscribePresence();
-  refreshPresenceUI();
-  updateOnlineCounter();
-  console.log('👥 Presence ready. Online:', onlineUsersCount);
+  initRealtimePresence();
+  if (lastSeenInterval) clearInterval(lastSeenInterval);
+  upsertLastSeen();
+  lastSeenInterval = setInterval(upsertLastSeen, 60000);
+  if (presenceRefreshInterval) clearInterval(presenceRefreshInterval);
+  presenceRefreshInterval = setInterval(() => {
+    refreshPresenceUI();
+    updateOnlineCounter();
+  }, 5000);
+  console.log('👥 Presence initialized (REALTIME)');
 }
 
 function cleanupPresence() {
-  stopHeartbeat();
-  if (presenceChannel) { try { presenceChannel.unsubscribe(); } catch(e) {} presenceChannel = null; }
-}
-
-window.addEventListener('beforeunload', () => {
-  if (chatClient && currentUser) {
-    const chatUserId = currentUser?.id;
-    if (chatUserId) {
-      chatClient.from('user_presence')
-        .update({ is_online: false, last_seen: new Date().toISOString() })
-        .eq('user_id', chatUserId).then(() => {}).catch(() => {});
-    }
+  if (presenceChannelRealtime) {
+    try { presenceChannelRealtime.untrack(); } catch(e) {}
+    try { presenceChannelRealtime.unsubscribe(); } catch(e) {}
+    presenceChannelRealtime = null;
   }
-});
-
-document.addEventListener('visibilitychange', () => {
-  if (!document.hidden && currentUser) updateMyPresence(true);
-});
-
-window.addEventListener('focus', () => {
-  if (currentUser) updateMyPresence(true);
-});
+  if (lastSeenInterval) { clearInterval(lastSeenInterval); lastSeenInterval = null; }
+  if (presenceRefreshInterval) { clearInterval(presenceRefreshInterval); presenceRefreshInterval = null; }
+  onlineUsersMap = {};
+}
 
 // ============================================================
 // CHAT SYSTEM
@@ -3786,20 +3778,14 @@ async function loadSupportUsers() {
     listEl.innerHTML = `<div class="chat-empty"><span class="icon">📭</span>Belum ada chat dari user</div>`;
     return;
   }
-  // Fetch presence
   const supportUserIds = users.map(u => u.user_id).filter(Boolean);
-  if (supportUserIds.length > 0) {
-    try {
-      const { data: presenceData } = await chatClient.from('user_presence').select('*').in('user_id', supportUserIds);
-      (presenceData || []).forEach(p => { presenceUsersCache[p.user_id] = p; });
-    } catch(e) {}
-  }
+  await fetchLastSeenMap(supportUserIds);
   let html = '';
   users.forEach(u => {
     const initial = (u.email || '?').charAt(0).toUpperCase();
     const unreadClass = u.hasUnread ? 'unread' : '';
     const staffTag = u.lastRole !== 'user' ? '💬 ' : '';
-    const presence = presenceUsersCache[u.user_id];
+    const presence = { user_id: u.user_id, ...(presenceUsersCache[u.user_id] || {}) };
     html += `
       <div class="support-user-item ${unreadClass}" data-user-id="${u.user_id}" onclick="openSupportChatWith('${u.user_id}','${escapeAttr(u.email)}')">
         <div class="support-user-avatar">${initial}${getStatusIndicatorHTML(presence)}</div>
@@ -3844,20 +3830,15 @@ async function loadCSFolders() {
       listEl.innerHTML = `<div class="chat-empty" style="padding:20px 10px;"><span class="icon">📭</span>Belum ada folder chat<br><span style="font-size:11px;color:#6b4a7a;">Mulai chat baru dengan Gmail user di atas</span></div>`;
       return;
     }
-    // Fetch presence
     const folderUserIds = folders.map(f => f.user_id).filter(Boolean);
-    if (folderUserIds.length > 0) {
-      try {
-        const { data: presenceData } = await chatClient.from('user_presence').select('*').in('user_id', folderUserIds);
-        (presenceData || []).forEach(p => { presenceUsersCache[p.user_id] = p; });
-      } catch(e) {}
-    }
+    await fetchLastSeenMap(folderUserIds);
+
     let html = '';
     folders.forEach(f => {
       const initial = (f.email || '?').charAt(0).toUpperCase();
       const unreadClass = f.hasUnread ? 'has-unread' : '';
       const staffTag = f.lastRole !== 'user' ? '💬 ' : '';
-      const presence = presenceUsersCache[f.user_id];
+      const presence = { user_id: f.user_id, ...(presenceUsersCache[f.user_id] || {}) };
       const presenceBadge = getPresenceBadgeHTML(presence);
       html += `
         <div class="cs-folder-item ${unreadClass}" data-user-id="${f.user_id}" onclick="openCSFolder('${f.user_id}','${escapeAttr(f.email)}')">
@@ -3914,8 +3895,8 @@ async function startNewChat() {
       const chatUserId = await getChatUserId();
       const { error: createErr } = await chatClient.from('support_messages').insert({
         user_id: target.id, email: target.email,
-        sender_id: chatUserId, sender_role: currentProfile?.role || 'cs',
-        message: `👋 Halo! Saya ${currentProfile?.role === 'owner' ? 'Owner' : (currentProfile?.role === 'admin' ? 'Admin' : 'Customer Service')} Shine Shop. Ada yang bisa saya bantu?`,
+        sender_id: chatUserId, sender_role: currentProfile?.role || 'admin',
+        message: `👋 Halo! Saya ${currentProfile?.role === 'owner' ? 'Owner' : 'Admin'} Shine Shop. Ada yang bisa saya bantu?`,
         read_by_admin: true
       });
       if (createErr) console.warn('Gagal buat pesan pembuka:', createErr.message);
@@ -3989,36 +3970,24 @@ async function sendSupportReply() {
 }
 
 // ============================================================
-// FLOATING CHAT BUBBLE (FIXED)
+// FLOATING CHAT BUBBLE
 // ============================================================
 function initCSBubbleChannel() {
-  if (!chatClient || !currentUser) {
-    console.warn('⚠️ Bubble: no chatClient or currentUser');
-    return;
-  }
+  if (!chatClient || !currentUser) return;
   
-  if (csBubbleChannel) {
-    try { csBubbleChannel.unsubscribe(); } catch(e) {}
-    csBubbleChannel = null;
-  }
+  if (csBubbleChannel) { try { csBubbleChannel.unsubscribe(); } catch(e) {} csBubbleChannel = null; }
   
   lastPolledTime = new Date().toISOString();
   
   csBubbleChannel = chatClient
     .channel('cs_bubble_' + Date.now())
-    .on('postgres_changes', {
-      event: 'INSERT',
-      schema: 'public',
-      table: 'support_messages'
-    }, (payload) => {
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'support_messages' }, (payload) => {
       console.log('📩 Support message baru:', payload.new);
       handleNewSupportMessage(payload.new);
     })
     .subscribe((status) => {
-      console.log('📢 CS Bubble channel status:', status);
-      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
-        setTimeout(initCSBubbleChannel, 3000);
-      }
+      console.log('📢 CS Bubble channel:', status);
+      if (['CHANNEL_ERROR','TIMED_OUT','CLOSED'].includes(status)) setTimeout(initCSBubbleChannel, 3000);
     });
 }
 
@@ -4026,22 +3995,15 @@ async function handleNewSupportMessage(msg) {
   if (!msg || !currentUser) return;
   if (!msg.sender_role || !msg.created_at) return;
   
-  // Hanya proses pesan dalam 60 detik terakhir
   const msgTime = new Date(msg.created_at).getTime();
   const now = Date.now();
   if (now - msgTime > 60000) return;
   
-  // HANYA pesan dari STAFF
   const isFromStaff = ['cs', 'admin', 'owner'].includes(msg.sender_role);
   if (!isFromStaff) return;
-  
-  // Skip kalau yang login adalah staff
   if (isStaff) return;
-  
-  // Skip kalau chat CS sedang dibuka
   if (chatHubOpen && currentChatTab === 'support') return;
   
-  // Pastikan pesan untuk user yang login
   const chatUserId = await getChatUserId();
   if (!chatUserId || msg.user_id !== chatUserId) return;
   
@@ -4052,12 +4014,8 @@ function showCSBubble(msg) {
   if (activeBubbles[msg.id]) return;
   
   const container = document.getElementById('csBubbleContainer');
-  if (!container) {
-    console.warn('⚠️ Bubble container not found');
-    return;
-  }
+  if (!container) return;
   
-  // Batasi maksimal 3 bubble
   const currentBubbles = container.querySelectorAll('.cs-bubble:not(.removing)');
   if (currentBubbles.length >= CS_BUBBLE_MAX) {
     const oldest = currentBubbles[0];
@@ -4103,13 +4061,9 @@ function showCSBubble(msg) {
   });
   
   container.appendChild(bubble);
-  console.log('✅ Bubble shown for message:', msg.id);
+  console.log('✅ Bubble shown:', msg.id);
   
-  // Auto-remove setelah durasi
-  const timeoutId = setTimeout(() => {
-    dismissCSBubble(msg.id);
-  }, CS_BUBBLE_DURATION);
-  
+  const timeoutId = setTimeout(() => { dismissCSBubble(msg.id); }, CS_BUBBLE_DURATION);
   activeBubbles[msg.id] = timeoutId;
   
   playBubbleSound();
@@ -4121,24 +4075,18 @@ function dismissCSBubble(msgId) {
   if (!container) return;
   const bubble = container.querySelector(`.cs-bubble[data-msg-id="${msgId}"]`);
   if (bubble) removeBubble(bubble);
-  if (activeBubbles[msgId]) {
-    clearTimeout(activeBubbles[msgId]);
-    delete activeBubbles[msgId];
-  }
+  if (activeBubbles[msgId]) { clearTimeout(activeBubbles[msgId]); delete activeBubbles[msgId]; }
 }
 
 function removeBubble(bubbleEl) {
   if (!bubbleEl) return;
   bubbleEl.classList.add('removing');
-  setTimeout(() => {
-    if (bubbleEl.parentNode) bubbleEl.parentNode.removeChild(bubbleEl);
-  }, 300);
+  setTimeout(() => { if (bubbleEl.parentNode) bubbleEl.parentNode.removeChild(bubbleEl); }, 300);
 }
 
 async function openCSBubbleReply(msgId) {
   dismissCSBubble(msgId);
   if (typeof openChatHub === 'function') openChatHub('support');
-  
   if (!isStaff && currentUser) {
     setTimeout(async () => {
       const chatUserId = await getChatUserId();
@@ -4175,61 +4123,42 @@ function playBubbleSound() {
 function toggleBubbleVisibility() {
   const container = document.getElementById('csBubbleContainer');
   if (!container) return;
-  if (chatHubOpen && currentChatTab === 'support') {
-    container.style.display = 'none';
-  } else {
-    container.style.display = 'flex';
-  }
+  if (chatHubOpen && currentChatTab === 'support') container.style.display = 'none';
+  else container.style.display = 'flex';
 }
 
-// ============================================================
-// POLLING FALLBACK (FIXED)
-// ============================================================
 function startCSPolling() {
   if (csPollingInterval) clearInterval(csPollingInterval);
   lastPolledTime = new Date().toISOString();
-  
   csPollingInterval = setInterval(async () => {
     if (!chatClient || !currentUser) return;
     if (isStaff) return;
     if (chatHubOpen && currentChatTab === 'support') return;
-    
     try {
       const chatUserId = await getChatUserId();
       if (!chatUserId) return;
-      
       const since = lastPolledTime || new Date(Date.now() - 30000).toISOString();
-      
       const { data, error } = await chatClient
-        .from('support_messages')
-        .select('*')
+        .from('support_messages').select('*')
         .eq('user_id', chatUserId)
         .in('sender_role', ['cs', 'admin', 'owner'])
         .gt('created_at', since)
         .order('created_at', { ascending: true });
-      
       if (error) return;
       if (!data || data.length === 0) return;
-      
       lastPolledTime = data[data.length - 1].created_at;
-      
       data.forEach(msg => {
         if (!activeBubbles[msg.id]) {
-          console.log('📩 [Polling] Bubble from:', msg.email);
+          console.log('📩 [Polling] Bubble:', msg.email);
           showCSBubble(msg);
         }
       });
-    } catch(e) {
-      console.warn('CS Polling error:', e.message);
-    }
+    } catch(e) {}
   }, 8000);
 }
 
 function stopCSPolling() {
-  if (csPollingInterval) {
-    clearInterval(csPollingInterval);
-    csPollingInterval = null;
-  }
+  if (csPollingInterval) { clearInterval(csPollingInterval); csPollingInterval = null; }
 }
 
 // ============================================================
