@@ -19,7 +19,15 @@
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700;800;900&family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+
+<!-- QRCode library - qrcodejs (lebih stabil dari qrcode) -->
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+<script>
+  // Fallback kalau jsdelivr gagal
+  if (typeof QRCode === 'undefined') {
+    document.write('<script src="https://unpkg.com/qrcodejs@1.0.0/qrcode.min.js"><\/script>');
+  }
+</script>
 
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -498,9 +506,24 @@ h1 {
   background: #fff; border-radius: 16px;
   padding: 14px; margin: 0 auto 14px;
   width: fit-content;
+  min-width: 260px; min-height: 260px;
   box-shadow: 0 0 40px rgba(255,107,157,0.4);
+  display: flex; align-items: center; justify-content: center;
 }
-#qrisCanvas { display: block; max-width: 100%; height: auto; }
+#qrisCanvas {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 260px;
+  min-height: 260px;
+}
+#qrisCanvas img,
+#qrisCanvas canvas {
+  display: block !important;
+  max-width: 260px;
+  height: auto !important;
+  border-radius: 8px;
+}
 .qris-timer {
   font-family: 'Courier New', monospace;
   font-size: 20px; font-weight: 900;
@@ -767,7 +790,9 @@ h1 {
       <div class="amount-detail" id="qrisAmountDetail">Termasuk kode unik</div>
     </div>
     <div class="qris-canvas-wrapper">
-      <canvas id="qrisCanvas" width="280" height="280"></canvas>
+      <div id="qrisCanvas">
+        <div style="color:#666;font-size:12px;">Memuat QR...</div>
+      </div>
     </div>
     <div class="qris-timer" id="qrisTimer">10:00</div>
     <div class="qris-status waiting" id="qrisStatus">
@@ -872,7 +897,7 @@ async function handleLogin(event) {
     let msg = err.message || 'Terjadi kesalahan.';
     if (msg.includes('Invalid login credentials')) msg = 'Email atau password salah.';
     else if (msg.includes('Email not confirmed')) {
-      msg = 'Email belum dikonfirmasi. Nonaktifkan "Confirm email" di Supabase atau konfirmasi email Anda.';
+      msg = 'Email belum dikonfirmasi. Nonaktifkan "Confirm email" di Supabase.';
     }
     Swal.fire({
       title: '❌ Login Gagal', text: msg, icon: 'error',
@@ -903,30 +928,20 @@ async function handleSignup(event) {
   btn.disabled = true; btn.innerHTML = '⏳ Membuat akun...';
 
   try {
-    // 🔥 SIGN UP TANPA KONFIRMASI EMAIL
-    // Karena Confirm Email dimatikan di Supabase, data.session langsung ada
     const { data, error } = await supabaseClient.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: window.location.origin + window.location.pathname
-      }
+      email, password,
+      options: { emailRedirectTo: window.location.origin + window.location.pathname }
     });
 
     if (error) throw error;
-
     console.log('✅ Signup berhasil:', data);
 
-    // Kalau Confirm Email masih aktif, session akan null
     if (data.user && !data.session) {
-      // Kasus ini hanya muncul jika Confirm Email MASIH ON
       await Swal.fire({
         title: '⚠️ Email Belum Dikonfirmasi',
         html: `Signup berhasil tapi email konfirmasi masih aktif.<br><br><b>Solusi:</b><br>1. Buka Supabase Dashboard<br>2. Authentication → Providers → Email<br>3. Matikan <b>"Confirm email"</b><br>4. Coba signup ulang.`,
-        icon: 'warning',
-        confirmButtonColor: '#ff6b9d',
-        background: '#1a0e2e', color: '#fff',
-        confirmButtonText: '✅ Mengerti'
+        icon: 'warning', confirmButtonColor: '#ff6b9d',
+        background: '#1a0e2e', color: '#fff', confirmButtonText: '✅ Mengerti'
       });
       switchAuthTab('login');
       document.getElementById('loginEmail').value = email;
@@ -934,7 +949,6 @@ async function handleSignup(event) {
       return;
     }
 
-    // ✅ Auto-login (Confirm Email MATI)
     await Swal.fire({
       title: '🎉 Akun Berhasil Dibuat!',
       html: `Selamat bergabung di Shine Shop,<br><b>${email}</b> 🌸`,
@@ -943,25 +957,14 @@ async function handleSignup(event) {
       timer: 2200, timerProgressBar: true, showConfirmButton: false
     });
 
-    if (data.session && data.user) {
-      processGmailUpdate(data.user.email);
-      // UI akan auto-update via onAuthStateChange
-    }
-
+    if (data.session && data.user) processGmailUpdate(data.user.email);
     document.getElementById('formSignup').reset();
-
   } catch (err) {
     console.error('❌ Signup error:', err);
     let msg = err.message || 'Terjadi kesalahan.';
-    if (msg.includes('already registered') || msg.includes('already been registered')) {
-      msg = 'Email sudah terdaftar. Silakan login.';
-    } else if (msg.includes('Password should be')) {
-      msg = 'Password minimal 6 karakter.';
-    } else if (msg.includes('rate limit') || msg.includes('over_email_send_rate_limit')) {
-      msg = 'Rate limit email terlampaui. Nonaktifkan "Confirm email" di Supabase atau tunggu 1 jam.';
-    } else if (msg.includes('invalid')) {
-      msg = 'Format email tidak valid.';
-    }
+    if (msg.includes('already registered') || msg.includes('already been registered')) msg = 'Email sudah terdaftar. Silakan login.';
+    else if (msg.includes('Password should be')) msg = 'Password minimal 6 karakter.';
+    else if (msg.includes('rate limit') || msg.includes('over_email_send_rate_limit')) msg = 'Rate limit email. Nonaktifkan "Confirm email" atau tunggu 1 jam.';
     Swal.fire({
       title: '❌ Registrasi Gagal', text: msg, icon: 'error',
       confirmButtonColor: '#ff4444', background: '#1a0e2e', color: '#fff'
@@ -1013,7 +1016,6 @@ async function fetchProfile(userId) {
 function showBanOverlay(profile) {
   const overlay = document.getElementById('banOverlay');
   overlay.classList.add('show');
-
   document.getElementById('banEmail').textContent = profile.email || '-';
   document.getElementById('banReason').innerHTML = (profile.banned_reason || 'Tidak ada alasan').replace(/\n/g, '<br>');
 
@@ -1121,7 +1123,6 @@ async function updateAuthUI(user) {
     adminSection.classList.remove('show');
     document.getElementById('banOverlay').classList.remove('show');
     if (banCountdownInterval) clearInterval(banCountdownInterval);
-    console.log('ℹ️ Logout');
   }
 }
 
@@ -1152,7 +1153,7 @@ async function refreshBalance() {
 }
 
 // ============================================================
-// 💳 DEPOSIT & QRIS
+// 🧮 QRIS BUILDER (FIXED)
 // ============================================================
 function generateUniqueCode() {
   return Math.floor(Math.random() * 999) + 1;
@@ -1171,34 +1172,96 @@ function crc16(str) {
   return crc.toString(16).toUpperCase().padStart(4, '0');
 }
 
-function buildDynamicQris(baseCrc, amount) {
-  const baseWithoutCrc = baseCrc.slice(0, -4);
-  const amountStr = String(amount);
-  const lenStr = String(amountStr.length).padStart(2, '0');
-  const tag54 = '54' + lenStr + amountStr;
-  const insertPos = baseWithoutCrc.indexOf('5802ID');
-  let newQris;
-  if (insertPos > -1) {
-    newQris = baseWithoutCrc.slice(0, insertPos) + tag54 + baseWithoutCrc.slice(insertPos);
-  } else {
-    newQris = baseWithoutCrc + tag54;
+function buildDynamicQris(baseQris, amount) {
+  try {
+    let base = baseQris.trim();
+    if (base.length < 8) throw new Error('QRIS base terlalu pendek');
+
+    const crcTagPos = base.lastIndexOf('6304');
+    if (crcTagPos === -1) throw new Error('Tag CRC (6304) tidak ditemukan');
+    base = base.substring(0, crcTagPos);
+
+    // Set tag 01 jadi "12" (dynamic)
+    base = base.replace(/0102\d{2}/, '010212');
+
+    // Hapus tag 54 lama jika ada
+    base = base.replace(/54\d{2}\d+(\.\d+)?/g, '');
+
+    // Build tag 54
+    const amountStr = String(Math.round(amount));
+    const tag54 = '54' + String(amountStr.length).padStart(2, '0') + amountStr;
+
+    // Insert sebelum tag 58 atau 53
+    let insertPos = base.indexOf('5802ID');
+    if (insertPos === -1) insertPos = base.indexOf('5303360');
+    if (insertPos === -1) insertPos = base.indexOf('5303');
+    if (insertPos === -1) insertPos = base.length;
+
+    const withAmount = base.slice(0, insertPos) + tag54 + base.slice(insertPos);
+
+    const toHash = withAmount + '6304';
+    const newCrc = crc16(toHash);
+    const finalQris = toHash + newCrc;
+
+    console.log('📦 QRIS Final:', finalQris);
+    console.log('📦 Amount:', amount);
+    return finalQris;
+  } catch (e) {
+    console.error('❌ buildDynamicQris error:', e);
+    return baseQris;
   }
-  const crc = crc16(newQris + '6304');
-  return newQris + '6304' + crc;
 }
 
+/**
+ * Render QRIS ke DOM. Pakai qrcodejs, fallback ke API kalau library gagal.
+ */
 function renderQrisToCanvas(qrisString) {
-  const canvas = document.getElementById('qrisCanvas');
-  if (!canvas || typeof QRCode === 'undefined') return;
-  QRCode.toCanvas(canvas, qrisString, {
-    width: 280, margin: 1,
-    color: { dark: '#000000', light: '#ffffff' }
-  }, function(err) {
-    if (err) console.error('QR render error:', err);
-    else console.log('✅ QRIS rendered');
-  });
+  const container = document.getElementById('qrisCanvas');
+  if (!container) {
+    console.error('❌ #qrisCanvas tidak ditemukan');
+    return;
+  }
+
+  container.innerHTML = '';
+
+  if (typeof QRCode === 'undefined') {
+    console.warn('⚠️ Library QRCode gagal load, fallback ke API');
+    const url = 'https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=10&data=' + encodeURIComponent(qrisString);
+    const img = document.createElement('img');
+    img.src = url;
+    img.alt = 'QRIS';
+    img.style.cssText = 'width:260px;height:260px;display:block;border-radius:8px;';
+    img.onerror = () => {
+      container.innerHTML = '<div style="color:#c00;font-size:12px;padding:20px;text-align:center;">❌ Gagal memuat QR.<br>Coba refresh.</div>';
+    };
+    container.appendChild(img);
+    console.log('✅ QR dirender via API fallback');
+    return;
+  }
+
+  try {
+    new QRCode(container, {
+      text: qrisString,
+      width: 260,
+      height: 260,
+      colorDark: '#000000',
+      colorLight: '#ffffff',
+      correctLevel: QRCode.CorrectLevel.M
+    });
+    console.log('✅ QR dirender via qrcodejs, panjang:', qrisString.length);
+  } catch (e) {
+    console.error('❌ QRCode render error:', e);
+    const url = 'https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=10&data=' + encodeURIComponent(qrisString);
+    const img = document.createElement('img');
+    img.src = url;
+    img.style.cssText = 'width:260px;height:260px;display:block;';
+    container.appendChild(img);
+  }
 }
 
+// ============================================================
+// 💳 DEPOSIT
+// ============================================================
 async function openDepositDialog() {
   if (!currentUser) return;
   const { value: amountInput } = await Swal.fire({
@@ -1253,9 +1316,15 @@ async function createDeposit(amount) {
     const qrisString = buildDynamicQris(QRIS_CRC, totalAmount);
     document.getElementById('qrisAmount').textContent = 'Rp ' + totalAmount.toLocaleString('id-ID');
     document.getElementById('qrisAmountDetail').innerHTML = `Nominal: Rp ${amount.toLocaleString('id-ID')} + Kode Unik: <b style="color:#ffd700;">${uniqueCode}</b>`;
-    renderQrisToCanvas(qrisString);
 
+    // Tampilkan modal DULU
     document.getElementById('qrisModal').classList.add('show');
+
+    // Baru render QR setelah modal visible
+    setTimeout(() => {
+      renderQrisToCanvas(qrisString);
+    }, 100);
+
     startDepositTimer(expiresAt);
     startDepositPolling(totalAmount);
   } catch (err) {
@@ -1341,7 +1410,8 @@ async function handleDepositSuccess() {
 
     document.getElementById('qrisStatus').className = 'qris-status';
     document.getElementById('qrisStatusText').textContent = '✅ Pembayaran Berhasil!';
-    document.getElementById('qrisStatus').querySelector('.spin-dot').style.display = 'none';
+    const spinDot = document.getElementById('qrisStatus').querySelector('.spin-dot');
+    if (spinDot) spinDot.style.display = 'none';
 
     await Swal.fire({
       title: '🎉 Deposit Berhasil!',
@@ -1771,7 +1841,8 @@ window.addEventListener('load', async () => {
   setupAudioEvents();
   updateGmailDisplay();
   await initAuth();
-  console.log('🌸 Shine Shop tanpa konfirmasi email ready!');
+  console.log('🌸 Shine Shop ready — QRIS fixed!');
+  console.log('📦 QRCode library:', typeof QRCode !== 'undefined' ? 'LOADED' : 'FAILED (pakai fallback API)');
 });
 
 document.addEventListener('keydown', function(e) {
