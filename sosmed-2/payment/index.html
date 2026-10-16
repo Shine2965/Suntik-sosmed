@@ -696,6 +696,11 @@ p.warning-text{
   </div>
   
   <p class="warning-text">📸 Screenshot seluruh transaksi serta bukti transfer untuk berjaga-jaga jika terdapat kendala, anda bisa menghubungi admin melalui CS Bot</p>
+  
+  <!-- REFUND HISTORY BUTTON -->
+  <button class="btn" style="background:linear-gradient(135deg,#22c55e,#16a34a);margin-top:12px;" onclick="showRefundHistory()">
+    💰 Lihat Riwayat Refund
+  </button>
 </div>
 
 <script>
@@ -1012,16 +1017,13 @@ function startWIBClock() {
 startWIBClock();
 
 // ============================================================
-// 🚫 CEK BANNED - SUPABASE + FILE JSON
+// 🚫 CEK BANNED
 // ============================================================
 async function checkSupabaseBanned() {
   if (!supabaseClient) return null;
   try {
     const { data: { session } } = await supabaseClient.auth.getSession();
-    if (!session || !session.user) {
-      console.log('ℹ️ Belum login Supabase, skip cek banned Supabase');
-      return null;
-    }
+    if (!session || !session.user) return null;
 
     const { data, error } = await supabaseClient
       .from('profiles')
@@ -1032,16 +1034,11 @@ async function checkSupabaseBanned() {
     if (error) throw error;
     if (!data || !data.banned) return null;
 
-    // Cek apakah masa banned sudah berakhir
     if (data.banned_until) {
       const untilDate = new Date(data.banned_until);
-      if (new Date() > untilDate) {
-        console.log('ℹ️ Banned Supabase sudah berakhir');
-        return null;
-      }
+      if (new Date() > untilDate) return null;
     }
 
-    console.log('🚫 User BANNED di Supabase:', data);
     return {
       Gmail: data.email,
       Alasan: data.banned_reason || 'Tidak ada alasan',
@@ -1079,30 +1076,15 @@ async function checkJsonBanned(gmail) {
   }
 }
 
-// Cek banned dari SEMUA sumber (Supabase dulu, fallback JSON)
 async function checkGmailBanned(gmail) {
-  // 1. Cek Supabase dulu (prioritas utama)
   const supaBanned = await checkSupabaseBanned();
-  if (supaBanned) {
-    console.log('🚫 Banned dari Supabase:', supaBanned.Alasan);
-    return supaBanned;
-  }
-
-  // 2. Cek file JSON (backward compat)
+  if (supaBanned) return supaBanned;
   const jsonBanned = await checkJsonBanned(gmail);
-  if (jsonBanned) {
-    console.log('🚫 Banned dari JSON lokal:', jsonBanned.Alasan);
-    return jsonBanned;
-  }
-
+  if (jsonBanned) return jsonBanned;
   return null;
 }
 
-// ============================================================
-// 🚫 SHOW BANNED PAGE + POPUP
-// ============================================================
 function showBannedPage(bannedData, userID, gmail) {
-  // Sembunyikan semua & tampilkan banned page
   document.getElementById('bannedContainer').style.display = 'flex';
   document.getElementById('qrisCard').style.display = 'none';
   
@@ -1122,7 +1104,6 @@ function showBannedPage(bannedData, userID, gmail) {
     appealLink.href = `https://wa.me/${WHATSAPP_NUMBER}?text=Halo%20Admin%2C%20saya%20ingin%20mengajukan%20banding%20atas%20ban%20akun%20saya.%20Gmail%3A%20${encodeURIComponent(gmail)}%0AUser%20ID%3A%20${encodeURIComponent(userID || '-')}`;
   }
 
-  // 🔥 POPUP NOTIFIKASI BANNED
   setTimeout(() => {
     Swal.fire({
       title: '🚫 Akun Anda Dibanned',
@@ -1140,9 +1121,6 @@ function showBannedPage(bannedData, userID, gmail) {
             <b style="color:#ffaa00;">⏳ Dibanned sampai:</b><br>
             <span style="font-size:13px;color:#ffaa00;">${untilText}</span>
           </div>
-          <p style="margin-top:12px;font-size:12px;color:#94a3b8;text-align:center;">
-            Silakan hubungi CS untuk mengajukan banding.
-          </p>
         </div>
       `,
       icon: 'error',
@@ -1166,7 +1144,6 @@ async function checkAndHandleBan() {
   const userID = await getUserID();
   const gmailDisplay = document.getElementById('gmailDisplay');
   
-  // Update display gmail
   if (gmailDisplay) {
     if (gmail && validateEmail(gmail)) {
       gmailDisplay.textContent = gmail;
@@ -1177,8 +1154,6 @@ async function checkAndHandleBan() {
     }
   }
 
-  // Cek banned (Supabase + JSON) — tetap jalan walau gmail belum di-set,
-  // karena Supabase bisa cek berdasarkan session user
   const bannedData = await checkGmailBanned(gmail);
   if (bannedData) {
     showBannedPage(bannedData, userID, gmail || bannedData.Gmail || '-');
@@ -1535,6 +1510,120 @@ function regenerateQris() {
   });
 }
 
+// ================= AUTO-REFUND FUNCTION =================
+async function autoRefundOrder(orderIndex, order, errorMessage) {
+  if (!supabaseClient || !userProfileId) {
+    console.warn('⚠️ Auto-refund: no userProfileId');
+    return { success: false, amount: 0 };
+  }
+  
+  try {
+    let paymentMethodUsed = paymentMethod;
+    
+    // Ambil amount refundable dari order_payments
+    const { data: orderPayment, error: fetchErr } = await supabaseClient
+      .from('order_payments')
+      .select('id, amount, refunded')
+      .eq('trx_id', trx)
+      .eq('order_index', orderIndex)
+      .maybeSingle();
+    
+    if (fetchErr) console.warn('Fetch order_payment err:', fetchErr.message);
+    
+    // Fallback amount
+    let refundAmount = orderPayment?.amount;
+    if (!refundAmount || refundAmount <= 0) {
+      if (paymentMethodUsed === 'qris') {
+        // QRIS: refund = finalTotal (TANPA kode unik), dibagi rata
+        const amountRefundable = normalizeTotal(finalTotal);
+        refundAmount = Math.ceil(amountRefundable / ordersData.length);
+        console.log('⚠️ Fallback refund QRIS (no unique code):', refundAmount);
+      } else {
+        const totalBayarSaldo = normalizeTotal(finalTotal);
+        refundAmount = Math.ceil(totalBayarSaldo / ordersData.length);
+        console.log('⚠️ Fallback refund Saldo:', refundAmount);
+      }
+    }
+    
+    if (orderPayment?.refunded) {
+      console.log('ℹ️ Order sudah pernah di-refund');
+      return { success: false, amount: 0 };
+    }
+    
+    // Panggil RPC sesuai metode
+    let rpcResult;
+    if (paymentMethodUsed === 'qris') {
+      const qrisTotalPaid = normalizeTotal(finalTotal + uniqueCode + adminFee);
+      const { data, error } = await supabaseClient.rpc('refund_from_qris', {
+        p_user_id: userProfileId,
+        p_amount: refundAmount,
+        p_trx_id: trx,
+        p_qris_total: qrisTotalPaid,
+        p_unique_code: uniqueCode || 0,
+        p_order_id: null,
+        p_reason: `Pesanan gagal (QRIS): ${errorMessage}`
+      });
+      if (error) throw error;
+      rpcResult = data;
+      console.log(`💰 QRIS Refund OK: Rp ${refundAmount.toLocaleString('id-ID')} (excl. unique code ${uniqueCode})`);
+    } else {
+      const { data, error } = await supabaseClient.rpc('refund_balance', {
+        p_user_id: userProfileId,
+        p_amount: refundAmount,
+        p_trx_id: trx,
+        p_order_id: null,
+        p_reason: `Pesanan gagal (Saldo): ${errorMessage}`
+      });
+      if (error) throw error;
+      rpcResult = data;
+      console.log(`💰 Saldo Refund OK: Rp ${refundAmount.toLocaleString('id-ID')}`);
+    }
+    
+    if (!rpcResult.success) throw new Error(rpcResult.message);
+    
+    if (orderPayment?.id) {
+      await supabaseClient.from('order_payments')
+        .update({ 
+          status: 'failed', 
+          fail_reason: errorMessage,
+          refunded: true,
+          refunded_at: new Date().toISOString()
+        })
+        .eq('id', orderPayment.id);
+    }
+    
+    userBalance = parseInt(rpcResult.new_balance) || userBalance;
+    
+    return { success: true, amount: refundAmount, method: paymentMethodUsed };
+    
+  } catch (err) {
+    console.error('❌ Auto-refund error:', err.message);
+    
+    // Fallback: simpan ke refunds sebagai pending
+    try {
+      let fallbackAmount;
+      if (paymentMethod === 'qris') {
+        fallbackAmount = Math.ceil(normalizeTotal(finalTotal) / ordersData.length);
+      } else {
+        fallbackAmount = Math.ceil(normalizeTotal(finalTotal) / ordersData.length);
+      }
+      
+      await supabaseClient.from('refunds').insert({
+        user_id: userProfileId,
+        email: userEmail || '-',
+        trx_id: trx,
+        amount: fallbackAmount,
+        reason: `Auto-refund gagal: ${err.message}. Order: ${order.serviceName}`,
+        method: 'balance',
+        status: 'pending',
+        source_method: paymentMethod
+      });
+    } catch(e) {}
+    
+    return { success: false, amount: 0 };
+  }
+}
+
 // ================= ORDER FAYUPEDIA =================
 async function sendMassOrdersToFayupedia() {
   if (isOrderAlreadySent()) return true;
@@ -1563,6 +1652,8 @@ async function sendMassOrdersToFayupedia() {
   let successCount = 0;
   let failedOrders = [];
   let orderIds = [];
+  let totalRefundAmount = 0;
+  let refundedOrders = [];
   
   try {
     for (let i = 0; i < ordersData.length; i++) {
@@ -1576,24 +1667,70 @@ async function sendMassOrdersToFayupedia() {
       };
       if (order.comment && order.comment.trim() !== '') payload.comments = order.comment.trim();
       
-      const response = await fetch(FAYUPEDIA_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      const result = await response.json();
-      
-      if (result.status === true && result.order) {
-        successCount++;
-        orderIds.push(result.order);
-      } else {
-        failedOrders.push({ index: i, order, error: result.msg || 'Gagal' });
+      try {
+        const response = await fetch(FAYUPEDIA_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const result = await response.json();
+        
+        if (result.status === true && result.order) {
+          successCount++;
+          orderIds.push(result.order);
+          
+          // Update order_payments: order sukses
+          try {
+            await supabaseClient.from('order_payments')
+              .update({ 
+                fayupedia_order_id: String(result.order), 
+                status: 'processing',
+                updated_at: new Date().toISOString()
+              })
+              .eq('trx_id', trx)
+              .eq('order_index', i);
+          } catch(e) { console.warn('Track success err:', e); }
+          
+        } else {
+          const errorMsg = result.msg || 'Gagal dari Fayupedia';
+          failedOrders.push({ index: i, order, error: errorMsg });
+          console.warn(`❌ Order #${i+1} gagal:`, errorMsg);
+          
+          // AUTO REFUND
+          const refundInfo = await autoRefundOrder(i, order, errorMsg);
+          if (refundInfo.success) {
+            totalRefundAmount += refundInfo.amount;
+            refundedOrders.push({ 
+              index: i, 
+              serviceName: order.serviceName, 
+              amount: refundInfo.amount,
+              error: errorMsg
+            });
+          }
+        }
+      } catch (fetchErr) {
+        console.warn(`❌ Order #${i+1} error:`, fetchErr.message);
+        failedOrders.push({ index: i, order, error: 'Network error: ' + fetchErr.message });
+        
+        const refundInfo = await autoRefundOrder(i, order, 'Network error');
+        if (refundInfo.success) {
+          totalRefundAmount += refundInfo.amount;
+          refundedOrders.push({ 
+            index: i, 
+            serviceName: order.serviceName, 
+            amount: refundInfo.amount,
+            error: 'Network error'
+          });
+        }
       }
+      
       orderStatus.textContent = `⏳ Mengirim ${i+1}/${ordersData.length}... (${successCount} berhasil)`;
     }
     
+    const orderIdStr = orderIds.join(', ') || '-';
+    
     if (successCount === ordersData.length) {
-      const orderIdStr = orderIds.join(', ');
+      // ✅ SEMUA SUKSES
       orderResultData = { orderIds, message: `${successCount} pesanan berhasil dibuat.` };
       orderStatus.className = 'order-status success';
       orderStatus.innerHTML = `
@@ -1602,14 +1739,13 @@ async function sendMassOrdersToFayupedia() {
           🆔 ID Pesanan: <strong>${orderIdStr}</strong>
           <button class="copy-btn" onclick="copyOrderId('${orderIdStr}')">📋 Salin Semua</button>
         </div>
-        <div style="margin-top:6px;font-size:11px;color:#888;">
-          ⚠️ Simpan ID pesanan ini untuk cek status order.
-        </div>
       `;
       markOrderSent();
       saveOrderIds(orderIds);
       isSendingOrder = false;
+      
       await sendMassOrderNotificationToDiscord(orderIds, successCount, failedOrders);
+      
       await Swal.fire({
         title: '✅ Semua Pesanan Berhasil!',
         html: `<div style="text-align:left;color:#ddd;font-size:14px;">
@@ -1620,33 +1756,112 @@ async function sendMassOrdersToFayupedia() {
             <br>
             <button onclick="copyOrderId('${orderIdStr}')" style="margin-top:6px;background:#ffaa0022;color:#ffaa00;border:1px solid #ffaa0044;padding:4px 16px;border-radius:6px;cursor:pointer;font-size:12px;">📋 Salin Semua ID</button>
           </div>
-          <p style="font-size:12px;color:#888;">⚠️ Simpan ID pesanan ini untuk cek status order.</p>
         </div>`,
         icon: 'success',
         confirmButtonColor: '#ffaa00',
         confirmButtonText: '✅ OK, Saya Simpan'
       });
       return true;
-    } else {
-      const failedMsg = failedOrders.map(f => `#${f.index+1} ${f.order.serviceName}: ${f.error}`).join('\n');
+      
+    } else if (successCount > 0) {
+      // ⚠️ SEBAGIAN GAGAL
       orderStatus.className = 'order-status failed';
-      orderStatus.innerHTML = `❌ ${successCount}/${ordersData.length} pesanan berhasil.<br><span style="font-size:11px;color:#f87171;">Gagal: ${failedMsg}</span>`;
+      orderStatus.innerHTML = `⚠️ ${successCount}/${ordersData.length} berhasil. ${refundedOrders.length} order di-refund.`;
+      
       if (orderIds.length > 0) saveOrderIds(orderIds);
       isSendingOrder = false;
+      
       await sendMassOrderNotificationToDiscord(orderIds, successCount, failedOrders);
-      Swal.fire({
-        title: '⚠️ Sebagian Gagal',
-        html: `<div style="text-align:left;color:#ddd;font-size:14px;">
-          <p>${successCount}/${ordersData.length} pesanan berhasil.</p>
-          <div style="background:#ff444415;padding:12px;border-radius:10px;margin:10px 0;border:1px solid #ff444433;">
-            <b style="color:#f87171;">Gagal:</b><br>${failedMsg.replace(/\n/g, '<br>')}
+      await loadUserBalance();
+      
+      const methodLabel = paymentMethod === 'qris' 
+        ? '💰 Saldo Dikembalikan (via QRIS)' 
+        : '💰 Saldo Dikembalikan (via Saldo)';
+      
+      const failedMsg = failedOrders.map(f => `#${f.index+1} ${f.order.serviceName}: ${f.error}`).join('<br>');
+      const refundMsg = refundedOrders.map(r => 
+        `#${r.index+1} ${r.serviceName}: <b style="color:#22c55e;">+Rp ${r.amount.toLocaleString('id-ID')}</b>`
+      ).join('<br>');
+      
+      await Swal.fire({
+        title: '⚠️ Sebagian Gagal — Saldo Dikembalikan!',
+        html: `<div style="text-align:left;color:#ddd;font-size:13px;line-height:1.7;">
+          <div style="background:rgba(34,197,94,0.1);padding:10px 12px;border-radius:8px;margin-bottom:10px;border-left:3px solid #22c55e;">
+            <b style="color:#22c55e;">✅ Berhasil:</b> ${successCount} pesanan
           </div>
+          <div style="background:rgba(239,68,68,0.1);padding:10px 12px;border-radius:8px;margin-bottom:10px;border-left:3px solid #ef4444;">
+            <b style="color:#ef4444;">❌ Gagal:</b> ${failedOrders.length} pesanan<br>
+            <span style="font-size:11px;color:#f87171;">${failedMsg}</span>
+          </div>
+          ${refundedOrders.length > 0 ? `
+            <div style="background:rgba(250,204,21,0.1);padding:10px 12px;border-radius:8px;border-left:3px solid #facc15;">
+              <b style="color:#facc15;">${methodLabel}:</b><br>
+              <span style="font-size:11px;">${refundMsg}</span>
+              ${paymentMethod === 'qris' ? `
+                <div style="font-size:10px;color:#94a3b8;margin-top:6px;font-style:italic;">
+                  ℹ️ Refund tidak termasuk kode unik (Rp ${uniqueCode.toLocaleString('id-ID')})
+                </div>
+              ` : ''}
+              <div style="margin-top:8px;font-size:15px;color:#22c55e;font-weight:800;text-align:center;">
+                Total Refund: Rp ${totalRefundAmount.toLocaleString('id-ID')}
+              </div>
+            </div>
+          ` : ''}
         </div>`,
         icon: 'warning',
-        confirmButtonColor: '#ffaa00'
+        confirmButtonColor: '#facc15',
+        confirmButtonText: '✅ OK, Mengerti',
+        background: '#0a0e1a', color: '#fff'
+      });
+      return false;
+      
+    } else {
+      // ❌ SEMUA GAGAL
+      orderStatus.className = 'order-status failed';
+      orderStatus.innerHTML = `❌ Semua pesanan gagal. Saldo dikembalikan Rp ${totalRefundAmount.toLocaleString('id-ID')}`;
+      
+      isSendingOrder = false;
+      await sendMassOrderNotificationToDiscord(orderIds, 0, failedOrders);
+      await loadUserBalance();
+      
+      const methodLabel = paymentMethod === 'qris' 
+        ? '💰 Saldo Dikembalikan (via QRIS)' 
+        : '💰 Saldo Dikembalikan (via Saldo)';
+      
+      const failedMsg = failedOrders.map(f => `#${f.index+1} ${f.order.serviceName}: ${f.error}`).join('<br>');
+      
+      await Swal.fire({
+        title: '❌ Semua Pesanan Gagal — Saldo Dikembalikan!',
+        html: `<div style="text-align:left;color:#ddd;font-size:13px;line-height:1.7;">
+          <div style="background:rgba(239,68,68,0.1);padding:12px;border-radius:8px;margin-bottom:12px;border-left:3px solid #ef4444;">
+            <b style="color:#ef4444;">❌ ${ordersData.length} pesanan gagal</b><br>
+            <span style="font-size:11px;color:#f87171;margin-top:6px;display:block;">${failedMsg}</span>
+          </div>
+          <div style="background:rgba(34,197,94,0.15);padding:14px;border-radius:10px;border:1px dashed #22c55e;text-align:center;">
+            <div style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">
+              ${methodLabel}
+            </div>
+            <div style="font-size:22px;font-weight:900;color:#22c55e;margin-top:4px;">
+              Rp ${totalRefundAmount.toLocaleString('id-ID')}
+            </div>
+            ${paymentMethod === 'qris' ? `
+              <div style="font-size:10px;color:#94a3b8;margin-top:6px;font-style:italic;">
+                ℹ️ Tidak termasuk kode unik (Rp ${uniqueCode.toLocaleString('id-ID')})
+              </div>
+            ` : ''}
+            <div style="font-size:11px;color:#94a3b8;margin-top:8px;padding-top:8px;border-top:1px dashed rgba(34,197,94,0.3);">
+              💰 Saldo Anda sekarang: <b style="color:#facc15;">Rp ${userBalance.toLocaleString('id-ID')}</b>
+            </div>
+          </div>
+        </div>`,
+        icon: 'success',
+        confirmButtonColor: '#22c55e',
+        confirmButtonText: '✅ OK',
+        background: '#0a0e1a', color: '#fff'
       });
       return false;
     }
+    
   } catch (err) {
     console.error('❌ Error send mass orders:', err);
     orderStatus.className = 'order-status failed';
@@ -1677,19 +1892,32 @@ async function sendMassOrderNotificationToDiscord(orderIds, successCount, failed
       orderList += `\n  ${i+1}. ${o.serviceName} (ID: ${o.serviceId}) x${o.jumlah} → ${o.target}`;
     });
     const orderIdStr = orderIds.join(', ') || '-';
-    const failedMsg = failedOrders.length > 0 ? `\n⚠️ Gagal: ${failedOrders.length} pesanan` : '';
+    const failedCount = failedOrders.length;
+    
+    let refundInfo = '';
+    if (failedCount > 0) {
+      if (paymentMethod === 'qris') {
+        refundInfo = `\n💰 **Auto-Refund:** ${failedCount} pesanan → ke Saldo (via QRIS, excl. kode unik ${uniqueCode})`;
+      } else {
+        refundInfo = `\n💰 **Auto-Refund:** ${failedCount} pesanan → ke Saldo (via Saldo)`;
+      }
+    }
+    
     const message = `📦 **ORDER MASSAL FAYUPEDIA**
 ━━━━━━━━━━━━━━━━━━━━━
 🆔 **ID Transaksi:** ${trx}
+💳 **Metode Bayar:** ${paymentMethod === 'qris' ? '📱 QRIS' : '💰 Saldo'}
 📊 **Total Pesanan:** ${ordersData.length}
-✅ **Berhasil:** ${successCount}${failedMsg}
+✅ **Berhasil:** ${successCount}
+❌ **Gagal:** ${failedCount}${refundInfo}
 🆔 **Order IDs:** ${orderIdStr}
 📅 **Waktu:** ${formatWIB(new Date())}
 ━━━━━━━━━━━━━━━━━━━━━
 📋 **Detail Pesanan:**
 ${orderList}
 ━━━━━━━━━━━━━━━━━━━━━
-✅ **${successCount === ordersData.length ? 'Semua pesanan berhasil dibuat!' : 'Beberapa pesanan gagal, cek manual.'}**`;
+${successCount === ordersData.length ? '✅ Semua pesanan berhasil!' : `⚠️ ${failedCount} pesanan gagal & saldo sudah di-refund otomatis.`}`;
+    
     await fetch(discordWebhook, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1879,7 +2107,6 @@ async function checkPaymentStatus() {
     const gmail = getStoredGmail();
     const userID = await getUserID();
     
-    // 🔥 Cek banned realtime
     const bannedData = await checkGmailBanned(gmail);
     if (bannedData) {
       showBannedPage(bannedData, userID, gmail || bannedData.Gmail || '-');
@@ -1911,6 +2138,41 @@ async function checkPaymentStatus() {
       statusEl.textContent = `✅ Pembayaran Rp ${totalBayar.toLocaleString('id-ID')} terverifikasi!`;
       
       savePaymentState({ verified: true, orderSent: false, verifiedAt: new Date().toISOString(), totalBayar, trx, method: 'qris' });
+      
+      // 🔥 TRACKING ORDER PAYMENTS untuk QRIS
+      try {
+        if (ordersData && ordersData.length > 0 && userProfileId) {
+          const { data: existing } = await supabaseClient
+            .from('order_payments')
+            .select('id')
+            .eq('trx_id', trx)
+            .limit(1);
+          
+          if (!existing || existing.length === 0) {
+            // Hitung amount per order TANPA kode unik
+            const amountRefundable = normalizeTotal(finalTotal); // TANPA kode unik
+            const perOrderAmount = Math.ceil(amountRefundable / ordersData.length);
+            
+            const orderPaymentRows = ordersData.map((o, i) => ({
+              user_id: userProfileId,
+              email: userEmail || gmail,
+              trx_id: trx,
+              order_index: i,
+              service_id: String(o.serviceId || ''),
+              service_name: o.serviceName || '',
+              target: o.target || '',
+              quantity: parseInt(o.jumlah) || 0,
+              amount: perOrderAmount,
+              status: 'paid'
+            }));
+            
+            await supabaseClient.from('order_payments').insert(orderPaymentRows);
+            console.log('💾 QRIS order_payments tracked:', orderPaymentRows.length, 'rows @ Rp', perOrderAmount);
+          }
+        }
+      } catch (trackErr) {
+        console.warn('⚠️ Gagal track order_payments QRIS:', trackErr.message);
+      }
       
       const sent = await sendToDiscord(gmail, userID);
       if (sent && ordersData.length > 0) {
@@ -2168,22 +2430,103 @@ document.getElementById('regenerateBtn').onclick = function() {
   }).then((result) => { if (result.isConfirmed) regenerateQris(); });
 };
 
+// ================= REFUND HISTORY =================
+async function showRefundHistory() {
+  if (!supabaseClient || !userProfileId) {
+    Swal.fire({ 
+      title: '⚠️ Harus Login', 
+      text: 'Login dulu untuk lihat refund.', 
+      icon: 'warning', 
+      confirmButtonColor: '#facc15',
+      background: '#0a0e1a', color: '#fff'
+    });
+    return;
+  }
+  
+  try {
+    const { data, error } = await supabaseClient
+      .from('refunds')
+      .select('*')
+      .eq('user_id', userProfileId)
+      .order('created_at', { ascending: false })
+      .limit(50);
+    
+    if (error) throw error;
+    
+    if (!data || data.length === 0) {
+      Swal.fire({ 
+        title: '💰 Riwayat Refund', 
+        html: '<p style="color:#94a3b8;font-size:14px;">Belum ada refund.</p><p style="color:#6b7280;font-size:12px;margin-top:8px;">Refund akan muncul di sini jika ada pesanan yang gagal.</p>', 
+        icon: 'info', 
+        confirmButtonColor: '#facc15',
+        background: '#0a0e1a', color: '#fff'
+      });
+      return;
+    }
+    
+    const totalRefund = data.filter(r => r.status === 'success').reduce((s, r) => s + parseFloat(r.amount || 0), 0);
+    
+    let listHtml = '';
+    data.forEach(r => {
+      const statusColor = r.status === 'success' ? '#22c55e' : (r.status === 'pending' ? '#facc15' : '#ef4444');
+      const statusIcon = r.status === 'success' ? '✅' : (r.status === 'pending' ? '⏳' : '❌');
+      const sourceLabel = r.source_method === 'qris' ? '📱 QRIS' : '💰 Saldo';
+      listHtml += `
+        <div style="background:rgba(255,255,255,0.04);padding:10px 12px;border-radius:10px;margin-bottom:8px;text-align:left;border-left:3px solid ${statusColor};">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+            <span style="color:${statusColor};font-weight:800;font-size:13px;">${statusIcon} Rp ${parseFloat(r.amount).toLocaleString('id-ID')}</span>
+            <span style="color:#94a3b8;font-size:10px;">${new Date(r.created_at).toLocaleDateString('id-ID')}</span>
+          </div>
+          <div style="color:#00c6ff;font-size:10px;font-weight:600;margin-bottom:4px;">${sourceLabel} · ${r.status.toUpperCase()}</div>
+          <div style="color:#ddd;font-size:11px;">${r.reason || '-'}</div>
+          <div style="color:#6b7280;font-size:10px;margin-top:2px;font-family:monospace;">${r.trx_id}</div>
+        </div>
+      `;
+    });
+    
+    Swal.fire({
+      title: '💰 Riwayat Refund',
+      html: `
+        <div style="text-align:left;max-height:400px;overflow-y:auto;scrollbar-width:thin;">
+          <div style="background:linear-gradient(135deg,rgba(34,197,94,0.15),rgba(34,197,94,0.05));padding:12px;border-radius:10px;margin-bottom:12px;text-align:center;">
+            <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;">Total Refund Diterima</div>
+            <div style="font-size:22px;font-weight:900;color:#22c55e;margin-top:4px;">Rp ${totalRefund.toLocaleString('id-ID')}</div>
+          </div>
+          ${listHtml}
+        </div>
+      `,
+      icon: 'info',
+      confirmButtonColor: '#facc15',
+      background: '#0a0e1a', color: '#fff',
+      width: 500
+    });
+    
+  } catch (err) {
+    Swal.fire({ 
+      title: '❌ Gagal', 
+      text: err.message, 
+      icon: 'error', 
+      confirmButtonColor: '#ef4444',
+      background: '#0a0e1a', color: '#fff'
+    });
+  }
+}
+
+window.showRefundHistory = showRefundHistory;
+
 // ================= INIT =================
 (async function() {
   await fetchConfigFromEnv();
   configLoaded = true;
   
-  // 🔥 CEK BANNED (Supabase + JSON) DI AWAL
   const isBanned = await checkAndHandleBan();
   if (isBanned) {
     console.log('🚫 User banned, payment page disabled');
     return;
   }
   
-  // Load saldo user
   await loadUserBalance();
   
-  // CEK STATE PERSISTEN
   const savedState = getPaymentState();
   if (savedState && savedState.verified === true && savedState.verifiedAt) {
     const diffMinutes = (Date.now() - new Date(savedState.verifiedAt).getTime()) / 1000 / 60;
@@ -2291,9 +2634,9 @@ setInterval(() => {
   }
 }, 2000);
 
-console.log('💳 Payment — QRIS + Saldo + Ban Check Supabase ready!');
+console.log('💳 Payment — QRIS + Saldo + Auto-Refund ready!');
 console.log('📦 Mass order:', isMass, ordersData.length, 'items');
-console.log('🚫 Ban check: Supabase + JSON lokal');
+console.log('💰 Auto-Refund: enabled (via QRIS excl. kode unik)');
 </script>
 </body>
 </html>
