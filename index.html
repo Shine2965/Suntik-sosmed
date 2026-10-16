@@ -290,7 +290,7 @@ h1{font-size:28px;font-weight:900;background:linear-gradient(135deg,#ff6b9d,#ffb
 .chat-empty .icon{font-size:42px;display:block;margin-bottom:10px;opacity:0.5}
 
 .chat-input-area{padding:12px 14px;background:rgba(255,255,255,0.03);border-top:1px solid rgba(255,255,255,0.08);display:flex;gap:8px;align-items:flex-end;flex-shrink:0}
-.chat-input{flex:1;background:rgba(255,255,255,0.06);border:1.5px solid rgba(255,107,157,0.25);border-radius:14px;padding:11px 14px;color:#fff;font-family:'Quicksand',sans-serif;font-size:13px;outline:none;resize:none;min-height:44px;max-height:150px;transition:border-color 0.3s ease,background 0.3s ease;line-height:1.5;overflow-y:auto;display:block}
+.chat-input{flex:1;background:rgba(255,255,255,0.06);border:1.5px solid rgba(255,107,157,0.25);border-radius:14px;padding:11px 14px;color:#fff;font-family:'Quicksand',sans-serif;font-size:13px;outline:none;resize:none;height:44px;max-height:150px;transition:border-color 0.3s ease,background 0.3s ease;line-height:1.4;overflow-y:hidden;display:block;box-sizing:border-box}
 .chat-input::-webkit-scrollbar{width:6px}
 .chat-input::-webkit-scrollbar-track{background:transparent}
 .chat-input::-webkit-scrollbar-thumb{background:rgba(255,107,157,0.3);border-radius:10px}
@@ -1672,6 +1672,7 @@ async function sendGlobalMessage() {
     if (error) throw error;
     input.value = '';
     input.style.height = '44px';
+    input.style.overflowY = 'hidden';
   } catch (err) {
     Swal.fire({ title: '❌ Gagal', text: err.message, icon: 'error', confirmButtonColor: '#ff4444', background: '#1a0e2e', color: '#fff' });
   } finally {
@@ -1844,6 +1845,7 @@ async function sendSupportMessage() {
     if (error) throw error;
     input.value = '';
     input.style.height = '44px';
+    input.style.overflowY = 'hidden';
     loadSupportChatForUser(chatUserId);
   } catch (err) {
     Swal.fire({ title: '❌ Gagal', text: err.message, icon: 'error', confirmButtonColor: '#ff4444', background: '#1a0e2e', color: '#fff' });
@@ -1922,6 +1924,7 @@ async function sendSupportReply() {
     if (error) throw error;
     input.value = '';
     input.style.height = '44px';
+    input.style.overflowY = 'hidden';
     loadSupportChatForAdmin(currentSupportTarget.user_id);
   } catch (err) {
     Swal.fire({ title: '❌ Gagal', text: err.message, icon: 'error', confirmButtonColor: '#ff4444', background: '#1a0e2e', color: '#fff' });
@@ -2130,11 +2133,22 @@ window.addEventListener('load', async () => {
           else if (id === 'supportChatInputAdmin') sendSupportReply();
         }
       });
-      el.addEventListener('input', () => {
+      // Auto-resize: reset height ke auto dulu, baru set ke scrollHeight
+      const autoResize = () => {
         el.style.height = 'auto';
         const newHeight = Math.min(el.scrollHeight, 150);
         el.style.height = newHeight + 'px';
+        if (el.scrollHeight > 150) {
+          el.style.overflowY = 'auto';
+        } else {
+          el.style.overflowY = 'hidden';
+        }
+      };
+      el.addEventListener('input', autoResize);
+      el.addEventListener('keyup', (e) => {
+        if (e.key === 'Enter' || e.key === 'Backspace') autoResize();
       });
+      autoResize();
     }
   });
 
