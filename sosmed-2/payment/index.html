@@ -745,7 +745,7 @@ let isMass = p.get("mass") === "1";
 let ordersData = [];
 
 // ================= PAYMENT METHOD STATE =================
-let paymentMethod = 'qris'; // 'qris' | 'saldo'
+let paymentMethod = 'qris';
 let userBalance = 0;
 let userEmail = null;
 let userProfileId = null;
@@ -852,7 +852,7 @@ function displayStoredOrderIds() {
   return false;
 }
 
-// ===== NOTIFIKASI DISCORD =====
+// ===== DISCORD STATE =====
 function getDiscordSentKey() { return `discord_sent_${trx}`; }
 function isDiscordAlreadySent() { try { return localStorage.getItem(getDiscordSentKey()) === 'true'; } catch { return false; } }
 function markDiscordSent() { try { localStorage.setItem(getDiscordSentKey(), 'true'); return true; } catch { return false; } }
@@ -1011,44 +1011,162 @@ function startWIBClock() {
 }
 startWIBClock();
 
-// ================= CEK BANNED =================
-async function checkGmailBanned(gmail) {
+// ============================================================
+// 🚫 CEK BANNED - SUPABASE + FILE JSON
+// ============================================================
+async function checkSupabaseBanned() {
+  if (!supabaseClient) return null;
+  try {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (!session || !session.user) {
+      console.log('ℹ️ Belum login Supabase, skip cek banned Supabase');
+      return null;
+    }
+
+    const { data, error } = await supabaseClient
+      .from('profiles')
+      .select('banned, banned_reason, banned_until, banned_at, banned_by, email')
+      .eq('id', session.user.id)
+      .single();
+
+    if (error) throw error;
+    if (!data || !data.banned) return null;
+
+    // Cek apakah masa banned sudah berakhir
+    if (data.banned_until) {
+      const untilDate = new Date(data.banned_until);
+      if (new Date() > untilDate) {
+        console.log('ℹ️ Banned Supabase sudah berakhir');
+        return null;
+      }
+    }
+
+    console.log('🚫 User BANNED di Supabase:', data);
+    return {
+      Gmail: data.email,
+      Alasan: data.banned_reason || 'Tidak ada alasan',
+      "Dibanned sampai": data.banned_until || null,
+      source: 'supabase',
+      banned_by: data.banned_by,
+      banned_at: data.banned_at
+    };
+  } catch (err) {
+    console.warn('⚠️ Gagal cek banned Supabase:', err.message);
+    return null;
+  }
+}
+
+async function checkJsonBanned(gmail) {
   if (!gmail || !validateEmail(gmail)) return null;
   try {
     const res = await fetch(GMAIL_BAN_URL + '?t=' + Date.now(), { cache: "no-store" });
     if (!res.ok) return null;
     const list = await res.json();
     if (!Array.isArray(list)) return null;
-    const banned = list.find(item => item.Gmail && item.Gmail.toLowerCase() === gmail.toLowerCase());
+    const banned = list.find(item =>
+      item.Gmail && item.Gmail.toLowerCase() === gmail.toLowerCase()
+    );
     if (!banned) return null;
     if (banned["Dibanned sampai"]) {
       const untilDate = new Date(banned["Dibanned sampai"]);
       if (getWIBTime() > untilDate) return null;
     }
+    banned.source = 'json';
     return banned;
-  } catch (err) { return null; }
+  } catch (err) {
+    console.warn('⚠️ Gagal cek banned JSON:', err.message);
+    return null;
+  }
 }
 
+// Cek banned dari SEMUA sumber (Supabase dulu, fallback JSON)
+async function checkGmailBanned(gmail) {
+  // 1. Cek Supabase dulu (prioritas utama)
+  const supaBanned = await checkSupabaseBanned();
+  if (supaBanned) {
+    console.log('🚫 Banned dari Supabase:', supaBanned.Alasan);
+    return supaBanned;
+  }
+
+  // 2. Cek file JSON (backward compat)
+  const jsonBanned = await checkJsonBanned(gmail);
+  if (jsonBanned) {
+    console.log('🚫 Banned dari JSON lokal:', jsonBanned.Alasan);
+    return jsonBanned;
+  }
+
+  return null;
+}
+
+// ============================================================
+// 🚫 SHOW BANNED PAGE + POPUP
+// ============================================================
 function showBannedPage(bannedData, userID, gmail) {
+  // Sembunyikan semua & tampilkan banned page
   document.getElementById('bannedContainer').style.display = 'flex';
   document.getElementById('qrisCard').style.display = 'none';
+  
   document.getElementById('bannedGmail').textContent = gmail || '-';
   document.getElementById('bannedReason').textContent = bannedData.Alasan || 'Tidak ada keterangan';
   document.getElementById('bannedUserId').textContent = '🆔 User ID: ' + (userID || '-');
+  
   let untilText = '-';
-  if (bannedData["Dibanned sampai"]) untilText = formatWIB(new Date(bannedData["Dibanned sampai"]));
+  if (bannedData["Dibanned sampai"]) {
+    untilText = formatWIB(new Date(bannedData["Dibanned sampai"]));
+  }
   document.getElementById('bannedUntil').textContent = '⏳ Dibanned sampai: ' + untilText;
   updateBannedWIBDisplay();
+  
   const appealLink = document.querySelector('.btn-appeal');
   if (appealLink && gmail) {
     appealLink.href = `https://wa.me/${WHATSAPP_NUMBER}?text=Halo%20Admin%2C%20saya%20ingin%20mengajukan%20banding%20atas%20ban%20akun%20saya.%20Gmail%3A%20${encodeURIComponent(gmail)}%0AUser%20ID%3A%20${encodeURIComponent(userID || '-')}`;
   }
+
+  // 🔥 POPUP NOTIFIKASI BANNED
+  setTimeout(() => {
+    Swal.fire({
+      title: '🚫 Akun Anda Dibanned',
+      html: `
+        <div style="text-align:left;color:#ddd;font-size:14px;line-height:1.7;">
+          <div style="background:rgba(255,68,68,0.1);padding:12px;border-radius:10px;margin-bottom:12px;border-left:3px solid #ff4444;">
+            <b style="color:#ff6666;">📧 Email:</b><br>
+            <span style="color:#00ffaa;font-size:13px;word-break:break-all;">${gmail || '-'}</span>
+          </div>
+          <div style="background:rgba(255,68,68,0.1);padding:12px;border-radius:10px;margin-bottom:12px;border-left:3px solid #ff4444;">
+            <b style="color:#ff6666;">📝 Alasan:</b><br>
+            <span style="font-size:13px;">${bannedData.Alasan || 'Tidak ada keterangan'}</span>
+          </div>
+          <div style="background:rgba(255,170,0,0.1);padding:12px;border-radius:10px;border-left:3px solid #ffaa00;">
+            <b style="color:#ffaa00;">⏳ Dibanned sampai:</b><br>
+            <span style="font-size:13px;color:#ffaa00;">${untilText}</span>
+          </div>
+          <p style="margin-top:12px;font-size:12px;color:#94a3b8;text-align:center;">
+            Silakan hubungi CS untuk mengajukan banding.
+          </p>
+        </div>
+      `,
+      icon: 'error',
+      confirmButtonText: '📱 Ajukan Banding',
+      confirmButtonColor: '#ff4444',
+      showCancelButton: true,
+      cancelButtonText: 'Tutup',
+      cancelButtonColor: '#666',
+      allowOutsideClick: false,
+      allowEscapeKey: false
+    }).then((result) => {
+      if (result.isConfirmed) {
+        window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=Halo%20Admin%2C%20saya%20ingin%20mengajukan%20banding%20atas%20ban%20akun%20saya.%20Gmail%3A%20${encodeURIComponent(gmail || '-')}%0AUser%20ID%3A%20${encodeURIComponent(userID || '-')}`, '_blank');
+      }
+    });
+  }, 300);
 }
 
 async function checkAndHandleBan() {
   const gmail = getStoredGmail();
   const userID = await getUserID();
   const gmailDisplay = document.getElementById('gmailDisplay');
+  
+  // Update display gmail
   if (gmailDisplay) {
     if (gmail && validateEmail(gmail)) {
       gmailDisplay.textContent = gmail;
@@ -1058,10 +1176,12 @@ async function checkAndHandleBan() {
       gmailDisplay.className = 'value not-set';
     }
   }
-  if (!gmail || !validateEmail(gmail)) return false;
+
+  // Cek banned (Supabase + JSON) — tetap jalan walau gmail belum di-set,
+  // karena Supabase bisa cek berdasarkan session user
   const bannedData = await checkGmailBanned(gmail);
   if (bannedData) {
-    showBannedPage(bannedData, userID, gmail);
+    showBannedPage(bannedData, userID, gmail || bannedData.Gmail || '-');
     return true;
   }
   return false;
@@ -1104,7 +1224,6 @@ function updateSaldoDisplay() {
   if (saldoSub) saldoSub.textContent = 'Rp ' + userBalance.toLocaleString('id-ID');
   if (saldoValue) saldoValue.textContent = 'Rp ' + userBalance.toLocaleString('id-ID');
   
-  // Hitung total bayar saat ini (untuk saldo, tanpa kode unik & admin fee)
   const totalBayarSaldo = normalizeTotal(finalTotal);
   if (saldoTotalBayar) saldoTotalBayar.textContent = 'Rp ' + totalBayarSaldo.toLocaleString('id-ID');
   
@@ -1114,7 +1233,6 @@ function updateSaldoDisplay() {
     saldoSisa.className = 'si-val ' + (sisa < 0 ? 'negative' : 'positive');
   }
   
-  // Disable tombol kalau saldo kurang
   if (btnPaySaldo) {
     if (sisa < 0) {
       btnPaySaldo.disabled = true;
@@ -1140,7 +1258,6 @@ function selectPaymentMethod(method) {
   
   paymentMethod = method;
   
-  // Reset UI
   const btnQris = document.getElementById('btnMethodQris');
   const btnSaldo = document.getElementById('btnMethodSaldo');
   btnQris.classList.remove('active', 'qris', 'saldo');
@@ -1154,7 +1271,6 @@ function selectPaymentMethod(method) {
     qrisSection.classList.remove('hide');
     saldoInfo.classList.remove('show');
     
-    // Start QRIS timer kalau belum
     if (!qrisTimerInterval) startQrisTimer();
     
     console.log('📱 Metode: QRIS');
@@ -1163,10 +1279,7 @@ function selectPaymentMethod(method) {
     qrisSection.classList.add('hide');
     saldoInfo.classList.add('show');
     
-    // Pause QRIS timer (biar tidak expire selama mode saldo)
     if (qrisTimerInterval) clearInterval(qrisTimerInterval);
-    
-    // Update saldo display
     updateSaldoDisplay();
     
     console.log('💰 Metode: Saldo');
@@ -1195,9 +1308,9 @@ async function payWithBalance() {
     return;
   }
   
-  // Cek banned lagi
   const bannedData = await checkGmailBanned(getStoredGmail());
   if (bannedData) {
+    showBannedPage(bannedData, await getUserID(), bannedData.Gmail || '-');
     Swal.fire({
       title: '🚫 Akun Diblokir',
       text: 'Akun Anda diblokir, tidak bisa melakukan pembayaran.',
@@ -1208,8 +1321,6 @@ async function payWithBalance() {
   }
   
   const totalBayarSaldo = normalizeTotal(finalTotal);
-  
-  // Re-fetch balance untuk akurasi
   await loadUserBalance();
   
   if (userBalance < totalBayarSaldo) {
@@ -1229,7 +1340,6 @@ async function payWithBalance() {
     return;
   }
   
-  // Konfirmasi
   const confirm = await Swal.fire({
     title: '💰 Bayar dengan Saldo?',
     html: `
@@ -1250,13 +1360,11 @@ async function payWithBalance() {
   
   if (!confirm.isConfirmed) return;
   
-  // Proses bayar
   const btn = document.getElementById('btnPaySaldo');
   btn.disabled = true;
   btn.innerHTML = '⏳ Memproses...';
   
   try {
-    // Potong saldo via RPC
     const { data, error } = await supabaseClient.rpc('pay_with_balance', {
       p_user_id: userProfileId,
       p_amount: totalBayarSaldo
@@ -1265,14 +1373,12 @@ async function payWithBalance() {
     if (error) throw error;
     if (!data.success) throw new Error(data.message || 'Gagal potong saldo');
     
-    console.log('✅ Saldo berhasil dipotong. Saldo baru:', data.balance);
+    console.log('✅ Saldo dipotong. Saldo baru:', data.balance);
     userBalance = parseInt(data.balance) || 0;
     
-    // Tandai transaksi verified
     isPaymentVerified = true;
     transactionLocked = true;
     
-    // Simpan ke tabel orders
     await supabaseClient.from('orders').insert({
       user_id: userProfileId,
       email: userEmail,
@@ -1283,7 +1389,6 @@ async function payWithBalance() {
       order_count: ordersData.length || 0
     });
     
-    // Update UI
     updateSaldoDisplay();
     const statusEl = document.getElementById('paymentStatus');
     statusEl.className = 'payment-status success';
@@ -1293,17 +1398,14 @@ async function payWithBalance() {
     btn.innerHTML = '✅ Sudah Dibayar';
     btn.disabled = true;
     
-    // Kirim notif Discord
     const gmail = getStoredGmail();
     const userID = await getUserID();
     await sendToDiscordSaldo(gmail, userID, totalBayarSaldo);
     
-    // Kirim order ke Fayupedia
     if (ordersData.length > 0 && !isOrderAlreadySent()) {
       await sendMassOrdersToFayupedia();
     }
     
-    // Save payment state
     savePaymentState({
       verified: true,
       orderSent: isOrderAlreadySent(),
@@ -1316,7 +1418,7 @@ async function payWithBalance() {
       title: '🎉 Pembayaran Berhasil!',
       html: `
         <div style="text-align:left;color:#ddd;font-size:14px;">
-          <p>✅ Saldo berhasil dipotong: <b style="color:#facc15;">Rp ${totalBayarSaldo.toLocaleString('id-ID')}</b></p>
+          <p>✅ Saldo dipotong: <b style="color:#facc15;">Rp ${totalBayarSaldo.toLocaleString('id-ID')}</b></p>
           <p>💰 Saldo tersisa: <b style="color:#22c55e;">Rp ${userBalance.toLocaleString('id-ID')}</b></p>
           <p style="margin-top:12px;font-size:12px;color:#94a3b8;">Pesanan sedang diproses...</p>
         </div>
@@ -1697,7 +1799,7 @@ function isTransactionValid(transaction, targetAmount) {
 // ================= CHECK PAYMENT (QRIS) =================
 async function checkPaymentStatus() {
   if (isProcessingPayment) return;
-  if (paymentMethod !== 'qris') return; // Skip kalau pakai saldo
+  if (paymentMethod !== 'qris') return;
   
   const statusEl = document.getElementById('paymentStatus');
   const confirmBtn = document.getElementById('confirmBtn');
@@ -1776,12 +1878,11 @@ async function checkPaymentStatus() {
   try {
     const gmail = getStoredGmail();
     const userID = await getUserID();
+    
+    // 🔥 Cek banned realtime
     const bannedData = await checkGmailBanned(gmail);
     if (bannedData) {
-      statusEl.className = 'payment-status failed';
-      statusEl.textContent = '🚫 Akun Anda diblokir!';
-      confirmBtn.disabled = false;
-      confirmBtn.textContent = '✅ Cek Status Pembayaran';
+      showBannedPage(bannedData, userID, gmail || bannedData.Gmail || '-');
       isProcessingPayment = false;
       return;
     }
@@ -1933,7 +2034,6 @@ function updateDisplay(){
   
   document.getElementById('orderDetails').innerHTML = detailHtml;
   
-  // Render QR (hanya kalau mode QRIS aktif)
   QRCode.toCanvas(document.getElementById('qrisCanvas'), buildQR(totalDenganUnik), { width:240 }, function(err){
     if(err) return console.error(err);
     const ctx = document.getElementById('qrisCanvas').getContext("2d");
@@ -1950,9 +2050,7 @@ function updateDisplay(){
     logo.onerror = function(){};
   });
   
-  // Update saldo display juga
   updateSaldoDisplay();
-  
   console.log('🔄 QRIS updated:', totalDenganUnik);
 }
 
@@ -2075,8 +2173,12 @@ document.getElementById('regenerateBtn').onclick = function() {
   await fetchConfigFromEnv();
   configLoaded = true;
   
+  // 🔥 CEK BANNED (Supabase + JSON) DI AWAL
   const isBanned = await checkAndHandleBan();
-  if (isBanned) return;
+  if (isBanned) {
+    console.log('🚫 User banned, payment page disabled');
+    return;
+  }
   
   // Load saldo user
   await loadUserBalance();
@@ -2090,7 +2192,6 @@ document.getElementById('regenerateBtn').onclick = function() {
       isPaymentVerified = true;
       transactionLocked = true;
       
-      // Set metode dari state
       if (savedState.method === 'balance') {
         paymentMethod = 'balance';
         document.getElementById('btnMethodQris').classList.remove('active', 'qris');
@@ -2190,9 +2291,9 @@ setInterval(() => {
   }
 }, 2000);
 
-console.log('💳 Payment — QRIS & Saldo ready!');
+console.log('💳 Payment — QRIS + Saldo + Ban Check Supabase ready!');
 console.log('📦 Mass order:', isMass, ordersData.length, 'items');
-console.log('💰 Saldo & QRIS tersedia');
+console.log('🚫 Ban check: Supabase + JSON lokal');
 </script>
 </body>
 </html>
