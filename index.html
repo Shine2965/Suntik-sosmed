@@ -291,7 +291,7 @@ h1{font-size:28px;font-weight:900;background:linear-gradient(135deg,#ff6b9d,#ffb
 
 .chat-input-area{padding:12px 14px;background:rgba(255,255,255,0.03);border-top:1px solid rgba(255,255,255,0.08);display:flex;gap:8px;align-items:flex-end;flex-shrink:0}
 .chat-input{flex:1;background:rgba(255,255,255,0.06);border:1.5px solid rgba(255,107,157,0.25);border-radius:14px;padding:11px 14px;color:#fff;font-family:'Quicksand',sans-serif;font-size:13px;outline:none;resize:none;max-height:120px;min-height:44px;transition:all 0.3s ease;line-height:1.4;overflow-y:auto}
-.chat-input::placeholder{color:#6b4a7a}
+.chat-input::placeholder{color:#6b4a7a;font-size:11.5px}
 .chat-input:focus{border-color:#ff6b9d;background:rgba(255,107,157,0.08)}
 .chat-input:disabled{opacity:0.5;cursor:not-allowed}
 .chat-send{background:linear-gradient(135deg,#ff6b9d,#ff4080);border:none;width:44px;height:44px;border-radius:50%;color:#fff;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.3s ease;flex-shrink:0}
@@ -593,7 +593,7 @@ h1{font-size:28px;font-weight:900;background:linear-gradient(135deg,#ff6b9d,#ffb
         <div class="chat-empty"><span class="icon">💬</span>Belum ada pesan. Jadilah yang pertama!</div>
       </div>
       <div class="chat-input-area">
-        <textarea class="chat-input" id="globalChatInput" placeholder="Tulis pesan... (Shift+Enter = baris baru)" rows="1" maxlength="2000"></textarea>
+        <textarea class="chat-input" id="globalChatInput" placeholder="Tulis pesan... (Enter = baris baru, Ctrl+Enter = kirim)" rows="1" maxlength="2000"></textarea>
         <button class="chat-send" id="globalChatSend" onclick="sendGlobalMessage()">➤</button>
       </div>
     </div>
@@ -612,7 +612,7 @@ h1{font-size:28px;font-weight:900;background:linear-gradient(135deg,#ff6b9d,#ffb
           <div class="chat-empty"><span class="icon">📩</span>Hubungi CS untuk bantuan</div>
         </div>
         <div class="chat-input-area">
-          <textarea class="chat-input" id="supportChatInput" placeholder="Tulis pesan... (Shift+Enter = baris baru)" rows="1" maxlength="2000"></textarea>
+          <textarea class="chat-input" id="supportChatInput" placeholder="Tulis pesan... (Enter = baris baru, Ctrl+Enter = kirim)" rows="1" maxlength="2000"></textarea>
           <button class="chat-send" id="supportChatSend" onclick="sendSupportMessage()">➤</button>
         </div>
       </div>
@@ -632,7 +632,7 @@ h1{font-size:28px;font-weight:900;background:linear-gradient(135deg,#ff6b9d,#ffb
         </div>
         <div class="chat-body" id="supportChatBodyAdmin"></div>
         <div class="chat-input-area">
-          <textarea class="chat-input" id="supportChatInputAdmin" placeholder="Balas sebagai CS... (Shift+Enter = baris baru)" rows="1" maxlength="2000"></textarea>
+          <textarea class="chat-input" id="supportChatInputAdmin" placeholder="Balas sebagai CS... (Enter = baris baru, Ctrl+Enter = kirim)" rows="1" maxlength="2000"></textarea>
           <button class="chat-send" id="supportChatSendAdmin" onclick="sendSupportReply()">➤</button>
         </div>
       </div>
@@ -1913,7 +1913,6 @@ function escapeHtml(str) {
     .replace(/"/g, '&quot;');
 }
 
-// Khusus untuk render pesan chat (dengan dukungan multiline)
 function formatMessageText(str) {
   if (!str) return '';
   return escapeHtml(str)
@@ -2078,17 +2077,19 @@ window.addEventListener('load', async () => {
   updateGmailDisplay();
   await initAuth();
 
-  // Enter = kirim, Shift+Enter = baris baru + auto-expand textarea
+  // Enter = baris baru, Ctrl/Cmd+Enter = kirim, tombol ➤ = kirim
   ['globalChatInput', 'supportChatInput', 'supportChatInputAdmin'].forEach(id => {
     const el = document.getElementById(id);
     if (el) {
       el.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
+        // Ctrl+Enter atau Cmd+Enter = kirim
+        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
           e.preventDefault();
           if (id === 'globalChatInput') sendGlobalMessage();
           else if (id === 'supportChatInput') sendSupportMessage();
           else if (id === 'supportChatInputAdmin') sendSupportReply();
         }
+        // Enter biasa = baris baru (default browser behavior)
       });
       el.addEventListener('input', () => {
         el.style.height = 'auto';
