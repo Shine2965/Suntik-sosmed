@@ -231,11 +231,15 @@ h1{font-size:28px;font-weight:900;background:linear-gradient(135deg,#ff6b9d,#ffb
 .chat-tab.active{background:rgba(255,255,255,0.1);color:#fff;border-bottom-color:#ff6b9d}
 .chat-tab.active.global{border-bottom-color:#00c6ff}
 .chat-tab.active.support{border-bottom-color:#ff6b9d}
+.chat-tab .live-dot{width:6px;height:6px;border-radius:50%;background:#00c6ff;animation:livePulse 1.5s ease-in-out infinite;display:inline-block}
+@keyframes livePulse{0%,100%{opacity:1;box-shadow:0 0 8px #00c6ff}50%{opacity:0.4;box-shadow:0 0 3px #00c6ff}}
 
 .chat-header{padding:16px 20px;background:linear-gradient(135deg,rgba(255,107,157,0.15),rgba(0,198,255,0.1));border-bottom:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;gap:12px;flex-shrink:0}
 .chat-header .chat-icon{font-size:24px}
 .chat-header .chat-title{flex:1;font-size:15px;font-weight:800;display:flex;flex-direction:column;gap:2px}
-.chat-header .chat-title .subtitle{font-size:11px;font-weight:400;color:#b39ddb;font-style:italic}
+.chat-header .chat-title .subtitle{font-size:11px;font-weight:400;color:#b39ddb;font-style:italic;display:flex;align-items:center;gap:6px}
+.chat-header .chat-title .subtitle .live-badge{display:inline-flex;align-items:center;gap:4px;background:rgba(0,198,255,0.15);padding:2px 8px;border-radius:10px;font-size:10px;color:#00c6ff;font-weight:700;font-style:normal;text-transform:uppercase;letter-spacing:0.5px}
+.chat-header .chat-title .subtitle .live-badge .live-dot{width:5px;height:5px;border-radius:50%;background:#00c6ff;animation:livePulse 1.5s ease-in-out infinite}
 .chat-header .chat-close{background:rgba(255,80,80,0.2);color:#ff8080;border:1px solid rgba(255,80,80,0.3);width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;cursor:pointer;transition:all 0.3s ease}
 .chat-header .chat-close:hover{background:rgba(255,80,80,0.4);transform:scale(1.1)}
 
@@ -569,7 +573,7 @@ h1{font-size:28px;font-weight:900;background:linear-gradient(135deg,#ff6b9d,#ffb
   <div class="chat-window" id="chatHubWindow">
     <div class="chat-tabs">
       <button class="chat-tab active global" id="tabChatGlobal" onclick="switchChatTab('global')">
-        💬 Global Chat
+        <span class="live-dot"></span> Global Chat
       </button>
       <button class="chat-tab" id="tabChatSupport" onclick="switchChatTab('support')">
         📩 Customer Service
@@ -582,7 +586,10 @@ h1{font-size:28px;font-weight:900;background:linear-gradient(135deg,#ff6b9d,#ffb
         <span class="chat-icon">💬</span>
         <div class="chat-title">
           Global Chat
-          <span class="subtitle" id="globalChatSub">Semua user · auto-hapus 12 jam</span>
+          <span class="subtitle" id="globalChatSub">
+            <span class="live-badge"><span class="live-dot"></span> LIVE</span>
+            Semua user · auto-hapus 12 jam
+          </span>
         </div>
       </div>
       <div class="chat-mute-notice" id="globalChatMuteNotice">
@@ -670,6 +677,7 @@ let depositPollingInterval = null;
 let currentDeposit = null;
 
 let globalChatChannel = null;
+let globalChatPollingInterval = null;
 let supportChatChannel = null;
 let chatHubOpen = false;
 let currentChatTab = 'global';
@@ -692,20 +700,16 @@ try {
 } catch (e) { console.error('❌ Chat Supabase init error:', e); }
 
 // ============================================================
-// AUTO RESIZE TEXTAREA (GLOBAL HELPER)
+// AUTO RESIZE TEXTAREA
 // ============================================================
 window.autoResizeTextarea = function(el) {
   if (!el) return;
-  // Reset height ke 0 dulu supaya layout stabil
   el.style.height = '0px';
-  // Force reflow — biar browser hitung ulang
   void el.offsetHeight;
-  // Hitung tinggi sebenarnya
   const scrollH = el.scrollHeight;
   const maxH = 150;
   const finalH = Math.min(scrollH, maxH);
   el.style.height = finalH + 'px';
-  // Scrollbar kalau lebih dari max
   if (scrollH > maxH) {
     el.style.overflowY = 'auto';
   } else {
@@ -846,6 +850,7 @@ async function handleLogout() {
   try {
     if (globalChatChannel) { globalChatChannel.unsubscribe(); globalChatChannel = null; }
     if (supportChatChannel) { supportChatChannel.unsubscribe(); supportChatChannel = null; }
+    if (globalChatPollingInterval) { clearInterval(globalChatPollingInterval); globalChatPollingInterval = null; }
     if (chatClient) await chatClient.auth.signOut();
     await supabaseClient.auth.signOut();
     try {
@@ -1516,6 +1521,12 @@ function openChatHub() {
   if (!currentUser) return;
   document.getElementById('chatHubModal').classList.add('show');
   chatHubOpen = true;
+
+  // 🔥 Re-subscribe global chat biar realtime fresh
+  if (!globalChatChannel) {
+    subscribeGlobalChat();
+  }
+
   if (currentChatTab === 'global') {
     loadGlobalMessages();
     checkGlobalMute();
@@ -1547,6 +1558,8 @@ function switchChatTab(tab) {
     windowEl.classList.add('global');
     viewGlobal.style.display = 'flex';
     viewSupport.style.display = 'none';
+    // 🔥 Pastikan subscription aktif
+    if (!globalChatChannel) subscribeGlobalChat();
     loadGlobalMessages();
     checkGlobalMute();
     setTimeout(() => document.getElementById('globalChatInput').focus(), 200);
@@ -1563,12 +1576,18 @@ async function loadGlobalMessages() {
   if (!chatClient) return;
   try {
     try { await chatClient.rpc('cleanup_old_global_messages'); } catch(e) {}
-    const { data, error } = await chatClient.from('global_messages').select('*').order('created_at', { ascending: true }).limit(200);
+    const { data, error } = await chatClient
+      .from('global_messages')
+      .select('*')
+      .order('created_at', { ascending: true })
+      .limit(200);
     if (error) throw error;
     cachedGlobalMessages = data || [];
     renderGlobalMessages(cachedGlobalMessages);
     renderPinnedMessages(cachedGlobalMessages);
     updateGlobalSubtitle();
+    // Pastikan subscription aktif
+    if (!globalChatChannel) subscribeGlobalChat();
   } catch (err) {
     document.getElementById('globalChatBody').innerHTML = `<div class="chat-empty"><span class="icon">⚠️</span>${err.message}</div>`;
   }
@@ -1576,7 +1595,9 @@ async function loadGlobalMessages() {
 
 function updateGlobalSubtitle() {
   const el = document.getElementById('globalChatSub');
-  if (el) el.textContent = `Semua user · auto-hapus 12 jam · ${cachedGlobalMessages.length} pesan`;
+  if (el) {
+    el.innerHTML = `<span class="live-badge"><span class="live-dot"></span> LIVE</span> Semua user · auto-hapus 12 jam · ${cachedGlobalMessages.length} pesan`;
+  }
 }
 
 function renderPinnedMessages(messages) {
@@ -1642,70 +1663,132 @@ function renderGlobalMessages(messages) {
   scrollChatToBottom('globalChatBody');
 }
 
+// 🔥 LIVE REALTIME GLOBAL CHAT
 function subscribeGlobalChat() {
   if (globalChatChannel) {
     try { globalChatChannel.unsubscribe(); } catch(e) {}
     globalChatChannel = null;
   }
   if (!chatClient) return;
+
+  // 🟢 UTAMA: Postgres Changes (server push)
   globalChatChannel = chatClient
-    .channel('global_chat_' + Date.now())
+    .channel('global_chat_' + Date.now(), {
+      config: {
+        broadcast: { self: false },
+        presence: { key: currentUser?.id || 'anon' }
+      }
+    })
     .on('postgres_changes', {
       event: 'INSERT',
       schema: 'public',
       table: 'global_messages'
     }, (payload) => {
-      console.log('💬 Realtime INSERT:', payload.new);
-      if (payload.new && !payload.new.deleted) {
-        const exists = cachedGlobalMessages.find(m => m.id === payload.new.id);
-        if (!exists) cachedGlobalMessages.push(payload.new);
-        updateGlobalSubtitle();
-      }
-      if (chatHubOpen && currentChatTab === 'global') {
-        renderGlobalMessages(cachedGlobalMessages);
-        renderPinnedMessages(cachedGlobalMessages);
-        setTimeout(() => scrollChatToBottom('globalChatBody'), 100);
-      }
+      console.log('💬 [GLOBAL] INSERT realtime:', payload.new?.message?.substring(0, 30));
+      handleGlobalMessageInsert(payload.new);
     })
     .on('postgres_changes', {
       event: 'UPDATE',
       schema: 'public',
       table: 'global_messages'
     }, (payload) => {
-      console.log('💬 Realtime UPDATE:', payload.new);
-      if (payload.new) {
-        const idx = cachedGlobalMessages.findIndex(m => m.id === payload.new.id);
-        if (idx !== -1) cachedGlobalMessages[idx] = payload.new;
-        else cachedGlobalMessages.push(payload.new);
-        updateGlobalSubtitle();
-      }
-      if (chatHubOpen && currentChatTab === 'global') {
-        renderGlobalMessages(cachedGlobalMessages);
-        renderPinnedMessages(cachedGlobalMessages);
-      }
+      console.log('💬 [GLOBAL] UPDATE realtime:', payload.new?.id);
+      handleGlobalMessageUpdate(payload.new);
     })
     .on('postgres_changes', {
       event: 'DELETE',
       schema: 'public',
       table: 'global_messages'
     }, (payload) => {
-      console.log('💬 Realtime DELETE:', payload.old);
-      if (payload.old && payload.old.id) {
-        cachedGlobalMessages = cachedGlobalMessages.filter(m => m.id !== payload.old.id);
-        updateGlobalSubtitle();
-      }
-      if (chatHubOpen && currentChatTab === 'global') {
-        renderGlobalMessages(cachedGlobalMessages);
-        renderPinnedMessages(cachedGlobalMessages);
-      }
+      console.log('💬 [GLOBAL] DELETE realtime:', payload.old?.id);
+      handleGlobalMessageDelete(payload.old);
     })
-    .subscribe((status) => {
-      console.log('🔔 Global chat status:', status);
+    .subscribe((status, err) => {
+      console.log('🔔 [GLOBAL] status:', status, err || '');
+      if (status === 'SUBSCRIBED') {
+        console.log('✅ [GLOBAL] Realtime aktif');
+      }
       if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
-        console.warn('⚠️ Reconnect global chat...');
+        console.warn('⚠️ [GLOBAL] Reconnect dalam 3s...');
         setTimeout(subscribeGlobalChat, 3000);
       }
     });
+
+  // 🟡 FALLBACK: Polling tiap 5 detik (jaga-jaga kalau realtime drop)
+  if (globalChatPollingInterval) clearInterval(globalChatPollingInterval);
+  globalChatPollingInterval = setInterval(() => {
+    if (chatHubOpen && currentChatTab === 'global') {
+      silentRefreshGlobalChat();
+    }
+  }, 5000);
+}
+
+function handleGlobalMessageInsert(newMsg) {
+  if (!newMsg || newMsg.deleted) return;
+  const exists = cachedGlobalMessages.find(m => m.id === newMsg.id);
+  if (exists) return;
+  cachedGlobalMessages.push(newMsg);
+  updateGlobalSubtitle();
+  if (chatHubOpen && currentChatTab === 'global') {
+    renderGlobalMessages(cachedGlobalMessages);
+    renderPinnedMessages(cachedGlobalMessages);
+    setTimeout(() => scrollChatToBottom('globalChatBody'), 100);
+  }
+}
+
+function handleGlobalMessageUpdate(updatedMsg) {
+  if (!updatedMsg) return;
+  const idx = cachedGlobalMessages.findIndex(m => m.id === updatedMsg.id);
+  if (idx !== -1) cachedGlobalMessages[idx] = updatedMsg;
+  else cachedGlobalMessages.push(updatedMsg);
+  updateGlobalSubtitle();
+  if (chatHubOpen && currentChatTab === 'global') {
+    renderGlobalMessages(cachedGlobalMessages);
+    renderPinnedMessages(cachedGlobalMessages);
+    setTimeout(() => scrollChatToBottom('globalChatBody'), 50);
+  }
+}
+
+function handleGlobalMessageDelete(oldMsg) {
+  if (!oldMsg || !oldMsg.id) return;
+  cachedGlobalMessages = cachedGlobalMessages.filter(m => m.id !== oldMsg.id);
+  updateGlobalSubtitle();
+  if (chatHubOpen && currentChatTab === 'global') {
+    renderGlobalMessages(cachedGlobalMessages);
+    renderPinnedMessages(cachedGlobalMessages);
+  }
+}
+
+async function silentRefreshGlobalChat() {
+  if (!chatClient) return;
+  try {
+    const { data, error } = await chatClient
+      .from('global_messages')
+      .select('*')
+      .order('created_at', { ascending: true })
+      .limit(200);
+    if (error) return;
+
+    const newData = data || [];
+    if (newData.length === cachedGlobalMessages.length) {
+      let changed = false;
+      for (let i = 0; i < newData.length; i++) {
+        if (newData[i].id !== cachedGlobalMessages[i]?.id ||
+            newData[i].pinned !== cachedGlobalMessages[i]?.pinned) {
+          changed = true;
+          break;
+        }
+      }
+      if (!changed) return;
+    }
+
+    console.log('🔄 [GLOBAL] Silent refresh — ada update');
+    cachedGlobalMessages = newData;
+    renderGlobalMessages(cachedGlobalMessages);
+    renderPinnedMessages(cachedGlobalMessages);
+    updateGlobalSubtitle();
+    setTimeout(() => scrollChatToBottom('globalChatBody'), 100);
+  } catch (e) {}
 }
 
 async function sendGlobalMessage() {
@@ -1722,16 +1805,34 @@ async function sendGlobalMessage() {
   sendBtn.disabled = true;
   try {
     const chatUserId = await getChatUserId();
-    const { error } = await chatClient.from('global_messages').insert({
+
+    // Insert + optimistic UI
+    const { data, error } = await chatClient.from('global_messages').insert({
       user_id: chatUserId,
       email: currentUser.email,
       role: currentProfile?.role || 'user',
       message: msg
-    });
+    }).select().single();
+
     if (error) throw error;
+
+    // 🎯 OPTIMISTIC: Langsung tampilkan
+    if (data) {
+      handleGlobalMessageInsert(data);
+      // Broadcast ke user lain (biar makin cepat)
+      if (globalChatChannel) {
+        globalChatChannel.send({
+          type: 'broadcast',
+          event: 'new_message',
+          payload: data
+        }).catch(() => {});
+      }
+    }
+
     input.value = '';
     window.autoResizeTextarea(input);
   } catch (err) {
+    console.error('❌ Send error:', err);
     Swal.fire({ title: '❌ Gagal', text: err.message, icon: 'error', confirmButtonColor: '#ff4444', background: '#1a0e2e', color: '#fff' });
   } finally {
     input.disabled = false;
@@ -2179,8 +2280,7 @@ window.addEventListener('load', async () => {
   updateGmailDisplay();
   await initAuth();
 
-  // Enter = baris baru, Ctrl/Cmd+Enter = kirim, tombol ➤ = kirim
-  // + Auto-resize textarea presisi
+  // Enter = baris baru, Ctrl/Cmd+Enter = kirim
   ['globalChatInput', 'supportChatInput', 'supportChatInputAdmin'].forEach(id => {
     const el = document.getElementById(id);
     if (el) {
@@ -2192,19 +2292,15 @@ window.addEventListener('load', async () => {
           else if (id === 'supportChatInputAdmin') sendSupportReply();
         }
       });
-      // Auto-resize on input
       el.addEventListener('input', () => window.autoResizeTextarea(el));
-      // Handle Enter/Backspace dengan requestAnimationFrame
       el.addEventListener('keyup', (e) => {
         if (e.key === 'Enter' || e.key === 'Backspace' || e.key === 'Delete') {
           requestAnimationFrame(() => window.autoResizeTextarea(el));
         }
       });
-      // Handle paste
       el.addEventListener('paste', () => {
         setTimeout(() => window.autoResizeTextarea(el), 0);
       });
-      // Initial resize
       window.autoResizeTextarea(el);
     }
   });
