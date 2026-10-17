@@ -536,7 +536,6 @@ p.alert-text{
 <div class="orb orb-2"></div>
 <div class="orb orb-3"></div>
 
-<!-- BANNED CONTAINER -->
 <div id="bannedContainer" style="display:none;" class="banned-page">
   <div class="banned-card">
     <span class="icon">🚫</span>
@@ -555,20 +554,17 @@ p.alert-text{
   </div>
 </div>
 
-<!-- PAYMENT CARD -->
 <div id="qrisCard" class="card">
   <h2>💳 Pembayaran</h2>
   <p class="alert-text"><b>Jangan tutup halaman saat sedang melakukan pembayaran atau pembayaran terverifikasi sampai muncul pop up id pesanan</b></p>
   
   <div class="subtitle">✦ Shine Shop - Sosmed 1 ✦</div>
   
-  <!-- GMAIL DISPLAY -->
   <div class="gmail-display">
     <span class="label">📧 Gmail:</span>
     <span class="value" id="gmailDisplay">Belum diatur</span>
   </div>
 
-  <!-- ========== PAYMENT METHOD SELECTOR ========== -->
   <div class="method-selector" id="methodSelector">
     <button class="method-btn active qris" id="btnMethodQris" onclick="selectPaymentMethod('qris')">
       <span class="m-icon">📱</span>
@@ -582,7 +578,6 @@ p.alert-text{
     </button>
   </div>
 
-  <!-- ========== SALDO INFO BOX ========== -->
   <div class="saldo-info" id="saldoInfo">
     <div class="si-label">💰 Saldo Anda</div>
     <div class="si-value" id="saldoValue">Rp 0</div>
@@ -599,7 +594,6 @@ p.alert-text{
     </button>
   </div>
 
-  <!-- ========== QRIS SECTION ========== -->
   <div class="qris-section" id="qrisSection">
     <div class="qr-wrapper" id="qrWrapper">
       <canvas id="qrisCanvas" width="240" height="240"></canvas>
@@ -641,7 +635,6 @@ p.alert-text{
   
   <p class="alert-text">📸 Screenshot seluruh transaksi serta bukti transfer untuk berjaga-jaga jika terdapat kendala, anda bisa menghubungi admin melalui CS Bot</p>
   
-  <!-- REFUND HISTORY BUTTON -->
   <button class="btn" style="background:linear-gradient(135deg,#22c55e,#16a34a);margin-top:12px;" onclick="showRefundHistory()">
     💰 Lihat Riwayat Refund
   </button>
@@ -653,6 +646,13 @@ const discordWebhook = "https://discord.com/api/webhooks/1482244992725553164/k6b
 const GMAIL_BAN_URL = "/sosmed-2/payment/gmail.json";
 const WHATSAPP_NUMBER = "6289518103883";
 const MERCHANT_CODE = "QP052692";
+
+// 📍 IDENTIFIKASI SOSMED TYPE — GANTI SESUAI FILE
+// sosmed-1 → 'sosmed-1'
+// sosmed-2 → 'sosmed-2'
+// sosmed-3 → 'sosmed-3'
+// sosmed-4 → 'sosmed-4'
+const SOSMED_TYPE = 'sosmed-1';
 
 const SUPABASE_URL = 'https://vvzgpbiesvupuhqqoxrg.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ2emdwYmllc3Z1cHVocXFveHJnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIwNzE3MTUsImV4cCI6MjEwNzY0NzcxNX0.W3_Ck8B5Q-nEfNlsyeufJsLsTqbM8xPcAeHoAHfGRwY';
@@ -693,7 +693,6 @@ let target = "-";
 let jumlah = 0;
 let serviceId = null;
 
-// ================= PAYMENT METHOD STATE =================
 let paymentMethod = 'qris';
 let userBalance = 0;
 let userEmail = null;
@@ -846,6 +845,81 @@ function startWIBClock() {
 startWIBClock();
 
 // ============================================================
+// 💾 SAVE ORDER DETAIL KE DATABASE
+// ============================================================
+
+async function saveAllOrdersDetailToDB(method) {
+  if (!supabaseClient || !userProfileId || !ordersData || ordersData.length === 0) {
+    console.warn('⚠️ saveAllOrdersDetail: skip');
+    return false;
+  }
+  
+  try {
+    const gmail = getStoredGmail();
+    const totalPayment = normalizeTotal(finalTotal);
+    const perOrderAmount = Math.ceil(totalPayment / ordersData.length);
+    
+    const { data: existing } = await supabaseClient
+      .from('orders_detail')
+      .select('id')
+      .eq('trx_id', trx)
+      .limit(1);
+    
+    if (existing && existing.length > 0) {
+      console.log('ℹ️ Order detail sudah ada, skip');
+      return true;
+    }
+    
+    const ordersArray = ordersData.map(o => ({
+      user_id: userProfileId,
+      email: userEmail || gmail || '-',
+      gmail_target: gmail || '-',
+      trx_id: trx,
+      service_id: String(o.serviceId || ''),
+      service_name: o.serviceName || '',
+      target: o.target || '',
+      quantity: parseInt(o.jumlah) || 0,
+      comment: o.comment || null,
+      total_payment: perOrderAmount,
+      payment_method: method,
+      sosmed_type: SOSMED_TYPE
+    }));
+    
+    const { data, error } = await supabaseClient.rpc('save_order_details_bulk', {
+      p_orders: ordersArray
+    });
+    
+    if (error) throw error;
+    if (!data.success) throw new Error(data.message);
+    
+    console.log(`💾 ${data.saved_count} order details saved (${SOSMED_TYPE}, ${method} @ Rp ${perOrderAmount.toLocaleString('id-ID')}/order)`);
+    return true;
+  } catch (err) {
+    console.error('❌ Save all orders error:', err.message);
+    return false;
+  }
+}
+
+async function updateOrderStatusInDB(order, status, fayupediaOrderId, failReason) {
+  if (!supabaseClient) return false;
+  try {
+    const { data, error } = await supabaseClient.rpc('update_order_detail_status', {
+      p_trx_id: trx,
+      p_service_id: String(order.serviceId || ''),
+      p_target: order.target || '',
+      p_status: status,
+      p_fayupedia_order_id: fayupediaOrderId || null,
+      p_fail_reason: failReason || null
+    });
+    if (error) throw error;
+    return data.success;
+  } catch (err) {
+    console.error('❌ Update order status error:', err.message);
+    return false;
+  }
+}
+
+// ============================================================
 // 🚫 CEK BANNED
 // ============================================================
 async function checkSupabaseBanned() {
@@ -989,7 +1063,6 @@ async function checkAndHandleBan() {
   return false;
 }
 
-// ================= LOAD USER BALANCE =================
 async function loadUserBalance() {
   if (!supabaseClient) return;
   try {
@@ -1046,7 +1119,6 @@ function updateSaldoDisplay() {
   }
 }
 
-// ================= SELECT METHOD =================
 function selectPaymentMethod(method) {
   if (isPaymentVerified || transactionLocked) {
     Swal.fire({
@@ -1073,18 +1145,15 @@ function selectPaymentMethod(method) {
     qrisSection.classList.remove('hide');
     saldoInfo.classList.remove('show');
     if (!qrisTimerInterval) startQrisTimer();
-    console.log('📱 Metode: QRIS');
   } else {
     btnSaldo.classList.add('active', 'saldo');
     qrisSection.classList.add('hide');
     saldoInfo.classList.add('show');
     if (qrisTimerInterval) clearInterval(qrisTimerInterval);
     updateSaldoDisplay();
-    console.log('💰 Metode: Saldo');
   }
 }
 
-// ================= PAY WITH BALANCE =================
 async function payWithBalance() {
   if (!supabaseClient || !userProfileId) {
     Swal.fire({
@@ -1123,7 +1192,6 @@ async function payWithBalance() {
           <p>Saldo Anda: <b style="color:#facc15;">Rp ${userBalance.toLocaleString('id-ID')}</b></p>
           <p>Total bayar: <b style="color:#22c55e;">Rp ${totalBayarSaldo.toLocaleString('id-ID')}</b></p>
           <p style="margin-top:8px;color:#ef4444;">Kurang <b>Rp ${(totalBayarSaldo - userBalance).toLocaleString('id-ID')}</b></p>
-          <p style="margin-top:12px;font-size:12px;color:#94a3b8;">Silakan deposit saldo dulu atau pakai QRIS.</p>
         </div>
       `,
       icon: 'error',
@@ -1139,7 +1207,7 @@ async function payWithBalance() {
         <p>Saldo saat ini: <b style="color:#facc15;">Rp ${userBalance.toLocaleString('id-ID')}</b></p>
         <p>Total bayar: <b style="color:#22c55e;">Rp ${totalBayarSaldo.toLocaleString('id-ID')}</b></p>
         <p style="margin-top:8px;">Sisa saldo setelah bayar: <b style="color:#00c6ff;">Rp ${(userBalance - totalBayarSaldo).toLocaleString('id-ID')}</b></p>
-        <p style="margin-top:12px;font-size:12px;color:#ffaa00;">⚠️ Saldo akan langsung terpotong dan tidak bisa dibatalkan.</p>
+        <p style="margin-top:12px;font-size:12px;color:#ffaa00;">⚠️ Saldo akan langsung terpotong.</p>
       </div>
     `,
     icon: 'question',
@@ -1181,7 +1249,10 @@ async function payWithBalance() {
       order_count: ordersData.length || 0
     });
     
-    // 🔥 TRACKING ORDER PAYMENTS untuk SALDO
+    // 💾 SAVE ORDER DETAIL
+    await saveAllOrdersDetailToDB('saldo');
+    
+    // Tracking order_payments
     try {
       if (ordersData && ordersData.length > 0) {
         const { data: existing } = await supabaseClient
@@ -1205,12 +1276,9 @@ async function payWithBalance() {
             status: 'paid'
           }));
           await supabaseClient.from('order_payments').insert(orderPaymentRows);
-          console.log('💾 Saldo order_payments tracked:', orderPaymentRows.length);
         }
       }
-    } catch (trackErr) {
-      console.warn('⚠️ Gagal track order_payments Saldo:', trackErr.message);
-    }
+    } catch (trackErr) {}
     
     updateSaldoDisplay();
     const statusEl = document.getElementById('paymentStatus');
@@ -1263,7 +1331,6 @@ async function payWithBalance() {
   }
 }
 
-// ================= QRIS TIMER =================
 function startQrisTimer() {
   if (qrisTimerInterval) clearInterval(qrisTimerInterval);
   qrisExpiryTime = Date.now() + (QRIS_EXPIRY_MINUTES * 60 * 1000);
@@ -1358,17 +1425,14 @@ function regenerateQris() {
   });
 }
 
-// ================= AUTO-REFUND FUNCTION =================
 async function autoRefundOrder(orderIndex, order, errorMessage) {
   if (!supabaseClient || !userProfileId) {
-    console.warn('⚠️ Auto-refund: no userProfileId');
     return { success: false, amount: 0 };
   }
   
   try {
     let paymentMethodUsed = paymentMethod;
     
-    // Ambil amount refundable dari order_payments
     const { data: orderPayment, error: fetchErr } = await supabaseClient
       .from('order_payments')
       .select('id, amount, refunded')
@@ -1378,27 +1442,21 @@ async function autoRefundOrder(orderIndex, order, errorMessage) {
     
     if (fetchErr) console.warn('Fetch order_payment err:', fetchErr.message);
     
-    // Fallback amount
     let refundAmount = orderPayment?.amount;
     if (!refundAmount || refundAmount <= 0) {
       if (paymentMethodUsed === 'qris') {
-        // QRIS: refund = finalTotal (TANPA kode unik), dibagi rata
         const amountRefundable = normalizeTotal(finalTotal);
         refundAmount = Math.ceil(amountRefundable / ordersData.length);
-        console.log('⚠️ Fallback refund QRIS (no unique code):', refundAmount);
       } else {
         const totalBayarSaldo = normalizeTotal(finalTotal);
         refundAmount = Math.ceil(totalBayarSaldo / ordersData.length);
-        console.log('⚠️ Fallback refund Saldo:', refundAmount);
       }
     }
     
     if (orderPayment?.refunded) {
-      console.log('ℹ️ Order sudah pernah di-refund');
       return { success: false, amount: 0 };
     }
     
-    // Panggil RPC sesuai metode
     let rpcResult;
     if (paymentMethodUsed === 'qris') {
       const qrisTotalPaid = normalizeTotal(finalTotal + uniqueCode + adminFee);
@@ -1413,7 +1471,6 @@ async function autoRefundOrder(orderIndex, order, errorMessage) {
       });
       if (error) throw error;
       rpcResult = data;
-      console.log(`💰 QRIS Refund OK: Rp ${refundAmount.toLocaleString('id-ID')} (excl. unique code ${uniqueCode})`);
     } else {
       const { data, error } = await supabaseClient.rpc('refund_balance', {
         p_user_id: userProfileId,
@@ -1424,7 +1481,6 @@ async function autoRefundOrder(orderIndex, order, errorMessage) {
       });
       if (error) throw error;
       rpcResult = data;
-      console.log(`💰 Saldo Refund OK: Rp ${refundAmount.toLocaleString('id-ID')}`);
     }
     
     if (!rpcResult.success) throw new Error(rpcResult.message);
@@ -1440,6 +1496,23 @@ async function autoRefundOrder(orderIndex, order, errorMessage) {
         .eq('id', orderPayment.id);
     }
     
+    // 🔥 Tandai refunded di orders_detail
+    try {
+      await supabaseClient
+        .from('orders_detail')
+        .update({ 
+          refunded: true, 
+          refunded_amount: refundAmount,
+          refunded_at: new Date().toISOString(),
+          order_status: 'failed',
+          fail_reason: errorMessage,
+          updated_at: new Date().toISOString()
+        })
+        .eq('trx_id', trx)
+        .eq('service_id', String(order.serviceId || ''))
+        .eq('target', order.target || '');
+    } catch(e) {}
+    
     userBalance = parseInt(rpcResult.new_balance) || userBalance;
     
     return { success: true, amount: refundAmount, method: paymentMethodUsed };
@@ -1447,7 +1520,6 @@ async function autoRefundOrder(orderIndex, order, errorMessage) {
   } catch (err) {
     console.error('❌ Auto-refund error:', err.message);
     
-    // Fallback: simpan ke refunds sebagai pending
     try {
       let fallbackAmount;
       if (paymentMethod === 'qris') {
@@ -1472,7 +1544,6 @@ async function autoRefundOrder(orderIndex, order, errorMessage) {
   }
 }
 
-// ================= ORDER KE LOLLIPOP (dengan Auto-Refund) =================
 async function sendOrdersToLollipop() {
   if (isOrderAlreadySent()) return true;
   if (isSendingOrder) return false;
@@ -1527,7 +1598,6 @@ async function sendOrdersToLollipop() {
           successCount++;
           orderIds.push(extractedOrderId);
           
-          // Update order_payments: order sukses
           try {
             await supabaseClient.from('order_payments')
               .update({ 
@@ -1537,14 +1607,18 @@ async function sendOrdersToLollipop() {
               })
               .eq('trx_id', trx)
               .eq('order_index', i);
-          } catch(e) { console.warn('Track success err:', e); }
+          } catch(e) {}
+          
+          // 🔥 UPDATE ORDER DETAIL STATUS
+          await updateOrderStatusInDB(order, 'processing', String(extractedOrderId), null);
           
         } else {
           const errorMsg = result.msg || result.error || result.message || ('HTTP ' + response.status);
           failedOrders.push({ index: i, order, error: errorMsg });
-          console.warn(`❌ Order #${i+1} gagal:`, errorMsg);
           
-          // AUTO REFUND
+          // 🔥 UPDATE ORDER DETAIL STATUS GAGAL
+          await updateOrderStatusInDB(order, 'failed', null, errorMsg);
+          
           const refundInfo = await autoRefundOrder(i, order, errorMsg);
           if (refundInfo.success) {
             totalRefundAmount += refundInfo.amount;
@@ -1557,8 +1631,9 @@ async function sendOrdersToLollipop() {
           }
         }
       } catch (fetchErr) {
-        console.warn(`❌ Order #${i+1} error:`, fetchErr.message);
         failedOrders.push({ index: i, order, error: 'Network error: ' + fetchErr.message });
+        
+        await updateOrderStatusInDB(order, 'failed', null, 'Network error: ' + fetchErr.message);
         
         const refundInfo = await autoRefundOrder(i, order, 'Network error');
         if (refundInfo.success) {
@@ -1580,7 +1655,6 @@ async function sendOrdersToLollipop() {
     const orderIdStr = orderIds.join(', ') || '-';
     
     if (successCount === ordersData.length) {
-      // ✅ SEMUA SUKSES
       orderResultData = { orderIds, message: `${successCount} pesanan berhasil dibuat.` };
       orderStatus.className = 'order-status success';
       orderStatus.innerHTML = `
@@ -1616,7 +1690,6 @@ async function sendOrdersToLollipop() {
       return true;
       
     } else if (successCount > 0) {
-      // ⚠️ SEBAGIAN GAGAL
       orderStatus.className = 'order-status failed';
       orderStatus.innerHTML = `⚠️ ${successCount}/${ordersData.length} berhasil. ${refundedOrders.length} order di-refund.`;
       
@@ -1666,7 +1739,6 @@ async function sendOrdersToLollipop() {
       return false;
       
     } else {
-      // ❌ SEMUA GAGAL
       orderStatus.className = 'order-status failed';
       orderStatus.innerHTML = `❌ Semua pesanan gagal. Saldo dikembalikan Rp ${totalRefundAmount.toLocaleString('id-ID')}`;
       
@@ -1748,7 +1820,7 @@ async function sendMassOrderNotificationToDiscord(orderIds, successCount, failed
       }
     }
     
-    const message = `📦 **ORDER MASSAL LOLLIPOP (Sosmed-1)**
+    const message = `📦 **ORDER MASSAL LOLLIPOP (${SOSMED_TYPE})**
 ━━━━━━━━━━━━━━━━━━━━━
 🆔 **ID Transaksi:** ${trx}
 💳 **Metode Bayar:** ${paymentMethod === 'qris' ? '📱 QRIS' : '💰 Saldo'}
@@ -1770,7 +1842,6 @@ ${successCount === ordersData.length ? '✅ Semua pesanan berhasil!' : `⚠️ $
   } catch (err) {}
 }
 
-// ================= SEND DISCORD (QRIS) =================
 async function sendToDiscord(gmail, userID) {
   if (isDiscordAlreadySent()) return true;
   if (isSendingDiscord) return false;
@@ -1786,7 +1857,7 @@ async function sendToDiscord(gmail, userID) {
       orderList = `\n  ${o.serviceName} (ID: ${o.serviceId}) x${o.jumlah} → ${o.target}`;
     }
     let adminFeeText = adminFee > 0 ? `\n📊 **Biaya Admin (1%):** Rp ${adminFee.toLocaleString('id-ID')}` : '';
-    const message = `💰 **PEMBAYARAN QRIS BERHASIL (Sosmed-1)**
+    const message = `💰 **PEMBAYARAN QRIS BERHASIL (${SOSMED_TYPE})**
 ━━━━━━━━━━━━━━━━━━━━━
 🆔 **ID Transaksi:** ${trx}
 📊 **Jenis:** ${isMass ? 'MASSAL ('+ordersData.length+' pesanan)' : 'Single'}
@@ -1814,7 +1885,6 @@ ${orderList || '  -'}
   } catch (err) { isSendingDiscord = false; return false; }
 }
 
-// ================= SEND DISCORD (SALDO) =================
 async function sendToDiscordSaldo(gmail, userID, totalBayar) {
   try {
     const refCode = localStorage.getItem('referral_code') || "-";
@@ -1825,7 +1895,7 @@ async function sendToDiscordSaldo(gmail, userID, totalBayar) {
       const o = ordersData[0];
       orderList = `\n  ${o.serviceName} (ID: ${o.serviceId}) x${o.jumlah} → ${o.target}`;
     }
-    const message = `💰 **PEMBAYARAN VIA SALDO BERHASIL (Sosmed-1)**
+    const message = `💰 **PEMBAYARAN VIA SALDO BERHASIL (${SOSMED_TYPE})**
 ━━━━━━━━━━━━━━━━━━━━━
 🆔 **ID Transaksi:** ${trx}
 💳 **Metode:** Saldo
@@ -1850,7 +1920,6 @@ ${orderList || '  -'}
   } catch (err) {}
 }
 
-// ================= VALIDATE TX =================
 function isTransactionValid(transaction, targetAmount) {
   targetAmount = Math.ceil(Number(targetAmount) || 0);
   let rawAmount = String(transaction.amount || '');
@@ -1867,7 +1936,6 @@ function isTransactionValid(transaction, targetAmount) {
   return true;
 }
 
-// ================= CHECK PAYMENT (QRIS) =================
 async function checkPaymentStatus() {
   if (isProcessingPayment) return;
   if (paymentMethod !== 'qris') return;
@@ -1943,7 +2011,6 @@ async function checkPaymentStatus() {
     
     const totalBayar = normalizeTotal(finalTotal + uniqueCode + adminFee);
     currentTotalBayar = totalBayar;
-    console.log('💰 Nominal cek:', totalBayar);
     
     const res = await fetch(QIOSPAY_MUTASI_URL() + '?t=' + Date.now());
     if (!res.ok) throw new Error('Gagal koneksi mutasi: ' + res.status);
@@ -1966,7 +2033,6 @@ async function checkPaymentStatus() {
       
       savePaymentState({ verified: true, orderSent: false, verifiedAt: new Date().toISOString(), totalBayar, trx, method: 'qris' });
       
-      // 🔥 TRACKING ORDER PAYMENTS untuk QRIS
       try {
         if (ordersData && ordersData.length > 0 && userProfileId) {
           const { data: existing } = await supabaseClient
@@ -1976,8 +2042,7 @@ async function checkPaymentStatus() {
             .limit(1);
           
           if (!existing || existing.length === 0) {
-            // Hitung amount per order TANPA kode unik
-            const amountRefundable = normalizeTotal(finalTotal); // TANPA kode unik
+            const amountRefundable = normalizeTotal(finalTotal);
             const perOrderAmount = Math.ceil(amountRefundable / ordersData.length);
             
             const orderPaymentRows = ordersData.map((o, i) => ({
@@ -1994,12 +2059,12 @@ async function checkPaymentStatus() {
             }));
             
             await supabaseClient.from('order_payments').insert(orderPaymentRows);
-            console.log('💾 QRIS order_payments tracked:', orderPaymentRows.length, 'rows @ Rp', perOrderAmount);
           }
         }
-      } catch (trackErr) {
-        console.warn('⚠️ Gagal track order_payments QRIS:', trackErr.message);
-      }
+      } catch (trackErr) {}
+      
+      // 💾 SAVE ORDER DETAIL KE DATABASE
+      await saveAllOrdersDetailToDB('qris');
       
       const sent = await sendToDiscord(gmail, userID);
       if (sent && ordersData.length > 0) {
@@ -2129,7 +2194,6 @@ function updateDisplay(){
   });
   
   updateSaldoDisplay();
-  console.log('🔄 QRIS updated:', totalDenganUnik);
 }
 
 async function loadVoucher(){
@@ -2208,7 +2272,6 @@ document.getElementById('regenerateBtn').onclick = function() {
   }).then((result) => { if (result.isConfirmed) regenerateQris(); });
 };
 
-// ================= REFUND HISTORY =================
 async function showRefundHistory() {
   if (!supabaseClient || !userProfileId) {
     Swal.fire({ 
@@ -2234,7 +2297,7 @@ async function showRefundHistory() {
     if (!data || data.length === 0) {
       Swal.fire({ 
         title: '💰 Riwayat Refund', 
-        html: '<p style="color:#94a3b8;font-size:14px;">Belum ada refund.</p><p style="color:#6b7280;font-size:12px;margin-top:8px;">Refund akan muncul di sini jika ada pesanan yang gagal.</p>', 
+        html: '<p style="color:#94a3b8;font-size:14px;">Belum ada refund.</p>', 
         icon: 'info', 
         confirmButtonColor: '#facc15',
         background: '#0a0e1a', color: '#fff'
@@ -2292,16 +2355,12 @@ async function showRefundHistory() {
 
 window.showRefundHistory = showRefundHistory;
 
-// ================= INIT =================
 (async function() {
   await fetchConfigFromEnv();
   configLoaded = true;
   
   const isBanned = await checkAndHandleBan();
-  if (isBanned) {
-    console.log('🚫 User banned, payment page disabled');
-    return;
-  }
+  if (isBanned) return;
   
   await loadUserBalance();
   
@@ -2351,7 +2410,6 @@ window.showRefundHistory = showRefundHistory;
   }, 3000);
 })();
 
-// ================= ANTI DEVTOOLS =================
 document.addEventListener("keydown", function(e){
   if(e.key === "F12") e.preventDefault();
   if(e.ctrlKey && e.shiftKey && ["I","J"].includes(e.key)) e.preventDefault();
@@ -2367,8 +2425,9 @@ setInterval(() => {
   }
 }, 2000);
 
-console.log('💳 Payment Sosmed-1 — QRIS + Saldo + Auto-Refund ready!');
-console.log('💰 Auto-Refund: enabled (via QRIS excl. kode unik + Saldo)');
+console.log(`💳 Payment ${SOSMED_TYPE} ready!`);
+console.log(`📦 Orders: ${ordersData.length} items`);
+console.log(`💾 Auto-save to orders_detail: enabled`);
 </script>
 </body>
 </html>
