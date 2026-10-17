@@ -273,6 +273,9 @@ const ADMIN_FEE_PERCENT = 2;
 const ADMIN_FEE_THRESHOLD = 10000;
 const QRIS_EXPIRY_MINUTES = 10;
 
+// 🚨 GLOBAL FLAG: jika true, semua interaksi diblokir
+let IS_GMAIL_BLOCKED = false;
+
 function normalizeTotal(amount) {
   const n = Number(amount) || 0;
   return Math.ceil(n);
@@ -505,59 +508,123 @@ function startWIBClock() {
 startWIBClock();
 
 // ============================================================
-// 🚨 CEK GMAIL NULL → REDIRECT KE HOMEPAGE
+// 🚨 CEK GMAIL NULL → BLOCK SEMUA INTERAKSI + REDIRECT
 // ============================================================
+function blockAllInteractions() {
+  IS_GMAIL_BLOCKED = true;
+  
+  // Blokir semua klik di body
+  document.body.style.pointerEvents = 'none';
+  document.body.style.userSelect = 'none';
+  
+  // Blokir keyboard (kecuali dev tools)
+  document.addEventListener('keydown', function blockKey(e) {
+    // Izinkan F5 refresh agar user tidak stuck
+    if (e.key === 'F5' || (e.ctrlKey && e.key === 'r')) return;
+    // Izinkan buka dev tools (opsional, bisa comment kalau mau blokir total)
+    if (e.key === 'F12') return;
+    if (e.ctrlKey && e.shiftKey && ['I', 'J', 'C'].includes(e.key)) return;
+    if (e.ctrlKey && e.key === 'u') return;
+    
+    e.preventDefault();
+    e.stopPropagation();
+    return false;
+  }, true);
+  
+  // Blokir context menu
+  document.addEventListener('contextmenu', e => {
+    e.preventDefault();
+    return false;
+  }, true);
+  
+  // Blokir scroll
+  document.addEventListener('wheel', e => {
+    e.preventDefault();
+    return false;
+  }, { passive: false, capture: true });
+  
+  // Blokir touch
+  document.addEventListener('touchmove', e => {
+    e.preventDefault();
+    return false;
+  }, { passive: false, capture: true });
+}
+
 function checkGmailAndRedirect() {
   const gmail = getStoredGmail();
   
   if (!gmail || !validateEmail(gmail)) {
-    console.warn('⚠️ Gmail null/kosong → redirect ke homepage');
+    console.warn('⚠️ Gmail null/kosong → BLOCK + redirect ke homepage');
     
-    // Pop up peringatan selama 5 detik
+    // 🚨 Blokir semua interaksi DULU
+    blockAllInteractions();
+    
     let countdown = 5;
+    
     Swal.fire({
       title: '🔒 Harus Login Dulu',
       html: `
         <div style="text-align:center;color:#ddd;font-size:14px;line-height:1.7;">
-          <div style="font-size:60px;margin-bottom:12px;">🔐</div>
+          <div style="font-size:60px;margin-bottom:12px;animation:pulse 1.5s ease-in-out infinite;">🔐</div>
           <p style="font-size:16px;font-weight:700;color:#fff;margin-bottom:12px;">
-            Gmail belum terdaftar!
+            Gmail Belum Terdaftar!
           </p>
           <p style="color:#94a3b8;font-size:13px;margin-bottom:16px;">
-            Silakan <b style="color:#00c6ff;">login</b> terlebih dahulu di halaman utama untuk melanjutkan pembayaran.
+            Anda <b style="color:#ff6666;">HARUS LOGIN</b> terlebih dahulu di halaman utama untuk melanjutkan pembayaran.
           </p>
-          <div style="background:rgba(0,198,255,0.1);padding:14px;border-radius:12px;border-left:3px solid #00c6ff;text-align:left;margin-bottom:12px;">
-            <div style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">📌 Langkah:</div>
-            <div style="font-size:12px;color:#e2e8f0;">
-              1. Klik tombol di bawah<br>
+          <div style="background:rgba(0,198,255,0.1);padding:14px;border-radius:12px;border-left:3px solid #00c6ff;text-align:left;margin-bottom:16px;">
+            <div style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">📌 Langkah-langkah:</div>
+            <div style="font-size:12.5px;color:#e2e8f0;line-height:1.7;">
+              1. Anda akan diarahkan ke halaman utama<br>
               2. Login dengan akun Anda<br>
               3. Ulangi proses pemesanan
             </div>
           </div>
-          <div style="font-size:32px;font-weight:900;color:#facc15;font-family:monospace;" id="redirectCountdown">
-            ${countdown}
+          <div style="background:rgba(250,204,21,0.1);padding:14px;border-radius:12px;border:1px solid rgba(250,204,21,0.3);margin-bottom:12px;">
+            <div style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">⏳ Redirect otomatis dalam</div>
+            <div style="font-size:40px;font-weight:900;color:#facc15;font-family:'Courier New',monospace;line-height:1;" id="redirectCountdown">
+              ${countdown}
+            </div>
+            <div style="font-size:11px;color:#94a3b8;margin-top:4px;">detik</div>
           </div>
-          <p style="font-size:11px;color:#94a3b8;margin-top:4px;">
-            Redirect otomatis dalam <b id="redirectSeconds">${countdown}</b> detik...
-          </p>
+          <div style="font-size:11px;color:#ff8080;font-style:italic;">
+            ⚠️ Halaman ini tidak bisa diakses tanpa login
+          </div>
         </div>
+        <style>
+          @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.15); }
+          }
+        </style>
       `,
       icon: 'warning',
-      showCancelButton: true,
-      confirmButtonText: '🏠 Ke Halaman Utama',
-      cancelButtonText: '❌ Tutup',
-      confirmButtonColor: '#00c6ff',
-      cancelButtonColor: '#666',
-      background: '#0a0e1a', color: '#fff',
       allowOutsideClick: false,
       allowEscapeKey: false,
+      allowEnterKey: false,
+      showConfirmButton: false,
+      showCancelButton: false,
+      showCloseButton: false,
+      showDenyButton: false,
+      backdrop: 'rgba(0,0,0,0.95)',
+      background: '#0a0e1a',
+      color: '#fff',
+      width: 480,
+      padding: '24px',
+      customClass: {
+        popup: 'gmail-block-popup'
+      },
       didOpen: () => {
+        // Matikan pointer-events pada tombol apapun
+        const popup = Swal.getPopup();
+        if (popup) {
+          popup.style.pointerEvents = 'none';
+        }
+        
         const timerInterval = setInterval(() => {
           countdown--;
           const cdEl = document.getElementById('redirectCountdown');
-          const secEl = document.getElementById('redirectSeconds');
-          if (cdEl) cdEl.textContent = countdown;
-          if (secEl) secEl.textContent = countdown;
+          if (cdEl) cdEl.textContent = Math.max(0, countdown);
           
           if (countdown <= 0) {
             clearInterval(timerInterval);
@@ -565,13 +632,7 @@ function checkGmailAndRedirect() {
           }
         }, 1000);
         
-        // Simpan interval agar bisa di-clear saat user klik tombol
         window._redirectInterval = timerInterval;
-      }
-    }).then((result) => {
-      if (window._redirectInterval) clearInterval(window._redirectInterval);
-      if (result.isConfirmed) {
-        window.location.href = HOME_URL;
       }
     });
     
@@ -663,7 +724,6 @@ async function saveAllOrdersDetailToDB(method) {
 
 /**
  * Update status order + simpan ORDER ID dari provider (bukan trx_id)
- * p_provider_order_id = ID dari response provider (contoh: 1107)
  */
 async function updateOrderStatusInDB(order, status, providerOrderId, failReason) {
   if (!supabaseClient) return false;
@@ -870,6 +930,8 @@ function updateSaldoDisplay() {
 }
 
 function selectPaymentMethod(method) {
+  if (IS_GMAIL_BLOCKED) return;
+  
   if (isPaymentVerified || transactionLocked) {
     Swal.fire({
       title: '🔒 Transaksi Terkunci',
@@ -905,6 +967,8 @@ function selectPaymentMethod(method) {
 }
 
 async function payWithBalance() {
+  if (IS_GMAIL_BLOCKED) return;
+  
   // 🚨 CEK GMAIL NULL
   if (!checkGmailAndRedirect()) return;
   
@@ -1121,6 +1185,8 @@ function expireQris() {
 }
 
 function regenerateQris() {
+  if (IS_GMAIL_BLOCKED) return;
+  
   uniqueCode = regenerateUniqueCode();
   qrisRegenerationCount++;
   isQrisExpired = false;
@@ -1271,7 +1337,6 @@ async function autoRefundOrder(orderIndex, order, errorMessage) {
 // ============================================================
 // 🔥 SEND ORDER TO LOLLIPOP
 // OrderID diambil dari response provider (contoh: 1107)
-// Disimpan ke kolom provider_order_id (BUKAN trx_id)
 // ============================================================
 async function sendOrdersToLollipop() {
   if (isOrderAlreadySent()) return true;
@@ -1293,7 +1358,7 @@ async function sendOrdersToLollipop() {
   
   let successCount = 0;
   let failedOrders = [];
-  let orderIds = [];       // 🔥 Array ORDER ID dari provider (contoh: ["1107", "1108"])
+  let orderIds = [];
   let totalRefundAmount = 0;
   let refundedOrders = [];
   
@@ -1327,7 +1392,6 @@ async function sendOrdersToLollipop() {
         
         console.log(`📥 Response order #${i+1}:`, result);
         
-        // 🔥 ROBUST ORDER ID EXTRACTION — prioritas ke result.order (contoh: 1107)
         let extractedOrderId = null;
         
         if (result.order !== undefined && result.order !== null && result.order !== '') {
@@ -1356,13 +1420,12 @@ async function sendOrdersToLollipop() {
           extractedOrderId = String(extractedOrderId).trim();
         }
         
-        console.log(`🆔 Extracted OrderID (dari provider) #${i+1}:`, extractedOrderId);
+        console.log(`🆔 Extracted OrderID #${i+1}:`, extractedOrderId);
         
         if (extractedOrderId && extractedOrderId !== 'undefined' && extractedOrderId !== 'null' && extractedOrderId !== '') {
           successCount++;
           orderIds.push(extractedOrderId);
           
-          // Update order_payments (legacy) — kolom fayupedia_order_id untuk kompatibilitas
           try {
             await supabaseClient.from('order_payments')
               .update({ 
@@ -1374,12 +1437,10 @@ async function sendOrdersToLollipop() {
               .eq('order_index', i);
           } catch(e) { console.warn('order_payments update:', e.message); }
           
-          // ✅ SIMPAN ORDER ID KE orders_detail → kolom provider_order_id
           const updated = await updateOrderStatusInDB(order, 'processing', extractedOrderId, null);
           if (updated) {
             console.log(`💾 Order #${i+1} → orders_detail [provider_order_id: ${extractedOrderId}, status: processing]`);
           } else {
-            // Retry dengan explicit update ke provider_order_id
             try {
               const { data: retryData, error: retryErr } = await supabaseClient
                 .from('orders_detail')
@@ -1731,10 +1792,10 @@ function isTransactionValid(transaction, targetAmount) {
 }
 
 async function checkPaymentStatus() {
+  if (IS_GMAIL_BLOCKED) return;
   if (isProcessingPayment) return;
   if (paymentMethod !== 'qris') return;
   
-  // 🚨 CEK GMAIL NULL
   if (!checkGmailAndRedirect()) return;
   
   const statusEl = document.getElementById('paymentStatus');
@@ -2002,6 +2063,8 @@ async function loadVoucher(){
 }
 
 document.getElementById('applyVoucher').onclick = async function() {
+  if (IS_GMAIL_BLOCKED) return;
+  
   const code = document.getElementById('voucherInput').value.trim().toUpperCase();
   if(!code) return Swal.fire("Isi kode voucher","","warning");
   if (isVoucherUsed(code)) {
@@ -2041,6 +2104,8 @@ document.getElementById('applyVoucher').onclick = async function() {
 };
 
 document.getElementById('confirmBtn').onclick = function() {
+  if (IS_GMAIL_BLOCKED) return;
+  
   if (paymentMethod === 'saldo') {
     Swal.fire({ title: '💰 Metode Saldo', text: 'Klik "Bayar dengan Saldo" di atas untuk melanjutkan.', icon: 'info', confirmButtonColor: '#facc15' });
     return;
@@ -2049,6 +2114,8 @@ document.getElementById('confirmBtn').onclick = function() {
 };
 
 document.getElementById('regenerateBtn').onclick = function() {
+  if (IS_GMAIL_BLOCKED) return;
+  
   Swal.fire({
     title: '🔄 Generate Ulang QRIS?',
     html: `
@@ -2069,6 +2136,8 @@ document.getElementById('regenerateBtn').onclick = function() {
 };
 
 async function showRefundHistory() {
+  if (IS_GMAIL_BLOCKED) return;
+  
   if (!supabaseClient || !userProfileId) {
     Swal.fire({ 
       title: '⚠️ Harus Login', 
@@ -2155,7 +2224,7 @@ window.showRefundHistory = showRefundHistory;
   await fetchConfigFromEnv();
   configLoaded = true;
   
-  // 🚨 CEK GMAIL NULL DULU — kalau null, langsung redirect
+  // 🚨 CEK GMAIL NULL DULU — kalau null, pop up muncul + block + redirect
   const gmailValid = checkGmailAndRedirect();
   if (!gmailValid) return;
   
@@ -2164,7 +2233,6 @@ window.showRefundHistory = showRefundHistory;
   
   await loadUserBalance();
   
-  // Fallback kalau gmail hilang setelah login
   const gmailNow = getStoredGmail();
   if (!gmailNow || !validateEmail(gmailNow)) {
     checkGmailAndRedirect();
@@ -2247,7 +2315,7 @@ console.log(`💳 Payment ${SOSMED_TYPE} ready!`);
 console.log(`📦 Orders: ${ordersData.length} items`);
 console.log(`💾 Auto-save to orders_detail: enabled`);
 console.log(`🆔 OrderID dari provider → kolom: provider_order_id`);
-console.log(`🚨 Gmail null → redirect ke ${HOME_URL}`);
+console.log(`🚨 Gmail null → BLOCK ALL + redirect ke ${HOME_URL}`);
 </script>
 </body>
 </html>
