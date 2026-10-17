@@ -288,7 +288,6 @@ let userBalance = 0;
 let userEmail = null;
 let userProfileId = null;
 
-// URL params storage
 function getUrlParamsKey(trxId) { return `url_params_${trxId}`; }
 
 function saveUrlParams() {
@@ -344,7 +343,6 @@ function loadUrlParams() {
 if (trx && trx !== "-") localStorage.setItem('last_trx', trx);
 loadUrlParams();
 
-// Order IDs storage
 function getOrderIdsKey(trxId) { return `order_ids_${trxId}`; }
 
 function saveOrderIds(orderIds) {
@@ -506,7 +504,7 @@ function startWIBClock() {
 startWIBClock();
 
 // ============================================================
-// 💾 SAVE ORDER DETAIL KE DATABASE (FIXED WITH FALLBACK)
+// 💾 SAVE ORDER DETAIL KE DATABASE
 // ============================================================
 
 async function saveAllOrdersDetailToDB(method) {
@@ -515,7 +513,7 @@ async function saveAllOrdersDetailToDB(method) {
     return false;
   }
   
-  // 🔥 FALLBACK: kalau ordersData kosong, coba parse ulang dari URL/localStorage
+  // Fallback: kalau ordersData kosong, coba recover
   if ((!ordersData || ordersData.length === 0) && trx && trx !== '-') {
     try {
       const urlOrders = new URLSearchParams(location.search).get('orders');
@@ -528,7 +526,7 @@ async function saveAllOrdersDetailToDB(method) {
           ordersData = data.orders || [];
         }
       }
-      console.log(`📦 Recovered ${ordersData.length} orders from URL/localStorage`);
+      console.log(`📦 Recovered ${ordersData.length} orders`);
     } catch(e) {
       console.warn('⚠️ Gagal recover ordersData:', e.message);
     }
@@ -543,8 +541,6 @@ async function saveAllOrdersDetailToDB(method) {
     const gmail = getStoredGmail();
     const totalPayment = normalizeTotal(finalTotal);
     const perOrderAmount = Math.ceil(totalPayment / ordersData.length);
-    
-    // Normalize payment method
     const normalizedMethod = method === 'balance' ? 'saldo' : method;
     
     const { data: existing } = await supabaseClient
@@ -580,7 +576,7 @@ async function saveAllOrdersDetailToDB(method) {
     if (error) throw error;
     if (!data || !data.success) throw new Error(data?.message || 'Save failed');
     
-    console.log(`💾 ${data.saved_count} order details saved (${SOSMED_TYPE}, ${normalizedMethod} @ Rp ${perOrderAmount.toLocaleString('id-ID')}/order)`);
+    console.log(`💾 ${data.saved_count} order details saved (${SOSMED_TYPE}, ${normalizedMethod})`);
     return true;
   } catch (err) {
     console.error('❌ Save all orders error:', err.message);
@@ -591,16 +587,35 @@ async function saveAllOrdersDetailToDB(method) {
 async function updateOrderStatusInDB(order, status, providerOrderId, failReason) {
   if (!supabaseClient) return false;
   try {
-    const { data, error } = await supabaseClient.rpc('update_order_detail_status', {
-      p_trx_id: trx,
-      p_service_id: String(order.serviceId || ''),
-      p_target: order.target || '',
-      p_status: status,
-      p_fayupedia_order_id: providerOrderId || null,
-      p_fail_reason: failReason || null
-    });
+    const updateObj = {
+      order_status: status,
+      updated_at: new Date().toISOString()
+    };
+    
+    if (providerOrderId !== null && providerOrderId !== undefined) {
+      updateObj.order_id = String(providerOrderId);
+    }
+    if (failReason !== null && failReason !== undefined) {
+      updateObj.fail_reason = failReason;
+    }
+    
+    const { data, error } = await supabaseClient
+      .from('orders_detail')
+      .update(updateObj)
+      .eq('trx_id', trx)
+      .eq('service_id', String(order.serviceId || ''))
+      .eq('target', order.target || '')
+      .select();
+    
     if (error) throw error;
-    return data && data.success;
+    
+    if (data && data.length > 0) {
+      console.log(`💾 Order status updated: ${status}, order_id: ${providerOrderId || '-'}`, data);
+      return true;
+    } else {
+      console.warn(`⚠️ No orders_detail row matched for service_id=${order.serviceId} target=${order.target}`);
+      return false;
+    }
   } catch (err) {
     console.error('❌ Update order status error:', err.message);
     return false;
@@ -927,10 +942,8 @@ async function payWithBalance() {
     isPaymentVerified = true;
     transactionLocked = true;
     
-    // 💾 SAVE ORDER DETAIL (via RPC — primary source)
     await saveAllOrdersDetailToDB('saldo');
     
-    // Track order_payments (legacy)
     try {
       if (ordersData && ordersData.length > 0) {
         const { data: existing } = await supabaseClient
@@ -1168,7 +1181,6 @@ async function autoRefundOrder(orderIndex, order, errorMessage) {
         .eq('id', orderPayment.id);
     }
     
-    // 🔥 Update orders_detail
     try {
       await supabaseClient
         .from('orders_detail')
@@ -1206,6 +1218,9 @@ async function autoRefundOrder(orderIndex, order, errorMessage) {
   }
 }
 
+// ============================================================
+// 🔥 SEND ORDER TO LOLLIPOP — dengan robust extraction & auto-save order_id
+// ============================================================
 async function sendOrdersToLollipop() {
   if (isOrderAlreadySent()) return true;
   if (isSendingOrder) return false;
@@ -1252,31 +1267,96 @@ async function sendOrdersToLollipop() {
         });
         
         let result;
-        try { result = await response.json(); } catch (e) { result = { error: 'Invalid JSON response', status: response.status }; }
+        try { 
+          result = await response.json(); 
+        } catch (e) { 
+          result = { error: 'Invalid JSON response', status: response.status }; 
+        }
         
-        const extractedOrderId = result.order || (result.data && result.data.order);
+        console.log(`📥 Response order #${i+1}:`, result);
         
-        if (extractedOrderId) {
+        // 🔥 ROBUST ORDER ID EXTRACTION
+        let extractedOrderId = null;
+        
+        if (result.order !== undefined && result.order !== null && result.order !== '') {
+          extractedOrderId = result.order;
+        }
+        else if (result.data && result.data.order !== undefined && result.data.order !== null) {
+          extractedOrderId = result.data.order;
+        }
+        else if (result.order_id !== undefined && result.order_id !== null) {
+          extractedOrderId = result.order_id;
+        }
+        else if (result.data && result.data.id !== undefined && result.data.id !== null) {
+          extractedOrderId = result.data.id;
+        }
+        else if (result.id !== undefined && result.id !== null) {
+          extractedOrderId = result.id;
+        }
+        else if (result.orderId !== undefined && result.orderId !== null) {
+          extractedOrderId = result.orderId;
+        }
+        else if (result.data?.data?.order !== undefined) {
+          extractedOrderId = result.data.data.order;
+        }
+        
+        if (extractedOrderId !== null && extractedOrderId !== undefined) {
+          extractedOrderId = String(extractedOrderId).trim();
+        }
+        
+        console.log(`🆔 Extracted order ID #${i+1}:`, extractedOrderId);
+        
+        if (extractedOrderId && extractedOrderId !== 'undefined' && extractedOrderId !== 'null' && extractedOrderId !== '') {
           successCount++;
           orderIds.push(extractedOrderId);
           
+          // Update order_payments (legacy)
           try {
             await supabaseClient.from('order_payments')
               .update({ 
-                fayupedia_order_id: String(extractedOrderId), 
+                fayupedia_order_id: extractedOrderId, 
                 status: 'processing',
                 updated_at: new Date().toISOString()
               })
               .eq('trx_id', trx)
               .eq('order_index', i);
-          } catch(e) {}
+          } catch(e) { console.warn('order_payments update:', e.message); }
           
-          // 🔥 UPDATE ORDER DETAIL STATUS: PROCESSING
-          await updateOrderStatusInDB(order, 'processing', String(extractedOrderId), null);
+          // ✅ SIMPAN ORDER ID KE orders_detail
+          const updated = await updateOrderStatusInDB(order, 'processing', extractedOrderId, null);
+          if (updated) {
+            console.log(`💾 Order #${i+1} → orders_detail [order_id: ${extractedOrderId}, status: processing]`);
+          } else {
+            // Retry with explicit update
+            try {
+              const { data: retryData, error: retryErr } = await supabaseClient
+                .from('orders_detail')
+                .update({
+                  order_id: extractedOrderId,
+                  order_status: 'processing',
+                  updated_at: new Date().toISOString()
+                })
+                .eq('trx_id', trx)
+                .eq('service_id', String(order.serviceId || ''))
+                .eq('target', order.target || '')
+                .select();
+              
+              if (retryErr) {
+                console.warn(`⚠️ Retry failed #${i+1}:`, retryErr.message);
+              } else {
+                console.log(`💾 Retry success #${i+1}:`, retryData);
+              }
+            } catch (retryE) {
+              console.warn(`⚠️ Retry error #${i+1}:`, retryE.message);
+            }
+          }
           
         } else {
-          const errorMsg = result.msg || result.error || result.message || ('HTTP ' + response.status);
+          const errorMsg = result.msg || result.error || result.message || 
+                          (result.data && result.data.msg) || 
+                          ('Response tidak ada order ID (HTTP ' + response.status + ')');
           failedOrders.push({ index: i, order, error: errorMsg });
+          console.warn(`❌ Order #${i+1} gagal (no order ID):`, errorMsg);
           
           await updateOrderStatusInDB(order, 'failed', null, errorMsg);
           
@@ -1290,7 +1370,9 @@ async function sendOrdersToLollipop() {
           }
         }
       } catch (fetchErr) {
+        console.warn(`❌ Order #${i+1} network error:`, fetchErr.message);
         failedOrders.push({ index: i, order, error: 'Network error: ' + fetchErr.message });
+        
         await updateOrderStatusInDB(order, 'failed', null, 'Network error: ' + fetchErr.message);
         
         const refundInfo = await autoRefundOrder(i, order, 'Network error');
@@ -1368,7 +1450,8 @@ async function sendOrdersToLollipop() {
         title: '⚠️ Sebagian Gagal — Saldo Dikembalikan!',
         html: `<div style="text-align:left;color:#ddd;font-size:13px;line-height:1.7;">
           <div style="background:rgba(34,197,94,0.1);padding:10px 12px;border-radius:8px;margin-bottom:10px;border-left:3px solid #22c55e;">
-            <b style="color:#22c55e;">✅ Berhasil:</b> ${successCount} pesanan
+            <b style="color:#22c55e;">✅ Berhasil:</b> ${successCount} pesanan<br>
+            <span style="font-size:11px;color:#86efac;">ID: ${orderIdStr}</span>
           </div>
           <div style="background:rgba(239,68,68,0.1);padding:10px 12px;border-radius:8px;margin-bottom:10px;border-left:3px solid #ef4444;">
             <b style="color:#ef4444;">❌ Gagal:</b> ${failedOrders.length} pesanan<br>
@@ -1442,6 +1525,7 @@ async function sendOrdersToLollipop() {
       return false;
     }
   } catch (err) {
+    console.error('❌ Error send mass orders:', err);
     orderStatus.className = 'order-status failed';
     orderStatus.textContent = `❌ Error: ${err.message}`;
     isSendingOrder = false;
@@ -1700,7 +1784,7 @@ async function checkPaymentStatus() {
             .limit(1);
           
           if (!existing || existing.length === 0) {
-            const amountRefundable = normalizeTotal(finalTotal);
+            const amountRefundable = normalizeTotal(finalFinal);
             const perOrderAmount = Math.ceil(amountRefundable / ordersData.length);
             
             const orderPaymentRows = ordersData.map((o, i) => ({
@@ -1721,7 +1805,7 @@ async function checkPaymentStatus() {
         }
       } catch (trackErr) {}
       
-      // 💾 SAVE ORDER DETAIL KE DATABASE
+      // Save order detail ke DB
       await saveAllOrdersDetailToDB('qris');
       
       const sent = await sendToDiscord(gmail, userID);
