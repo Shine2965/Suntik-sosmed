@@ -252,7 +252,6 @@ const WHATSAPP_NUMBER = "6289518103883";
 const MERCHANT_CODE = "QP052692";
 const FAYUPEDIA_URL = "https://fayupedia.id/api/order";
 
-// 📍 IDENTIFIKASI SOSMED TYPE
 const SOSMED_TYPE = 'sosmed-2';
 
 const SUPABASE_URL = 'https://vvzgpbiesvupuhqqoxrg.supabase.co';
@@ -539,16 +538,89 @@ function startWIBClock() {
 startWIBClock();
 
 // ============================================================
-// 💾 SAVE ORDER DETAIL KE DATABASE (FIXED WITH FALLBACK)
+// 🎯 EXTRACT ORDER ID DARI RESPONSE PROVIDER
+// Support 15+ format response berbeda
 // ============================================================
+function extractOrderIdFromResponse(result) {
+  if (!result) return null;
 
+  // Helper: normalisasi value jadi string valid
+  const tryValue = (val) => {
+    if (val === null || val === undefined) return null;
+    if (typeof val === 'number' && !isNaN(val) && val > 0) return String(val);
+    if (typeof val === 'string' && val.trim() !== '' && val !== '0') return val.trim();
+    return null;
+  };
+
+  const isValidId = (val) => {
+    if (!val) return false;
+    const str = String(val).trim();
+    if (str === '' || str === '0' || str === 'null' || str === 'undefined') return false;
+    if (/^\d+$/.test(str) && parseInt(str) > 0) return true;
+    if (str.length >= 3 && str.length <= 50) return true;
+    return false;
+  };
+
+  // Daftar lokasi order ID yang mungkin (paling umum dulu)
+  const candidates = [
+    result.order,
+    result.order_id,
+    result.orderId,
+    result.id,
+    result.OrderId,
+    result.Order,
+    result.OrderID,
+    result.data?.order,
+    result.data?.order_id,
+    result.data?.orderId,
+    result.data?.id,
+    result.result?.order,
+    result.result?.order_id,
+    result.result?.id,
+    result.response?.order,
+    result.response?.order_id,
+    result.response?.id,
+    result.payload?.order,
+    result.payload?.order_id,
+    result.payload?.id,
+    result.orders?.[0]?.id,
+    result.orders?.[0]?.order_id,
+    result.orders?.[0]?.order,
+  ];
+
+  for (const candidate of candidates) {
+    const val = tryValue(candidate);
+    if (val && isValidId(val)) return val;
+  }
+
+  // Fallback: kalau result array
+  if (Array.isArray(result) && result.length > 0) {
+    const first = result[0];
+    if (typeof first === 'object') {
+      const val = tryValue(first.order) || tryValue(first.order_id) || 
+                  tryValue(first.id) || tryValue(first.OrderId);
+      if (val && isValidId(val)) return val;
+    }
+    const val = tryValue(first);
+    if (val && isValidId(val)) return val;
+  }
+
+  // Fallback: kalau result primitive
+  const directVal = tryValue(result);
+  if (directVal && isValidId(directVal)) return directVal;
+
+  return null;
+}
+
+// ============================================================
+// 💾 SAVE ORDER DETAIL KE DATABASE
+// ============================================================
 async function saveAllOrdersDetailToDB(method) {
   if (!supabaseClient || !userProfileId) {
     console.warn('⚠️ saveAllOrdersDetail: skip (no auth)');
     return false;
   }
   
-  // 🔥 FALLBACK: kalau ordersData kosong, coba parse ulang dari URL/localStorage
   if ((!ordersData || ordersData.length === 0) && trx && trx !== '-') {
     try {
       const urlOrders = new URLSearchParams(location.search).get('orders');
@@ -576,8 +648,6 @@ async function saveAllOrdersDetailToDB(method) {
     const gmail = getStoredGmail();
     const totalPayment = normalizeTotal(finalTotal);
     const perOrderAmount = Math.ceil(totalPayment / ordersData.length);
-    
-    // Normalize payment method — DB constraint pakai 'saldo' atau 'qris'
     const normalizedMethod = method === 'balance' ? 'saldo' : method;
     
     const { data: existing } = await supabaseClient
@@ -965,7 +1035,6 @@ async function payWithBalance() {
     isPaymentVerified = true;
     transactionLocked = true;
     
-    // Save ke order_payments (legacy tracking)
     try {
       await supabaseClient.from('order_payments').insert({
         user_id: userProfileId,
@@ -981,7 +1050,6 @@ async function payWithBalance() {
       });
     } catch(e) { console.warn('order_payments insert skip:', e.message); }
     
-    // 💾 SAVE ORDER DETAIL KE DATABASE (via RPC)
     await saveAllOrdersDetailToDB('saldo');
     
     updateSaldoDisplay();
@@ -1201,7 +1269,6 @@ async function autoRefundOrder(orderIndex, order, errorMessage) {
         .eq('id', orderPayment.id);
     }
     
-    // 🔥 Tandai refunded di orders_detail
     try {
       await supabaseClient
         .from('orders_detail')
@@ -1249,6 +1316,10 @@ async function autoRefundOrder(orderIndex, order, errorMessage) {
   }
 }
 
+// ============================================================
+// 🚀 KIRIM ORDER KE FAYUPEDIA
+// Order ID diambil dari response via extractOrderIdFromResponse()
+// ============================================================
 async function sendMassOrdersToFayupedia() {
   if (isOrderAlreadySent()) return true;
   if (isSendingOrder) return false;
@@ -1292,69 +1363,91 @@ async function sendMassOrdersToFayupedia() {
       if (order.comment && order.comment.trim() !== '') payload.comments = order.comment.trim();
       
       try {
+        console.log(`📤 [Order ${i+1}/${ordersData.length}] Kirim ke Fayupedia:`, payload);
+        
         const response = await fetch(FAYUPEDIA_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
           body: JSON.stringify(payload)
         });
-        const result = await response.json();
         
-        if (result.status === true && result.order) {
+        const rawText = await response.text();
+        console.log(`📥 [Order ${i+1}] Raw response:`, rawText);
+        
+        let result;
+        try {
+          result = JSON.parse(rawText);
+        } catch(e) {
+          console.error(`❌ [Order ${i+1}] Response bukan JSON:`, rawText);
+          result = { error: 'Invalid JSON response', status: response.status, raw: rawText };
+        }
+        
+        console.log(`📦 [Order ${i+1}] Parsed result:`, result);
+        
+        // 🔥 EXTRACT ORDER ID DARI BERBAGAI FORMAT RESPONSE
+        const extractedOrderId = extractOrderIdFromResponse(result);
+        
+        console.log(`🎯 [Order ${i+1}] Extracted Order ID:`, extractedOrderId);
+        
+        // Cek juga status === true sebagai validasi tambahan
+        const isSuccessStatus = result.status === true || result.status === 'true' || result.success === true;
+        
+        if (extractedOrderId && (isSuccessStatus || !('status' in result))) {
           successCount++;
-          orderIds.push(result.order);
+          orderIds.push(extractedOrderId);
           
           try {
             await supabaseClient.from('order_payments')
               .update({ 
-                fayupedia_order_id: String(result.order), 
+                fayupedia_order_id: String(extractedOrderId), 
                 status: 'processing',
                 updated_at: new Date().toISOString()
               })
               .eq('trx_id', trx)
               .eq('order_index', i);
-          } catch(e) {}
+          } catch(e) { console.warn('order_payments update skip:', e.message); }
           
-          // 🔥 UPDATE ORDER DETAIL STATUS: PROCESSING
-          await updateOrderStatusInDB(order, 'processing', String(result.order), null);
+          // 🔥 SIMPAN ORDER ID KE orders_detail
+          const updateResult = await updateOrderStatusInDB(order, 'processing', String(extractedOrderId), null);
+          console.log(`💾 [Order ${i+1}] DB update:`, updateResult);
           
         } else {
-          const errorMsg = result.msg || 'Gagal dari Fayupedia';
+          const errorMsg = result.msg || result.error || result.message || 
+                          result.data?.msg || result.data?.error ||
+                          (extractedOrderId ? 'Status tidak success' : 'Tidak ada order ID di response');
           failedOrders.push({ index: i, order, error: errorMsg });
+          console.warn(`❌ [Order ${i+1}] Gagal:`, errorMsg);
           
-          // 🔥 UPDATE ORDER DETAIL STATUS: FAILED
           await updateOrderStatusInDB(order, 'failed', null, errorMsg);
           
           const refundInfo = await autoRefundOrder(i, order, errorMsg);
           if (refundInfo.success) {
             totalRefundAmount += refundInfo.amount;
             refundedOrders.push({ 
-              index: i, 
-              serviceName: order.serviceName, 
-              amount: refundInfo.amount,
-              error: errorMsg
+              index: i, order, serviceName: order.serviceName, 
+              amount: refundInfo.amount, error: errorMsg
             });
           }
         }
       } catch (fetchErr) {
+        console.error(`❌ [Order ${i+1}] Network error:`, fetchErr);
         failedOrders.push({ index: i, order, error: 'Network error: ' + fetchErr.message });
-        
-        // 🔥 UPDATE ORDER DETAIL STATUS: FAILED
         await updateOrderStatusInDB(order, 'failed', null, 'Network error: ' + fetchErr.message);
         
         const refundInfo = await autoRefundOrder(i, order, 'Network error');
         if (refundInfo.success) {
           totalRefundAmount += refundInfo.amount;
           refundedOrders.push({ 
-            index: i, 
-            serviceName: order.serviceName, 
-            amount: refundInfo.amount,
-            error: 'Network error'
+            index: i, order, serviceName: order.serviceName, 
+            amount: refundInfo.amount, error: 'Network error'
           });
         }
       }
       
       orderStatus.textContent = `⏳ Mengirim ${i+1}/${ordersData.length}... (${successCount} berhasil)`;
     }
+    
+    markOrderSent();
     
     const orderIdStr = orderIds.join(', ') || '-';
     
@@ -1368,7 +1461,6 @@ async function sendMassOrdersToFayupedia() {
           <button class="copy-btn" onclick="copyOrderId('${orderIdStr}')">📋 Salin Semua</button>
         </div>
       `;
-      markOrderSent();
       saveOrderIds(orderIds);
       isSendingOrder = false;
       
@@ -1790,7 +1882,6 @@ async function checkPaymentStatus() {
         console.warn('⚠️ Gagal track order_payments QRIS:', trackErr.message);
       }
       
-      // 💾 SAVE ORDER DETAIL KE DATABASE (via RPC)
       await saveAllOrdersDetailToDB('qris');
       
       const sent = await sendToDiscord(gmail, userID);
