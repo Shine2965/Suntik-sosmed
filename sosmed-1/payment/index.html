@@ -167,7 +167,7 @@ p.alert-text{color:#fca5a5;font-size:13px;line-height:1.7;margin-top:16px;margin
   
   <div class="gmail-display">
     <span class="label">📧 Gmail:</span>
-    <span class="value" id="gmailDisplay">Belum diatur</span>
+    <span class="value" id="gmailDisplay">Memuat...</span>
   </div>
 
   <div class="method-selector" id="methodSelector">
@@ -251,6 +251,7 @@ const discordWebhook = "https://discord.com/api/webhooks/1482244992725553164/k6b
 const GMAIL_BAN_URL = "/sosmed-1/payment/gmail.json";
 const WHATSAPP_NUMBER = "6289518103883";
 const MERCHANT_CODE = "QP052692";
+const HOME_URL = "https://shinedomain.my.id";
 
 const SOSMED_TYPE = 'sosmed-1';
 
@@ -371,7 +372,7 @@ function displayStoredOrderIds() {
     orderStatus.innerHTML = `
       ✅ ${storedIds.length} pesanan tersimpan!
       <div class="order-id-box">
-        🆔 ID Pesanan: <strong>${orderIdStr}</strong>
+        🆔 OrderID: <strong>${orderIdStr}</strong>
         <button class="copy-btn" onclick="copyOrderId('${orderIdStr}')">📋 Salin Semua</button>
       </div>
     `;
@@ -504,6 +505,83 @@ function startWIBClock() {
 startWIBClock();
 
 // ============================================================
+// 🚨 CEK GMAIL NULL → REDIRECT KE HOMEPAGE
+// ============================================================
+function checkGmailAndRedirect() {
+  const gmail = getStoredGmail();
+  
+  if (!gmail || !validateEmail(gmail)) {
+    console.warn('⚠️ Gmail null/kosong → redirect ke homepage');
+    
+    // Pop up peringatan selama 5 detik
+    let countdown = 5;
+    Swal.fire({
+      title: '🔒 Harus Login Dulu',
+      html: `
+        <div style="text-align:center;color:#ddd;font-size:14px;line-height:1.7;">
+          <div style="font-size:60px;margin-bottom:12px;">🔐</div>
+          <p style="font-size:16px;font-weight:700;color:#fff;margin-bottom:12px;">
+            Gmail belum terdaftar!
+          </p>
+          <p style="color:#94a3b8;font-size:13px;margin-bottom:16px;">
+            Silakan <b style="color:#00c6ff;">login</b> terlebih dahulu di halaman utama untuk melanjutkan pembayaran.
+          </p>
+          <div style="background:rgba(0,198,255,0.1);padding:14px;border-radius:12px;border-left:3px solid #00c6ff;text-align:left;margin-bottom:12px;">
+            <div style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">📌 Langkah:</div>
+            <div style="font-size:12px;color:#e2e8f0;">
+              1. Klik tombol di bawah<br>
+              2. Login dengan akun Anda<br>
+              3. Ulangi proses pemesanan
+            </div>
+          </div>
+          <div style="font-size:32px;font-weight:900;color:#facc15;font-family:monospace;" id="redirectCountdown">
+            ${countdown}
+          </div>
+          <p style="font-size:11px;color:#94a3b8;margin-top:4px;">
+            Redirect otomatis dalam <b id="redirectSeconds">${countdown}</b> detik...
+          </p>
+        </div>
+      `,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: '🏠 Ke Halaman Utama',
+      cancelButtonText: '❌ Tutup',
+      confirmButtonColor: '#00c6ff',
+      cancelButtonColor: '#666',
+      background: '#0a0e1a', color: '#fff',
+      allowOutsideClick: false,
+      allowEscapeKey: false,
+      didOpen: () => {
+        const timerInterval = setInterval(() => {
+          countdown--;
+          const cdEl = document.getElementById('redirectCountdown');
+          const secEl = document.getElementById('redirectSeconds');
+          if (cdEl) cdEl.textContent = countdown;
+          if (secEl) secEl.textContent = countdown;
+          
+          if (countdown <= 0) {
+            clearInterval(timerInterval);
+            window.location.href = HOME_URL;
+          }
+        }, 1000);
+        
+        // Simpan interval agar bisa di-clear saat user klik tombol
+        window._redirectInterval = timerInterval;
+      }
+    }).then((result) => {
+      if (window._redirectInterval) clearInterval(window._redirectInterval);
+      if (result.isConfirmed) {
+        window.location.href = HOME_URL;
+      }
+    });
+    
+    return false;
+  }
+  
+  return true;
+}
+
+// ============================================================
 // 💾 SAVE ORDER DETAIL KE DATABASE
 // ============================================================
 
@@ -513,7 +591,6 @@ async function saveAllOrdersDetailToDB(method) {
     return false;
   }
   
-  // Fallback: kalau ordersData kosong, coba recover
   if ((!ordersData || ordersData.length === 0) && trx && trx !== '-') {
     try {
       const urlOrders = new URLSearchParams(location.search).get('orders');
@@ -584,6 +661,10 @@ async function saveAllOrdersDetailToDB(method) {
   }
 }
 
+/**
+ * Update status order + simpan ORDER ID dari provider (bukan trx_id)
+ * p_provider_order_id = ID dari response provider (contoh: 1107)
+ */
 async function updateOrderStatusInDB(order, status, providerOrderId, failReason) {
   if (!supabaseClient) return false;
   try {
@@ -592,8 +673,8 @@ async function updateOrderStatusInDB(order, status, providerOrderId, failReason)
       updated_at: new Date().toISOString()
     };
     
-    if (providerOrderId !== null && providerOrderId !== undefined) {
-      updateObj.order_id = String(providerOrderId);
+    if (providerOrderId !== null && providerOrderId !== undefined && providerOrderId !== '') {
+      updateObj.provider_order_id = String(providerOrderId);
     }
     if (failReason !== null && failReason !== undefined) {
       updateObj.fail_reason = failReason;
@@ -610,7 +691,7 @@ async function updateOrderStatusInDB(order, status, providerOrderId, failReason)
     if (error) throw error;
     
     if (data && data.length > 0) {
-      console.log(`💾 Order status updated: ${status}, order_id: ${providerOrderId || '-'}`, data);
+      console.log(`💾 Order status updated: ${status}, provider_order_id: ${providerOrderId || '-'}`, data);
       return true;
     } else {
       console.warn(`⚠️ No orders_detail row matched for service_id=${order.serviceId} target=${order.target}`);
@@ -709,40 +790,6 @@ function showBannedPage(bannedData, userID, gmail) {
   if (appealLink && gmail) {
     appealLink.href = `https://wa.me/${WHATSAPP_NUMBER}?text=Halo%20Admin%2C%20saya%20ingin%20mengajukan%20banding%20atas%20ban%20akun%20saya.%20Gmail%3A%20${encodeURIComponent(gmail)}%0AUser%20ID%3A%20${encodeURIComponent(userID || '-')}`;
   }
-
-  setTimeout(() => {
-    Swal.fire({
-      title: '🚫 Akun Anda Dibanned',
-      html: `
-        <div style="text-align:left;color:#ddd;font-size:14px;line-height:1.7;">
-          <div style="background:rgba(255,68,68,0.1);padding:12px;border-radius:10px;margin-bottom:12px;border-left:3px solid #ff4444;">
-            <b style="color:#ff6666;">📧 Email:</b><br>
-            <span style="color:#00ffaa;font-size:13px;word-break:break-all;">${gmail || '-'}</span>
-          </div>
-          <div style="background:rgba(255,68,68,0.1);padding:12px;border-radius:10px;margin-bottom:12px;border-left:3px solid #ff4444;">
-            <b style="color:#ff6666;">📝 Alasan:</b><br>
-            <span style="font-size:13px;">${bannedData.Alasan || 'Tidak ada keterangan'}</span>
-          </div>
-          <div style="background:rgba(255,170,0,0.1);padding:12px;border-radius:10px;border-left:3px solid #ffaa00;">
-            <b style="color:#ffaa00;">⏳ Dibanned sampai:</b><br>
-            <span style="font-size:13px;color:#ffaa00;">${untilText}</span>
-          </div>
-        </div>
-      `,
-      icon: 'error',
-      confirmButtonText: '📱 Ajukan Banding',
-      confirmButtonColor: '#ff4444',
-      showCancelButton: true,
-      cancelButtonText: 'Tutup',
-      cancelButtonColor: '#666',
-      allowOutsideClick: false,
-      allowEscapeKey: false
-    }).then((result) => {
-      if (result.isConfirmed) {
-        window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=Halo%20Admin%2C%20saya%20ingin%20mengajukan%20banding%20atas%20ban%20akun%20saya.%20Gmail%3A%20${encodeURIComponent(gmail || '-')}%0AUser%20ID%3A%20${encodeURIComponent(userID || '-')}`, '_blank');
-      }
-    });
-  }, 300);
 }
 
 async function checkAndHandleBan() {
@@ -858,6 +905,9 @@ function selectPaymentMethod(method) {
 }
 
 async function payWithBalance() {
+  // 🚨 CEK GMAIL NULL
+  if (!checkGmailAndRedirect()) return;
+  
   if (!supabaseClient || !userProfileId) {
     Swal.fire({
       title: '❌ Tidak Bisa Bayar',
@@ -1219,7 +1269,9 @@ async function autoRefundOrder(orderIndex, order, errorMessage) {
 }
 
 // ============================================================
-// 🔥 SEND ORDER TO LOLLIPOP — dengan robust extraction & auto-save order_id
+// 🔥 SEND ORDER TO LOLLIPOP
+// OrderID diambil dari response provider (contoh: 1107)
+// Disimpan ke kolom provider_order_id (BUKAN trx_id)
 // ============================================================
 async function sendOrdersToLollipop() {
   if (isOrderAlreadySent()) return true;
@@ -1241,7 +1293,7 @@ async function sendOrdersToLollipop() {
   
   let successCount = 0;
   let failedOrders = [];
-  let orderIds = [];
+  let orderIds = [];       // 🔥 Array ORDER ID dari provider (contoh: ["1107", "1108"])
   let totalRefundAmount = 0;
   let refundedOrders = [];
   
@@ -1275,7 +1327,7 @@ async function sendOrdersToLollipop() {
         
         console.log(`📥 Response order #${i+1}:`, result);
         
-        // 🔥 ROBUST ORDER ID EXTRACTION
+        // 🔥 ROBUST ORDER ID EXTRACTION — prioritas ke result.order (contoh: 1107)
         let extractedOrderId = null;
         
         if (result.order !== undefined && result.order !== null && result.order !== '') {
@@ -1304,13 +1356,13 @@ async function sendOrdersToLollipop() {
           extractedOrderId = String(extractedOrderId).trim();
         }
         
-        console.log(`🆔 Extracted order ID #${i+1}:`, extractedOrderId);
+        console.log(`🆔 Extracted OrderID (dari provider) #${i+1}:`, extractedOrderId);
         
         if (extractedOrderId && extractedOrderId !== 'undefined' && extractedOrderId !== 'null' && extractedOrderId !== '') {
           successCount++;
           orderIds.push(extractedOrderId);
           
-          // Update order_payments (legacy)
+          // Update order_payments (legacy) — kolom fayupedia_order_id untuk kompatibilitas
           try {
             await supabaseClient.from('order_payments')
               .update({ 
@@ -1322,17 +1374,17 @@ async function sendOrdersToLollipop() {
               .eq('order_index', i);
           } catch(e) { console.warn('order_payments update:', e.message); }
           
-          // ✅ SIMPAN ORDER ID KE orders_detail
+          // ✅ SIMPAN ORDER ID KE orders_detail → kolom provider_order_id
           const updated = await updateOrderStatusInDB(order, 'processing', extractedOrderId, null);
           if (updated) {
-            console.log(`💾 Order #${i+1} → orders_detail [order_id: ${extractedOrderId}, status: processing]`);
+            console.log(`💾 Order #${i+1} → orders_detail [provider_order_id: ${extractedOrderId}, status: processing]`);
           } else {
-            // Retry with explicit update
+            // Retry dengan explicit update ke provider_order_id
             try {
               const { data: retryData, error: retryErr } = await supabaseClient
                 .from('orders_detail')
                 .update({
-                  order_id: extractedOrderId,
+                  provider_order_id: extractedOrderId,
                   order_status: 'processing',
                   updated_at: new Date().toISOString()
                 })
@@ -1354,9 +1406,9 @@ async function sendOrdersToLollipop() {
         } else {
           const errorMsg = result.msg || result.error || result.message || 
                           (result.data && result.data.msg) || 
-                          ('Response tidak ada order ID (HTTP ' + response.status + ')');
+                          ('Response tidak ada OrderID (HTTP ' + response.status + ')');
           failedOrders.push({ index: i, order, error: errorMsg });
-          console.warn(`❌ Order #${i+1} gagal (no order ID):`, errorMsg);
+          console.warn(`❌ Order #${i+1} gagal (no OrderID):`, errorMsg);
           
           await updateOrderStatusInDB(order, 'failed', null, errorMsg);
           
@@ -1398,7 +1450,7 @@ async function sendOrdersToLollipop() {
       orderStatus.innerHTML = `
         ✅ ${successCount} pesanan berhasil dibuat!
         <div class="order-id-box">
-          🆔 ID Pesanan: <strong>${orderIdStr}</strong>
+          🆔 OrderID: <strong>${orderIdStr}</strong>
           <button class="copy-btn" onclick="copyOrderId('${orderIdStr}')">📋 Salin</button>
         </div>
       `;
@@ -1412,14 +1464,14 @@ async function sendOrdersToLollipop() {
           <div style="text-align:center;color:#ddd;font-size:14px;">
             <p>Transaksi Anda telah terverifikasi dan pesanan sudah diteruskan.</p>
             <div style="background:#1e293b;padding:15px;border-radius:12px;margin:15px 0;border:1px solid #00c6ff;">
-              <span style="color:#94a3b8;font-size:12px;">ID PESANAN Anda:</span><br>
+              <span style="color:#94a3b8;font-size:12px;">🆔 ORDER ID (dari Provider):</span><br>
               <span style="color:#00ffaa;font-size:22px;font-weight:800;font-family:monospace;letter-spacing:1px;">${orderIdStr}</span>
               <br><br>
               <button onclick="copyOrderId('${orderIdStr}')" style="background:linear-gradient(135deg,#00c6ff,#0072ff);color:#fff;border:none;padding:8px 18px;border-radius:20px;cursor:pointer;font-size:13px;font-weight:600;">
-                📋 Salin ID Pesanan
+                📋 Salin OrderID
               </button>
             </div>
-            <p style="font-size:12px;color:#facc15;">⚠️ Catat atau simpan ID Pesanan di atas!</p>
+            <p style="font-size:12px;color:#facc15;">⚠️ Catat atau simpan OrderID di atas!</p>
           </div>
         `,
         icon: 'success',
@@ -1451,7 +1503,7 @@ async function sendOrdersToLollipop() {
         html: `<div style="text-align:left;color:#ddd;font-size:13px;line-height:1.7;">
           <div style="background:rgba(34,197,94,0.1);padding:10px 12px;border-radius:8px;margin-bottom:10px;border-left:3px solid #22c55e;">
             <b style="color:#22c55e;">✅ Berhasil:</b> ${successCount} pesanan<br>
-            <span style="font-size:11px;color:#86efac;">ID: ${orderIdStr}</span>
+            <span style="font-size:11px;color:#86efac;">🆔 OrderID: ${orderIdStr}</span>
           </div>
           <div style="background:rgba(239,68,68,0.1);padding:10px 12px;border-radius:8px;margin-bottom:10px;border-left:3px solid #ef4444;">
             <b style="color:#ef4444;">❌ Gagal:</b> ${failedOrders.length} pesanan<br>
@@ -1535,7 +1587,7 @@ async function sendOrdersToLollipop() {
 
 window.copyOrderId = function(orderId) {
   navigator.clipboard.writeText(String(orderId)).then(() => {
-    Swal.fire({ title: '✅ Berhasil Disalin!', text: `ID Pesanan ${orderId} telah disalin.`, icon: 'success', timer: 2000, showConfirmButton: false, toast: true, position: 'top-end' });
+    Swal.fire({ title: '✅ Berhasil Disalin!', text: `OrderID ${orderId} telah disalin.`, icon: 'success', timer: 2000, showConfirmButton: false, toast: true, position: 'top-end' });
   }).catch(() => {
     const textarea = document.createElement('textarea');
     textarea.value = orderId;
@@ -1569,7 +1621,7 @@ async function sendMassOrderNotificationToDiscord(orderIds, successCount, failed
 📊 **Total Pesanan:** ${ordersData.length}
 ✅ **Berhasil:** ${successCount}
 ❌ **Gagal:** ${failedCount}${refundInfo}
-🆔 **Order IDs:** ${orderIdStr}
+🆔 **Order IDs (dari Provider):** ${orderIdStr}
 📅 **Waktu:** ${formatWIB(new Date())}
 ━━━━━━━━━━━━━━━━━━━━━
 📋 **Detail Pesanan:**
@@ -1682,6 +1734,9 @@ async function checkPaymentStatus() {
   if (isProcessingPayment) return;
   if (paymentMethod !== 'qris') return;
   
+  // 🚨 CEK GMAIL NULL
+  if (!checkGmailAndRedirect()) return;
+  
   const statusEl = document.getElementById('paymentStatus');
   const confirmBtn = document.getElementById('confirmBtn');
   
@@ -1784,7 +1839,7 @@ async function checkPaymentStatus() {
             .limit(1);
           
           if (!existing || existing.length === 0) {
-            const amountRefundable = normalizeTotal(finalFinal);
+            const amountRefundable = normalizeTotal(finalTotal);
             const perOrderAmount = Math.ceil(amountRefundable / ordersData.length);
             
             const orderPaymentRows = ordersData.map((o, i) => ({
@@ -1805,7 +1860,6 @@ async function checkPaymentStatus() {
         }
       } catch (trackErr) {}
       
-      // Save order detail ke DB
       await saveAllOrdersDetailToDB('qris');
       
       const sent = await sendToDiscord(gmail, userID);
@@ -2101,10 +2155,21 @@ window.showRefundHistory = showRefundHistory;
   await fetchConfigFromEnv();
   configLoaded = true;
   
+  // 🚨 CEK GMAIL NULL DULU — kalau null, langsung redirect
+  const gmailValid = checkGmailAndRedirect();
+  if (!gmailValid) return;
+  
   const isBanned = await checkAndHandleBan();
   if (isBanned) return;
   
   await loadUserBalance();
+  
+  // Fallback kalau gmail hilang setelah login
+  const gmailNow = getStoredGmail();
+  if (!gmailNow || !validateEmail(gmailNow)) {
+    checkGmailAndRedirect();
+    return;
+  }
   
   const savedState = getPaymentState();
   if (savedState && savedState.verified === true && savedState.verifiedAt) {
@@ -2181,6 +2246,8 @@ document.addEventListener("keydown", function(e){
 console.log(`💳 Payment ${SOSMED_TYPE} ready!`);
 console.log(`📦 Orders: ${ordersData.length} items`);
 console.log(`💾 Auto-save to orders_detail: enabled`);
+console.log(`🆔 OrderID dari provider → kolom: provider_order_id`);
+console.log(`🚨 Gmail null → redirect ke ${HOME_URL}`);
 </script>
 </body>
 </html>
