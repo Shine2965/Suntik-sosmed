@@ -825,6 +825,10 @@ body::before{
 .order-card .oc-status.refunded{background:rgba(255,170,0,0.2);color:#ffaa00;border:1px solid rgba(255,170,0,0.4)}
 .order-card .oc-orderid{background:rgba(0,198,255,0.08);border:1px solid rgba(0,198,255,0.2);border-radius:8px;padding:6px 10px;font-family:'Courier New',monospace;font-size:11.5px;color:#00c6ff;font-weight:800;word-break:break-all;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;gap:8px}
 .order-card .oc-orderid .label{color:#94a3b8;font-size:9px;font-family:'Quicksand',sans-serif;text-transform:uppercase;letter-spacing:1px;font-weight:700}
+.order-card .oc-orderid.pending-provider .label{color:#facc15}
+.order-card .oc-orderid.pending-provider{background:rgba(250,204,21,0.08);border-color:rgba(250,204,21,0.2);color:#facc15}
+.order-card .oc-orderid.failed-provider .label{color:#ef4444}
+.order-card .oc-orderid.failed-provider{background:rgba(239,68,68,0.08);border-color:rgba(239,68,68,0.2);color:#ef4444}
 .order-card .oc-copy-btn{background:rgba(0,198,255,0.2);border:none;color:#00c6ff;padding:3px 8px;border-radius:6px;font-size:10px;cursor:pointer;font-weight:800;flex-shrink:0}
 .order-card .oc-copy-btn:hover{background:rgba(0,198,255,0.4)}
 .order-card .oc-meta{font-size:10.5px;color:#94a3b8;display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}
@@ -968,7 +972,7 @@ body.chat-open .cs-bubble-container{display:none !important}
 
     </div>
 
-    <!-- PAGE: PESANAN (RIWAYAT ORDER) - Sekarang di Nav Bar -->
+    <!-- PAGE: PESANAN (RIWAYAT ORDER) -->
     <div class="page" id="page-orders">
       <div class="section-title" style="margin-bottom:12px;">📋 Riwayat Pesanan<div class="line"></div></div>
 
@@ -1527,7 +1531,7 @@ async function loadOrderHistory(showLoading = false) {
     }
     
     if (orderSearchQuery) {
-      query = query.or(`trx_id.ilike.%${orderSearchQuery}%,email.ilike.%${orderSearchQuery}%,target.ilike.%${orderSearchQuery}%,service_name.ilike.%${orderSearchQuery}%,service_id.ilike.%${orderSearchQuery}%`);
+      query = query.or(`provider_order_id.ilike.%${orderSearchQuery}%,email.ilike.%${orderSearchQuery}%,target.ilike.%${orderSearchQuery}%,service_name.ilike.%${orderSearchQuery}%,service_id.ilike.%${orderSearchQuery}%`);
     }
     
     if (orderStatusFilter !== 'all') {
@@ -1575,9 +1579,28 @@ function renderOrderList(orders) {
     const gmailTarget = order.gmail_target || '-';
     const emailUser = order.email || '-';
     const target = order.target || '-';
-    const orderId = order.trx_id || '-';
     const serviceId = order.service_id || '-';
-    const hasProviderOrderId = order.provider_order_id && order.provider_order_id !== '-';
+    
+    // 🔥 ORDERID = PROVIDER ORDER ID (dari response provider, contoh: 1107)
+    const providerOrderId = order.provider_order_id;
+    const hasProviderOrderId = providerOrderId && providerOrderId !== '-' && providerOrderId !== 'null' && providerOrderId !== '';
+    
+    // Status untuk warna kotak OrderID
+    let orderIdBoxClass = '';
+    let orderIdLabel = '🆔 OrderID';
+    let orderIdDisplay = '';
+    
+    if (hasProviderOrderId) {
+      orderIdDisplay = providerOrderId;
+    } else if (order.order_status === 'failed') {
+      orderIdBoxClass = 'failed-provider';
+      orderIdLabel = '❌ OrderID (Gagal)';
+      orderIdDisplay = 'Tidak ada ID';
+    } else {
+      orderIdBoxClass = 'pending-provider';
+      orderIdLabel = '⏳ OrderID (Pending)';
+      orderIdDisplay = 'Menunggu provider...';
+    }
     
     html += `
       <div class="order-card" data-order-id="${order.id}">
@@ -1585,12 +1608,12 @@ function renderOrderList(orders) {
           <div class="oc-service">${escapeHtml(order.service_name || 'Layanan')}</div>
           <span class="oc-status ${statusClass}">${statusLabel}</span>
         </div>
-        <div class="oc-orderid">
+        <div class="oc-orderid ${orderIdBoxClass}">
           <div style="display:flex;flex-direction:column;gap:2px;flex:1;min-width:0;">
-            <span class="label">🆔 OrderID</span>
-            <span style="word-break:break-all;">${escapeHtml(orderId)}</span>
+            <span class="label">${orderIdLabel}</span>
+            <span style="word-break:break-all;">${escapeHtml(orderIdDisplay)}</span>
           </div>
-          <button class="oc-copy-btn" onclick="copyOrderId('${escapeAttr(orderId)}')">📋</button>
+          ${hasProviderOrderId ? `<button class="oc-copy-btn" onclick="copyOrderId('${escapeAttr(providerOrderId)}')">📋</button>` : ''}
         </div>
         <div class="oc-serviceid">🔧 Service ID: <b>${escapeHtml(serviceId)}</b></div>
         <div class="oc-meta">
@@ -1601,7 +1624,6 @@ function renderOrderList(orders) {
         <div class="oc-meta" style="margin-bottom:0;">
           <span>🔢 Qty: ${parseInt(order.quantity || 0).toLocaleString('id-ID')}</span>
           <span>🏷️ ${sosmedLabel}</span>
-          ${hasProviderOrderId ? `<span>🔖 Provider ID: ${escapeHtml(order.provider_order_id)}</span>` : ''}
           ${order.comment ? `<span>💬 Komentar: ${order.comment.split('\n').filter(l=>l.trim()).length} baris</span>` : ''}
         </div>
         <div class="oc-footer">
