@@ -1,6 +1,9 @@
 // /api/fayupedia-services.js
 // Vercel Serverless Function - Proxy ke Fayupedia API
-// Support: 1. Ambil daftar layanan  2. Cek saldo
+// Support:
+//   1. Ambil daftar layanan (default)
+//   2. Cek saldo (?action=balance)
+//   3. Cek status pesanan (?action=status&id=...)
 
 export default async function handler(req, res) {
   // CORS
@@ -10,6 +13,14 @@ export default async function handler(req, res) {
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
+  }
+
+  // Allow GET dan POST
+  if (req.method !== 'GET' && req.method !== 'POST') {
+    return res.status(405).json({
+      status: false,
+      msg: 'Method not allowed. Use GET or POST'
+    });
   }
 
   try {
@@ -23,9 +34,21 @@ export default async function handler(req, res) {
       });
     }
 
-    // ===== DETECT ACTION =====
-    // ?action=services (default) atau ?action=balance
-    const action = (req.query && req.query.action) || 'services';
+    // ===== PARSE BODY (untuk POST) =====
+    let body = {};
+    if (req.method === 'POST') {
+      body = req.body || {};
+      if (typeof body === 'string') {
+        try { body = JSON.parse(body); } catch (e) { body = {}; }
+      }
+    }
+
+    // ===== DETECT ACTION (dari query atau body) =====
+    const action = String(
+      body.action ||
+      (req.query && req.query.action) ||
+      'services'
+    ).toLowerCase().trim();
 
     // ============================================================
     // 🔥 ACTION: BALANCE (CEK SALDO)
@@ -61,7 +84,6 @@ export default async function handler(req, res) {
         });
       }
 
-      // Cache singkat
       res.setHeader('Cache-Control', 's-maxage=10, stale-while-revalidate=20');
 
       return res.status(200).json({
@@ -72,7 +94,146 @@ export default async function handler(req, res) {
     }
 
     // ============================================================
-    // 🔥 ACTION: SERVICES (DAFTAR LAYANAN)
+    // 🔥 ACTION: STATUS (CEK STATUS PESANAN)
+    // Support single ID atau multiple ID (dipisah koma, max 50)
+    // ============================================================
+    if (action === 'status') {
+      // Ambil ID dari body / query — support berbagai nama parameter
+      const rawId = 
+        body.id || 
+        body.order_id || 
+        body.order || 
+        body.ids ||
+        (req.query && (req.query.id || req.query.order_id || req.query.order || req.query.ids));
+
+      if (!rawId) {
+        return res.status(400).json({
+          status: false,
+          msg: 'Parameter "id" wajib diisi (bisa single atau multiple dipisah koma)'
+        });
+      }
+
+      // Normalisasi ID: hapus spasi, trim
+      let idStr = String(rawId).trim();
+      
+      // Validasi: pisahkan per koma, filter yang valid
+      const idArray = idStr.split(',')
+        .map(s => s.trim())
+        .filter(s => s.length > 0);
+      
+      if (idArray.length === 0) {
+        return res.status(400).json({
+          status: false,
+          msg: 'Format ID tidak valid'
+        });
+      }
+
+      // Batasan max 50 ID sesuai dokumentasi
+      if (idArray.length > 50) {
+        return res.status(400).json({
+          status: false,
+          msg: 'Maksimal 50 ID Pesanan per request'
+        });
+      }
+
+      idStr = idArray.join(',');
+
+      try {
+        console.log(`🔍 [Fayupedia Status] Checking IDs: ${idStr}`);
+
+        const statusResponse = await fetch('https://fayupedia.id/api/status', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify({
+            api_id: apiId,
+            api_key: apiKey,
+            id: idStr
+          })
+        });
+
+        if (!statusResponse.ok) {
+          const text = await statusResponse.text().catch(() => '');
+          console.error('Fayupedia status HTTP error:', statusResponse.status, text);
+          return res.status(502).json({
+            status: false,
+            msg: `Gagal menghubungi provider (HTTP ${statusResponse.status})`,
+            error: text
+          });
+        }
+
+        const statusData = await statusResponse.json();
+        console.log('📥 [Fayupedia Status] Raw response:', JSON.stringify(statusData).substring(0, 500));
+
+        // Kalau response error dari provider
+        if (statusData && statusData.status === false) {
+          return res.status(200).json({
+            status: false,
+            msg: statusData.msg || statusData.message || 'Provider menolak request',
+            data: statusData.data || null
+          });
+        }
+
+        // Provider return data
+        const data = statusData.data;
+
+        // ===== NORMALIZE RESPONSE =====
+        // Fayupedia bisa return single object atau array
+        // Format single: { id, status, start_count, remains, ... }
+        // Format multiple: [{ id, status, ... }, { id, status, ... }]
+
+        if (!data) {
+          return res.status(200).json({
+            status: true,
+            msg: statusData.msg || 'OK',
+            data: null,
+            results: []
+          });
+        }
+
+        // Kalau array (multiple ID)
+        if (Array.isArray(data)) {
+          const normalizedArray = data.map(item => normalizeStatusItem(item));
+          return res.status(200).json({
+            status: true,
+            msg: statusData.msg || 'OK',
+            count: normalizedArray.length,
+            results: normalizedArray
+          });
+        }
+
+        // Kalau single object
+        if (typeof data === 'object') {
+          const normalized = normalizeStatusItem(data);
+          return res.status(200).json({
+            status: true,
+            msg: statusData.msg || 'OK',
+            count: 1,
+            results: [normalized]
+          });
+        }
+
+        // Fallback: primitive
+        return res.status(200).json({
+          status: true,
+          msg: statusData.msg || 'OK',
+          data: data,
+          results: []
+        });
+
+      } catch (fetchErr) {
+        console.error('❌ Fayupedia status fetch error:', fetchErr);
+        return res.status(500).json({
+          status: false,
+          msg: 'Gagal cek status: ' + (fetchErr.message || '')
+        });
+      }
+    }
+
+    // ============================================================
+    // 🔥 ACTION: SERVICES (DAFTAR LAYANAN) — DEFAULT
     // ============================================================
     const servicesResponse = await fetch('https://fayupedia.id/api/services', {
       method: 'POST',
@@ -105,7 +266,7 @@ export default async function handler(req, res) {
       });
     }
 
-    // ===== GROUP BY CATEGORY + MARKUP 10% =====
+    // ===== GROUP BY CATEGORY + MARKUP 7.5% =====
     const grouped = {};
     const MARKUP = 1.075;
 
@@ -129,7 +290,6 @@ export default async function handler(req, res) {
         id: s.id,
         name: s.name || `Service #${s.id}`,
         pricePerFollower: markedUpPrice,
-        // 🔥 SIMPAN HARGA ASLI PROVIDER UNTUK CEK SALDO
         rawPricePerFollower: rawPrice,
         min: Number(s.min) || 1,
         max: Number(s.max) || 1000000,
@@ -161,4 +321,58 @@ export default async function handler(req, res) {
       msg: 'Internal server error: ' + (error.message || '')
     });
   }
+}
+
+// ============================================================
+// 🔧 HELPER: NORMALIZE STATUS ITEM
+// Ubah format provider jadi format konsisten
+// ============================================================
+function normalizeStatusItem(item) {
+  if (!item || typeof item !== 'object') {
+    return {
+      id: null,
+      status: 'Unknown',
+      start_count: 0,
+      remains: 0,
+      charge: 0,
+      currency: 'IDR',
+      raw: item
+    };
+  }
+
+  // Ambil nilai dengan fallback ke berbagai kemungkinan nama field
+  const id = 
+    item.id ?? 
+    item.order ?? 
+    item.order_id ?? 
+    item.OrderId ?? 
+    null;
+
+  const status = 
+    item.status ?? 
+    item.order_status ?? 
+    item.state ?? 
+    'Unknown';
+
+  const startCount = 
+    parseInt(item.start_count ?? item.startCount ?? item.start ?? 0) || 0;
+
+  const remains = 
+    parseInt(item.remains ?? item.remains_count ?? item.remaining ?? 0) || 0;
+
+  const charge = 
+    parseFloat(item.charge ?? item.price ?? item.cost ?? 0) || 0;
+
+  const currency = 
+    item.currency ?? 'IDR';
+
+  return {
+    id: id ? String(id) : null,
+    status: String(status),
+    start_count: startCount,
+    remains: remains,
+    charge: charge,
+    currency: currency,
+    raw: item
+  };
 }
