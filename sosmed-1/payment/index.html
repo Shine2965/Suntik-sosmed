@@ -727,38 +727,62 @@ async function saveAllOrdersDetailToDB(method) {
  */
 async function updateOrderStatusInDB(order, status, providerOrderId, failReason) {
   if (!supabaseClient) return false;
+  
   try {
-    const updateObj = {
-      order_status: status,
-      updated_at: new Date().toISOString()
-    };
+    console.log(`💾 [updateOrderStatusInDB] Input:`, {
+      trx_id: trx,
+      service_id: String(order.serviceId || ''),
+      target: order.target || '',
+      status: status,
+      order_id: providerOrderId || null
+    });
     
-    if (providerOrderId !== null && providerOrderId !== undefined && providerOrderId !== '') {
-      updateObj.provider_order_id = String(providerOrderId);
-    }
-    if (failReason !== null && failReason !== undefined) {
-      updateObj.fail_reason = failReason;
-    }
+    const { data, error } = await supabaseClient.rpc('update_order_detail_status', {
+      p_trx_id: trx,
+      p_service_id: String(order.serviceId || ''),
+      p_target: order.target || '',
+      p_status: status,
+      p_fayupedia_order_id: providerOrderId || null,
+      p_fail_reason: failReason || null
+    });
     
-    const { data, error } = await supabaseClient
-      .from('orders_detail')
-      .update(updateObj)
-      .eq('trx_id', trx)
-      .eq('service_id', String(order.serviceId || ''))
-      .eq('target', order.target || '')
-      .select();
-    
-    if (error) throw error;
-    
-    if (data && data.length > 0) {
-      console.log(`💾 Order status updated: ${status}, provider_order_id: ${providerOrderId || '-'}`, data);
-      return true;
-    } else {
-      console.warn(`⚠️ No orders_detail row matched for service_id=${order.serviceId} target=${order.target}`);
+    if (error) {
+      console.error('❌ RPC error:', error);
       return false;
     }
+    
+    console.log('📊 RPC response:', data);
+    
+    if (data && data.rows_updated === 0) {
+      console.warn('⚠️ RPC tidak match apapun. Fallback direct update...');
+      
+      // 🔥 FALLBACK: Direct update kalau RPC tidak match
+      const updateObj = {
+        order_status: status,
+        updated_at: new Date().toISOString()
+      };
+      if (providerOrderId) updateObj.order_id = String(providerOrderId);
+      if (failReason) updateObj.fail_reason = failReason;
+      
+      const { data: fallbackData, error: fallbackErr } = await supabaseClient
+        .from('orders_detail')
+        .update(updateObj)
+        .eq('trx_id', trx)
+        .eq('service_id', String(order.serviceId || ''))
+        .select();
+      
+      if (fallbackErr) {
+        console.error('❌ Fallback error:', fallbackErr);
+        return false;
+      }
+      
+      console.log(`💾 Fallback result: ${fallbackData?.length || 0} rows updated`);
+      return (fallbackData?.length || 0) > 0;
+    }
+    
+    return data && data.success;
   } catch (err) {
-    console.error('❌ Update order status error:', err.message);
+    console.error('❌ updateOrderStatusInDB error:', err);
     return false;
   }
 }
