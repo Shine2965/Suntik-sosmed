@@ -1447,7 +1447,7 @@ async function fetchProviderStatus(order) {
 }
 
 // ============================================================
-// AUTO REFUND - Kembalikan ke saldo user OTOMATIS (bukan pending)
+// AUTO REFUND
 // ============================================================
 async function processAutoRefund(order, newStatus) {
   if (!supabaseClient || !order) return false;
@@ -1460,7 +1460,6 @@ async function processAutoRefund(order, newStatus) {
   }
   
   try {
-    // Check existing refund untuk cegah duplikat
     const { data: existingRefund } = await supabaseClient
       .from('refunds')
       .select('id')
@@ -1480,14 +1479,11 @@ async function processAutoRefund(order, newStatus) {
     
     let refundAmount = 0;
     let refundReason = '';
-    let refundType = 'refund_canceled';
     
     if (newStatus === 'canceled') {
       refundAmount = totalPayment;
       refundReason = `Refund otomatis: Order ${order.order_id || '-'} DIBATALKAN provider. Rp ${totalPayment.toLocaleString('id-ID')} dikembalikan ke saldo.`;
-      refundType = 'refund_canceled';
     } else if (newStatus === 'partial') {
-      refundType = 'refund_partial';
       if (quantity > 0 && remains > 0) {
         refundAmount = Math.floor((remains / quantity) * totalPayment);
         refundReason = `Refund otomatis: Order ${order.order_id || '-'} PARTIAL. Sisa ${remains} dari ${quantity} tidak terpenuhi. Rp ${refundAmount.toLocaleString('id-ID')} dikembalikan ke saldo.`;
@@ -1506,7 +1502,6 @@ async function processAutoRefund(order, newStatus) {
       return false;
     }
     
-    // 1) Insert ke tabel refunds dengan status SUCCESS (langsung)
     const { data: refundData, error: refundError } = await supabaseClient
       .from('refunds')
       .insert({
@@ -1525,7 +1520,6 @@ async function processAutoRefund(order, newStatus) {
     
     if (refundError) throw refundError;
     
-    // 2) Update saldo user langsung (+refundAmount) via RPC
     const { data: rpcData, error: rpcError } = await supabaseClient.rpc('add_user_balance', {
       p_target_email: order.email,
       p_amount: refundAmount,
@@ -1534,7 +1528,6 @@ async function processAutoRefund(order, newStatus) {
     
     if (rpcError) {
       console.error('❌ Gagal update saldo refund:', rpcError);
-      // Rollback refund status ke pending jika update saldo gagal
       await supabaseClient.from('refunds').update({ status: 'pending', approved_at: null }).eq('id', refundData.id);
       return false;
     }
@@ -1542,7 +1535,6 @@ async function processAutoRefund(order, newStatus) {
     autoRefundProcessedSet.add(refundKey);
     console.log(`💰 Auto-refund sukses: Rp ${refundAmount.toLocaleString('id-ID')} → ${order.email}`);
     
-    // Notif sukses ke user & admin
     const Toast = Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 6000, timerProgressBar: true, background: '#1a0e2e', color: '#fff' });
     Toast.fire({
       icon: 'success',
@@ -1720,7 +1712,6 @@ async function checkSingleOrderStatus(orderId) {
       renderOrderList(allOrdersCache);
       if ((newStatus === 'partial' || newStatus === 'canceled') && oldStatus !== newStatus) {
         await processAutoRefund(order, newStatus);
-        // Refresh saldo user jika order milik sendiri
         if (order.email === currentUser?.email) refreshBalance();
       }
       if (oldStatus !== newStatus) {
@@ -1991,6 +1982,7 @@ async function handleLogout() {
     stopUserBanCheckTimer();
     stopOrderAutoRefresh();
     stopOrderSyncRealtime();
+    if (window._mutasiUserRefreshInterval) { clearInterval(window._mutasiUserRefreshInterval); window._mutasiUserRefreshInterval = null; }
     if (chatClient) await chatClient.auth.signOut();
     await supabaseClient.auth.signOut();
     try { localStorage.removeItem('chat_auth_email'); localStorage.removeItem('chat_auth_password'); } catch(e) {}
@@ -2200,8 +2192,20 @@ async function updateAuthUI(user) {
       stopMemberRealtime();
     }
 
-    // Auto-load mutasi user (semua role)
-    setTimeout(() => { if (document.getElementById('mutasiManagerUser')) loadMutasiUser(); }, 800);
+    // Auto-load mutasi user (semua role) + refresh tiap 60 detik
+    setTimeout(() => { 
+      if (document.getElementById('mutasiManagerUser')) {
+        loadMutasiUser();
+      }
+    }, 800);
+
+    if (window._mutasiUserRefreshInterval) clearInterval(window._mutasiUserRefreshInterval);
+    window._mutasiUserRefreshInterval = setInterval(() => {
+      const manager = document.getElementById('mutasiManagerUser');
+      if (manager && manager.classList.contains('open') && !document.hidden && currentUser) {
+        loadMutasiUser();
+      }
+    }, 60000);
 
     const newChatSection = document.getElementById('newChatBoxSection');
     const csFolderSection = document.getElementById('csFolderSection');
@@ -2216,7 +2220,6 @@ async function updateAuthUI(user) {
     if (profile?.banned) startUserBanCheckTimer();
     updateNotifStatusDisplay();
 
-    // Auto-cleanup mutasi >30 hari saat login
     setTimeout(() => cleanupOldMutations(), 3000);
 
   } else {
@@ -2233,6 +2236,7 @@ async function updateAuthUI(user) {
     stopUserBanCheckTimer();
     stopOrderAutoRefresh();
     stopOrderSyncRealtime();
+    if (window._mutasiUserRefreshInterval) { clearInterval(window._mutasiUserRefreshInterval); window._mutasiUserRefreshInterval = null; }
     const notifBanner = document.querySelector('.notif-permission-banner');
     if (notifBanner) notifBanner.remove();
   }
@@ -2429,7 +2433,6 @@ async function handleDepositSuccess() {
   if (!currentDeposit) return;
   try {
     await supabaseClient.from('deposits').update({ status: 'success', paid_at: new Date().toISOString() }).eq('id', currentDeposit.id);
-    // Tambah saldo via RPC (yang juga insert mutasi deposit)
     const { error } = await supabaseClient.rpc('add_user_balance', {
       p_target_email: currentUser.email,
       p_amount: currentDeposit.amount,
@@ -2752,7 +2755,7 @@ async function changePasswordPrompt(targetEmail) {
 }
 
 // ============================================================
-// MUTASI USER (per user sendiri)
+// MUTASI USER (per user sendiri) — DIPERBAIKI
 // ============================================================
 function toggleMutasiUser() {
   const manager = document.getElementById('mutasiManagerUser');
@@ -2766,48 +2769,130 @@ function toggleMutasiUser() {
 async function loadMutasiUser() {
   const listEl = document.getElementById('mutasiListUser');
   if (!listEl) return;
-  if (!currentUser) { listEl.innerHTML = `<div class="mutasi-empty">Silakan login dulu</div>`; return; }
+  if (!currentUser) { 
+    listEl.innerHTML = `<div class="mutasi-empty">Silakan login dulu</div>`; 
+    return; 
+  }
+  
   listEl.innerHTML = '<div class="loading-box"><span class="spinner"></span><br>Memuat mutasi...</div>';
+  
   try {
-    // Filter: user_id = current.id OR email = current.email
-    // Auto-delete >30 hari juga di sini (cleanup per user)
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-    const { data, error } = await supabaseClient
-      .from('balance_mutations')
-      .select('*')
-      .or(`user_id.eq.${currentUser.id},email.eq.${currentUser.email}`)
-      .gte('created_at', thirtyDaysAgo)
-      .order('created_at', { ascending: false })
-      .limit(300);
-    if (error) {
-      if (error.code === '42P01') {
-        listEl.innerHTML = `<div class="mutasi-empty" style="color:#facc15;">⚠️ Tabel balance_mutations belum ada. Hubungi admin.</div>`;
-        return;
+    let data = null;
+    let lastError = null;
+    
+    // METHOD 1: Query via user_id
+    try {
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+      const { data: d1, error: e1 } = await supabaseClient
+        .from('balance_mutations')
+        .select('*')
+        .eq('user_id', currentUser.id)
+        .gte('created_at', thirtyDaysAgo)
+        .order('created_at', { ascending: false })
+        .limit(300);
+      
+      if (!e1 && d1) {
+        data = d1;
+        console.log(`✅ Mutasi user via user_id: ${d1.length} record`);
+      } else if (e1) {
+        lastError = e1;
       }
-      throw error;
+    } catch (e) { lastError = e; }
+    
+    // METHOD 2: Jika method 1 kosong, coba via email
+    if ((!data || data.length === 0) && currentUser.email) {
+      try {
+        const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+        const { data: d2, error: e2 } = await supabaseClient
+          .from('balance_mutations')
+          .select('*')
+          .eq('email', currentUser.email)
+          .gte('created_at', thirtyDaysAgo)
+          .order('created_at', { ascending: false })
+          .limit(300);
+        
+        if (!e2 && d2) {
+          data = d2;
+          console.log(`✅ Mutasi user via email: ${d2.length} record`);
+        } else if (e2) {
+          lastError = e2;
+        }
+      } catch (e) { lastError = e; }
     }
+    
+    // METHOD 3: Tanpa filter tanggal (fallback)
+    if ((!data || data.length === 0)) {
+      try {
+        const { data: d3, error: e3 } = await supabaseClient
+          .from('balance_mutations')
+          .select('*')
+          .eq('user_id', currentUser.id)
+          .order('created_at', { ascending: false })
+          .limit(300);
+        
+        if (!e3 && d3 && d3.length > 0) {
+          data = d3;
+          console.log(`✅ Mutasi user (tanpa filter tanggal): ${d3.length} record`);
+        } else if (e3) {
+          lastError = e3;
+        }
+      } catch (e) { lastError = e; }
+    }
+    
+    // Handle error tabel tidak ada
+    if (lastError && lastError.code === '42P01') {
+      listEl.innerHTML = `<div class="mutasi-empty" style="color:#facc15;">
+        ⚠️ Tabel <b>balance_mutations</b> belum dibuat.<br>
+        <small>Buat tabel di Supabase dengan kolom:<br>
+        id (uuid), user_id (uuid), email (text), amount (numeric), type (text), 
+        reason (text), balance_before (numeric), balance_after (numeric), 
+        created_at (timestamptz)</small>
+      </div>`;
+      return;
+    }
+    
+    if (!data && lastError) throw lastError;
+    
     allMutasiUserCache = data || [];
+    
     const badge = document.getElementById('mutasiBadgeUser');
-    if (badge) badge.textContent = `${allMutasiUserCache.length}`;
+    if (badge) {
+      badge.textContent = `${allMutasiUserCache.length}`;
+      if (allMutasiUserCache.length > 0) {
+        badge.style.background = 'rgba(100,255,200,0.25)';
+        badge.style.color = '#64ffc8';
+      }
+    }
+    
     renderMutasiUserList(allMutasiUserCache);
+    console.log(`✅ Total mutasi user dimuat: ${allMutasiUserCache.length}`);
+    
   } catch (err) {
-    listEl.innerHTML = `<div class="mutasi-empty" style="color:#ff8080;">❌ ${escapeHtml(err.message)}</div>`;
+    console.error('❌ loadMutasiUser error:', err);
+    listEl.innerHTML = `<div class="mutasi-empty" style="color:#ff8080;">
+      ❌ ${escapeHtml(err.message || 'Gagal memuat mutasi')}<br>
+      <button onclick="loadMutasiUser()" style="margin-top:10px;padding:6px 14px;border-radius:8px;border:none;background:#ff6b9d;color:#fff;font-weight:800;cursor:pointer;">🔄 Coba Lagi</button>
+    </div>`;
   }
 }
 
 function getMutasiTypeInfo(type) {
+  const t = String(type || '').toLowerCase().trim();
   const map = {
-    'deposit': { label: '💰 Deposit', cls: 'deposit', icon: '💵' },
-    'purchase': { label: '🛒 Pembelian', cls: 'purchase', icon: '🛒' },
-    'refund': { label: '💰 Refund', cls: 'refund', icon: '💰' },
-    'refund_partial': { label: '💰 Refund Partial', cls: 'refund', icon: '💰' },
-    'refund_canceled': { label: '💰 Refund Batal', cls: 'refund', icon: '💰' },
-    'admin_add': { label: '➕ Saldo Ditambah', cls: 'admin_add', icon: '➕' },
-    'admin_sub': { label: '➖ Saldo Dikurangi', cls: 'admin_sub', icon: '➖' },
-    'credit': { label: '➕ Kredit', cls: 'admin_add', icon: '➕' },
-    'debit': { label: '➖ Debit', cls: 'admin_sub', icon: '➖' }
+    'deposit': { label: 'Deposit', cls: 'deposit', icon: '💵' },
+    'purchase': { label: 'Pembelian', cls: 'purchase', icon: '🛒' },
+    'refund': { label: 'Refund', cls: 'refund', icon: '💰' },
+    'refund_partial': { label: 'Refund Partial', cls: 'refund', icon: '💰' },
+    'refund_canceled': { label: 'Refund Batal', cls: 'refund', icon: '💰' },
+    'admin_add': { label: 'Saldo Ditambah', cls: 'admin_add', icon: '➕' },
+    'admin_sub': { label: 'Saldo Dikurangi', cls: 'admin_sub', icon: '➖' },
+    'credit': { label: 'Kredit', cls: 'admin_add', icon: '➕' },
+    'debit': { label: 'Debit', cls: 'admin_sub', icon: '➖' },
+    'topup': { label: 'Top Up', cls: 'deposit', icon: '💵' },
+    'withdraw': { label: 'Penarikan', cls: 'admin_sub', icon: '➖' },
+    'order': { label: 'Pembelian', cls: 'purchase', icon: '🛒' }
   };
-  return map[type] || { label: type || 'Mutasi', cls: 'deposit', icon: '💸' };
+  return map[t] || { label: type || 'Mutasi', cls: 'deposit', icon: '💸' };
 }
 
 function renderMutasiUserList(data) {
@@ -2817,28 +2902,40 @@ function renderMutasiUserList(data) {
     listEl.innerHTML = `<div class="mutasi-empty"><span class="icon">💸</span>Belum ada mutasi saldo</div>`;
     return;
   }
+  
   let html = '';
   data.forEach(m => {
-    const amount = parseFloat(m.amount || 0);
+    const amount = parseFloat(m.amount ?? m.nominal ?? m.total ?? 0) || 0;
     const isCredit = amount >= 0;
     const typeClass = isCredit ? 'credit' : 'debit';
     const icon = isCredit ? '➕' : '➖';
     const amountFormatted = Math.abs(amount).toLocaleString('id-ID');
     const prefix = isCredit ? '+' : '-';
-    const createdAt = m.created_at ? new Date(m.created_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', day: '2-digit', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' }) : '-';
+    
+    const createdAtRaw = m.created_at || m.created || m.date || m.time;
+    const createdAt = createdAtRaw 
+      ? new Date(createdAtRaw).toLocaleString('id-ID', { 
+          timeZone: 'Asia/Jakarta', day: '2-digit', month: 'short', 
+          year: '2-digit', hour: '2-digit', minute: '2-digit' 
+        }) 
+      : '-';
+    
     const typeInfo = getMutasiTypeInfo(m.type);
+    const hasBalanceInfo = m.balance_before !== undefined && m.balance_before !== null
+                        && m.balance_after !== undefined && m.balance_after !== null;
+    
     html += `
       <div class="mutasi-item ${typeClass}">
         <div class="mutasi-icon">${icon}</div>
         <div class="mutasi-info">
           <div class="mutasi-top">
-            <div class="mutasi-email">${escapeHtml(m.reason || 'Tidak ada keterangan')}</div>
+            <div class="mutasi-email">${escapeHtml(m.reason || m.description || m.keterangan || 'Tidak ada keterangan')}</div>
             <div class="mutasi-amount">${prefix}Rp ${amountFormatted}</div>
           </div>
           <div class="mutasi-meta">
             <span class="mutasi-type-badge ${typeInfo.cls}">${typeInfo.icon} ${typeInfo.label}</span>
             <span>🕐 ${createdAt} WIB</span>
-            ${m.balance_before !== undefined && m.balance_after !== undefined ? `<span>💰 ${parseFloat(m.balance_before || 0).toLocaleString('id-ID')} → ${parseFloat(m.balance_after || 0).toLocaleString('id-ID')}</span>` : ''}
+            ${hasBalanceInfo ? `<span>💰 ${parseFloat(m.balance_before || 0).toLocaleString('id-ID')} → ${parseFloat(m.balance_after || 0).toLocaleString('id-ID')}</span>` : ''}
           </div>
         </div>
       </div>
@@ -2858,7 +2955,7 @@ function filterMutasiUserByType(type, btnElement) {
 }
 
 // ============================================================
-// MUTASI ADMIN (semua user) - BISA DIKLIK
+// MUTASI ADMIN (semua user) — DIPERBAIKI
 // ============================================================
 function toggleMutasiAdmin() {
   const manager = document.getElementById('mutasiManagerAdmin');
@@ -2872,28 +2969,68 @@ function toggleMutasiAdmin() {
 async function loadMutasiAdmin() {
   const listEl = document.getElementById('mutasiListAdmin');
   if (!listEl) return;
+  if (!isAdminOrOwner) {
+    listEl.innerHTML = `<div class="mutasi-empty">Hanya admin/owner</div>`;
+    return;
+  }
+  
   listEl.innerHTML = '<div class="loading-box"><span class="spinner"></span><br>Memuat mutasi...</div>';
+  
   try {
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-    const { data, error } = await supabaseClient
+    
+    let { data, error } = await supabaseClient
       .from('balance_mutations')
       .select('*')
       .gte('created_at', thirtyDaysAgo)
       .order('created_at', { ascending: false })
-      .limit(300);
+      .limit(500);
+    
+    if (error || !data || data.length === 0) {
+      const fallback = await supabaseClient
+        .from('balance_mutations')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(500);
+      
+      if (!fallback.error && fallback.data) {
+        data = fallback.data;
+        error = null;
+      } else if (fallback.error) {
+        error = fallback.error;
+      }
+    }
+    
     if (error) {
       if (error.code === '42P01') {
-        listEl.innerHTML = `<div class="mutasi-empty" style="color:#facc15;">⚠️ Tabel balance_mutations belum ada.</div>`;
+        listEl.innerHTML = `<div class="mutasi-empty" style="color:#facc15;">
+          ⚠️ Tabel <b>balance_mutations</b> belum dibuat.
+        </div>`;
         return;
       }
       throw error;
     }
+    
     allMutasiAdminCache = data || [];
+    
     const badge = document.getElementById('mutasiBadgeAdmin');
-    if (badge) badge.textContent = `${allMutasiAdminCache.length}`;
+    if (badge) {
+      badge.textContent = `${allMutasiAdminCache.length}`;
+      if (allMutasiAdminCache.length > 0) {
+        badge.style.background = 'rgba(100,255,200,0.25)';
+        badge.style.color = '#64ffc8';
+      }
+    }
+    
     renderMutasiAdminList(allMutasiAdminCache);
+    console.log(`✅ Total mutasi admin dimuat: ${allMutasiAdminCache.length}`);
+    
   } catch (err) {
-    listEl.innerHTML = `<div class="mutasi-empty" style="color:#ff8080;">❌ ${escapeHtml(err.message)}</div>`;
+    console.error('❌ loadMutasiAdmin error:', err);
+    listEl.innerHTML = `<div class="mutasi-empty" style="color:#ff8080;">
+      ❌ ${escapeHtml(err.message || 'Gagal memuat mutasi')}<br>
+      <button onclick="loadMutasiAdmin()" style="margin-top:10px;padding:6px 14px;border-radius:8px;border:none;background:#ff6b9d;color:#fff;font-weight:800;cursor:pointer;">🔄 Coba Lagi</button>
+    </div>`;
   }
 }
 
@@ -2904,36 +3041,45 @@ function renderMutasiAdminList(data) {
     listEl.innerHTML = `<div class="mutasi-empty"><span class="icon">💸</span>Belum ada mutasi</div>`;
     return;
   }
+  
   let html = '';
   data.forEach(m => {
-    const amount = parseFloat(m.amount || 0);
+    const amount = parseFloat(m.amount ?? m.nominal ?? m.total ?? 0) || 0;
     const isCredit = amount >= 0;
     const typeClass = isCredit ? 'credit' : 'debit';
     const icon = isCredit ? '➕' : '➖';
     const amountFormatted = Math.abs(amount).toLocaleString('id-ID');
     const prefix = isCredit ? '+' : '-';
-    const createdAt = m.created_at ? new Date(m.created_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '-';
+    
+    const createdAtRaw = m.created_at || m.created || m.date || m.time;
+    const createdAt = createdAtRaw 
+      ? new Date(createdAtRaw).toLocaleString('id-ID', { 
+          timeZone: 'Asia/Jakarta', day: '2-digit', month: 'short', 
+          hour: '2-digit', minute: '2-digit' 
+        }) 
+      : '-';
+    
     const typeInfo = getMutasiTypeInfo(m.type);
     const emailSafe = escapeAttr(m.email || '');
     const typeSafe = escapeAttr(m.type || '');
-    const amountNum = amount;
-    const reasonSafe = escapeAttr(m.reason || '');
+    const reasonSafe = escapeAttr(m.reason || m.description || '');
     const balanceBeforeNum = parseFloat(m.balance_before || 0);
     const balanceAfterNum = parseFloat(m.balance_after || 0);
     const timeFull = m.created_at ? escapeAttr(new Date(m.created_at).toISOString()) : '';
+    
     html += `
-      <div class="mutasi-item ${typeClass}" onclick="showMutasiDetail('${emailSafe}','${typeSafe}',${amountNum},'${reasonSafe}',${balanceBeforeNum},${balanceAfterNum},'${timeFull}')">
+      <div class="mutasi-item ${typeClass}" onclick="showMutasiDetail('${emailSafe}','${typeSafe}',${amount},'${reasonSafe}',${balanceBeforeNum},${balanceAfterNum},'${timeFull}')">
         <div class="mutasi-icon">${icon}</div>
         <div class="mutasi-info">
           <div class="mutasi-top">
             <div class="mutasi-email">📧 ${escapeHtml(m.email || '-')}</div>
             <div class="mutasi-amount">${prefix}Rp ${amountFormatted}</div>
           </div>
-          <div class="mutasi-reason">${escapeHtml(m.reason || 'Tidak ada keterangan')}</div>
+          <div class="mutasi-reason">${escapeHtml(m.reason || m.description || 'Tidak ada keterangan')}</div>
           <div class="mutasi-meta">
             <span class="mutasi-type-badge ${typeInfo.cls}">${typeInfo.icon} ${typeInfo.label}</span>
             <span>🕐 ${createdAt}</span>
-            ${m.balance_before !== undefined && m.balance_after !== undefined ? `<span>💰 ${balanceBeforeNum.toLocaleString('id-ID')} → ${balanceAfterNum.toLocaleString('id-ID')}</span>` : ''}
+            ${m.balance_before != null && m.balance_after != null ? `<span>💰 ${balanceBeforeNum.toLocaleString('id-ID')} → ${balanceAfterNum.toLocaleString('id-ID')}</span>` : ''}
           </div>
         </div>
       </div>
@@ -3324,7 +3470,7 @@ function stopMemberRealtime() {
 }
 
 // ============================================================
-// REFUND PENDING (HISTORY SAJA - auto refund sudah otomatis)
+// REFUND PENDING
 // ============================================================
 async function loadPendingRefunds() {
   const container = document.getElementById('refundPendingContainer');
