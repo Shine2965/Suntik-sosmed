@@ -1,4 +1,5 @@
-<!DOCTYPE html>
+
+ <!DOCTYPE html>
 <html lang="id">
 <head>
 <meta charset="utf-8"/>
@@ -347,16 +348,11 @@ function loadUrlParams() {
 if (trx && trx !== "-") localStorage.setItem('last_trx', trx);
 loadUrlParams();
 
-// ============================================================
-// 🚨 CEK URL PARAMS KOSONG / INVALID → AUTO-REFUND
-// ============================================================
 async function checkUrlParamsAndAutoRefund() {
-  // Cek apakah trx atau ordersData kosong
   if (!trx || trx === '-' || !ordersData || ordersData.length === 0) {
     console.warn('⚠️ URL params kosong atau tidak valid:', { trx, ordersCount: ordersData.length });
     IS_URL_PARAMS_INVALID = true;
     
-    // Tampilkan popup blocking
     await Swal.fire({
       title: '⚠️ Parameter Tidak Lengkap',
       html: `
@@ -371,14 +367,6 @@ async function checkUrlParamsAndAutoRefund() {
               • Trx ID: <b style="color:${!trx || trx === '-' ? '#ef4444' : '#22c55e'};">${trx || '-'}</b><br>
               • Jumlah Order: <b style="color:${!ordersData || ordersData.length === 0 ? '#ef4444' : '#22c55e'};">${ordersData?.length || 0}</b><br>
               • Total: <b style="color:${total <= 0 ? '#ef4444' : '#22c55e'};">Rp ${(total || 0).toLocaleString('id-ID')}</b>
-            </div>
-          </div>
-          <div style="background:rgba(250,204,21,0.1);padding:14px;border-radius:12px;border-left:3px solid #facc15;text-align:left;margin-bottom:16px;">
-            <div style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">⚠️ Kemungkinan penyebab:</div>
-            <div style="font-size:12px;color:#e2e8f0;line-height:1.7;">
-              • Link rusak / terpotong<br>
-              • Transaksi dibatalkan sebelum bayar<br>
-              • Sesi localStorage hilang (browser di-clear)
             </div>
           </div>
           <div style="font-size:11px;color:#94a3b8;font-style:italic;">
@@ -677,21 +665,28 @@ async function updateOrderStatusInDB(order, status, providerOrderId, failReason)
 
 // ============================================================
 // 🆕 RECORD MUTASI SALDO untuk pembelian dengan saldo
+//    Referensi = OrderID dari provider (BUKAN TRX)
 // ============================================================
-async function recordPurchaseMutation(amount, reason, oldBalance, newBalance) {
+async function recordPurchaseMutation(amount, reason, oldBalance, newBalance, orderIds) {
   if (!supabaseClient || !userProfileId) return false;
   try {
+    const referenceId = orderIds && String(orderIds).trim() !== '' 
+      ? String(orderIds).trim() 
+      : trx;
+    
+    const fullReason = `[OrderID: ${referenceId}] ${reason}`;
+    
     const { data, error } = await supabaseClient.rpc('record_balance_mutation', {
       p_user_id: userProfileId,
-      p_amount: -Math.abs(amount),  // negatif untuk pembelian
+      p_amount: -Math.abs(amount),
       p_type: 'purchase',
-      p_reason: reason,
+      p_reason: fullReason,
       p_balance_before: oldBalance,
       p_balance_after: newBalance
     });
     if (error) throw error;
     if (!data || !data.success) throw new Error(data?.message || 'Record failed');
-    console.log('💾 Mutasi purchase tercatat:', data);
+    console.log(`💾 Mutasi purchase tercatat [Ref OrderID: ${referenceId}]:`, data);
     return true;
   } catch (err) {
     console.error('❌ recordPurchaseMutation error:', err.message);
@@ -699,15 +694,11 @@ async function recordPurchaseMutation(amount, reason, oldBalance, newBalance) {
   }
 }
 
-// ============================================================
-// 🆕 AUTO-REFUND UNTUK URL PARAMS / PROVIDER ERROR
-// ============================================================
 async function autoRefundFullTransaction(reason) {
   if (!supabaseClient || !userProfileId) {
     return { success: false, message: 'No auth' };
   }
   if (isPaymentVerified && loadOrderIds().length > 0) {
-    // Sudah ada order yang berhasil, tidak perlu refund penuh
     return { success: false, message: 'Order sudah diproses' };
   }
   
@@ -728,7 +719,6 @@ async function autoRefundFullTransaction(reason) {
     return { success: true, amount: totalRefund, new_balance: userBalance };
   } catch (err) {
     console.error('❌ autoRefundFullTransaction error:', err.message);
-    // Fallback: insert ke refunds table dengan status pending
     try {
       const totalRefund = normalizeTotal(finalTotal);
       await supabaseClient.from('refunds').insert({
@@ -883,6 +873,9 @@ function selectPaymentMethod(method) {
   }
 }
 
+// ============================================================
+// 🆕 payWithBalance: Mutasi purchase pakai OrderID provider
+// ============================================================
 async function payWithBalance() {
   if (IS_GMAIL_BLOCKED || IS_URL_PARAMS_INVALID) return;
   if (!checkGmailAndRedirect()) return;
@@ -929,6 +922,7 @@ async function payWithBalance() {
   const oldBalance = userBalance;
   
   try {
+    // 1️⃣ POTONG SALDO
     const { data, error } = await supabaseClient.rpc('pay_with_balance', {
       p_user_id: userProfileId, p_amount: totalBayarSaldo
     });
@@ -936,14 +930,6 @@ async function payWithBalance() {
     if (!data.success) throw new Error(data.message || 'Gagal potong saldo');
     
     userBalance = parseInt(data.balance) || 0;
-    
-    // 🆕 CATAT MUTASI PURCHASE
-    await recordPurchaseMutation(
-      totalBayarSaldo,
-      `Pembelian ${ordersData.length} pesanan (${SOSMED_TYPE}) - Trx: ${trx}`,
-      oldBalance,
-      userBalance
-    );
     
     isPaymentVerified = true;
     transactionLocked = true;
@@ -977,8 +963,27 @@ async function payWithBalance() {
     const userID = await getUserID();
     await sendToDiscordSaldo(gmail, userID, totalBayarSaldo);
     
+    // 2️⃣ KIRIM ORDER → dapat OrderID dari provider
+    let orderIdsFromProvider = [];
     if (ordersData.length > 0 && !isOrderAlreadySent()) {
       await sendOrdersToLollipop();
+      orderIdsFromProvider = loadOrderIds();
+    } else {
+      orderIdsFromProvider = loadOrderIds();
+    }
+    
+    // 3️⃣ 🆕 CATAT MUTASI PURCHASE pakai OrderID PROVIDER
+    if (orderIdsFromProvider.length > 0) {
+      const orderIdsStr = orderIdsFromProvider.join(', ');
+      await recordPurchaseMutation(
+        totalBayarSaldo,
+        `Pembelian ${ordersData.length} pesanan (${SOSMED_TYPE})`,
+        oldBalance,
+        userBalance,
+        orderIdsStr
+      );
+    } else {
+      console.log('ℹ️ Tidak ada OrderID provider. Mutasi purchase tidak dicatat (akan muncul mutasi refund).');
     }
     
     savePaymentState({
@@ -991,6 +996,7 @@ async function payWithBalance() {
       html: `<div style="text-align:left;color:#ddd;font-size:14px;">
         <p>✅ Saldo dipotong: <b style="color:#facc15;">Rp ${totalBayarSaldo.toLocaleString('id-ID')}</b></p>
         <p>💰 Saldo tersisa: <b style="color:#22c55e;">Rp ${userBalance.toLocaleString('id-ID')}</b></p>
+        ${orderIdsFromProvider.length > 0 ? `<p style="margin-top:8px;">🆔 <b>OrderID:</b> <b style="color:#00ffaa;font-family:monospace;">${orderIdsFromProvider.join(', ')}</b></p>` : ''}
         <p style="margin-top:12px;font-size:12px;color:#94a3b8;">Pesanan sedang diproses...</p>
       </div>`, icon: 'success', confirmButtonColor: '#facc15'
     });
@@ -1089,9 +1095,6 @@ function regenerateQris() {
   });
 }
 
-// ============================================================
-// 🆕 AUTO-REFUND PER-ORDER saat endpoint provider gagal
-// ============================================================
 async function autoRefundOrder(orderIndex, order, errorMessage) {
   if (!supabaseClient || !userProfileId) return { success: false, amount: 0 };
   
@@ -1113,7 +1116,6 @@ async function autoRefundOrder(orderIndex, order, errorMessage) {
       }
     }
     
-    // 🆕 Gunakan RPC auto_refund_on_failure (record ke mutasi + refunds)
     const { data, error } = await supabaseClient.rpc('auto_refund_on_failure', {
       p_user_id: userProfileId,
       p_amount: refundAmount,
@@ -1142,7 +1144,6 @@ async function autoRefundOrder(orderIndex, order, errorMessage) {
     
   } catch (err) {
     console.error('❌ Auto-refund error:', err.message);
-    // Fallback: insert ke refunds table
     try {
       let fallbackAmount = Math.ceil(normalizeTotal(finalTotal) / ordersData.length);
       await supabaseClient.from('refunds').insert({
@@ -1156,9 +1157,6 @@ async function autoRefundOrder(orderIndex, order, errorMessage) {
   }
 }
 
-// ============================================================
-// 🆕 SEND ORDER WITH TIMEOUT + AUTO-REFUND ON FAILURE
-// ============================================================
 async function fetchWithTimeout(url, options, timeoutMs = 15000) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -1182,7 +1180,6 @@ async function sendOrdersToLollipop() {
   const orderStatus = document.getElementById('orderStatus');
   
   if (!ordersData || ordersData.length === 0) {
-    // 🆕 URL params kosong saat mau kirim order → auto-refund penuh
     const refundResult = await autoRefundFullTransaction('Orders data kosong saat kirim ke provider');
     orderStatus.className = 'order-status failed';
     orderStatus.innerHTML = `❌ Data pesanan kosong! ${refundResult.success ? `💰 Saldo dikembalikan Rp ${refundResult.amount.toLocaleString('id-ID')}` : '⚠️ Refund pending'}`;
@@ -1229,7 +1226,6 @@ async function sendOrdersToLollipop() {
       }
       
       try {
-        // 🆕 Pakai timeout untuk cegah hang
         const response = await fetchWithTimeout('/api/lollipop-services', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1239,7 +1235,6 @@ async function sendOrdersToLollipop() {
         let result;
         try { result = await response.json(); } catch (e) { result = { error: 'Invalid JSON', status: response.status }; }
         
-        // 🆕 Cek HTTP status error
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}: ${result.error || result.message || 'Server error'}`);
         }
@@ -1886,11 +1881,7 @@ async function showRefundHistory() {
 
 window.showRefundHistory = showRefundHistory;
 
-// ============================================================
-// 🆕 INIT UTAMA
-// ============================================================
 (async function() {
-  // 🆕 CEK URL PARAMS DULU → block + redirect kalau kosong
   const paramsValid = await checkUrlParamsAndAutoRefund();
   if (!paramsValid) return;
   
@@ -1978,10 +1969,8 @@ document.addEventListener("keydown", function(e){
 
 console.log(`💳 Payment ${SOSMED_TYPE} ready!`);
 console.log(`📦 Orders: ${ordersData.length} items`);
-console.log(`💾 Auto-save orders_detail: enabled`);
-console.log(`💰 Auto-record mutasi purchase: enabled`);
+console.log(`💰 Mutasi purchase reference: ORDER ID PROVIDER`);
 console.log(`🔄 Auto-refund on provider failure: enabled`);
-console.log(`🚨 Auto-refund on URL params invalid: enabled`);
 </script>
 </body>
 </html>
