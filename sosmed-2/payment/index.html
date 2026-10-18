@@ -276,8 +276,8 @@ const ADMIN_FEE_PERCENT = 2;
 const ADMIN_FEE_THRESHOLD = 50;
 const QRIS_EXPIRY_MINUTES = 30;
 
-// 🚨 GLOBAL FLAG: jika true, semua interaksi diblokir
 let IS_GMAIL_BLOCKED = false;
+let IS_URL_PARAMS_INVALID = false;
 
 function roundUp(amount) { return Math.ceil(Number(amount) || 0); }
 function normalizeTotal(amount) {
@@ -350,6 +350,52 @@ function loadUrlParams() {
 
 if (trx && trx !== "-") localStorage.setItem('last_trx', trx);
 loadUrlParams();
+
+// ============================================================
+// 🚨 CEK URL PARAMS KOSONG / INVALID → AUTO-REFUND
+// ============================================================
+async function checkUrlParamsAndAutoRefund() {
+  if (!trx || trx === '-' || !ordersData || ordersData.length === 0) {
+    console.warn('⚠️ URL params kosong atau tidak valid:', { trx, ordersCount: ordersData.length });
+    IS_URL_PARAMS_INVALID = true;
+    
+    await Swal.fire({
+      title: '⚠️ Parameter Tidak Lengkap',
+      html: `
+        <div style="text-align:center;color:#ddd;font-size:14px;line-height:1.7;">
+          <div style="font-size:60px;margin-bottom:12px;">🔗</div>
+          <p style="font-size:16px;font-weight:700;color:#fff;margin-bottom:12px;">
+            URL Params Kosong atau Tidak Valid!
+          </p>
+          <div style="background:rgba(239,68,68,0.1);padding:14px;border-radius:12px;border-left:3px solid #ef4444;text-align:left;margin-bottom:16px;">
+            <div style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">📌 Yang terdeteksi:</div>
+            <div style="font-size:12.5px;color:#e2e8f0;line-height:1.7;">
+              • Trx ID: <b style="color:${!trx || trx === '-' ? '#ef4444' : '#22c55e'};">${trx || '-'}</b><br>
+              • Jumlah Order: <b style="color:${!ordersData || ordersData.length === 0 ? '#ef4444' : '#22c55e'};">${ordersData?.length || 0}</b><br>
+              • Total: <b style="color:${total <= 0 ? '#ef4444' : '#22c55e'};">Rp ${(total || 0).toLocaleString('id-ID')}</b>
+            </div>
+          </div>
+          <div style="font-size:11px;color:#94a3b8;font-style:italic;">
+            💡 Silakan ulangi pemesanan dari awal.<br>
+            Tidak ada saldo yang dikurangi karena transaksi belum diproses.
+          </div>
+        </div>
+      `,
+      icon: 'warning',
+      confirmButtonText: '🏠 Kembali ke Home',
+      confirmButtonColor: '#00c6ff',
+      allowOutsideClick: false,
+      allowEscapeKey: false,
+      background: '#0a0e1a',
+      color: '#fff',
+      width: 480
+    });
+    
+    window.location.href = HOME_URL;
+    return false;
+  }
+  return true;
+}
 
 function getOrderIdsKey(trxId) { return `order_ids_${trxId}`; }
 
@@ -542,15 +588,10 @@ function startWIBClock() {
 }
 startWIBClock();
 
-// ============================================================
-// 🚨 CEK GMAIL NULL → BLOCK SEMUA INTERAKSI + REDIRECT
-// ============================================================
 function blockAllInteractions() {
   IS_GMAIL_BLOCKED = true;
-  
   document.body.style.pointerEvents = 'none';
   document.body.style.userSelect = 'none';
-  
   document.addEventListener('keydown', function blockKey(e) {
     if (e.key === 'F5' || (e.ctrlKey && e.key === 'r')) return;
     if (e.key === 'F12') return;
@@ -560,33 +601,17 @@ function blockAllInteractions() {
     e.stopPropagation();
     return false;
   }, true);
-  
-  document.addEventListener('contextmenu', e => {
-    e.preventDefault();
-    return false;
-  }, true);
-  
-  document.addEventListener('wheel', e => {
-    e.preventDefault();
-    return false;
-  }, { passive: false, capture: true });
-  
-  document.addEventListener('touchmove', e => {
-    e.preventDefault();
-    return false;
-  }, { passive: false, capture: true });
+  document.addEventListener('contextmenu', e => { e.preventDefault(); return false; }, true);
+  document.addEventListener('wheel', e => { e.preventDefault(); return false; }, { passive: false, capture: true });
+  document.addEventListener('touchmove', e => { e.preventDefault(); return false; }, { passive: false, capture: true });
 }
 
 function checkGmailAndRedirect() {
   const gmail = getStoredGmail();
-  
   if (!gmail || !validateEmail(gmail)) {
     console.warn('⚠️ Gmail null/kosong → BLOCK + redirect ke homepage');
-    
     blockAllInteractions();
-    
     let countdown = 5;
-    
     Swal.fire({
       title: '🔒 Harus Login Dulu',
       html: `
@@ -598,23 +623,12 @@ function checkGmailAndRedirect() {
           <p style="color:#94a3b8;font-size:13px;margin-bottom:16px;">
             Anda <b style="color:#ff6666;">HARUS LOGIN</b> terlebih dahulu di halaman utama untuk melanjutkan pembayaran.
           </p>
-          <div style="background:rgba(0,198,255,0.1);padding:14px;border-radius:12px;border-left:3px solid #00c6ff;text-align:left;margin-bottom:16px;">
-            <div style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">📌 Langkah-langkah:</div>
-            <div style="font-size:12.5px;color:#e2e8f0;line-height:1.7;">
-              1. Anda akan diarahkan ke halaman utama<br>
-              2. Login dengan akun Anda<br>
-              3. Ulangi proses pemesanan
-            </div>
-          </div>
           <div style="background:rgba(250,204,21,0.1);padding:14px;border-radius:12px;border:1px solid rgba(250,204,21,0.3);margin-bottom:12px;">
             <div style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">⏳ Redirect otomatis dalam</div>
             <div style="font-size:40px;font-weight:900;color:#facc15;font-family:'Courier New',monospace;line-height:1;" id="redirectCountdown">
               ${countdown}
             </div>
             <div style="font-size:11px;color:#94a3b8;margin-top:4px;">detik</div>
-          </div>
-          <div style="font-size:11px;color:#ff8080;font-style:italic;">
-            ⚠️ Halaman ini tidak bisa diakses tanpa login
           </div>
         </div>
         <style>
@@ -639,45 +653,32 @@ function checkGmailAndRedirect() {
       padding: '24px',
       didOpen: () => {
         const popup = Swal.getPopup();
-        if (popup) {
-          popup.style.pointerEvents = 'none';
-        }
-        
+        if (popup) popup.style.pointerEvents = 'none';
         const timerInterval = setInterval(() => {
           countdown--;
           const cdEl = document.getElementById('redirectCountdown');
           if (cdEl) cdEl.textContent = Math.max(0, countdown);
-          
           if (countdown <= 0) {
             clearInterval(timerInterval);
             window.location.href = HOME_URL;
           }
         }, 1000);
-        
         window._redirectInterval = timerInterval;
       }
     });
-    
     return false;
   }
-  
   return true;
 }
 
-// ============================================================
-// 🎯 EXTRACT ORDER ID DARI RESPONSE PROVIDER
-// Support 15+ format response berbeda
-// ============================================================
 function extractOrderIdFromResponse(result) {
   if (!result) return null;
-
   const tryValue = (val) => {
     if (val === null || val === undefined) return null;
     if (typeof val === 'number' && !isNaN(val) && val > 0) return String(val);
     if (typeof val === 'string' && val.trim() !== '' && val !== '0') return val.trim();
     return null;
   };
-
   const isValidId = (val) => {
     if (!val) return false;
     const str = String(val).trim();
@@ -686,235 +687,168 @@ function extractOrderIdFromResponse(result) {
     if (str.length >= 3 && str.length <= 50) return true;
     return false;
   };
-
   const candidates = [
-    result.order,
-    result.order_id,
-    result.orderId,
-    result.id,
-    result.OrderId,
-    result.Order,
-    result.OrderID,
-    result.data?.order,
-    result.data?.order_id,
-    result.data?.orderId,
-    result.data?.id,
-    result.result?.order,
-    result.result?.order_id,
-    result.result?.id,
-    result.response?.order,
-    result.response?.order_id,
-    result.response?.id,
-    result.payload?.order,
-    result.payload?.order_id,
-    result.payload?.id,
-    result.orders?.[0]?.id,
-    result.orders?.[0]?.order_id,
-    result.orders?.[0]?.order,
+    result.order, result.order_id, result.orderId, result.id,
+    result.OrderId, result.Order, result.OrderID,
+    result.data?.order, result.data?.order_id, result.data?.orderId, result.data?.id,
+    result.result?.order, result.result?.order_id, result.result?.id,
+    result.response?.order, result.response?.order_id, result.response?.id,
+    result.payload?.order, result.payload?.order_id, result.payload?.id,
+    result.orders?.[0]?.id, result.orders?.[0]?.order_id, result.orders?.[0]?.order,
   ];
-
   for (const candidate of candidates) {
     const val = tryValue(candidate);
     if (val && isValidId(val)) return val;
   }
-
   if (Array.isArray(result) && result.length > 0) {
     const first = result[0];
     if (typeof first === 'object') {
-      const val = tryValue(first.order) || tryValue(first.order_id) || 
-                  tryValue(first.id) || tryValue(first.OrderId);
+      const val = tryValue(first.order) || tryValue(first.order_id) || tryValue(first.id) || tryValue(first.OrderId);
       if (val && isValidId(val)) return val;
     }
     const val = tryValue(first);
     if (val && isValidId(val)) return val;
   }
-
   const directVal = tryValue(result);
   if (directVal && isValidId(directVal)) return directVal;
-
   return null;
 }
 
-// ============================================================
-// 💾 SAVE ORDER DETAIL KE DATABASE
-// ============================================================
 async function saveAllOrdersDetailToDB(method) {
-  if (!supabaseClient || !userProfileId) {
-    console.warn('⚠️ saveAllOrdersDetail: skip (no auth)');
-    return false;
-  }
-  
+  if (!supabaseClient || !userProfileId) return false;
   if ((!ordersData || ordersData.length === 0) && trx && trx !== '-') {
     try {
       const urlOrders = new URLSearchParams(location.search).get('orders');
-      if (urlOrders) {
-        ordersData = JSON.parse(decodeURIComponent(urlOrders));
-      } else {
+      if (urlOrders) ordersData = JSON.parse(decodeURIComponent(urlOrders));
+      else {
         const stored = localStorage.getItem(`url_params_${trx}`);
-        if (stored) {
-          const data = JSON.parse(stored);
-          ordersData = data.orders || [];
-        }
+        if (stored) { const data = JSON.parse(stored); ordersData = data.orders || []; }
       }
-      console.log(`📦 Recovered ${ordersData.length} orders from URL/localStorage`);
-    } catch(e) {
-      console.warn('⚠️ Gagal recover ordersData:', e.message);
-    }
+    } catch(e) {}
   }
-  
-  if (!ordersData || ordersData.length === 0) {
-    console.warn('⚠️ saveAllOrdersDetail: no orders to save');
-    return false;
-  }
-  
+  if (!ordersData || ordersData.length === 0) return false;
   try {
     const gmail = getStoredGmail();
     const totalPayment = normalizeTotal(finalTotal);
     const perOrderAmount = Math.ceil(totalPayment / ordersData.length);
     const normalizedMethod = method === 'balance' ? 'saldo' : method;
-    
-    const { data: existing } = await supabaseClient
-      .from('orders_detail')
-      .select('id')
-      .eq('trx_id', trx)
-      .limit(1);
-    
-    if (existing && existing.length > 0) {
-      console.log('ℹ️ Order detail sudah ada, skip');
-      return true;
-    }
-    
+    const { data: existing } = await supabaseClient.from('orders_detail').select('id').eq('trx_id', trx).limit(1);
+    if (existing && existing.length > 0) return true;
     const ordersArray = ordersData.map(o => ({
-      user_id: userProfileId,
-      email: userEmail || gmail || '-',
-      gmail_target: gmail || '-',
-      trx_id: trx,
-      service_id: String(o.serviceId || ''),
-      service_name: o.serviceName || '',
-      target: o.target || '',
-      quantity: parseInt(o.jumlah) || 0,
-      comment: o.comment || null,
-      total_payment: perOrderAmount,
-      payment_method: normalizedMethod,
-      sosmed_type: SOSMED_TYPE
+      user_id: userProfileId, email: userEmail || gmail || '-', gmail_target: gmail || '-',
+      trx_id: trx, service_id: String(o.serviceId || ''), service_name: o.serviceName || '',
+      target: o.target || '', quantity: parseInt(o.jumlah) || 0, comment: o.comment || null,
+      total_payment: perOrderAmount, payment_method: normalizedMethod, sosmed_type: SOSMED_TYPE
     }));
-    
-    const { data, error } = await supabaseClient.rpc('save_order_details_bulk', {
-      p_orders: ordersArray
-    });
-    
+    const { data, error } = await supabaseClient.rpc('save_order_details_bulk', { p_orders: ordersArray });
     if (error) throw error;
     if (!data || !data.success) throw new Error(data?.message || 'Save failed');
-    
-    console.log(`💾 ${data.saved_count} order details saved (${SOSMED_TYPE}, ${normalizedMethod} @ Rp ${perOrderAmount.toLocaleString('id-ID')}/order)`);
     return true;
-  } catch (err) {
-    console.error('❌ Save all orders error:', err.message);
-    return false;
-  }
+  } catch (err) { console.error('❌ Save all orders error:', err.message); return false; }
 }
 
-/**
- * Update status order + simpan ORDER ID dari provider (bukan trx_id)
- * p_provider_order_id = ID dari response provider (contoh: 1107)
- */
 async function updateOrderStatusInDB(order, status, providerOrderId, failReason) {
   if (!supabaseClient) return false;
-  
   try {
-    console.log(`💾 [updateOrderStatusInDB] Input:`, {
-      trx_id: trx,
-      service_id: String(order.serviceId || ''),
-      target: order.target || '',
-      status: status,
-      order_id: providerOrderId || null
-    });
-    
     const { data, error } = await supabaseClient.rpc('update_order_detail_status', {
-      p_trx_id: trx,
-      p_service_id: String(order.serviceId || ''),
-      p_target: order.target || '',
-      p_status: status,
-      p_fayupedia_order_id: providerOrderId || null,
-      p_fail_reason: failReason || null
+      p_trx_id: trx, p_service_id: String(order.serviceId || ''),
+      p_target: order.target || '', p_status: status,
+      p_fayupedia_order_id: providerOrderId || null, p_fail_reason: failReason || null
     });
-    
-    if (error) {
-      console.error('❌ RPC error:', error);
-      return false;
-    }
-    
-    console.log('📊 RPC response:', data);
-    
+    if (error) { console.error('❌ RPC error:', error); return false; }
     if (data && data.rows_updated === 0) {
-      console.warn('⚠️ RPC tidak match apapun. Fallback direct update...');
-      
-      // 🔥 FALLBACK: Direct update kalau RPC tidak match
-      const updateObj = {
-        order_status: status,
-        updated_at: new Date().toISOString()
-      };
+      const updateObj = { order_status: status, updated_at: new Date().toISOString() };
       if (providerOrderId) updateObj.order_id = String(providerOrderId);
       if (failReason) updateObj.fail_reason = failReason;
-      
       const { data: fallbackData, error: fallbackErr } = await supabaseClient
-        .from('orders_detail')
-        .update(updateObj)
-        .eq('trx_id', trx)
-        .eq('service_id', String(order.serviceId || ''))
-        .select();
-      
-      if (fallbackErr) {
-        console.error('❌ Fallback error:', fallbackErr);
-        return false;
-      }
-      
-      console.log(`💾 Fallback result: ${fallbackData?.length || 0} rows updated`);
+        .from('orders_detail').update(updateObj)
+        .eq('trx_id', trx).eq('service_id', String(order.serviceId || '')).select();
+      if (fallbackErr) return false;
       return (fallbackData?.length || 0) > 0;
     }
-    
     return data && data.success;
+  } catch (err) { return false; }
+}
+
+// ============================================================
+// 🆕 RECORD MUTASI PURCHASE pakai OrderID PROVIDER
+// ============================================================
+async function recordPurchaseMutation(amount, reason, oldBalance, newBalance, orderIds) {
+  if (!supabaseClient || !userProfileId) return false;
+  try {
+    const referenceId = orderIds && String(orderIds).trim() !== '' 
+      ? String(orderIds).trim() 
+      : trx;
+    const fullReason = `[OrderID: ${referenceId}] ${reason}`;
+    const { data, error } = await supabaseClient.rpc('record_balance_mutation', {
+      p_user_id: userProfileId,
+      p_amount: -Math.abs(amount),
+      p_type: 'purchase',
+      p_reason: fullReason,
+      p_balance_before: oldBalance,
+      p_balance_after: newBalance
+    });
+    if (error) throw error;
+    if (!data || !data.success) throw new Error(data?.message || 'Record failed');
+    console.log(`💾 Mutasi purchase tercatat [Ref OrderID: ${referenceId}]:`, data);
+    return true;
   } catch (err) {
-    console.error('❌ updateOrderStatusInDB error:', err);
+    console.error('❌ recordPurchaseMutation error:', err.message);
     return false;
   }
 }
 
-// ============================================================
-// 🚫 CEK BANNED
-// ============================================================
+async function autoRefundFullTransaction(reason) {
+  if (!supabaseClient || !userProfileId) return { success: false, message: 'No auth' };
+  if (isPaymentVerified && loadOrderIds().length > 0) return { success: false, message: 'Order sudah diproses' };
+  try {
+    const totalRefund = normalizeTotal(finalTotal);
+    const { data, error } = await supabaseClient.rpc('auto_refund_on_failure', {
+      p_user_id: userProfileId,
+      p_amount: totalRefund,
+      p_trx_id: trx,
+      p_reason: `Auto-refund: ${reason}`
+    });
+    if (error) throw error;
+    if (!data || !data.success) throw new Error(data?.message || 'Refund failed');
+    console.log('💰 Auto-refund sukses:', data);
+    userBalance = parseInt(data.new_balance) || userBalance;
+    return { success: true, amount: totalRefund, new_balance: userBalance };
+  } catch (err) {
+    console.error('❌ autoRefundFullTransaction error:', err.message);
+    try {
+      const totalRefund = normalizeTotal(finalTotal);
+      await supabaseClient.from('refunds').insert({
+        user_id: userProfileId, email: userEmail || '-', trx_id: trx, amount: totalRefund,
+        reason: `Auto-refund PENDING: ${reason}. Perlu konfirmasi admin.`,
+        source_method: paymentMethod, status: 'pending'
+      });
+      return { success: true, amount: totalRefund, pending: true };
+    } catch (e) { return { success: false, message: err.message }; }
+  }
+}
+
 async function checkSupabaseBanned() {
   if (!supabaseClient) return null;
   try {
     const { data: { session } } = await supabaseClient.auth.getSession();
     if (!session || !session.user) return null;
-
     const { data, error } = await supabaseClient
       .from('profiles')
       .select('banned, banned_reason, banned_until, banned_at, banned_by, email')
-      .eq('id', session.user.id)
-      .single();
-
+      .eq('id', session.user.id).single();
     if (error) throw error;
     if (!data || !data.banned) return null;
-
     if (data.banned_until) {
       const untilDate = new Date(data.banned_until);
       if (new Date() > untilDate) return null;
     }
-
     return {
-      Gmail: data.email,
-      Alasan: data.banned_reason || 'Tidak ada alasan',
-      "Dibanned sampai": data.banned_until || null,
-      source: 'supabase',
-      banned_by: data.banned_by,
-      banned_at: data.banned_at
+      Gmail: data.email, Alasan: data.banned_reason || 'Tidak ada alasan',
+      "Dibanned sampai": data.banned_until || null, source: 'supabase',
+      banned_by: data.banned_by, banned_at: data.banned_at
     };
-  } catch (err) {
-    console.warn('⚠️ Gagal cek banned Supabase:', err.message);
-    return null;
-  }
+  } catch (err) { return null; }
 }
 
 async function checkJsonBanned(gmail) {
@@ -924,9 +858,7 @@ async function checkJsonBanned(gmail) {
     if (!res.ok) return null;
     const list = await res.json();
     if (!Array.isArray(list)) return null;
-    const banned = list.find(item =>
-      item.Gmail && item.Gmail.toLowerCase() === gmail.toLowerCase()
-    );
+    const banned = list.find(item => item.Gmail && item.Gmail.toLowerCase() === gmail.toLowerCase());
     if (!banned) return null;
     if (banned["Dibanned sampai"]) {
       const untilDate = new Date(banned["Dibanned sampai"]);
@@ -934,10 +866,7 @@ async function checkJsonBanned(gmail) {
     }
     banned.source = 'json';
     return banned;
-  } catch (err) {
-    console.warn('⚠️ Gagal cek banned JSON:', err.message);
-    return null;
-  }
+  } catch (err) { return null; }
 }
 
 async function checkGmailBanned(gmail) {
@@ -951,23 +880,17 @@ async function checkGmailBanned(gmail) {
 function showBannedPage(bannedData, userID, gmail) {
   document.getElementById('bannedContainer').style.display = 'flex';
   document.getElementById('qrisCard').style.display = 'none';
-  
   document.getElementById('bannedGmail').textContent = gmail || '-';
   document.getElementById('bannedReason').textContent = bannedData.Alasan || 'Tidak ada keterangan';
   document.getElementById('bannedUserId').textContent = '🆔 User ID: ' + (userID || '-');
-  
   let untilText = '-';
-  if (bannedData["Dibanned sampai"]) {
-    untilText = formatWIB(new Date(bannedData["Dibanned sampai"]));
-  }
+  if (bannedData["Dibanned sampai"]) untilText = formatWIB(new Date(bannedData["Dibanned sampai"]));
   document.getElementById('bannedUntil').textContent = '⏳ Dibanned sampai: ' + untilText;
   updateBannedWIBDisplay();
-  
   const appealLink = document.querySelector('.btn-appeal');
   if (appealLink && gmail) {
     appealLink.href = `https://wa.me/${WHATSAPP_NUMBER}?text=Halo%20Admin%2C%20saya%20ingin%20mengajukan%20banding%20atas%20ban%20akun%20saya.%20Gmail%3A%20${encodeURIComponent(gmail)}%0AUser%20ID%3A%20${encodeURIComponent(userID || '-')}`;
   }
-
   setTimeout(() => {
     Swal.fire({
       title: '🚫 Akun Anda Dibanned',
@@ -987,14 +910,9 @@ function showBannedPage(bannedData, userID, gmail) {
           </div>
         </div>
       `,
-      icon: 'error',
-      confirmButtonText: '📱 Ajukan Banding',
-      confirmButtonColor: '#ff4444',
-      showCancelButton: true,
-      cancelButtonText: 'Tutup',
-      cancelButtonColor: '#666',
-      allowOutsideClick: false,
-      allowEscapeKey: false
+      icon: 'error', confirmButtonText: '📱 Ajukan Banding', confirmButtonColor: '#ff4444',
+      showCancelButton: true, cancelButtonText: 'Tutup', cancelButtonColor: '#666',
+      allowOutsideClick: false, allowEscapeKey: false
     }).then((result) => {
       if (result.isConfirmed) {
         window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=Halo%20Admin%2C%20saya%20ingin%20mengajukan%20banding%20atas%20ban%20akun%20saya.%20Gmail%3A%20${encodeURIComponent(gmail || '-')}%0AUser%20ID%3A%20${encodeURIComponent(userID || '-')}`, '_blank');
@@ -1007,22 +925,12 @@ async function checkAndHandleBan() {
   const gmail = getStoredGmail();
   const userID = await getUserID();
   const gmailDisplay = document.getElementById('gmailDisplay');
-  
   if (gmailDisplay) {
-    if (gmail && validateEmail(gmail)) {
-      gmailDisplay.textContent = gmail;
-      gmailDisplay.className = 'value';
-    } else {
-      gmailDisplay.textContent = '⚠️ Belum diatur!';
-      gmailDisplay.className = 'value not-set';
-    }
+    if (gmail && validateEmail(gmail)) { gmailDisplay.textContent = gmail; gmailDisplay.className = 'value'; }
+    else { gmailDisplay.textContent = '⚠️ Belum diatur!'; gmailDisplay.className = 'value not-set'; }
   }
-
   const bannedData = await checkGmailBanned(gmail);
-  if (bannedData) {
-    showBannedPage(bannedData, userID, gmail || bannedData.Gmail || '-');
-    return true;
-  }
+  if (bannedData) { showBannedPage(bannedData, userID, gmail || bannedData.Gmail || '-'); return true; }
   return false;
 }
 
@@ -1030,25 +938,14 @@ async function loadUserBalance() {
   if (!supabaseClient) return;
   try {
     const { data: { session } } = await supabaseClient.auth.getSession();
-    if (!session || !session.user) {
-      console.warn('⚠️ User belum login Supabase');
-      return;
-    }
+    if (!session || !session.user) return;
     userEmail = session.user.email;
     userProfileId = session.user.id;
-    
-    const { data, error } = await supabaseClient
-      .from('profiles')
-      .select('balance, email')
-      .eq('id', session.user.id)
-      .single();
-    
+    const { data, error } = await supabaseClient.from('profiles').select('balance, email').eq('id', session.user.id).single();
     if (error) throw error;
     userBalance = parseInt(data.balance) || 0;
     updateSaldoDisplay();
-  } catch (err) {
-    console.error('❌ Load balance error:', err);
-  }
+  } catch (err) { console.error('❌ Load balance error:', err); }
 }
 
 function updateSaldoDisplay() {
@@ -1057,53 +954,34 @@ function updateSaldoDisplay() {
   const saldoTotalBayar = document.getElementById('saldoTotalBayar');
   const saldoSisa = document.getElementById('saldoSisa');
   const btnPaySaldo = document.getElementById('btnPaySaldo');
-  
   if (saldoSub) saldoSub.textContent = 'Rp ' + userBalance.toLocaleString('id-ID');
   if (saldoValue) saldoValue.textContent = 'Rp ' + userBalance.toLocaleString('id-ID');
-  
   const totalBayarSaldo = normalizeTotal(finalTotal);
   if (saldoTotalBayar) saldoTotalBayar.textContent = 'Rp ' + totalBayarSaldo.toLocaleString('id-ID');
-  
   const sisa = userBalance - totalBayarSaldo;
   if (saldoSisa) {
     saldoSisa.textContent = 'Rp ' + sisa.toLocaleString('id-ID');
     saldoSisa.className = 'si-val ' + (sisa < 0 ? 'negative' : 'positive');
   }
-  
   if (btnPaySaldo) {
-    if (sisa < 0) {
-      btnPaySaldo.disabled = true;
-      btnPaySaldo.innerHTML = '❌ Saldo Kurang';
-    } else {
-      btnPaySaldo.disabled = false;
-      btnPaySaldo.innerHTML = '💰 Bayar dengan Saldo';
-    }
+    if (sisa < 0) { btnPaySaldo.disabled = true; btnPaySaldo.innerHTML = '❌ Saldo Kurang'; }
+    else { btnPaySaldo.disabled = false; btnPaySaldo.innerHTML = '💰 Bayar dengan Saldo'; }
   }
 }
 
 function selectPaymentMethod(method) {
-  if (IS_GMAIL_BLOCKED) return;
-  
+  if (IS_GMAIL_BLOCKED || IS_URL_PARAMS_INVALID) return;
   if (isPaymentVerified || transactionLocked) {
-    Swal.fire({
-      title: '🔒 Transaksi Terkunci',
-      text: 'Pembayaran sudah terverifikasi, tidak bisa ubah metode.',
-      icon: 'info',
-      confirmButtonColor: '#00c6ff'
-    });
+    Swal.fire({ title: '🔒 Transaksi Terkunci', text: 'Pembayaran sudah terverifikasi, tidak bisa ubah metode.', icon: 'info', confirmButtonColor: '#00c6ff' });
     return;
   }
-  
   paymentMethod = method;
-  
   const btnQris = document.getElementById('btnMethodQris');
   const btnSaldo = document.getElementById('btnMethodSaldo');
   btnQris.classList.remove('active', 'qris', 'saldo');
   btnSaldo.classList.remove('active', 'qris', 'saldo');
-  
   const qrisSection = document.getElementById('qrisSection');
   const saldoInfo = document.getElementById('saldoInfo');
-  
   if (method === 'qris') {
     btnQris.classList.add('active', 'qris');
     qrisSection.classList.remove('hide');
@@ -1118,122 +996,85 @@ function selectPaymentMethod(method) {
   }
 }
 
+// ============================================================
+// 🆕 payWithBalance: Mutasi purchase pakai OrderID provider
+// ============================================================
 async function payWithBalance() {
-  if (IS_GMAIL_BLOCKED) return;
-  
+  if (IS_GMAIL_BLOCKED || IS_URL_PARAMS_INVALID) return;
   if (!checkGmailAndRedirect()) return;
-  
   if (!supabaseClient || !userProfileId) {
-    Swal.fire({
-      title: '❌ Tidak Bisa Bayar',
-      text: 'Anda belum login. Silakan login terlebih dahulu.',
-      icon: 'error',
-      confirmButtonColor: '#facc15'
-    });
+    Swal.fire({ title: '❌ Tidak Bisa Bayar', text: 'Anda belum login. Silakan login terlebih dahulu.', icon: 'error', confirmButtonColor: '#facc15' });
     return;
   }
-  
   if (isPaymentVerified || transactionLocked) {
-    Swal.fire({
-      title: '🔒 Sudah Dibayar',
-      text: 'Transaksi ini sudah terverifikasi.',
-      icon: 'info',
-      confirmButtonColor: '#00c6ff'
-    });
+    Swal.fire({ title: '🔒 Sudah Dibayar', text: 'Transaksi ini sudah terverifikasi.', icon: 'info', confirmButtonColor: '#00c6ff' });
     return;
   }
-  
   const bannedData = await checkGmailBanned(getStoredGmail());
   if (bannedData) {
     showBannedPage(bannedData, await getUserID(), bannedData.Gmail || '-');
-    Swal.fire({
-      title: '🚫 Akun Diblokir',
-      text: 'Akun Anda diblokir, tidak bisa melakukan pembayaran.',
-      icon: 'error',
-      confirmButtonColor: '#ff4444'
-    });
+    Swal.fire({ title: '🚫 Akun Diblokir', text: 'Akun Anda diblokir, tidak bisa melakukan pembayaran.', icon: 'error', confirmButtonColor: '#ff4444' });
     return;
   }
-  
   const totalBayarSaldo = normalizeTotal(finalTotal);
   await loadUserBalance();
-  
   if (userBalance < totalBayarSaldo) {
     Swal.fire({
       title: '❌ Saldo Tidak Cukup',
-      html: `
-        <div style="text-align:left;color:#ddd;font-size:14px;">
-          <p>Saldo Anda: <b style="color:#facc15;">Rp ${userBalance.toLocaleString('id-ID')}</b></p>
-          <p>Total bayar: <b style="color:#22c55e;">Rp ${totalBayarSaldo.toLocaleString('id-ID')}</b></p>
-          <p style="margin-top:8px;color:#ef4444;">Kurang <b>Rp ${(totalBayarSaldo - userBalance).toLocaleString('id-ID')}</b></p>
-        </div>
-      `,
-      icon: 'error',
-      confirmButtonColor: '#facc15'
+      html: `<div style="text-align:left;color:#ddd;font-size:14px;">
+        <p>Saldo Anda: <b style="color:#facc15;">Rp ${userBalance.toLocaleString('id-ID')}</b></p>
+        <p>Total bayar: <b style="color:#22c55e;">Rp ${totalBayarSaldo.toLocaleString('id-ID')}</b></p>
+        <p style="margin-top:8px;color:#ef4444;">Kurang <b>Rp ${(totalBayarSaldo - userBalance).toLocaleString('id-ID')}</b></p>
+      </div>`, icon: 'error', confirmButtonColor: '#facc15'
     });
     return;
   }
-  
   const confirm = await Swal.fire({
     title: '💰 Bayar dengan Saldo?',
-    html: `
-      <div style="text-align:left;color:#ddd;font-size:14px;">
-        <p>Saldo saat ini: <b style="color:#facc15;">Rp ${userBalance.toLocaleString('id-ID')}</b></p>
-        <p>Total bayar: <b style="color:#22c55e;">Rp ${totalBayarSaldo.toLocaleString('id-ID')}</b></p>
-        <p style="margin-top:8px;">Sisa saldo: <b style="color:#00c6ff;">Rp ${(userBalance - totalBayarSaldo).toLocaleString('id-ID')}</b></p>
-      </div>
-    `,
-    icon: 'question',
-    showCancelButton: true,
-    confirmButtonText: '✅ Ya, Bayar Sekarang',
-    cancelButtonText: '❌ Batal',
-    confirmButtonColor: '#facc15',
-    cancelButtonColor: '#666'
+    html: `<div style="text-align:left;color:#ddd;font-size:14px;">
+      <p>Saldo saat ini: <b style="color:#facc15;">Rp ${userBalance.toLocaleString('id-ID')}</b></p>
+      <p>Total bayar: <b style="color:#22c55e;">Rp ${totalBayarSaldo.toLocaleString('id-ID')}</b></p>
+      <p style="margin-top:8px;">Sisa saldo: <b style="color:#00c6ff;">Rp ${(userBalance - totalBayarSaldo).toLocaleString('id-ID')}</b></p>
+    </div>`, icon: 'question', showCancelButton: true,
+    confirmButtonText: '✅ Ya, Bayar Sekarang', cancelButtonText: '❌ Batal',
+    confirmButtonColor: '#facc15', cancelButtonColor: '#666'
   });
-  
   if (!confirm.isConfirmed) return;
   
   const btn = document.getElementById('btnPaySaldo');
   btn.disabled = true;
   btn.innerHTML = '⏳ Memproses...';
   
+  const oldBalance = userBalance;
+  
   try {
+    // 1️⃣ POTONG SALDO
     const { data, error } = await supabaseClient.rpc('pay_with_balance', {
-      p_user_id: userProfileId,
-      p_amount: totalBayarSaldo
+      p_user_id: userProfileId, p_amount: totalBayarSaldo
     });
-    
     if (error) throw error;
     if (!data.success) throw new Error(data.message || 'Gagal potong saldo');
     
     userBalance = parseInt(data.balance) || 0;
-    
     isPaymentVerified = true;
     transactionLocked = true;
     
     try {
       await supabaseClient.from('order_payments').insert({
-        user_id: userProfileId,
-        email: userEmail,
-        trx_id: trx,
-        order_index: 0,
-        service_id: ordersData[0]?.serviceId || '',
-        service_name: ordersData[0]?.serviceName || '',
-        target: ordersData[0]?.target || '',
-        quantity: parseInt(ordersData[0]?.jumlah) || 0,
-        amount: totalBayarSaldo,
-        status: 'paid'
+        user_id: userProfileId, email: userEmail, trx_id: trx, order_index: 0,
+        service_id: ordersData[0]?.serviceId || '', service_name: ordersData[0]?.serviceName || '',
+        target: ordersData[0]?.target || '', quantity: parseInt(ordersData[0]?.jumlah) || 0,
+        amount: totalBayarSaldo, status: 'paid'
       });
     } catch(e) { console.warn('order_payments insert skip:', e.message); }
     
     await saveAllOrdersDetailToDB('saldo');
-    
     updateSaldoDisplay();
+    
     const statusEl = document.getElementById('paymentStatus');
     statusEl.className = 'payment-status success';
     statusEl.textContent = `✅ Pembayaran Rp ${totalBayarSaldo.toLocaleString('id-ID')} via Saldo berhasil!`;
     statusEl.style.display = 'block';
-    
     btn.innerHTML = '✅ Sudah Dibayar';
     btn.disabled = true;
     
@@ -1241,42 +1082,49 @@ async function payWithBalance() {
     const userID = await getUserID();
     await sendToDiscordSaldo(gmail, userID, totalBayarSaldo);
     
+    // 2️⃣ KIRIM ORDER → dapat OrderID dari provider
+    let orderIdsFromProvider = [];
     if (ordersData.length > 0 && !isOrderAlreadySent()) {
       await sendMassOrdersToFayupedia();
+      orderIdsFromProvider = loadOrderIds();
+    } else {
+      orderIdsFromProvider = loadOrderIds();
+    }
+    
+    // 3️⃣ 🆕 CATAT MUTASI PURCHASE pakai OrderID PROVIDER
+    if (orderIdsFromProvider.length > 0) {
+      const orderIdsStr = orderIdsFromProvider.join(', ');
+      await recordPurchaseMutation(
+        totalBayarSaldo,
+        `Pembelian ${ordersData.length} pesanan (${SOSMED_TYPE})`,
+        oldBalance,
+        userBalance,
+        orderIdsStr
+      );
+    } else {
+      console.log('ℹ️ Tidak ada OrderID provider. Mutasi purchase tidak dicatat (akan muncul mutasi refund).');
     }
     
     savePaymentState({
-      verified: true,
-      orderSent: isOrderAlreadySent(),
-      verifiedAt: new Date().toISOString(),
-      totalBayar: totalBayarSaldo,
-      method: 'balance'
+      verified: true, orderSent: isOrderAlreadySent(),
+      verifiedAt: new Date().toISOString(), totalBayar: totalBayarSaldo, method: 'balance'
     });
     
     Swal.fire({
       title: '🎉 Pembayaran Berhasil!',
-      html: `
-        <div style="text-align:left;color:#ddd;font-size:14px;">
-          <p>✅ Saldo dipotong: <b style="color:#facc15;">Rp ${totalBayarSaldo.toLocaleString('id-ID')}</b></p>
-          <p>💰 Saldo tersisa: <b style="color:#22c55e;">Rp ${userBalance.toLocaleString('id-ID')}</b></p>
-          <p style="margin-top:12px;font-size:12px;color:#94a3b8;">Pesanan sedang diproses...</p>
-        </div>
-      `,
-      icon: 'success',
-      confirmButtonColor: '#facc15'
+      html: `<div style="text-align:left;color:#ddd;font-size:14px;">
+        <p>✅ Saldo dipotong: <b style="color:#facc15;">Rp ${totalBayarSaldo.toLocaleString('id-ID')}</b></p>
+        <p>💰 Saldo tersisa: <b style="color:#22c55e;">Rp ${userBalance.toLocaleString('id-ID')}</b></p>
+        ${orderIdsFromProvider.length > 0 ? `<p style="margin-top:8px;">🆔 <b>OrderID:</b> <b style="color:#00ffaa;font-family:monospace;">${orderIdsFromProvider.join(', ')}</b></p>` : ''}
+        <p style="margin-top:12px;font-size:12px;color:#94a3b8;">Pesanan sedang diproses...</p>
+      </div>`, icon: 'success', confirmButtonColor: '#facc15'
     });
     
   } catch (err) {
     console.error('❌ Pay error:', err);
     btn.disabled = false;
     btn.innerHTML = '💰 Bayar dengan Saldo';
-    
-    Swal.fire({
-      title: '❌ Pembayaran Gagal',
-      text: err.message || 'Terjadi kesalahan, coba lagi.',
-      icon: 'error',
-      confirmButtonColor: '#ff4444'
-    });
+    Swal.fire({ title: '❌ Pembayaran Gagal', text: err.message || 'Terjadi kesalahan, coba lagi.', icon: 'error', confirmButtonColor: '#ff4444' });
   }
 }
 
@@ -1291,12 +1139,7 @@ function startQrisTimer() {
   updateTimerDisplay();
   qrisTimerInterval = setInterval(function() {
     const remaining = qrisExpiryTime - Date.now();
-    if (remaining <= 0) {
-      clearInterval(qrisTimerInterval);
-      qrisTimerInterval = null;
-      expireQris();
-      return;
-    }
+    if (remaining <= 0) { clearInterval(qrisTimerInterval); qrisTimerInterval = null; expireQris(); return; }
     updateTimerDisplay();
   }, 1000);
 }
@@ -1329,8 +1172,7 @@ function expireQris() {
 }
 
 function regenerateQris() {
-  if (IS_GMAIL_BLOCKED) return;
-  
+  if (IS_GMAIL_BLOCKED || IS_URL_PARAMS_INVALID) return;
   uniqueCode = regenerateUniqueCode();
   qrisRegenerationCount++;
   isQrisExpired = false;
@@ -1368,31 +1210,18 @@ function regenerateQris() {
       <p><b>🔑 Kode Unik:</b> ${uniqueCode}</p>
       <p><b>💰 Total Bayar:</b> Rp ${normalizeTotal(finalTotal + uniqueCode + adminFee).toLocaleString('id-ID')}</p>
       <p style="margin-top:8px;color:#ffaa00;">⏳ QRIS berlaku ${QRIS_EXPIRY_MINUTES} menit</p>
-    </div>`,
-    icon: 'success',
-    confirmButtonColor: '#f59e0b',
-    confirmButtonText: '✅ OK'
+    </div>`, icon: 'success', confirmButtonColor: '#f59e0b', confirmButtonText: '✅ OK'
   });
 }
 
 async function autoRefundOrder(orderIndex, order, errorMessage) {
-  if (!supabaseClient || !userProfileId) {
-    console.warn('⚠️ Auto-refund: no userProfileId');
-    return { success: false, amount: 0 };
-  }
-  
+  if (!supabaseClient || !userProfileId) return { success: false, amount: 0 };
   try {
     let paymentMethodUsed = paymentMethod;
-    
     const { data: orderPayment, error: fetchErr } = await supabaseClient
-      .from('order_payments')
-      .select('id, amount, refunded')
-      .eq('trx_id', trx)
-      .eq('order_index', orderIndex)
-      .maybeSingle();
-    
+      .from('order_payments').select('id, amount, refunded')
+      .eq('trx_id', trx).eq('order_index', orderIndex).maybeSingle();
     if (fetchErr) console.warn('Fetch order_payment err:', fetchErr.message);
-    
     let refundAmount = orderPayment?.amount;
     if (!refundAmount || refundAmount <= 0) {
       if (paymentMethodUsed === 'qris') {
@@ -1403,110 +1232,95 @@ async function autoRefundOrder(orderIndex, order, errorMessage) {
         refundAmount = Math.ceil(totalBayarSaldo / ordersData.length);
       }
     }
-    
-    if (orderPayment?.refunded) {
-      return { success: false, amount: 0 };
-    }
-    
+    if (orderPayment?.refunded) return { success: false, amount: 0 };
     let rpcResult;
     if (paymentMethodUsed === 'qris') {
       const qrisTotalPaid = normalizeTotal(finalTotal + uniqueCode + adminFee);
       const { data, error } = await supabaseClient.rpc('refund_from_qris', {
-        p_user_id: userProfileId,
-        p_amount: refundAmount,
-        p_trx_id: trx,
-        p_qris_total: qrisTotalPaid,
-        p_unique_code: uniqueCode || 0,
-        p_order_id: null,
+        p_user_id: userProfileId, p_amount: refundAmount, p_trx_id: trx,
+        p_qris_total: qrisTotalPaid, p_unique_code: uniqueCode || 0, p_order_id: null,
         p_reason: `Pesanan gagal (QRIS): ${errorMessage}`
       });
       if (error) throw error;
       rpcResult = data;
     } else {
       const { data, error } = await supabaseClient.rpc('refund_balance', {
-        p_user_id: userProfileId,
-        p_amount: refundAmount,
-        p_trx_id: trx,
-        p_order_id: null,
-        p_reason: `Pesanan gagal (Saldo): ${errorMessage}`
+        p_user_id: userProfileId, p_amount: refundAmount, p_trx_id: trx,
+        p_order_id: null, p_reason: `Pesanan gagal (Saldo): ${errorMessage}`
       });
       if (error) throw error;
       rpcResult = data;
     }
-    
     if (!rpcResult.success) throw new Error(rpcResult.message);
-    
     if (orderPayment?.id) {
       await supabaseClient.from('order_payments')
-        .update({ 
-          status: 'failed', 
-          fail_reason: errorMessage,
-          refunded: true,
-          refunded_at: new Date().toISOString()
-        })
+        .update({ status: 'failed', fail_reason: errorMessage, refunded: true, refunded_at: new Date().toISOString() })
         .eq('id', orderPayment.id);
     }
-    
     try {
-      await supabaseClient
-        .from('orders_detail')
-        .update({ 
-          refunded: true, 
-          refunded_amount: refundAmount,
-          refunded_at: new Date().toISOString(),
-          order_status: 'failed',
-          fail_reason: errorMessage,
-          updated_at: new Date().toISOString()
-        })
-        .eq('trx_id', trx)
-        .eq('service_id', String(order.serviceId || ''))
-        .eq('target', order.target || '');
-    } catch(e) { console.warn('Update orders_detail refund:', e.message); }
-    
+      await supabaseClient.from('orders_detail')
+        .update({ refunded: true, refunded_amount: refundAmount, refunded_at: new Date().toISOString(),
+          order_status: 'failed', fail_reason: errorMessage, updated_at: new Date().toISOString() })
+        .eq('trx_id', trx).eq('service_id', String(order.serviceId || '')).eq('target', order.target || '');
+    } catch(e) {}
     userBalance = parseInt(rpcResult.new_balance) || userBalance;
-    
     return { success: true, amount: refundAmount, method: paymentMethodUsed };
-    
   } catch (err) {
     console.error('❌ Auto-refund error:', err.message);
-    
     try {
-      let fallbackAmount;
-      if (paymentMethod === 'qris') {
-        fallbackAmount = Math.ceil(normalizeTotal(finalTotal) / ordersData.length);
-      } else {
-        fallbackAmount = Math.ceil(normalizeTotal(finalTotal) / ordersData.length);
-      }
-      
+      let fallbackAmount = Math.ceil(normalizeTotal(finalTotal) / ordersData.length);
       await supabaseClient.from('refunds').insert({
-        user_id: userProfileId,
-        email: userEmail || '-',
-        trx_id: trx,
+        user_id: userProfileId, email: userEmail || '-', trx_id: trx,
         amount: fallbackAmount,
         reason: `Auto-refund gagal: ${err.message}. Order: ${order.serviceName}`,
-        method: 'balance',
-        status: 'pending',
-        source_method: paymentMethod
+        method: 'balance', status: 'pending', source_method: paymentMethod
       });
     } catch(e) {}
-    
     return { success: false, amount: 0 };
   }
 }
 
 // ============================================================
-// 🚀 KIRIM ORDER KE FAYUPEDIA
-// Order ID diambil dari response via extractOrderIdFromResponse()
-// Disimpan ke orders_detail.provider_order_id (BUKAN trx_id)
+// 🆕 FETCH WITH TIMEOUT (untuk endpoint provider)
 // ============================================================
+async function fetchWithTimeout(url, options, timeoutMs = 15000) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, { ...options, signal: controller.signal });
+    clearTimeout(timeoutId);
+    return response;
+  } catch (err) {
+    clearTimeout(timeoutId);
+    if (err.name === 'AbortError') {
+      throw new Error(`Timeout: Provider tidak merespon dalam ${timeoutMs/1000} detik`);
+    }
+    throw err;
+  }
+}
+
 async function sendMassOrdersToFayupedia() {
   if (isOrderAlreadySent()) return true;
   if (isSendingOrder) return false;
   if (!ordersData || ordersData.length === 0) {
+    // 🆕 URL params kosong → auto-refund penuh
     const orderStatus = document.getElementById('orderStatus');
+    const refundResult = await autoRefundFullTransaction('Orders data kosong saat kirim ke provider');
     orderStatus.className = 'order-status failed';
-    orderStatus.textContent = '❌ Tidak ada data pesanan.';
+    orderStatus.innerHTML = `❌ Data pesanan kosong! ${refundResult.success ? `💰 Saldo dikembalikan Rp ${refundResult.amount.toLocaleString('id-ID')}` : '⚠️ Refund pending'}`;
     orderStatus.style.display = 'block';
+    if (refundResult.success) {
+      await Swal.fire({
+        title: '💰 Auto-Refund Berhasil',
+        html: `<div style="text-align:left;color:#ddd;font-size:14px;">
+          <p>Data pesanan kosong, transaksi tidak bisa diproses.</p>
+          <div style="background:rgba(34,197,94,0.1);padding:12px;border-radius:8px;margin-top:10px;border-left:3px solid #22c55e;">
+            <b style="color:#22c55e;">💰 Refund: Rp ${refundResult.amount.toLocaleString('id-ID')}</b><br>
+            <span style="font-size:12px;">Saldo baru: Rp ${refundResult.new_balance.toLocaleString('id-ID')}</span>
+          </div>
+        </div>`, icon: 'success', confirmButtonColor: '#22c55e'
+      });
+    }
     return false;
   }
   if (!FAYUPEDIA_API_KEY) {
@@ -1542,89 +1356,62 @@ async function sendMassOrdersToFayupedia() {
       if (order.comment && order.comment.trim() !== '') payload.comments = order.comment.trim();
       
       try {
-        console.log(`📤 [Order ${i+1}/${ordersData.length}] Kirim ke Fayupedia:`, payload);
-        
-        const response = await fetch(FAYUPEDIA_URL, {
+        // 🆕 Pakai timeout
+        const response = await fetchWithTimeout(FAYUPEDIA_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
           body: JSON.stringify(payload)
-        });
+        }, 15000);
         
         const rawText = await response.text();
-        console.log(`📥 [Order ${i+1}] Raw response:`, rawText);
-        
         let result;
-        try {
-          result = JSON.parse(rawText);
-        } catch(e) {
-          console.error(`❌ [Order ${i+1}] Response bukan JSON:`, rawText);
-          result = { error: 'Invalid JSON response', status: response.status, raw: rawText };
+        try { result = JSON.parse(rawText); } catch(e) { result = { error: 'Invalid JSON', status: response.status, raw: rawText }; }
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${result.error || result.message || 'Server error'}`);
         }
         
-        console.log(`📦 [Order ${i+1}] Parsed result:`, result);
-        
         const extractedOrderId = extractOrderIdFromResponse(result);
-        
-        console.log(`🎯 [Order ${i+1}] Extracted OrderID (dari provider):`, extractedOrderId);
-        
         const isSuccessStatus = result.status === true || result.status === 'true' || result.success === true;
         
         if (extractedOrderId && (isSuccessStatus || !('status' in result))) {
           successCount++;
           orderIds.push(extractedOrderId);
-          
           try {
             await supabaseClient.from('order_payments')
-              .update({ 
-                fayupedia_order_id: String(extractedOrderId), 
-                status: 'processing',
-                updated_at: new Date().toISOString()
-              })
-              .eq('trx_id', trx)
-              .eq('order_index', i);
-          } catch(e) { console.warn('order_payments update skip:', e.message); }
-          
-          const updateResult = await updateOrderStatusInDB(order, 'processing', String(extractedOrderId), null);
-          console.log(`💾 [Order ${i+1}] DB update provider_order_id=${extractedOrderId}:`, updateResult);
-          
+              .update({ fayupedia_order_id: String(extractedOrderId), status: 'processing', updated_at: new Date().toISOString() })
+              .eq('trx_id', trx).eq('order_index', i);
+          } catch(e) {}
+          await updateOrderStatusInDB(order, 'processing', String(extractedOrderId), null);
         } else {
           const errorMsg = result.msg || result.error || result.message || 
                           result.data?.msg || result.data?.error ||
                           (extractedOrderId ? 'Status tidak success' : 'Tidak ada order ID di response');
           failedOrders.push({ index: i, order, error: errorMsg });
-          console.warn(`❌ [Order ${i+1}] Gagal:`, errorMsg);
-          
           await updateOrderStatusInDB(order, 'failed', null, errorMsg);
-          
           const refundInfo = await autoRefundOrder(i, order, errorMsg);
           if (refundInfo.success) {
             totalRefundAmount += refundInfo.amount;
-            refundedOrders.push({ 
-              index: i, order, serviceName: order.serviceName, 
-              amount: refundInfo.amount, error: errorMsg
-            });
+            refundedOrders.push({ index: i, order, serviceName: order.serviceName, amount: refundInfo.amount, error: errorMsg });
           }
         }
       } catch (fetchErr) {
-        console.error(`❌ [Order ${i+1}] Network error:`, fetchErr);
-        failedOrders.push({ index: i, order, error: 'Network error: ' + fetchErr.message });
-        await updateOrderStatusInDB(order, 'failed', null, 'Network error: ' + fetchErr.message);
-        
-        const refundInfo = await autoRefundOrder(i, order, 'Network error');
+        console.warn(`❌ Order #${i+1} error:`, fetchErr.message);
+        const errorMsg = fetchErr.message.includes('Timeout') 
+          ? 'Endpoint provider tidak merespon (timeout 15 detik)'
+          : ('Network error: ' + fetchErr.message);
+        failedOrders.push({ index: i, order, error: errorMsg });
+        await updateOrderStatusInDB(order, 'failed', null, errorMsg);
+        const refundInfo = await autoRefundOrder(i, order, errorMsg);
         if (refundInfo.success) {
           totalRefundAmount += refundInfo.amount;
-          refundedOrders.push({ 
-            index: i, order, serviceName: order.serviceName, 
-            amount: refundInfo.amount, error: 'Network error'
-          });
+          refundedOrders.push({ index: i, order, serviceName: order.serviceName, amount: refundInfo.amount, error: errorMsg });
         }
       }
-      
       orderStatus.textContent = `⏳ Mengirim ${i+1}/${ordersData.length}... (${successCount} berhasil)`;
     }
     
     markOrderSent();
-    
     const orderIdStr = orderIds.join(', ') || '-';
     
     if (successCount === ordersData.length) {
@@ -1639,9 +1426,7 @@ async function sendMassOrdersToFayupedia() {
       `;
       saveOrderIds(orderIds);
       isSendingOrder = false;
-      
       await sendMassOrderNotificationToDiscord(orderIds, successCount, failedOrders);
-      
       await Swal.fire({
         title: '✅ Semua Pesanan Berhasil!',
         html: `<div style="text-align:left;color:#ddd;font-size:14px;">
@@ -1652,32 +1437,19 @@ async function sendMassOrdersToFayupedia() {
             <br>
             <button onclick="copyOrderId('${orderIdStr}')" style="margin-top:6px;background:#ffaa0022;color:#ffaa00;border:1px solid #ffaa0044;padding:4px 16px;border-radius:6px;cursor:pointer;font-size:12px;">📋 Salin Semua ID</button>
           </div>
-        </div>`,
-        icon: 'success',
-        confirmButtonColor: '#ffaa00',
-        confirmButtonText: '✅ OK, Saya Simpan'
+        </div>`, icon: 'success', confirmButtonColor: '#ffaa00', confirmButtonText: '✅ OK, Saya Simpan'
       });
       return true;
-      
     } else if (successCount > 0) {
       orderStatus.className = 'order-status failed';
       orderStatus.innerHTML = `⚠️ ${successCount}/${ordersData.length} berhasil. ${refundedOrders.length} order di-refund.`;
-      
       if (orderIds.length > 0) saveOrderIds(orderIds);
       isSendingOrder = false;
-      
       await sendMassOrderNotificationToDiscord(orderIds, successCount, failedOrders);
       await loadUserBalance();
-      
-      const methodLabel = paymentMethod === 'qris' 
-        ? '💰 Saldo Dikembalikan (via QRIS)' 
-        : '💰 Saldo Dikembalikan (via Saldo)';
-      
+      const methodLabel = paymentMethod === 'qris' ? '💰 Saldo Dikembalikan (via QRIS)' : '💰 Saldo Dikembalikan (via Saldo)';
       const failedMsg = failedOrders.map(f => `#${f.index+1} ${f.order.serviceName}: ${f.error}`).join('<br>');
-      const refundMsg = refundedOrders.map(r => 
-        `#${r.index+1} ${r.serviceName}: <b style="color:#22c55e;">+Rp ${r.amount.toLocaleString('id-ID')}</b>`
-      ).join('<br>');
-      
+      const refundMsg = refundedOrders.map(r => `#${r.index+1} ${r.serviceName}: <b style="color:#22c55e;">+Rp ${r.amount.toLocaleString('id-ID')}</b>`).join('<br>');
       await Swal.fire({
         title: '⚠️ Sebagian Gagal — Saldo Dikembalikan!',
         html: `<div style="text-align:left;color:#ddd;font-size:13px;line-height:1.7;">
@@ -1693,38 +1465,21 @@ async function sendMassOrdersToFayupedia() {
             <div style="background:rgba(250,204,21,0.1);padding:10px 12px;border-radius:8px;border-left:3px solid #facc15;">
               <b style="color:#facc15;">${methodLabel}:</b><br>
               <span style="font-size:11px;">${refundMsg}</span>
-              ${paymentMethod === 'qris' ? `
-                <div style="font-size:10px;color:#94a3b8;margin-top:6px;font-style:italic;">
-                  ℹ️ Refund tidak termasuk kode unik (Rp ${uniqueCode.toLocaleString('id-ID')})
-                </div>
-              ` : ''}
-              <div style="margin-top:8px;font-size:15px;color:#22c55e;font-weight:800;text-align:center;">
-                Total Refund: Rp ${totalRefundAmount.toLocaleString('id-ID')}
-              </div>
-            </div>
-          ` : ''}
+              ${paymentMethod === 'qris' ? `<div style="font-size:10px;color:#94a3b8;margin-top:6px;font-style:italic;">ℹ️ Refund tidak termasuk kode unik (Rp ${uniqueCode.toLocaleString('id-ID')})</div>` : ''}
+              <div style="margin-top:8px;font-size:15px;color:#22c55e;font-weight:800;text-align:center;">Total Refund: Rp ${totalRefundAmount.toLocaleString('id-ID')}</div>
+            </div>` : ''}
         </div>`,
-        icon: 'warning',
-        confirmButtonColor: '#facc15',
-        confirmButtonText: '✅ OK, Mengerti',
-        background: '#0a0e1a', color: '#fff'
+        icon: 'warning', confirmButtonColor: '#facc15', confirmButtonText: '✅ OK, Mengerti', background: '#0a0e1a', color: '#fff'
       });
       return false;
-      
     } else {
       orderStatus.className = 'order-status failed';
       orderStatus.innerHTML = `❌ Semua pesanan gagal. Saldo dikembalikan Rp ${totalRefundAmount.toLocaleString('id-ID')}`;
-      
       isSendingOrder = false;
       await sendMassOrderNotificationToDiscord(orderIds, 0, failedOrders);
       await loadUserBalance();
-      
-      const methodLabel = paymentMethod === 'qris' 
-        ? '💰 Saldo Dikembalikan (via QRIS)' 
-        : '💰 Saldo Dikembalikan (via Saldo)';
-      
+      const methodLabel = paymentMethod === 'qris' ? '💰 Saldo Dikembalikan (via QRIS)' : '💰 Saldo Dikembalikan (via Saldo)';
       const failedMsg = failedOrders.map(f => `#${f.index+1} ${f.order.serviceName}: ${f.error}`).join('<br>');
-      
       await Swal.fire({
         title: '❌ Semua Pesanan Gagal — Saldo Dikembalikan!',
         html: `<div style="text-align:left;color:#ddd;font-size:13px;line-height:1.7;">
@@ -1733,30 +1488,17 @@ async function sendMassOrdersToFayupedia() {
             <span style="font-size:11px;color:#f87171;margin-top:6px;display:block;">${failedMsg}</span>
           </div>
           <div style="background:rgba(34,197,94,0.15);padding:14px;border-radius:10px;border:1px dashed #22c55e;text-align:center;">
-            <div style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">
-              ${methodLabel}
-            </div>
-            <div style="font-size:22px;font-weight:900;color:#22c55e;margin-top:4px;">
-              Rp ${totalRefundAmount.toLocaleString('id-ID')}
-            </div>
-            ${paymentMethod === 'qris' ? `
-              <div style="font-size:10px;color:#94a3b8;margin-top:6px;font-style:italic;">
-                ℹ️ Tidak termasuk kode unik (Rp ${uniqueCode.toLocaleString('id-ID')})
-              </div>
-            ` : ''}
+            <div style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">${methodLabel}</div>
+            <div style="font-size:22px;font-weight:900;color:#22c55e;margin-top:4px;">Rp ${totalRefundAmount.toLocaleString('id-ID')}</div>
+            ${paymentMethod === 'qris' ? `<div style="font-size:10px;color:#94a3b8;margin-top:6px;font-style:italic;">ℹ️ Tidak termasuk kode unik (Rp ${uniqueCode.toLocaleString('id-ID')})</div>` : ''}
             <div style="font-size:11px;color:#94a3b8;margin-top:8px;padding-top:8px;border-top:1px dashed rgba(34,197,94,0.3);">
               💰 Saldo Anda sekarang: <b style="color:#facc15;">Rp ${userBalance.toLocaleString('id-ID')}</b>
             </div>
           </div>
-        </div>`,
-        icon: 'success',
-        confirmButtonColor: '#22c55e',
-        confirmButtonText: '✅ OK',
-        background: '#0a0e1a', color: '#fff'
+        </div>`, icon: 'success', confirmButtonColor: '#22c55e', confirmButtonText: '✅ OK', background: '#0a0e1a', color: '#fff'
       });
       return false;
     }
-    
   } catch (err) {
     orderStatus.className = 'order-status failed';
     orderStatus.textContent = `❌ Error: ${err.message}`;
@@ -1782,12 +1524,9 @@ window.copyOrderId = function(orderId) {
 async function sendMassOrderNotificationToDiscord(orderIds, successCount, failedOrders) {
   try {
     let orderList = '';
-    ordersData.forEach((o, i) => {
-      orderList += `\n  ${i+1}. ${o.serviceName} (ID: ${o.serviceId}) x${o.jumlah} → ${o.target}`;
-    });
+    ordersData.forEach((o, i) => { orderList += `\n  ${i+1}. ${o.serviceName} (ID: ${o.serviceId}) x${o.jumlah} → ${o.target}`; });
     const orderIdStr = orderIds.join(', ') || '-';
     const failedCount = failedOrders.length;
-    
     let refundInfo = '';
     if (failedCount > 0) {
       if (paymentMethod === 'qris') {
@@ -1796,7 +1535,6 @@ async function sendMassOrderNotificationToDiscord(orderIds, successCount, failed
         refundInfo = `\n💰 **Auto-Refund:** ${failedCount} pesanan → ke Saldo (via Saldo)`;
       }
     }
-    
     const message = `📦 **ORDER MASSAL FAYUPEDIA (${SOSMED_TYPE})**
 ━━━━━━━━━━━━━━━━━━━━━
 🆔 **ID Transaksi:** ${trx}
@@ -1811,10 +1549,8 @@ async function sendMassOrderNotificationToDiscord(orderIds, successCount, failed
 ${orderList}
 ━━━━━━━━━━━━━━━━━━━━━
 ${successCount === ordersData.length ? '✅ Semua pesanan berhasil!' : `⚠️ ${failedCount} pesanan gagal & saldo sudah di-refund otomatis.`}`;
-    
     await fetch(discordWebhook, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ content: message })
     });
   } catch (err) { console.error('❌ Gagal notif Discord:', err); }
@@ -1853,8 +1589,7 @@ ${orderList || '  -'}
 ━━━━━━━━━━━━━━━━━━━━━
 ✅ **Status: LUNAS**`;
     const response = await fetch(discordWebhook, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ content: message })
     });
     if (response.ok) { markDiscordSent(); isSendingDiscord = false; return true; }
@@ -1891,8 +1626,7 @@ ${orderList || '  -'}
 ━━━━━━━━━━━━━━━━━━━━━
 ✅ **Status: LUNAS (Saldo)**`;
     await fetch(discordWebhook, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ content: message })
     });
   } catch (err) { console.error('❌ Discord saldo error:', err); }
@@ -1916,10 +1650,9 @@ function isTransactionValid(transaction, targetAmount) {
 }
 
 async function checkPaymentStatus() {
-  if (IS_GMAIL_BLOCKED) return;
+  if (IS_GMAIL_BLOCKED || IS_URL_PARAMS_INVALID) return;
   if (isProcessingPayment) return;
   if (paymentMethod !== 'qris') return;
-  
   if (!checkGmailAndRedirect()) return;
   
   const statusEl = document.getElementById('paymentStatus');
@@ -1936,8 +1669,7 @@ async function checkPaymentStatus() {
   if (savedState && savedState.verified === true && savedState.verifiedAt) {
     const diffMinutes = (Date.now() - new Date(savedState.verifiedAt).getTime()) / 1000 / 60;
     if (diffMinutes < 60) {
-      isPaymentVerified = true;
-      transactionLocked = true;
+      isPaymentVerified = true; transactionLocked = true;
       statusEl.className = 'payment-status success';
       statusEl.textContent = '✅ Pembayaran sudah terverifikasi!';
       statusEl.style.display = 'block';
@@ -1959,22 +1691,11 @@ async function checkPaymentStatus() {
     return;
   }
   
-  if (checkTransactionLockLocal()) {
+  if (checkTransactionLockLocal() || isDiscordAlreadySent()) {
     isPaymentVerified = true;
     statusEl.className = 'payment-status success';
     statusEl.textContent = '✅ Transaksi sudah dikonfirmasi sebelumnya!';
     statusEl.style.display = 'block';
-    savePaymentState({ verified: true, orderSent: isOrderAlreadySent(), verifiedAt: new Date().toISOString() });
-    return;
-  }
-  
-  if (isDiscordAlreadySent()) {
-    isPaymentVerified = true;
-    statusEl.className = 'payment-status success';
-    statusEl.textContent = '✅ Pembayaran sudah terverifikasi!';
-    statusEl.style.display = 'block';
-    confirmBtn.disabled = true;
-    confirmBtn.textContent = '✅ Pembayaran Terverifikasi';
     savePaymentState({ verified: true, orderSent: isOrderAlreadySent(), verifiedAt: new Date().toISOString() });
     return;
   }
@@ -2001,11 +1722,7 @@ async function checkPaymentStatus() {
     const userID = await getUserID();
     
     const bannedData = await checkGmailBanned(gmail);
-    if (bannedData) {
-      showBannedPage(bannedData, userID, gmail || bannedData.Gmail || '-');
-      isProcessingPayment = false;
-      return;
-    }
+    if (bannedData) { showBannedPage(bannedData, userID, gmail || bannedData.Gmail || '-'); isProcessingPayment = false; return; }
     
     const totalBayar = normalizeTotal(finalTotal + uniqueCode + adminFee);
     currentTotalBayar = totalBayar;
@@ -2023,8 +1740,7 @@ async function checkPaymentStatus() {
     }
     
     if (foundTransaction) {
-      isPaymentVerified = true;
-      transactionLocked = true;
+      isPaymentVerified = true; transactionLocked = true;
       statusEl.className = 'payment-status success';
       statusEl.textContent = `✅ Pembayaran Rp ${totalBayar.toLocaleString('id-ID')} terverifikasi!`;
       
@@ -2032,35 +1748,20 @@ async function checkPaymentStatus() {
       
       try {
         if (ordersData && ordersData.length > 0 && userProfileId) {
-          const { data: existing } = await supabaseClient
-            .from('order_payments')
-            .select('id')
-            .eq('trx_id', trx)
-            .limit(1);
-          
+          const { data: existing } = await supabaseClient.from('order_payments').select('id').eq('trx_id', trx).limit(1);
           if (!existing || existing.length === 0) {
             const amountRefundable = normalizeTotal(finalTotal);
             const perOrderAmount = Math.ceil(amountRefundable / ordersData.length);
-            
             const orderPaymentRows = ordersData.map((o, i) => ({
-              user_id: userProfileId,
-              email: userEmail || gmail,
-              trx_id: trx,
-              order_index: i,
-              service_id: String(o.serviceId || ''),
-              service_name: o.serviceName || '',
-              target: o.target || '',
-              quantity: parseInt(o.jumlah) || 0,
-              amount: perOrderAmount,
-              status: 'paid'
+              user_id: userProfileId, email: userEmail || gmail, trx_id: trx, order_index: i,
+              service_id: String(o.serviceId || ''), service_name: o.serviceName || '',
+              target: o.target || '', quantity: parseInt(o.jumlah) || 0,
+              amount: perOrderAmount, status: 'paid'
             }));
-            
             await supabaseClient.from('order_payments').insert(orderPaymentRows);
           }
         }
-      } catch (trackErr) {
-        console.warn('⚠️ Gagal track order_payments QRIS:', trackErr.message);
-      }
+      } catch (trackErr) {}
       
       await saveAllOrdersDetailToDB('qris');
       
@@ -2101,16 +1802,11 @@ function checkTransactionLockLocal() {
 function saveTransactionLockLocal() {
   try {
     const confirmed = JSON.parse(localStorage.getItem('confirmed_transactions') || '[]');
-    if (!confirmed.includes(trx)) {
-      confirmed.push(trx);
-      localStorage.setItem('confirmed_transactions', JSON.stringify(confirmed));
-    }
+    if (!confirmed.includes(trx)) { confirmed.push(trx); localStorage.setItem('confirmed_transactions', JSON.stringify(confirmed)); }
   } catch(e) {}
 }
 
-function getUsedVouchers() {
-  try { return JSON.parse(localStorage.getItem('used_vouchers_' + trx) || '[]'); } catch { return []; }
-}
+function getUsedVouchers() { try { return JSON.parse(localStorage.getItem('used_vouchers_' + trx) || '[]'); } catch { return []; } }
 function markVoucherUsed(code) {
   try {
     const used = getUsedVouchers();
@@ -2210,92 +1906,46 @@ async function loadVoucher(){
 }
 
 document.getElementById('applyVoucher').onclick = async function() {
-  if (IS_GMAIL_BLOCKED) return;
-  
+  if (IS_GMAIL_BLOCKED || IS_URL_PARAMS_INVALID) return;
   const code = document.getElementById('voucherInput').value.trim().toUpperCase();
   if(!code) return Swal.fire("Isi kode voucher","","warning");
-  
-  if (isVoucherUsed(code)) {
-    return Swal.fire({
-      title: "❌ Voucher Sudah Dipakai",
-      text: `Kode voucher "${code}" sudah digunakan untuk transaksi ini.`,
-      icon: "error",
-      confirmButtonColor: "#22c55e"
-    });
-  }
-  
+  if (isVoucherUsed(code)) return Swal.fire({ title: "❌ Voucher Sudah Dipakai", text: `Kode voucher "${code}" sudah digunakan untuk transaksi ini.`, icon: "error", confirmButtonColor: "#22c55e" });
   const list = await loadVoucher();
-  if(!list || list.length === 0) {
-    return Swal.fire("Error", "Gagal memuat data voucher", "error");
-  }
-  
+  if(!list || list.length === 0) return Swal.fire("Error", "Gagal memuat data voucher", "error");
   const v = list.find(x => x.code && x.code.toUpperCase() === code);
   if(!v) return Swal.fire("❌ Voucher tidak valid","","error");
-  
   const minPurchase = v.min_purchase || 0;
-  if (originalTotal < minPurchase) {
-    return Swal.fire({
-      title: "❌ Minimal Pembelian",
-      text: `Minimal pembelian untuk voucher ini adalah Rp ${minPurchase.toLocaleString("id-ID")}`,
-      icon: "warning",
-      confirmButtonColor: "#22c55e"
-    });
-  }
-  
+  if (originalTotal < minPurchase) return Swal.fire({ title: "❌ Minimal Pembelian", text: `Minimal pembelian untuk voucher ini adalah Rp ${minPurchase.toLocaleString("id-ID")}`, icon: "warning", confirmButtonColor: "#22c55e" });
   let discount = 0;
-  if (v.type === "percent") {
-    discount = originalTotal * (v.value / 100);
-    if (v.max_discount) discount = Math.min(discount, v.max_discount);
-  } else if (v.type === "fixed") {
-    discount = v.value;
-  } else {
-    return Swal.fire("❌ Tipe voucher tidak valid","","error");
-  }
-  
+  if (v.type === "percent") { discount = originalTotal * (v.value / 100); if (v.max_discount) discount = Math.min(discount, v.max_discount); }
+  else if (v.type === "fixed") { discount = v.value; }
+  else return Swal.fire("❌ Tipe voucher tidak valid","","error");
   discount = Math.ceil(Math.max(0, discount));
   finalTotal = Math.max(normalizeTotal(originalTotal) - discount, 0);
-  appliedVoucher = v.code;
-  appliedDiscount = discount;
-  
+  appliedVoucher = v.code; appliedDiscount = discount;
   markVoucherUsed(v.code);
-  
   let discountText = `Rp ${discount.toLocaleString("id-ID")}`;
   if (v.type === "percent") discountText += ` (${v.value}% dari total)`;
-  
   document.getElementById('voucherStatus').innerHTML = `<span class="active">✅ Voucher ${v.code} berhasil! Diskon: ${discountText}</span>`;
   document.getElementById('voucherInput').disabled = true;
   document.getElementById('voucherInput').style.opacity = '0.4';
   this.disabled = true;
   this.style.opacity = '0.4';
-  
   updateDisplay();
-  
-  Swal.fire({
-    title: "✅ Berhasil!",
-    html: `Voucher <b>${v.code}</b> berhasil digunakan!<br>Diskon: <b>${discountText}</b>`,
-    icon: "success",
-    confirmButtonColor: "#22c55e"
-  });
+  Swal.fire({ title: "✅ Berhasil!", html: `Voucher <b>${v.code}</b> berhasil digunakan!<br>Diskon: <b>${discountText}</b>`, icon: "success", confirmButtonColor: "#22c55e" });
 };
 
 document.getElementById('confirmBtn').onclick = function() {
-  if (IS_GMAIL_BLOCKED) return;
-  
+  if (IS_GMAIL_BLOCKED || IS_URL_PARAMS_INVALID) return;
   if (paymentMethod === 'saldo') {
-    Swal.fire({
-      title: '💰 Metode Saldo',
-      text: 'Klik tombol "Bayar dengan Saldo" di atas untuk melanjutkan.',
-      icon: 'info',
-      confirmButtonColor: '#facc15'
-    });
+    Swal.fire({ title: '💰 Metode Saldo', text: 'Klik tombol "Bayar dengan Saldo" di atas untuk melanjutkan.', icon: 'info', confirmButtonColor: '#facc15' });
     return;
   }
   checkPaymentStatus();
 };
 
 document.getElementById('regenerateBtn').onclick = function() {
-  if (IS_GMAIL_BLOCKED) return;
-  
+  if (IS_GMAIL_BLOCKED || IS_URL_PARAMS_INVALID) return;
   Swal.fire({
     title: '🔄 Generate Ulang QRIS?',
     html: `<div style="text-align:left;color:#ddd;font-size:14px;">
@@ -2304,106 +1954,66 @@ document.getElementById('regenerateBtn').onclick = function() {
         <li>🔑 Kode unik <b>BARU</b></li>
         <li>⏳ QRIS berlaku <b>${QRIS_EXPIRY_MINUTES} menit</b> lagi</li>
       </ul>
-    </div>`,
-    icon: 'warning',
-    showCancelButton: true,
-    confirmButtonText: '✅ Ya, Generate Ulang',
-    cancelButtonText: '❌ Batal',
-    confirmButtonColor: '#f59e0b',
-    cancelButtonColor: '#666'
+    </div>`, icon: 'warning', showCancelButton: true,
+    confirmButtonText: '✅ Ya, Generate Ulang', cancelButtonText: '❌ Batal',
+    confirmButtonColor: '#f59e0b', cancelButtonColor: '#666'
   }).then((result) => { if (result.isConfirmed) regenerateQris(); });
 };
 
 async function showRefundHistory() {
   if (IS_GMAIL_BLOCKED) return;
-  
   if (!supabaseClient || !userProfileId) {
-    Swal.fire({ 
-      title: '⚠️ Harus Login', 
-      text: 'Login dulu untuk lihat refund.', 
-      icon: 'warning', 
-      confirmButtonColor: '#facc15',
-      background: '#0a0e1a', color: '#fff'
-    });
+    Swal.fire({ title: '⚠️ Harus Login', text: 'Login dulu untuk lihat refund.', icon: 'warning', confirmButtonColor: '#facc15', background: '#0a0e1a', color: '#fff' });
     return;
   }
-  
   try {
-    const { data, error } = await supabaseClient
-      .from('refunds')
-      .select('*')
-      .eq('user_id', userProfileId)
-      .order('created_at', { ascending: false })
-      .limit(50);
-    
+    const { data, error } = await supabaseClient.from('refunds').select('*').eq('user_id', userProfileId).order('created_at', { ascending: false }).limit(50);
     if (error) throw error;
-    
     if (!data || data.length === 0) {
-      Swal.fire({ 
-        title: '💰 Riwayat Refund', 
-        html: '<p style="color:#94a3b8;font-size:14px;">Belum ada refund.</p>', 
-        icon: 'info', 
-        confirmButtonColor: '#facc15',
-        background: '#0a0e1a', color: '#fff'
-      });
+      Swal.fire({ title: '💰 Riwayat Refund', html: '<p style="color:#94a3b8;font-size:14px;">Belum ada refund.</p>', icon: 'info', confirmButtonColor: '#facc15', background: '#0a0e1a', color: '#fff' });
       return;
     }
-    
     const totalRefund = data.filter(r => r.status === 'success').reduce((s, r) => s + parseFloat(r.amount || 0), 0);
-    
     let listHtml = '';
     data.forEach(r => {
       const statusColor = r.status === 'success' ? '#22c55e' : (r.status === 'pending' ? '#facc15' : '#ef4444');
       const statusIcon = r.status === 'success' ? '✅' : (r.status === 'pending' ? '⏳' : '❌');
       const sourceLabel = r.source_method === 'qris' ? '📱 QRIS' : '💰 Saldo';
-      listHtml += `
-        <div style="background:rgba(255,255,255,0.04);padding:10px 12px;border-radius:10px;margin-bottom:8px;text-align:left;border-left:3px solid ${statusColor};">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-            <span style="color:${statusColor};font-weight:800;font-size:13px;">${statusIcon} Rp ${parseFloat(r.amount).toLocaleString('id-ID')}</span>
-            <span style="color:#94a3b8;font-size:10px;">${new Date(r.created_at).toLocaleDateString('id-ID')}</span>
-          </div>
-          <div style="color:#00c6ff;font-size:10px;font-weight:600;margin-bottom:4px;">${sourceLabel} · ${r.status.toUpperCase()}</div>
-          <div style="color:#ddd;font-size:11px;">${r.reason || '-'}</div>
-          <div style="color:#6b7280;font-size:10px;margin-top:2px;font-family:monospace;">${r.trx_id}</div>
+      listHtml += `<div style="background:rgba(255,255,255,0.04);padding:10px 12px;border-radius:10px;margin-bottom:8px;text-align:left;border-left:3px solid ${statusColor};">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+          <span style="color:${statusColor};font-weight:800;font-size:13px;">${statusIcon} Rp ${parseFloat(r.amount).toLocaleString('id-ID')}</span>
+          <span style="color:#94a3b8;font-size:10px;">${new Date(r.created_at).toLocaleDateString('id-ID')}</span>
         </div>
-      `;
+        <div style="color:#00c6ff;font-size:10px;font-weight:600;margin-bottom:4px;">${sourceLabel} · ${r.status.toUpperCase()}</div>
+        <div style="color:#ddd;font-size:11px;">${r.reason || '-'}</div>
+        <div style="color:#6b7280;font-size:10px;margin-top:2px;font-family:monospace;">${r.trx_id}</div>
+      </div>`;
     });
-    
     Swal.fire({
       title: '💰 Riwayat Refund',
-      html: `
-        <div style="text-align:left;max-height:400px;overflow-y:auto;">
-          <div style="background:linear-gradient(135deg,rgba(34,197,94,0.15),rgba(34,197,94,0.05));padding:12px;border-radius:10px;margin-bottom:12px;text-align:center;">
-            <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;">Total Refund Diterima</div>
-            <div style="font-size:22px;font-weight:900;color:#22c55e;margin-top:4px;">Rp ${totalRefund.toLocaleString('id-ID')}</div>
-          </div>
-          ${listHtml}
+      html: `<div style="text-align:left;max-height:400px;overflow-y:auto;">
+        <div style="background:linear-gradient(135deg,rgba(34,197,94,0.15),rgba(34,197,94,0.05));padding:12px;border-radius:10px;margin-bottom:12px;text-align:center;">
+          <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;">Total Refund Diterima</div>
+          <div style="font-size:22px;font-weight:900;color:#22c55e;margin-top:4px;">Rp ${totalRefund.toLocaleString('id-ID')}</div>
         </div>
-      `,
-      icon: 'info',
-      confirmButtonColor: '#facc15',
-      background: '#0a0e1a', color: '#fff',
-      width: 500
+        ${listHtml}
+      </div>`, icon: 'info', confirmButtonColor: '#facc15', background: '#0a0e1a', color: '#fff', width: 500
     });
-    
   } catch (err) {
-    Swal.fire({ 
-      title: '❌ Gagal', 
-      text: err.message, 
-      icon: 'error', 
-      confirmButtonColor: '#ef4444',
-      background: '#0a0e1a', color: '#fff'
-    });
+    Swal.fire({ title: '❌ Gagal', text: err.message, icon: 'error', confirmButtonColor: '#ef4444', background: '#0a0e1a', color: '#fff' });
   }
 }
 
 window.showRefundHistory = showRefundHistory;
 
 (async function() {
+  // 🆕 CEK URL PARAMS DULU → block + redirect kalau kosong
+  const paramsValid = await checkUrlParamsAndAutoRefund();
+  if (!paramsValid) return;
+  
   await fetchConfigFromEnv();
   configLoaded = true;
   
-  // 🚨 CEK GMAIL NULL DULU — kalau null, pop up muncul + block + redirect
   const gmailValid = checkGmailAndRedirect();
   if (!gmailValid) return;
   
@@ -2413,18 +2023,13 @@ window.showRefundHistory = showRefundHistory;
   await loadUserBalance();
   
   const gmailNow = getStoredGmail();
-  if (!gmailNow || !validateEmail(gmailNow)) {
-    checkGmailAndRedirect();
-    return;
-  }
+  if (!gmailNow || !validateEmail(gmailNow)) { checkGmailAndRedirect(); return; }
   
   const savedState = getPaymentState();
   if (savedState && savedState.verified === true && savedState.verifiedAt) {
     const diffMinutes = (Date.now() - new Date(savedState.verifiedAt).getTime()) / 1000 / 60;
     if (diffMinutes < 60) {
-      isPaymentVerified = true;
-      transactionLocked = true;
-      
+      isPaymentVerified = true; transactionLocked = true;
       if (savedState.method === 'balance') {
         paymentMethod = 'balance';
         document.getElementById('btnMethodQris').classList.remove('active', 'qris');
@@ -2437,11 +2042,9 @@ window.showRefundHistory = showRefundHistory;
         document.getElementById('confirmBtn').disabled = true;
         document.getElementById('confirmBtn').textContent = '✅ Pembayaran Terverifikasi';
       }
-      
       document.getElementById('paymentStatus').className = 'payment-status success';
       document.getElementById('paymentStatus').textContent = '✅ Pembayaran sudah terverifikasi!';
       document.getElementById('paymentStatus').style.display = 'block';
-      
       if (savedState.orderSent === false && ordersData.length > 0) {
         await sendMassOrdersToFayupedia();
         savedState.orderSent = true;
@@ -2449,14 +2052,11 @@ window.showRefundHistory = showRefundHistory;
       }
       displayStoredOrderIds();
       return;
-    } else {
-      clearPaymentState();
-    }
+    } else { clearPaymentState(); }
   }
   
   if (checkTransactionLockLocal()) {
-    transactionLocked = true;
-    isPaymentVerified = true;
+    transactionLocked = true; isPaymentVerified = true;
     document.getElementById('confirmBtn').disabled = true;
     document.getElementById('confirmBtn').textContent = '✅ Transaksi Sudah Dikonfirmasi';
     document.getElementById('paymentStatus').className = 'payment-status success';
@@ -2494,17 +2094,6 @@ window.showRefundHistory = showRefundHistory;
   });
 })();
 
-function ambilReferral() {
-  const savedRef = localStorage.getItem('referral_code');
-  const statusElement = document.getElementById('status-ref');
-  if (statusElement) {
-    if (savedRef) statusElement.innerHTML = `Terdeteksi! Kode referral: <strong>${savedRef}</strong>`;
-    else statusElement.innerHTML = `Tidak ada kode referral tersimpan.`;
-  }
-  return savedRef;
-}
-ambilReferral();
-
 document.addEventListener("keydown", function(e){
   if(e.key === "F12") e.preventDefault();
   if(e.ctrlKey && e.shiftKey && ["I","J"].includes(e.key)) e.preventDefault();
@@ -2513,9 +2102,9 @@ document.addEventListener("keydown", function(e){
 
 console.log(`💳 Payment ${SOSMED_TYPE} ready!`);
 console.log(`📦 Orders: ${ordersData.length} items`);
-console.log(`💾 Auto-save to orders_detail: enabled`);
-console.log(`🆔 OrderID dari provider → kolom: provider_order_id`);
-console.log(`🚨 Gmail null → BLOCK ALL + redirect ke ${HOME_URL}`);
+console.log(`💰 Mutasi purchase reference: ORDER ID PROVIDER`);
+console.log(`🔄 Auto-refund on provider failure: enabled`);
+console.log(`🚨 Auto-refund on URL params invalid: enabled`);
 </script>
 </body>
 </html>
