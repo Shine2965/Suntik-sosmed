@@ -1325,36 +1325,57 @@ function mapProviderStatusToLocal(providerStatus) {
   return 'pending';
 }
 
+// 🔥 Extract status data - FIXED: sosmed-2 HANYA pakai order_status, BUKAN "status": true
 function extractStatusData(sosmedType, data, orderId) {
   if (!data) return null;
   let status = null, startCount = 0, remains = 0;
+  
   if (sosmedType === 'sosmed-1') {
     const payload = data.data || data;
-    status = payload.status || payload.order_status || data.status;
+    // Untuk sosmed-1, prioritaskan order_status, fallback ke status string
+    const rawStatus = payload.order_status || payload.status;
+    if (rawStatus !== undefined && rawStatus !== null && typeof rawStatus === 'string' && rawStatus.trim() !== '') {
+      status = rawStatus;
+    }
     startCount = parseInt(payload.start_count || payload.startCount || 0);
     remains = parseInt(payload.remains || payload.remains_count || 0);
   } else if (sosmedType === 'sosmed-2') {
+    // 🔥 FIX: sosmed-2 HANYA pakai order_status, JANGAN pakai status
     if (data.results && Array.isArray(data.results) && data.results.length > 0) {
       const found = data.results.find(r => String(r.id) === String(orderId)) || data.results[0];
-      status = found.status;
+      // Hanya ambil order_status, bukan status
+      if (found.order_status !== undefined && found.order_status !== null && typeof found.order_status === 'string' && found.order_status.trim() !== '') {
+        status = found.order_status;
+      }
       startCount = parseInt(found.start_count || 0);
       remains = parseInt(found.remains || 0);
     } else if (data.data) {
       const payload = Array.isArray(data.data) ? data.data[0] : data.data;
-      status = payload.status || payload.order_status;
+      // Hanya ambil order_status
+      if (payload.order_status !== undefined && payload.order_status !== null && typeof payload.order_status === 'string' && payload.order_status.trim() !== '') {
+        status = payload.order_status;
+      }
       startCount = parseInt(payload.start_count || 0);
       remains = parseInt(payload.remains || 0);
     } else {
-      status = data.status || data.order_status;
+      // Hanya ambil order_status dari root data
+      if (data.order_status !== undefined && data.order_status !== null && typeof data.order_status === 'string' && data.order_status.trim() !== '') {
+        status = data.order_status;
+      }
       startCount = parseInt(data.start_count || 0);
       remains = parseInt(data.remains || 0);
     }
+    // JANGAN pakai data.status - itu bisa "true" yang artinya cuma sukses API call, bukan status order
   } else if (sosmedType === 'sosmed-4') {
     const payload = data.data || data;
-    status = payload.status || payload.order_status || data.status;
+    const rawStatus = payload.order_status || payload.status;
+    if (rawStatus !== undefined && rawStatus !== null && typeof rawStatus === 'string' && rawStatus.trim() !== '') {
+      status = rawStatus;
+    }
     startCount = parseInt(payload.start_count || payload.startCount || 0);
     remains = parseInt(payload.remains || payload.remains_count || 0);
   }
+  
   if (!status) return null;
   return { status, startCount, remains };
 }
@@ -1549,6 +1570,105 @@ function copyOrderId(orderId) {
   });
 }
 
+// 🔥 AUTO REFUND FUNCTION untuk order partial/canceled
+async function processAutoRefund(order, newStatus) {
+  if (!supabaseClient || !order) return false;
+  try {
+    // Cek apakah order sudah pernah di-refund
+    const { data: existingRefund } = await supabaseClient
+      .from('refunds')
+      .select('id, status')
+      .eq('trx_id', order.order_id || order.id)
+      .limit(1);
+    
+    if (existingRefund && existingRefund.length > 0) {
+      console.log(`⏭️ Refund sudah ada untuk order ${order.order_id || order.id}`);
+      return false;
+    }
+    
+    // Hitung jumlah refund berdasarkan data order
+    const totalPayment = parseFloat(order.total_payment || 0);
+    const quantity = parseInt(order.quantity || 0);
+    const remains = parseInt(order.remains || 0);
+    const startCount = parseInt(order.start_count || 0);
+    
+    let refundAmount = 0;
+    let refundReason = '';
+    
+    if (newStatus === 'canceled') {
+      // Canceled = refund FULL
+      refundAmount = totalPayment;
+      refundReason = `Order ${order.order_id || '-'} DIBATALKAN oleh provider. Refund penuh Rp ${totalPayment.toLocaleString('id-ID')}.`;
+    } else if (newStatus === 'partial') {
+      // Partial = refund sesuai sisa yang tidak terpenuhi
+      // Hitung berdasarkan remains vs quantity
+      if (quantity > 0 && remains > 0) {
+        // Refund proporsional: (remains / quantity) * total_payment
+        refundAmount = Math.floor((remains / quantity) * totalPayment);
+        refundReason = `Order ${order.order_id || '-'} PARTIAL. Sisa ${remains} dari ${quantity} tidak terpenuhi. Refund proporsional Rp ${refundAmount.toLocaleString('id-ID')} (${Math.round((remains/quantity)*100)}%).`;
+      } else if (quantity > 0 && startCount < quantity) {
+        // Fallback: refund berdasarkan start_count
+        const done = startCount;
+        const notDone = quantity - done;
+        refundAmount = Math.floor((notDone / quantity) * totalPayment);
+        refundReason = `Order ${order.order_id || '-'} PARTIAL. Hanya ${done} dari ${quantity} terpenuhi. Refund proporsional Rp ${refundAmount.toLocaleString('id-ID')}.`;
+      } else {
+        // Fallback: refund 50% jika data tidak jelas
+        refundAmount = Math.floor(totalPayment * 0.5);
+        refundReason = `Order ${order.order_id || '-'} PARTIAL. Data tidak lengkap, refund 50% Rp ${refundAmount.toLocaleString('id-ID')}.`;
+      }
+    } else {
+      return false;
+    }
+    
+    if (refundAmount <= 0) {
+      console.log(`⏭️ Refund amount 0, skip`);
+      return false;
+    }
+    
+    // Insert ke tabel refunds dengan status 'pending' untuk di-approve admin
+    const { data: refundData, error: refundError } = await supabaseClient
+      .from('refunds')
+      .insert({
+        user_id: order.user_id,
+        email: order.email,
+        trx_id: order.order_id || order.id,
+        amount: refundAmount,
+        reason: refundReason,
+        source_method: 'saldo',
+        status: 'pending',
+        created_at: new Date().toISOString()
+      })
+      .select()
+      .single();
+    
+    if (refundError) {
+      console.error('❌ Gagal insert refund:', refundError);
+      return false;
+    }
+    
+    console.log(`💰 Refund pending created: Rp ${refundAmount.toLocaleString('id-ID')} untuk ${order.email}`);
+    
+    // Notif ke admin
+    const Toast = Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 5000, timerProgressBar: true, background: '#1a0e2e', color: '#fff' });
+    Toast.fire({
+      icon: 'info',
+      title: `💰 Refund pending: Rp ${refundAmount.toLocaleString('id-ID')}`,
+      text: `${newStatus.toUpperCase()} - ${order.email}`
+    });
+    
+    // Refresh refund pending jika admin
+    if (isAdminOrOwner) {
+      setTimeout(() => loadPendingRefunds(), 500);
+    }
+    
+    return true;
+  } catch (err) {
+    console.error('❌ Auto refund error:', err);
+    return false;
+  }
+}
+
 async function saveOrderStatusToSupabase(orderId, newStatus, startCount, remains) {
   if (!supabaseClient) return false;
   try {
@@ -1586,12 +1706,26 @@ async function checkSingleOrderStatus(orderId) {
         allOrdersCache[idx].remains = result.remains;
       }
       renderOrderList(allOrdersCache);
-      if (oldStatus !== newStatus) {
+      
+      // 🔥 AUTO REFUND untuk partial/canceled
+      if ((newStatus === 'partial' || newStatus === 'canceled') && oldStatus !== newStatus) {
+        const refunded = await processAutoRefund(order, newStatus);
+        if (refunded) {
+          Swal.fire({
+            title: newStatus === 'canceled' ? '🚫 Dibatalkan & Refund' : '⚠️ Partial & Refund',
+            html: `<div style="text-align:left;font-size:13px;color:#ddd;line-height:1.7;">
+              <p><b>Status:</b> ${escapeHtml(result.status)}</p>
+              <p><b>OrderID:</b> ${escapeHtml(order.order_id)}</p>
+              <p style="margin-top:8px;color:#facc15;font-weight:800;">💰 Refund pending dibuat, tunggu approval admin</p>
+            </div>`,
+            icon: 'warning', timer: 4000, showConfirmButton: false, background: '#1a0e2e', color: '#fff'
+          });
+        }
+      } else if (oldStatus !== newStatus) {
         let title = '🔄 Status Diperbarui';
         let icon = 'info';
         if (newStatus === 'success' || newStatus === 'completed') { title = '✅ Pesanan Selesai!'; icon = 'success'; }
         else if (newStatus === 'failed') { title = '❌ Pesanan Gagal!'; icon = 'error'; }
-        else if (newStatus === 'canceled') { title = '🚫 Pesanan Dibatalkan'; icon = 'warning'; }
         Swal.fire({
           title,
           html: `<div style="text-align:left;font-size:13px;color:#ddd;line-height:1.7;">
@@ -1643,6 +1777,11 @@ async function syncAllOrdersStatusesSilent() {
         if (oldStatus !== newStatus || order.start_count !== result.startCount || order.remains !== result.remains) {
           await saveOrderStatusToSupabase(order.id, newStatus, result.startCount, result.remains);
           changedCount++;
+          
+          // 🔥 AUTO REFUND untuk partial/canceled
+          if ((newStatus === 'partial' || newStatus === 'canceled') && oldStatus !== newStatus) {
+            await processAutoRefund(order, newStatus);
+          }
         }
       }
     } catch (err) { console.warn(`⚠️ Auto-sync ${order.id}:`, err.message); }
@@ -1677,7 +1816,7 @@ async function syncAllOrdersStatuses() {
   const banner = document.getElementById('syncBanner');
   const syncCountEl = document.getElementById('syncCount');
   if (banner) { banner.classList.add('show'); if (syncCountEl) syncCountEl.textContent = `0/${pendingOrders.length}`; }
-  let changedCount = 0, successCount = 0, errorCount = 0;
+  let changedCount = 0, successCount = 0, errorCount = 0, refundCount = 0;
   for (let i = 0; i < pendingOrders.length; i++) {
     const order = pendingOrders[i];
     try {
@@ -1694,7 +1833,14 @@ async function syncAllOrdersStatuses() {
         }
         if (oldStatus !== newStatus || order.start_count !== result.startCount || order.remains !== result.remains) {
           const saveResult = await saveOrderStatusToSupabase(order.id, newStatus, result.startCount, result.remains);
-          if (saveResult.success) { changedCount++; successCount++; } else errorCount++;
+          if (saveResult.success) {
+            changedCount++; successCount++;
+            // 🔥 AUTO REFUND
+            if ((newStatus === 'partial' || newStatus === 'canceled') && oldStatus !== newStatus) {
+              const refunded = await processAutoRefund(order, newStatus);
+              if (refunded) refundCount++;
+            }
+          } else errorCount++;
         } else successCount++;
       } else errorCount++;
     } catch (err) { errorCount++; }
@@ -1711,6 +1857,7 @@ async function syncAllOrdersStatuses() {
         <p><b>📊 Total dicek:</b> ${pendingOrders.length} pesanan</p>
       </div>
       ${changedCount > 0 ? `<div style="background:rgba(34,197,94,0.1);padding:10px 12px;border-radius:8px;margin-bottom:10px;border-left:3px solid #22c55e;"><p><b style="color:#22c55e;">✅ Berubah:</b> ${changedCount} pesanan</p></div>` : ''}
+      ${refundCount > 0 ? `<div style="background:rgba(250,204,21,0.1);padding:10px 12px;border-radius:8px;margin-bottom:10px;border-left:3px solid #facc15;"><p><b style="color:#facc15;">💰 Refund pending:</b> ${refundCount} pesanan</p></div>` : ''}
       ${errorCount > 0 ? `<div style="background:rgba(239,68,68,0.1);padding:10px 12px;border-radius:8px;margin-bottom:10px;border-left:3px solid #ef4444;"><p><b style="color:#ef4444;">⚠️ Gagal:</b> ${errorCount}</p></div>` : ''}
       <p style="font-size:11px;color:#94a3b8;text-align:center;margin-top:8px;">🕐 ${new Date().toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta' })} WIB</p>
     </div>`,
@@ -2395,7 +2542,6 @@ async function sendBroadcast() {
   }
 }
 
-// 🔥 BROADCAST LISTENER — Pop-up di halaman selama 5 detik
 async function initBroadcastListener() {
   if (!supabaseClient || !currentUser) return;
   if (broadcastListenerChannel) { try { broadcastListenerChannel.unsubscribe(); } catch(e) {} broadcastListenerChannel = null; }
@@ -2416,7 +2562,6 @@ async function initBroadcastListener() {
     .subscribe((status) => {
       if (['CHANNEL_ERROR','TIMED_OUT','CLOSED'].includes(status)) setTimeout(initBroadcastListener, 3000);
     });
-  // Cek juga saat login: broadcast baru yang belum dilihat
   setTimeout(() => checkNewBroadcastsOnLoad(), 2000);
 }
 
@@ -2437,12 +2582,11 @@ async function checkNewBroadcastsOnLoad() {
       if (b.target_role !== 'all' && b.target_role !== myRole) continue;
       if (b.created_by === currentUser.id) continue;
       if (seenBroadcastIds.has(b.id)) continue;
-      // Cek localStorage — jangan tampil lagi kalau sudah pernah lihat
       const seenKey = 'seen_broadcast_' + b.id;
       if (localStorage.getItem(seenKey) === '1') { seenBroadcastIds.add(b.id); continue; }
       seenBroadcastIds.add(b.id);
       showBroadcastPopup(b);
-      break; // Cuma tampil 1 popup sekaligus
+      break;
     }
   } catch (e) {}
 }
@@ -2673,7 +2817,6 @@ function toggleMemberSelection(userId) {
   if (selectedMembersForBulk.has(userId)) selectedMembersForBulk.delete(userId);
   else selectedMembersForBulk.add(userId);
   updateBulkActionBar();
-  // Update UI checkbox
   const item = document.querySelector(`.member-item[data-user-id="${userId}"]`);
   if (item) {
     item.classList.toggle('selected', selectedMembersForBulk.has(userId));
@@ -2710,7 +2853,6 @@ async function bulkBalanceAction(action) {
   const actionIcon = action === 'add' ? '➕' : '➖';
   const actionColor = action === 'add' ? '#22c55e' : '#ef4444';
   const selectedUsers = allMembersCache.filter(m => selectedMembersForBulk.has(m.id));
-  const emailList = selectedUsers.map(u => u.email).join(', ');
   const { value: inputValue } = await Swal.fire({
     title: `${actionIcon} ${actionLabel} Saldo Massal`,
     html: `
@@ -2838,6 +2980,18 @@ async function renderMemberItems(data, listEl) {
     html += `<div class="member-item ${m.banned ? 'banned' : ''} ${muted ? 'muted' : ''} ${isSelected ? 'selected' : ''}" data-user-id="${m.id}">${showCheckbox ? `<div class="bulk-checkbox ${isSelected ? 'checked' : ''}" onclick="toggleMemberSelection('${m.id}')"></div>` : '<div style="width:18px;flex-shrink:0;"></div>'}<div class="member-avatar ${avatarClass}">${initial}${presenceDot}</div><div class="member-info"><div class="member-email">${emailDisplay} ${roleTag} ${ownerUtamaTag} ${bannedTag} ${mutedTag}<span class="presence-badge-container">${presenceBadge}</span></div><div class="member-meta">💰 <span class="${isMinusBalance ? 'minus-balance' : ''}">${balanceDisplay}</span>${bannedCountdownHtml}</div></div><div class="member-actions">${actions}</div></div>`;
   });
   listEl.innerHTML = html;
+}
+
+// 🔥 FIX: renderMemberList sekarang didefinisikan
+function renderMemberList(data) {
+  const listEl = document.getElementById('memberList');
+  if (!listEl) return;
+  if (!data || data.length === 0) {
+    listEl.innerHTML = '<div class="member-no-result"><span class="icon">🔍</span>Tidak ada member yang cocok</div>';
+    return;
+  }
+  // Panggil async renderMemberItems
+  renderMemberItems(data, listEl);
 }
 
 async function loadMemberList() {
