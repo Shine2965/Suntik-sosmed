@@ -309,7 +309,6 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
 .broadcast-history .bh-delete:hover{background:rgba(255,68,68,0.4);transform:scale(1.1)}
 .broadcast-empty{text-align:center;padding:20px;font-size:11px;color:#94a3b8;font-style:italic}
 .broadcast-empty .icon{font-size:28px;display:block;margin-bottom:6px;opacity:0.5}
-/* ============ BROADCAST POPUP (in-page, 5 detik) ============ */
 .broadcast-popup-overlay{position:fixed;inset:0;z-index:10001;background:rgba(10,0,20,0.85);backdrop-filter:blur(12px);display:none;align-items:center;justify-content:center;padding:20px}
 .broadcast-popup-overlay.show{display:flex;animation:pageFade 0.3s ease both}
 .broadcast-popup{max-width:420px;width:100%;background:linear-gradient(135deg,rgba(255,255,255,0.1),rgba(255,107,157,0.05));border:2px solid rgba(255,107,157,0.5);border-radius:20px;padding:24px 20px;text-align:center;box-shadow:0 30px 80px rgba(0,0,0,0.7),0 0 60px rgba(255,107,157,0.3);position:relative;overflow:hidden;animation:broadcastPopIn 0.5s cubic-bezier(0.34,1.56,0.64,1) both}
@@ -352,7 +351,6 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
 .refund-card .refund-btn.reject:hover:not(:disabled){background:rgba(239,68,68,0.3)}
 .refund-card .refund-btn:disabled{opacity:0.5;cursor:not-allowed;transform:none !important}
 .refund-empty{text-align:center;padding:20px;font-size:12px;color:#94a3b8;font-style:italic;background:rgba(255,255,255,0.02);border-radius:12px;border:1px dashed rgba(255,255,255,0.1)}
-/* ============ BOTTOM NAV dengan teks label ============ */
 .bottom-nav{display:flex;background:rgba(20,10,40,0.98);backdrop-filter:blur(20px);border-top:1px solid rgba(255,255,255,0.08);padding:8px 8px calc(8px + env(safe-area-inset-bottom, 0px));flex-shrink:0;position:relative}
 .bottom-nav::before{content:'';position:absolute;top:-1px;left:15%;right:15%;height:1px;background:linear-gradient(90deg,transparent,#ff6b9d,#ffb3d9,#ff6b9d,transparent)}
 .nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:10px 6px;border-radius:14px;background:transparent;border:none;color:#6b4a7a;font-family:'Quicksand',sans-serif;font-size:10px;font-weight:700;cursor:pointer;transition:all 0.3s ease;position:relative}
@@ -1300,15 +1298,13 @@ const SOSMED_TYPE_MAP = {
   'sosmed-4': { label: 'Sosmed-4', endpoint: '/api/juragan', method: 'POST' }
 };
 
-// 🔥 Mapping status provider → status lokal (termasuk Canceled & Failed)
+// 🔥 Mapping status provider → status lokal
 function mapProviderStatusToLocal(providerStatus) {
   if (!providerStatus) return 'pending';
   const s = String(providerStatus).toLowerCase().trim();
-  // Canceled / Cancelled / Batal
   if (s.includes('canceled') || s.includes('cancelled') || s.includes('cancel') || s.includes('batal')) {
     return 'canceled';
   }
-  // Failed / Fail / Error / Gagal
   if (s.includes('fail') || s.includes('error') || s.includes('gagal') || s === 'denied') {
     return 'failed';
   }
@@ -1325,57 +1321,69 @@ function mapProviderStatusToLocal(providerStatus) {
   return 'pending';
 }
 
-// 🔥 Extract status data - FIXED: sosmed-2 HANYA pakai order_status, BUKAN "status": true
+// 🔥 FIX: Extract status data — sosmed-2 baca dari data.results[] (proxy Vercel)
+// Prioritas: order_status → status (string only, bukan boolean)
 function extractStatusData(sosmedType, data, orderId) {
   if (!data) return null;
   let status = null, startCount = 0, remains = 0;
-  
+
   if (sosmedType === 'sosmed-1') {
     const payload = data.data || data;
-    // Untuk sosmed-1, prioritaskan order_status, fallback ke status string
     const rawStatus = payload.order_status || payload.status;
     if (rawStatus !== undefined && rawStatus !== null && typeof rawStatus === 'string' && rawStatus.trim() !== '') {
       status = rawStatus;
     }
-    startCount = parseInt(payload.start_count || payload.startCount || 0);
-    remains = parseInt(payload.remains || payload.remains_count || 0);
+    startCount = parseInt(payload.start_count || payload.startCount || 0) || 0;
+    remains = parseInt(payload.remains || payload.remains_count || 0) || 0;
   } else if (sosmedType === 'sosmed-2') {
-    // 🔥 FIX: sosmed-2 HANYA pakai order_status, JANGAN pakai status
+    // Proxy /api/fayupedia-services return:
+    //   Sukses: { status: true, msg: "OK", count: 1, results: [{ id, status, start_count, remains, ... }] }
+    //   Gagal : { status: false, msg: "..." }
+    // Provider asli Fayupedia return:
+    //   { status: true, msg: "...", order_id, order_status, start_count, remains }
+    // PENTING: JANGAN pakai `data.status` (boolean) sebagai status order!
+    let item = null;
     if (data.results && Array.isArray(data.results) && data.results.length > 0) {
-      const found = data.results.find(r => String(r.id) === String(orderId)) || data.results[0];
-      // Hanya ambil order_status, bukan status
-      if (found.order_status !== undefined && found.order_status !== null && typeof found.order_status === 'string' && found.order_status.trim() !== '') {
-        status = found.order_status;
-      }
-      startCount = parseInt(found.start_count || 0);
-      remains = parseInt(found.remains || 0);
+      item = data.results.find(r => String(r.id) === String(orderId)) || data.results[0];
     } else if (data.data) {
-      const payload = Array.isArray(data.data) ? data.data[0] : data.data;
-      // Hanya ambil order_status
-      if (payload.order_status !== undefined && payload.order_status !== null && typeof payload.order_status === 'string' && payload.order_status.trim() !== '') {
-        status = payload.order_status;
-      }
-      startCount = parseInt(payload.start_count || 0);
-      remains = parseInt(payload.remains || 0);
-    } else {
-      // Hanya ambil order_status dari root data
-      if (data.order_status !== undefined && data.order_status !== null && typeof data.order_status === 'string' && data.order_status.trim() !== '') {
-        status = data.order_status;
-      }
-      startCount = parseInt(data.start_count || 0);
-      remains = parseInt(data.remains || 0);
+      item = Array.isArray(data.data) ? data.data[0] : data.data;
+    } else if (data.order_status || (typeof data.status === 'string' && data.status.trim() !== '')) {
+      item = data;
     }
-    // JANGAN pakai data.status - itu bisa "true" yang artinya cuma sukses API call, bukan status order
+
+    if (item) {
+      // Prioritas 1: order_status (dari provider asli)
+      if (item.order_status !== undefined && item.order_status !== null && typeof item.order_status === 'string' && item.order_status.trim() !== '') {
+        status = item.order_status;
+      }
+      // Prioritas 2: status string (hasil normalizeStatusItem di proxy)
+      else if (item.status !== undefined && item.status !== null && typeof item.status === 'string' && item.status.trim() !== '') {
+        status = item.status;
+      }
+      startCount = parseInt(item.start_count || item.startCount || 0) || 0;
+      remains = parseInt(item.remains || item.remains_count || item.remaining || 0) || 0;
+    }
+
+    // Fallback root level
+    if (!status) {
+      if (data.order_status && typeof data.order_status === 'string' && data.order_status.trim() !== '') {
+        status = data.order_status;
+      } else if (data.status && typeof data.status === 'string' && data.status.trim() !== '') {
+        status = data.status;
+      }
+      if (!startCount) startCount = parseInt(data.start_count || data.startCount || 0) || 0;
+      if (!remains) remains = parseInt(data.remains || data.remains_count || 0) || 0;
+    }
   } else if (sosmedType === 'sosmed-4') {
     const payload = data.data || data;
     const rawStatus = payload.order_status || payload.status;
     if (rawStatus !== undefined && rawStatus !== null && typeof rawStatus === 'string' && rawStatus.trim() !== '') {
       status = rawStatus;
     }
-    startCount = parseInt(payload.start_count || payload.startCount || 0);
-    remains = parseInt(payload.remains || payload.remains_count || 0);
+    startCount = parseInt(payload.start_count || payload.startCount || 0) || 0;
+    remains = parseInt(payload.remains || payload.remains_count || 0) || 0;
   }
-  
+
   if (!status) return null;
   return { status, startCount, remains };
 }
@@ -1574,7 +1582,6 @@ function copyOrderId(orderId) {
 async function processAutoRefund(order, newStatus) {
   if (!supabaseClient || !order) return false;
   try {
-    // Cek apakah order sudah pernah di-refund
     const { data: existingRefund } = await supabaseClient
       .from('refunds')
       .select('id, status')
@@ -1586,7 +1593,6 @@ async function processAutoRefund(order, newStatus) {
       return false;
     }
     
-    // Hitung jumlah refund berdasarkan data order
     const totalPayment = parseFloat(order.total_payment || 0);
     const quantity = parseInt(order.quantity || 0);
     const remains = parseInt(order.remains || 0);
@@ -1596,24 +1602,18 @@ async function processAutoRefund(order, newStatus) {
     let refundReason = '';
     
     if (newStatus === 'canceled') {
-      // Canceled = refund FULL
       refundAmount = totalPayment;
       refundReason = `Order ${order.order_id || '-'} DIBATALKAN oleh provider. Refund penuh Rp ${totalPayment.toLocaleString('id-ID')}.`;
     } else if (newStatus === 'partial') {
-      // Partial = refund sesuai sisa yang tidak terpenuhi
-      // Hitung berdasarkan remains vs quantity
       if (quantity > 0 && remains > 0) {
-        // Refund proporsional: (remains / quantity) * total_payment
         refundAmount = Math.floor((remains / quantity) * totalPayment);
         refundReason = `Order ${order.order_id || '-'} PARTIAL. Sisa ${remains} dari ${quantity} tidak terpenuhi. Refund proporsional Rp ${refundAmount.toLocaleString('id-ID')} (${Math.round((remains/quantity)*100)}%).`;
       } else if (quantity > 0 && startCount < quantity) {
-        // Fallback: refund berdasarkan start_count
         const done = startCount;
         const notDone = quantity - done;
         refundAmount = Math.floor((notDone / quantity) * totalPayment);
         refundReason = `Order ${order.order_id || '-'} PARTIAL. Hanya ${done} dari ${quantity} terpenuhi. Refund proporsional Rp ${refundAmount.toLocaleString('id-ID')}.`;
       } else {
-        // Fallback: refund 50% jika data tidak jelas
         refundAmount = Math.floor(totalPayment * 0.5);
         refundReason = `Order ${order.order_id || '-'} PARTIAL. Data tidak lengkap, refund 50% Rp ${refundAmount.toLocaleString('id-ID')}.`;
       }
@@ -1626,7 +1626,6 @@ async function processAutoRefund(order, newStatus) {
       return false;
     }
     
-    // Insert ke tabel refunds dengan status 'pending' untuk di-approve admin
     const { data: refundData, error: refundError } = await supabaseClient
       .from('refunds')
       .insert({
@@ -1649,7 +1648,6 @@ async function processAutoRefund(order, newStatus) {
     
     console.log(`💰 Refund pending created: Rp ${refundAmount.toLocaleString('id-ID')} untuk ${order.email}`);
     
-    // Notif ke admin
     const Toast = Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 5000, timerProgressBar: true, background: '#1a0e2e', color: '#fff' });
     Toast.fire({
       icon: 'info',
@@ -1657,7 +1655,6 @@ async function processAutoRefund(order, newStatus) {
       text: `${newStatus.toUpperCase()} - ${order.email}`
     });
     
-    // Refresh refund pending jika admin
     if (isAdminOrOwner) {
       setTimeout(() => loadPendingRefunds(), 500);
     }
@@ -1707,7 +1704,6 @@ async function checkSingleOrderStatus(orderId) {
       }
       renderOrderList(allOrdersCache);
       
-      // 🔥 AUTO REFUND untuk partial/canceled
       if ((newStatus === 'partial' || newStatus === 'canceled') && oldStatus !== newStatus) {
         const refunded = await processAutoRefund(order, newStatus);
         if (refunded) {
@@ -1777,8 +1773,6 @@ async function syncAllOrdersStatusesSilent() {
         if (oldStatus !== newStatus || order.start_count !== result.startCount || order.remains !== result.remains) {
           await saveOrderStatusToSupabase(order.id, newStatus, result.startCount, result.remains);
           changedCount++;
-          
-          // 🔥 AUTO REFUND untuk partial/canceled
           if ((newStatus === 'partial' || newStatus === 'canceled') && oldStatus !== newStatus) {
             await processAutoRefund(order, newStatus);
           }
@@ -1835,7 +1829,6 @@ async function syncAllOrdersStatuses() {
           const saveResult = await saveOrderStatusToSupabase(order.id, newStatus, result.startCount, result.remains);
           if (saveResult.success) {
             changedCount++; successCount++;
-            // 🔥 AUTO REFUND
             if ((newStatus === 'partial' || newStatus === 'canceled') && oldStatus !== newStatus) {
               const refunded = await processAutoRefund(order, newStatus);
               if (refunded) refundCount++;
@@ -2990,7 +2983,6 @@ function renderMemberList(data) {
     listEl.innerHTML = '<div class="member-no-result"><span class="icon">🔍</span>Tidak ada member yang cocok</div>';
     return;
   }
-  // Panggil async renderMemberItems
   renderMemberItems(data, listEl);
 }
 
