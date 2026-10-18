@@ -1207,6 +1207,30 @@ body.chat-open .cs-bubble-container{display:none !important}
         </div>
       </div>
 
+      <!-- 💸 MUTASI SALDO SAYA (untuk SEMUA user, di luar adminSection) -->
+      <div class="section">
+        <div class="section-title">💸 Mutasi Saldo Saya<div class="line"></div></div>
+        <div class="mutasi-manager" id="mutasiManagerUser">
+          <button class="mutasi-toggle" onclick="toggleMutasiUser()">
+            <span class="mt-icon">💸</span>
+            <span class="mt-label">Riwayat Mutasi Saldo Saya</span>
+            <span class="mt-badge" id="mutasiBadgeUser">-</span>
+            <span class="mt-arrow" id="mutasiArrowUser">▼</span>
+          </button>
+          <div class="mutasi-content" id="mutasiContentUser">
+            <div class="mutasi-filter-row" id="mutasiFilterRowUser">
+              <button class="mutasi-filter-btn active" data-type="all" onclick="filterMutasiUserByType('all', this)">Semua</button>
+              <button class="mutasi-filter-btn" data-type="credit" onclick="filterMutasiUserByType('credit', this)">➕ Kredit</button>
+              <button class="mutasi-filter-btn" data-type="debit" onclick="filterMutasiUserByType('debit', this)">➖ Debit</button>
+            </div>
+            <div id="mutasiListUser" class="mutasi-list">
+              <div class="mutasi-empty"><span class="icon">💸</span>Klik untuk memuat</div>
+            </div>
+            <button class="auth-submit" style="background:linear-gradient(135deg,#100e2e,#0072ff);margin:10px 14px;padding:10px;font-size:11.5px;width:calc(100% - 28px);" onclick="loadMutasiUser()">🔄 Refresh Mutasi Saya</button>
+          </div>
+        </div>
+      </div>
+
       <div class="section" id="adminSection" style="display:none;">
         <div class="section-title">
           <span id="adminIcon">👑</span>
@@ -1304,11 +1328,11 @@ body.chat-open .cs-bubble-container{display:none !important}
         </div>
         <button class="auth-submit" style="background:linear-gradient(135deg,#facc15,#f59e0b);color:#1a0e2e;margin-bottom:16px;padding:10px;font-size:12px;" onclick="loadPendingRefunds()">🔄 Refresh Refund Pending</button>
 
-        <div class="section-title" style="margin-top:14px;">💸 Mutasi Saldo<div class="line"></div></div>
+        <div class="section-title" style="margin-top:14px;">💸 Mutasi Saldo Semua User<div class="line"></div></div>
         <div class="mutasi-manager">
           <button class="mutasi-toggle" onclick="toggleMutasiManager()">
             <span class="mt-icon">💸</span>
-            <span class="mt-label">Riwayat Mutasi Saldo</span>
+            <span class="mt-label">Riwayat Mutasi Semua User</span>
             <span class="mt-badge" id="mutasiBadge">-</span>
             <span class="mt-arrow" id="mutasiArrow">▼</span>
           </button>
@@ -1641,9 +1665,14 @@ let isSyncingOrders = false;
 let lastSyncTime = null;
 let autoRefundProcessedSet = new Set();
 
-// ============ MUTASI SALDO STATE ============
+// ============ MUTASI SALDO STATE (ADMIN - semua user) ============
 let allMutasiCache = [];
 let mutasiTypeFilter = 'all';
+
+// ============ MUTASI USER STATE (per user sendiri) ============
+let allMutasiUserCache = [];
+let mutasiUserTypeFilter = 'all';
+
 let broadcastPopupTimer = null;
 let broadcastPopupData = null;
 let seenBroadcastIds = new Set();
@@ -1730,7 +1759,7 @@ function mapProviderStatusToLocal(providerStatus) {
   return 'pending';
 }
 
-// 🔥 FIX: Extract status — sosmed-2 HANYA pakai order_status, BUKAN "status": true
+// 🔥 FIX: Extract status — mendukung response Fayupedia yang taruh order_status di ROOT
 function extractStatusData(sosmedType, data, orderId) {
   if (!data) return null;
 
@@ -1738,61 +1767,89 @@ function extractStatusData(sosmedType, data, orderId) {
   let startCount = 0;
   let remains = 0;
 
-  const pickStatus = (obj) => {
-    if (!obj || typeof obj !== 'object') return null;
-    if (obj.order_status !== undefined && obj.order_status !== null
-        && typeof obj.order_status === 'string' && obj.order_status.trim() !== '') {
-      return obj.order_status;
-    }
-    if (obj.status !== undefined && obj.status !== null
-        && typeof obj.status === 'string' && obj.status.trim() !== '') {
-      return obj.status;
-    }
-    return null;
+  // Helper: ambil string non-empty dari field, skip boolean
+  const strVal = (v) => {
+    if (v === undefined || v === null) return null;
+    if (typeof v === 'boolean') return null;
+    const s = String(v).trim();
+    return s === '' ? null : s;
   };
 
+  // Helper: ambil status dari object (prioritas order_status)
+  const pickStatus = (obj) => {
+    if (!obj || typeof obj !== 'object') return null;
+    return strVal(obj.order_status) 
+        || strVal(obj.orderStatus)
+        || strVal(obj.state)
+        || strVal(obj.status);
+  };
+
+  const pickStartCount = (obj) => {
+    if (!obj) return 0;
+    return parseInt(obj.start_count || obj.startCount || obj.start || 0) || 0;
+  };
+
+  const pickRemains = (obj) => {
+    if (!obj) return 0;
+    return parseInt(obj.remains || obj.remains_count || obj.remaining || obj.remainsCount || 0) || 0;
+  };
+
+  // ============ SOSMED-1 (Lollipop) ============
   if (sosmedType === 'sosmed-1') {
     const payload = data.data || data;
     status = pickStatus(payload) || pickStatus(data);
-    startCount = parseInt(payload.start_count || payload.startCount || 0) || 0;
-    remains = parseInt(payload.remains || payload.remains_count || 0) || 0;
-  } else if (sosmedType === 'sosmed-2') {
+    startCount = pickStartCount(payload) || pickStartCount(data);
+    remains = pickRemains(payload) || pickRemains(data);
+  }
+  // ============ SOSMED-2 (Fayupedia) ============
+  else if (sosmedType === 'sosmed-2') {
+    // Cari item di berbagai kemungkinan struktur
     let item = null;
+    
+    // 1) data.results[] — struktur proxy Vercel
     if (Array.isArray(data.results) && data.results.length > 0) {
-      item = data.results.find(r => String(r.id) === String(orderId)) || data.results[0];
-    } else if (data.data) {
+      item = data.results.find(r => String(r.id) === String(orderId) || String(r.order_id) === String(orderId))
+          || data.results[0];
+    }
+    // 2) data.data (array atau object)
+    else if (data.data) {
       item = Array.isArray(data.data) ? data.data[0] : data.data;
     }
-
-    if (item) {
-      if (item.order_status !== undefined && item.order_status !== null
-          && typeof item.order_status === 'string' && item.order_status.trim() !== '') {
-        status = item.order_status;
-      } else if (item.status !== undefined && item.status !== null
-          && typeof item.status === 'string' && item.status.trim() !== '') {
-        status = item.status;
-      }
-      startCount = parseInt(item.start_count || item.startCount || 0) || 0;
-      remains = parseInt(item.remains || item.remains_count || item.remaining || 0) || 0;
+    // 3) ROOT — kalau tidak ada results/data tapi ada order_status/order_id di root
+    //    (kasus utama Fayupedia: response langsung di root)
+    else if (data.order_status !== undefined || data.orderStatus !== undefined
+          || data.order_id !== undefined || data.remains !== undefined
+          || data.start_count !== undefined) {
+      item = data;
     }
 
+    if (item && typeof item === 'object') {
+      status = pickStatus(item);
+      startCount = pickStartCount(item);
+      remains = pickRemains(item);
+      
+      console.log('🔍 [Sosmed-2] Item ditemukan:', JSON.stringify(item).substring(0, 300));
+    }
+
+    // Fallback: root data
     if (!status) {
-      if (data.order_status && typeof data.order_status === 'string' && data.order_status.trim() !== '') {
-        status = data.order_status;
-      } else if (data.status && typeof data.status === 'string' && data.status.trim() !== '') {
-        status = data.status;
-      }
-      if (!startCount) startCount = parseInt(data.start_count || data.startCount || 0) || 0;
-      if (!remains) remains = parseInt(data.remains || data.remains_count || 0) || 0;
+      status = pickStatus(data);
+      if (!startCount) startCount = pickStartCount(data);
+      if (!remains) remains = pickRemains(data);
     }
-  } else if (sosmedType === 'sosmed-4') {
+  }
+  // ============ SOSMED-4 (Juragan) ============
+  else if (sosmedType === 'sosmed-4') {
     const payload = data.data || data;
     status = pickStatus(payload) || pickStatus(data);
-    startCount = parseInt(payload.start_count || payload.startCount || 0) || 0;
-    remains = parseInt(payload.remains || payload.remains_count || 0) || 0;
+    startCount = pickStartCount(payload) || pickStartCount(data);
+    remains = pickRemains(payload) || pickRemains(data);
   }
 
-  if (!status) return null;
+  if (!status) {
+    console.warn(`⚠️ [${sosmedType}] Tidak dapat ekstrak status. Raw data:`, JSON.stringify(data).substring(0, 500));
+    return null;
+  }
   return { status, startCount, remains };
 }
 
@@ -3042,6 +3099,11 @@ async function updateAuthUI(user) {
       stopMemberRealtime();
     }
 
+    // Auto-load mutasi user (untuk semua user)
+    setTimeout(() => {
+      if (document.getElementById('mutasiManagerUser')) loadMutasiUser();
+    }, 800);
+
     const newChatSection = document.getElementById('newChatBoxSection');
     const csFolderSection = document.getElementById('csFolderSection');
     if (newChatSection) newChatSection.style.display = isAdminOrOwner ? 'block' : 'none';
@@ -3389,7 +3451,7 @@ async function loadChatStats() {
 }
 
 // ============================================================
-// BROADCAST (in-page popup only, NO device notification)
+// BROADCAST
 // ============================================================
 function toggleBroadcastManager() {
   const manager = document.getElementById('broadcastManager');
@@ -3852,7 +3914,111 @@ async function changePasswordPrompt(targetEmail) {
 }
 
 // ============================================================
-// MUTASI SALDO
+// MUTASI SALDO - USER (per user sendiri)
+// ============================================================
+function toggleMutasiUser() {
+  const manager = document.getElementById('mutasiManagerUser');
+  if (!manager) return;
+  manager.classList.toggle('open');
+  if (manager.classList.contains('open')) {
+    if (allMutasiUserCache.length === 0) loadMutasiUser();
+  }
+}
+
+async function loadMutasiUser() {
+  const listEl = document.getElementById('mutasiListUser');
+  if (!listEl) return;
+  if (!currentUser) {
+    listEl.innerHTML = `<div class="mutasi-empty">Silakan login dulu</div>`;
+    return;
+  }
+  
+  listEl.innerHTML = '<div class="loading-box"><span class="spinner"></span><br>Memuat mutasi...</div>';
+  
+  try {
+    const { data, error } = await supabaseClient
+      .from('balance_mutations')
+      .select('*')
+      .or(`user_id.eq.${currentUser.id},email.eq.${currentUser.email}`)
+      .order('created_at', { ascending: false })
+      .limit(200);
+    
+    if (error) {
+      if (error.code === '42P01') {
+        listEl.innerHTML = `<div class="mutasi-empty" style="color:#facc15;">⚠️ Tabel balance_mutations belum ada. Hubungi admin.</div>`;
+        return;
+      }
+      throw error;
+    }
+    
+    allMutasiUserCache = data || [];
+    
+    const badge = document.getElementById('mutasiBadgeUser');
+    if (badge) badge.textContent = `${allMutasiUserCache.length}`;
+    
+    renderMutasiUserList(allMutasiUserCache);
+  } catch (err) {
+    listEl.innerHTML = `<div class="mutasi-empty" style="color:#ff8080;">❌ ${escapeHtml(err.message)}</div>`;
+  }
+}
+
+function renderMutasiUserList(data) {
+  const listEl = document.getElementById('mutasiListUser');
+  if (!listEl) return;
+  if (!data || data.length === 0) {
+    listEl.innerHTML = `<div class="mutasi-empty"><span class="icon">💸</span>Belum ada mutasi saldo</div>`;
+    return;
+  }
+  
+  let html = '';
+  data.forEach(m => {
+    const amount = parseFloat(m.amount || 0);
+    const isCredit = amount >= 0;
+    const typeClass = isCredit ? 'credit' : 'debit';
+    const icon = isCredit ? '➕' : '➖';
+    const amountFormatted = Math.abs(amount).toLocaleString('id-ID');
+    const prefix = isCredit ? '+' : '-';
+    const createdAt = m.created_at 
+      ? new Date(m.created_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', day: '2-digit', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' }) 
+      : '-';
+    const typeLabel = m.type || (isCredit ? 'credit' : 'debit');
+    
+    html += `
+      <div class="mutasi-item ${typeClass}">
+        <div class="mutasi-icon">${icon}</div>
+        <div class="mutasi-info">
+          <div class="mutasi-top">
+            <div class="mutasi-email">💸 ${escapeHtml(m.reason || 'Tidak ada keterangan')}</div>
+            <div class="mutasi-amount">${prefix}Rp ${amountFormatted}</div>
+          </div>
+          <div class="mutasi-reason" style="font-size:9.5px;color:#6b4a7a;">🏷️ ${escapeHtml(typeLabel)}</div>
+          <div class="mutasi-meta">
+            <span>🕐 ${createdAt} WIB</span>
+            ${m.balance_before !== undefined && m.balance_after !== undefined 
+              ? `<span>💰 ${parseFloat(m.balance_before || 0).toLocaleString('id-ID')} → ${parseFloat(m.balance_after || 0).toLocaleString('id-ID')}</span>` 
+              : ''}
+          </div>
+        </div>
+      </div>
+    `;
+  });
+  listEl.innerHTML = html;
+}
+
+function filterMutasiUserByType(type, btnElement) {
+  mutasiUserTypeFilter = type;
+  document.querySelectorAll('#mutasiFilterRowUser .mutasi-filter-btn').forEach(btn => btn.classList.remove('active'));
+  if (btnElement) btnElement.classList.add('active');
+  
+  let filtered = [...allMutasiUserCache];
+  if (type === 'credit') filtered = filtered.filter(m => parseFloat(m.amount || 0) >= 0);
+  else if (type === 'debit') filtered = filtered.filter(m => parseFloat(m.amount || 0) < 0);
+  
+  renderMutasiUserList(filtered);
+}
+
+// ============================================================
+// MUTASI SALDO - ADMIN (semua user)
 // ============================================================
 function toggleMutasiManager() {
   const manager = document.querySelector('.mutasi-manager');
@@ -3885,9 +4051,7 @@ async function loadMutasiSaldo() {
     allMutasiCache = data || [];
     
     const badge = document.getElementById('mutasiBadge');
-    if (badge) {
-      badge.textContent = `${allMutasiCache.length}`;
-    }
+    if (badge) badge.textContent = `${allMutasiCache.length}`;
     
     renderMutasiList(allMutasiCache);
   } catch (err) {
