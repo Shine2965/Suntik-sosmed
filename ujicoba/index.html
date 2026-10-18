@@ -936,6 +936,8 @@ body::before{
 .order-card .oc-status.pending{background:rgba(250,204,21,0.2);color:#facc15;border:1px solid rgba(250,204,21,0.4)}
 .order-card .oc-status.processing{background:rgba(0,198,255,0.2);color:#00c6ff;border:1px solid rgba(0,198,255,0.4)}
 .order-card .oc-status.failed{background:rgba(239,68,68,0.2);color:#ef4444;border:1px solid rgba(239,68,68,0.4)}
+.order-card .oc-status.canceled{background:rgba(148,163,184,0.25);color:#cbd5e1;border:1px solid rgba(148,163,184,0.4)}
+.order-card .oc-status.partial{background:rgba(250,204,21,0.2);color:#facc15;border:1px solid rgba(250,204,21,0.4)}
 .order-card .oc-status.refunded{background:rgba(255,170,0,0.2);color:#ffaa00;border:1px solid rgba(255,170,0,0.4)}
 .order-card .oc-status .sync-dot{width:6px;height:6px;border-radius:50%;background:currentColor;animation:syncPulse 1s ease-in-out infinite}
 @keyframes syncPulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.4;transform:scale(0.8)}}
@@ -1302,11 +1304,6 @@ body.chat-open .cs-bubble-container{display:none !important}
         </div>
         <button class="auth-submit" style="background:linear-gradient(135deg,#facc15,#f59e0b);color:#1a0e2e;margin-bottom:16px;padding:10px;font-size:12px;" onclick="loadPendingRefunds()">🔄 Refresh Refund Pending</button>
 
-        <button onclick="checkAndAutoUnban(false).then(r => { if(r.count > 0) loadMemberList(); })" 
-          style="width:100%;padding:10px;border-radius:10px;background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;border:none;font-weight:800;cursor:pointer;margin-bottom:12px;font-size:11px;">
-          🔄 Cek & Auto-Unban Sekarang
-        </button>
-
         <div class="section-title" style="margin-top:14px;">💸 Mutasi Saldo<div class="line"></div></div>
         <div class="mutasi-manager">
           <button class="mutasi-toggle" onclick="toggleMutasiManager()">
@@ -1327,6 +1324,11 @@ body.chat-open .cs-bubble-container{display:none !important}
             <button class="auth-submit" style="background:linear-gradient(135deg,#100e2e,#0072ff);margin:10px 14px;padding:10px;font-size:11.5px;width:calc(100% - 28px);" onclick="loadMutasiSaldo()">🔄 Refresh Mutasi</button>
           </div>
         </div>
+
+        <button onclick="checkAndAutoUnban(false).then(r => { if(r.count > 0) loadMemberList(); })" 
+          style="width:100%;padding:10px;border-radius:10px;background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;border:none;font-weight:800;cursor:pointer;margin-bottom:12px;font-size:11px;">
+          🔄 Cek & Auto-Unban Sekarang
+        </button>
 
         <div class="section-title" style="margin-top:14px;">👥 Daftar Member<div class="line"></div></div>
         <div class="member-dropdown">
@@ -1637,15 +1639,15 @@ let orderAutoRefreshInterval = null;
 let orderSyncInterval = null;
 let isSyncingOrders = false;
 let lastSyncTime = null;
-let autoRefundProcessedSet = new Set(); // prevent double refund
-let broadcastPopupTimer = null;
-let broadcastPopupData = null;
-let seenBroadcastIds = new Set();
-let broadcastListenerChannel = null;
+let autoRefundProcessedSet = new Set();
 
 // ============ MUTASI SALDO STATE ============
 let allMutasiCache = [];
 let mutasiTypeFilter = 'all';
+let broadcastPopupTimer = null;
+let broadcastPopupData = null;
+let seenBroadcastIds = new Set();
+let broadcastListenerChannel = null;
 
 try {
   supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
@@ -1728,7 +1730,7 @@ function mapProviderStatusToLocal(providerStatus) {
   return 'pending';
 }
 
-// 🔥 FIX: Extract data status — sosmed-2 HANYA pakai order_status, BUKAN "status": true
+// 🔥 FIX: Extract status — sosmed-2 HANYA pakai order_status, BUKAN "status": true
 function extractStatusData(sosmedType, data, orderId) {
   if (!data) return null;
 
@@ -1736,7 +1738,6 @@ function extractStatusData(sosmedType, data, orderId) {
   let startCount = 0;
   let remains = 0;
 
-  // Helper: ambil status string valid (bukan boolean)
   const pickStatus = (obj) => {
     if (!obj || typeof obj !== 'object') return null;
     if (obj.order_status !== undefined && obj.order_status !== null
@@ -1750,16 +1751,12 @@ function extractStatusData(sosmedType, data, orderId) {
     return null;
   };
 
-  // ===== SOSMED-1 (Lollipop) =====
   if (sosmedType === 'sosmed-1') {
     const payload = data.data || data;
     status = pickStatus(payload) || pickStatus(data);
     startCount = parseInt(payload.start_count || payload.startCount || 0) || 0;
     remains = parseInt(payload.remains || payload.remains_count || 0) || 0;
-  }
-  // ===== SOSMED-2 (Fayupedia) — 🔥 FIX: HANYA order_status, skip "status": true =====
-  else if (sosmedType === 'sosmed-2') {
-    // Struktur proxy: { status: true, msg: "OK", results: [{ id, status, order_status, start_count, remains }] }
+  } else if (sosmedType === 'sosmed-2') {
     let item = null;
     if (Array.isArray(data.results) && data.results.length > 0) {
       item = data.results.find(r => String(r.id) === String(orderId)) || data.results[0];
@@ -1768,20 +1765,17 @@ function extractStatusData(sosmedType, data, orderId) {
     }
 
     if (item) {
-      // PRIORITAS: order_status dulu (bukan status!)
       if (item.order_status !== undefined && item.order_status !== null
           && typeof item.order_status === 'string' && item.order_status.trim() !== '') {
         status = item.order_status;
       } else if (item.status !== undefined && item.status !== null
           && typeof item.status === 'string' && item.status.trim() !== '') {
-        // Fallback: status string (hasil normalizeStatusItem proxy)
         status = item.status;
       }
       startCount = parseInt(item.start_count || item.startCount || 0) || 0;
       remains = parseInt(item.remains || item.remains_count || item.remaining || 0) || 0;
     }
 
-    // Fallback root level — skip data.status kalau boolean
     if (!status) {
       if (data.order_status && typeof data.order_status === 'string' && data.order_status.trim() !== '') {
         status = data.order_status;
@@ -1791,9 +1785,7 @@ function extractStatusData(sosmedType, data, orderId) {
       if (!startCount) startCount = parseInt(data.start_count || data.startCount || 0) || 0;
       if (!remains) remains = parseInt(data.remains || data.remains_count || 0) || 0;
     }
-  }
-  // ===== SOSMED-4 (Juragan) =====
-  else if (sosmedType === 'sosmed-4') {
+  } else if (sosmedType === 'sosmed-4') {
     const payload = data.data || data;
     status = pickStatus(payload) || pickStatus(data);
     startCount = parseInt(payload.start_count || payload.startCount || 0) || 0;
@@ -1801,11 +1793,9 @@ function extractStatusData(sosmedType, data, orderId) {
   }
 
   if (!status) return null;
-
   return { status, startCount, remains };
 }
 
-// 🔥 Fetch status dari provider
 async function fetchProviderStatus(order) {
   const sosmedType = order.sosmed_type || 'sosmed-2';
   const config = SOSMED_TYPE_MAP[sosmedType];
@@ -1863,6 +1853,100 @@ async function fetchProviderStatus(order) {
 }
 
 // ============================================================
+// AUTO REFUND untuk order partial/canceled
+// ============================================================
+async function processAutoRefund(order, newStatus) {
+  if (!supabaseClient || !order) return false;
+  if (!['partial', 'canceled'].includes(newStatus)) return false;
+  
+  const refundKey = `${order.id}_${newStatus}`;
+  if (autoRefundProcessedSet.has(refundKey)) {
+    console.log(`⏭️ Auto-refund sudah diproses: ${refundKey}`);
+    return false;
+  }
+  
+  try {
+    const { data: existingRefund } = await supabaseClient
+      .from('refunds')
+      .select('id')
+      .eq('trx_id', order.order_id || order.id)
+      .limit(1);
+    
+    if (existingRefund && existingRefund.length > 0) {
+      console.log(`⏭️ Refund sudah ada untuk order ${order.order_id || order.id}`);
+      autoRefundProcessedSet.add(refundKey);
+      return false;
+    }
+    
+    const totalPayment = parseFloat(order.total_payment || 0);
+    const quantity = parseInt(order.quantity || 0);
+    const remains = parseInt(order.remains || 0);
+    const startCount = parseInt(order.start_count || 0);
+    
+    let refundAmount = 0;
+    let refundReason = '';
+    
+    if (newStatus === 'canceled') {
+      refundAmount = totalPayment;
+      refundReason = `Order ${order.order_id || '-'} DIBATALKAN oleh provider. Refund penuh Rp ${totalPayment.toLocaleString('id-ID')}.`;
+    } else if (newStatus === 'partial') {
+      if (quantity > 0 && remains > 0) {
+        refundAmount = Math.floor((remains / quantity) * totalPayment);
+        refundReason = `Order ${order.order_id || '-'} PARTIAL. Sisa ${remains} dari ${quantity} tidak terpenuhi. Refund Rp ${refundAmount.toLocaleString('id-ID')} (${Math.round((remains/quantity)*100)}%).`;
+      } else if (quantity > 0 && startCount > 0 && startCount < quantity) {
+        const notDone = quantity - startCount;
+        refundAmount = Math.floor((notDone / quantity) * totalPayment);
+        refundReason = `Order ${order.order_id || '-'} PARTIAL. Hanya ${startCount} dari ${quantity} terpenuhi. Refund Rp ${refundAmount.toLocaleString('id-ID')}.`;
+      } else {
+        refundAmount = Math.floor(totalPayment * 0.5);
+        refundReason = `Order ${order.order_id || '-'} PARTIAL. Data tidak lengkap, refund 50% Rp ${refundAmount.toLocaleString('id-ID')}.`;
+      }
+    }
+    
+    if (refundAmount <= 0) {
+      autoRefundProcessedSet.add(refundKey);
+      return false;
+    }
+    
+    const { data: refundData, error: refundError } = await supabaseClient
+      .from('refunds')
+      .insert({
+        user_id: order.user_id,
+        email: order.email,
+        trx_id: order.order_id || order.id,
+        amount: refundAmount,
+        reason: refundReason,
+        source_method: 'saldo',
+        status: 'pending',
+        created_at: new Date().toISOString()
+      })
+      .select()
+      .single();
+    
+    if (refundError) throw refundError;
+    
+    autoRefundProcessedSet.add(refundKey);
+    console.log(`💰 Auto-refund created: Rp ${refundAmount.toLocaleString('id-ID')} untuk ${order.email}`);
+    
+    const Toast = Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 5000, timerProgressBar: true, background: '#1a0e2e', color: '#fff' });
+    Toast.fire({
+      icon: 'info',
+      title: `💰 Auto-Refund: Rp ${refundAmount.toLocaleString('id-ID')}`,
+      text: `${newStatus.toUpperCase()} - ${order.email}`
+    });
+    
+    if (isAdminOrOwner) {
+      setTimeout(() => loadPendingRefunds(), 500);
+    }
+    
+    return true;
+  } catch (err) {
+    console.error('❌ Auto refund error:', err);
+    return false;
+  }
+}
+
+// ============================================================
 // LOAD ORDER HISTORY
 // ============================================================
 async function loadOrderHistory(showLoading = false) {
@@ -1904,7 +1988,6 @@ async function loadOrderHistory(showLoading = false) {
     
     renderOrderList(allOrdersCache);
     
-    // 🔥 Auto-sync status pending ke provider
     await syncAllOrdersStatusesSilent();
     
   } catch (err) {
@@ -1935,13 +2018,12 @@ function renderOrderList(orders) {
     const createdAt = order.created_at ? new Date(order.created_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) : '-';
     const price = parseFloat(order.total_payment || 0).toLocaleString('id-ID');
     const sosmedLabel = SOSMED_TYPE_MAP[order.sosmed_type]?.label || order.sosmed_type || '-';
-    const canRefresh = !['success', 'failed', 'refunded', 'canceled', 'completed'].includes(order.order_status);
+    const canRefresh = !['success', 'failed', 'refunded', 'canceled', 'completed', 'partial'].includes(order.order_status);
     const gmailTarget = order.gmail_target || '-';
     const emailUser = order.email || '-';
     const target = order.target || '-';
     const serviceId = order.service_id || '-';
     
-    // 🔥 ORDERID = order_id dari response provider
     const providerOrderId = order.order_id;
     const hasProviderOrderId = providerOrderId && providerOrderId !== '-' && providerOrderId !== 'null' && providerOrderId !== '';
     
@@ -1961,7 +2043,6 @@ function renderOrderList(orders) {
       orderIdDisplay = 'Menunggu provider...';
     }
     
-    // 🔥 Progress bar (kalau ada start_count & remains)
     let progressHtml = '';
     const startCount = parseInt(order.start_count || 0);
     const remains = parseInt(order.remains || 0);
@@ -2038,8 +2119,8 @@ function getOrderStatusClass(status) {
     'success': 'success',
     'completed': 'success',
     'failed': 'failed',
-    'partial': 'refunded',
-    'canceled': 'failed',
+    'partial': 'partial',
+    'canceled': 'canceled',
     'refunded': 'refunded'
   };
   return map[status] || 'pending';
@@ -2059,9 +2140,6 @@ function getOrderStatusLabel(status) {
   return map[status] || status || 'Unknown';
 }
 
-// ============================================================
-// FILTER & SEARCH
-// ============================================================
 function filterOrders(query) {
   orderSearchQuery = (query || '').trim();
   clearTimeout(window._orderSearchDebounce);
@@ -2095,105 +2173,7 @@ function copyOrderId(orderId) {
 }
 
 // ============================================================
-// 🔥 AUTO REFUND untuk order partial/canceled
-// ============================================================
-async function processAutoRefund(order, newStatus) {
-  if (!supabaseClient || !order) return false;
-  if (!['partial', 'canceled'].includes(newStatus)) return false;
-  
-  const refundKey = `${order.id}_${newStatus}`;
-  if (autoRefundProcessedSet.has(refundKey)) {
-    console.log(`⏭️ Auto-refund sudah diproses: ${refundKey}`);
-    return false;
-  }
-  
-  try {
-    // Check existing refund
-    const { data: existingRefund } = await supabaseClient
-      .from('refunds')
-      .select('id')
-      .eq('trx_id', order.order_id || order.id)
-      .limit(1);
-    
-    if (existingRefund && existingRefund.length > 0) {
-      console.log(`⏭️ Refund sudah ada untuk order ${order.order_id || order.id}`);
-      autoRefundProcessedSet.add(refundKey);
-      return false;
-    }
-    
-    const totalPayment = parseFloat(order.total_payment || 0);
-    const quantity = parseInt(order.quantity || 0);
-    const remains = parseInt(order.remains || 0);
-    const startCount = parseInt(order.start_count || 0);
-    
-    let refundAmount = 0;
-    let refundReason = '';
-    
-    if (newStatus === 'canceled') {
-      // Full refund
-      refundAmount = totalPayment;
-      refundReason = `Order ${order.order_id || '-'} DIBATALKAN oleh provider. Refund penuh Rp ${totalPayment.toLocaleString('id-ID')}.`;
-    } else if (newStatus === 'partial') {
-      // Partial refund berdasarkan remains
-      if (quantity > 0 && remains > 0) {
-        refundAmount = Math.floor((remains / quantity) * totalPayment);
-        refundReason = `Order ${order.order_id || '-'} PARTIAL. Sisa ${remains} dari ${quantity} tidak terpenuhi. Refund Rp ${refundAmount.toLocaleString('id-ID')} (${Math.round((remains/quantity)*100)}%).`;
-      } else if (quantity > 0 && startCount > 0 && startCount < quantity) {
-        const notDone = quantity - startCount;
-        refundAmount = Math.floor((notDone / quantity) * totalPayment);
-        refundReason = `Order ${order.order_id || '-'} PARTIAL. Hanya ${startCount} dari ${quantity} terpenuhi. Refund Rp ${refundAmount.toLocaleString('id-ID')}.`;
-      } else {
-        refundAmount = Math.floor(totalPayment * 0.5);
-        refundReason = `Order ${order.order_id || '-'} PARTIAL. Data tidak lengkap, refund 50% Rp ${refundAmount.toLocaleString('id-ID')}.`;
-      }
-    }
-    
-    if (refundAmount <= 0) {
-      autoRefundProcessedSet.add(refundKey);
-      return false;
-    }
-    
-    // Insert refund pending
-    const { data: refundData, error: refundError } = await supabaseClient
-      .from('refunds')
-      .insert({
-        user_id: order.user_id,
-        email: order.email,
-        trx_id: order.order_id || order.id,
-        amount: refundAmount,
-        reason: refundReason,
-        source_method: 'saldo',
-        status: 'pending',
-        created_at: new Date().toISOString()
-      })
-      .select()
-      .single();
-    
-    if (refundError) throw refundError;
-    
-    autoRefundProcessedSet.add(refundKey);
-    console.log(`💰 Auto-refund created: Rp ${refundAmount.toLocaleString('id-ID')} untuk ${order.email}`);
-    
-    const Toast = Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 5000, timerProgressBar: true, background: '#1a0e2e', color: '#fff' });
-    Toast.fire({
-      icon: 'info',
-      title: `💰 Auto-Refund: Rp ${refundAmount.toLocaleString('id-ID')}`,
-      text: `${newStatus.toUpperCase()} - ${order.email}`
-    });
-    
-    if (isAdminOrOwner) {
-      setTimeout(() => loadPendingRefunds(), 500);
-    }
-    
-    return true;
-  } catch (err) {
-    console.error('❌ Auto refund error:', err);
-    return false;
-  }
-}
-
-// ============================================================
-// 🔥 SIMPAN STATUS KE SUPABASE
+// SIMPAN STATUS KE SUPABASE
 // ============================================================
 async function saveOrderStatusToSupabase(orderId, newStatus, startCount, remains) {
   if (!supabaseClient) return false;
@@ -2223,7 +2203,7 @@ async function saveOrderStatusToSupabase(orderId, newStatus, startCount, remains
 }
 
 // ============================================================
-// 🔥 CEK STATUS 1 ORDER (Manual)
+// CEK STATUS 1 ORDER (Manual)
 // ============================================================
 async function checkSingleOrderStatus(orderId) {
   const order = allOrdersCache.find(o => o.id === orderId);
@@ -2266,12 +2246,10 @@ async function checkSingleOrderStatus(orderId) {
       
       renderOrderList(allOrdersCache);
       
-      // 🔥 AUTO REFUND kalau partial/canceled
       if ((newStatus === 'partial' || newStatus === 'canceled') && oldStatus !== newStatus) {
         await processAutoRefund(order, newStatus);
       }
       
-      // Notifikasi
       if (oldStatus !== newStatus) {
         if (newStatus === 'success' || newStatus === 'completed') {
           Swal.fire({ 
@@ -2357,7 +2335,7 @@ async function checkSingleOrderStatus(orderId) {
 }
 
 // ============================================================
-// 🔥 AUTO SYNC ALL ORDERS (Silent - Background)
+// AUTO SYNC ALL ORDERS (Silent)
 // ============================================================
 async function syncAllOrdersStatusesSilent() {
   if (isSyncingOrders) return;
@@ -2405,7 +2383,6 @@ async function syncAllOrdersStatusesSilent() {
           );
           changedCount++;
           
-          // 🔥 AUTO REFUND
           if ((newStatus === 'partial' || newStatus === 'canceled') && oldStatus !== newStatus) {
             await processAutoRefund(order, newStatus);
           }
@@ -2426,7 +2403,7 @@ async function syncAllOrdersStatusesSilent() {
 }
 
 // ============================================================
-// 🔥 SYNC ALL (Manual - dengan UI feedback)
+// SYNC ALL (Manual)
 // ============================================================
 async function syncAllOrdersStatuses() {
   if (isSyncingOrders) {
@@ -2508,7 +2485,6 @@ async function syncAllOrdersStatuses() {
           if (saveResult.success) {
             changedCount++;
             successCount++;
-            // 🔥 AUTO REFUND
             if ((newStatus === 'partial' || newStatus === 'canceled') && oldStatus !== newStatus) {
               const refunded = await processAutoRefund(order, newStatus);
               if (refunded) refundCount++;
@@ -2575,9 +2551,6 @@ async function syncAllOrdersStatuses() {
   });
 }
 
-// ============================================================
-// 🔥 REALTIME SYNC
-// ============================================================
 function startOrderAutoRefresh() {
   stopOrderAutoRefresh();
   orderAutoRefreshInterval = setInterval(() => {
@@ -3416,7 +3389,7 @@ async function loadChatStats() {
 }
 
 // ============================================================
-// BROADCAST (in-page popup only, no device notification)
+// BROADCAST (in-page popup only, NO device notification)
 // ============================================================
 function toggleBroadcastManager() {
   const manager = document.getElementById('broadcastManager');
@@ -3530,7 +3503,7 @@ async function sendBroadcast() {
 
     Swal.fire({
       title: '🎉 Broadcast Terkirim!',
-      html: `<div style="text-align:center;color:#ddd;"><div style="font-size:48px;margin-bottom:10px;">📢</div><p style="font-size:15px;font-weight:800;color:#22c55e;">${data.recipient_count} user akan menerima</p><p style="font-size:11px;color:#94a3b8;margin-top:8px;">Muncul sebagai pop-up di halaman user</p></div>`,
+      html: `<div style="text-align:center;color:#ddd;"><div style="font-size:48px;margin-bottom:10px;">📢</div><p style="font-size:15px;font-weight:800;color:#22c55e;">${data.recipient_count} user akan menerima</p><p style="font-size:11px;color:#94a3b8;margin-top:8px;">Muncul sebagai pop-up di halaman user (bukan notifikasi perangkat)</p></div>`,
       icon: 'success',
       confirmButtonColor: '#22c55e',
       background: '#0a0e1a', color: '#fff',
@@ -3616,7 +3589,7 @@ async function deleteBroadcast(id, btnElement) {
 }
 
 // ============================================================
-// BROADCAST LISTENER — In-page popup only (NO device notification)
+// BROADCAST LISTENER (In-page popup only)
 // ============================================================
 async function initBroadcastListener() {
   if (!supabaseClient || !currentUser) return;
@@ -3636,13 +3609,12 @@ async function initBroadcastListener() {
       if (Date.now() - sentAt > 60000) return;
       
       seenBroadcastIds.add(b.id);
-      showBroadcastPopup(b); // In-page popup saja
+      showBroadcastPopup(b);
     })
     .subscribe((status) => {
       if (['CHANNEL_ERROR','TIMED_OUT','CLOSED'].includes(status)) setTimeout(initBroadcastListener, 3000);
     });
 
-  // Cek broadcast baru saat login
   setTimeout(() => checkNewBroadcastsOnLoad(), 2000);
 }
 
@@ -3902,7 +3874,13 @@ async function loadMutasiSaldo() {
       .order('created_at', { ascending: false })
       .limit(200);
     
-    if (error) throw error;
+    if (error) {
+      if (error.code === '42P01') {
+        listEl.innerHTML = `<div class="mutasi-empty" style="color:#facc15;">⚠️ Tabel balance_mutations belum ada. Jalankan SQL migration dulu.</div>`;
+        return;
+      }
+      throw error;
+    }
     
     allMutasiCache = data || [];
     
@@ -4052,7 +4030,6 @@ function toggleSelectAllMembers() {
   const listEl = document.getElementById('memberList');
   if (!listEl) return;
   
-  // Get visible member IDs (yang tidak bisa dipilih: self, owner utama)
   const visibleItems = listEl.querySelectorAll('.member-item[data-user-id]');
   const selectableIds = [];
   
@@ -4060,7 +4037,6 @@ function toggleSelectAllMembers() {
     const userId = item.dataset.userId;
     const member = allMembersCache.find(m => m.id === userId);
     if (!member) return;
-    // Skip self & owner utama
     if (member.email === currentProfile?.email) return;
     if (member.email === OWNER_UTAMA) return;
     selectableIds.push(userId);
@@ -4069,17 +4045,14 @@ function toggleSelectAllMembers() {
   const allSelected = selectableIds.length > 0 && selectableIds.every(id => selectedMembersForBulk.has(id));
   
   if (allSelected) {
-    // Deselect all visible
     selectableIds.forEach(id => selectedMembersForBulk.delete(id));
   } else {
-    // Select all visible
     selectableIds.forEach(id => selectedMembersForBulk.add(id));
   }
   
   updateBulkActionBar();
   updateBulkSelectAllState();
   
-  // Update UI per item
   visibleItems.forEach(item => {
     const userId = item.dataset.userId;
     const isSelected = selectedMembersForBulk.has(userId);
@@ -4094,10 +4067,8 @@ function updateBulkSelectAllState(filteredData) {
   const infoEl = document.getElementById('bulkSelectAllInfo');
   if (!selectAllCb) return;
   
-  // Hitung member yang bisa dipilih di list saat ini
   let dataToUse = filteredData;
   if (!dataToUse) {
-    // Get current visible items
     const listEl = document.getElementById('memberList');
     if (!listEl) return;
     const visibleIds = Array.from(listEl.querySelectorAll('.member-item[data-user-id]')).map(el => el.dataset.userId);
@@ -4337,7 +4308,6 @@ async function renderMemberItems(data, listEl) {
       emailDisplay = escapeHtml(m.email).replace(regex, '<mark style="background:rgba(255,215,0,0.4);color:#fff;padding:0 2px;border-radius:3px;">$1</mark>');
     }
 
-    // Checkbox only for selectable members
     const showCheckbox = !isSelf && !isTargetOwnerUtama;
     
     html += `
@@ -4390,6 +4360,7 @@ async function silentRefreshMemberList() {
     if (!data) return;
     allMembersCache = data;
     applyMemberFilters();
+    console.log('🔄 Member list refreshed');
   } catch (e) {}
 }
 
@@ -4816,7 +4787,7 @@ async function unmuteUserChat(targetUserId, targetEmail) {
 }
 
 // ============================================================
-// NOTIFICATION (device notifications for chat only)
+// NOTIFICATION
 // ============================================================
 function isNotificationSupported() { return 'Notification' in window; }
 
