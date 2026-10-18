@@ -165,62 +165,88 @@ export default async function handler(req, res) {
         }
 
         const statusData = await statusResponse.json();
-        console.log('📥 [Fayupedia Status] Raw response:', JSON.stringify(statusData).substring(0, 500));
+        console.log('📥 [Fayupedia Status] Raw response:', JSON.stringify(statusData).substring(0, 800));
 
         // Kalau response error dari provider
         if (statusData && statusData.status === false) {
           return res.status(200).json({
             status: false,
             msg: statusData.msg || statusData.message || 'Provider menolak request',
-            data: statusData.data || null
-          });
-        }
-
-        // Provider return data
-        const data = statusData.data;
-
-        // ===== NORMALIZE RESPONSE =====
-        // Fayupedia bisa return single object atau array
-        // Format single: { id, status, start_count, remains, ... }
-        // Format multiple: [{ id, status, ... }, { id, status, ... }]
-
-        if (!data) {
-          return res.status(200).json({
-            status: true,
-            msg: statusData.msg || 'OK',
-            data: null,
             results: []
           });
         }
 
-        // Kalau array (multiple ID)
-        if (Array.isArray(data)) {
-          const normalizedArray = data.map(item => normalizeStatusItem(item));
+        // ===== DETEKSI BERBAGAI STRUKTUR RESPONSE =====
+        // 
+        // Struktur 1 (PALING UMUM — sesuai docs Fayupedia single ID):
+        // {
+        //   "status": true,
+        //   "msg": "Pesanan ditemukan.",
+        //   "order_id": 1107,
+        //   "order_status": "processing",
+        //   "charge": 10000,
+        //   "start_count": 10,
+        //   "remains": 90
+        // }
+        //
+        // Struktur 2 (multiple ID — data array):
+        // { "status": true, "msg": "...", "data": [ {id, status, ...}, ... ] }
+        //
+        // Struktur 3 (single di dalam data):
+        // { "status": true, "msg": "...", "data": {id, status, ...} }
+        //
+        // Struktur 4 (data null):
+        // { "status": true, "msg": "...", "data": null }
+
+        let itemsToNormalize = [];
+
+        // Cek 1: Ada `data` — array atau object
+        if (statusData.data !== undefined && statusData.data !== null) {
+          if (Array.isArray(statusData.data)) {
+            itemsToNormalize = statusData.data;
+          } else if (typeof statusData.data === 'object') {
+            itemsToNormalize = [statusData.data];
+          }
+        }
+
+        // Cek 2: Kalau `data` kosong/null, cek root punya field order (kasus utama Fayupedia)
+        if (itemsToNormalize.length === 0) {
+          const rootHasOrderFields = 
+            statusData.order_status !== undefined ||
+            statusData.order_id !== undefined ||
+            statusData.remains !== undefined ||
+            statusData.start_count !== undefined ||
+            (typeof statusData.status === 'string' && statusData.status !== '');
+
+          if (rootHasOrderFields) {
+            // Root object itu sendiri adalah item pesanan
+            itemsToNormalize = [statusData];
+          }
+        }
+
+        // Cek 3: Kalau ada `results` array (dari proxy lain / wrapper)
+        if (itemsToNormalize.length === 0 && Array.isArray(statusData.results)) {
+          itemsToNormalize = statusData.results;
+        }
+
+        // Kalau benar-benar tidak ada data pesanan
+        if (itemsToNormalize.length === 0) {
           return res.status(200).json({
             status: true,
             msg: statusData.msg || 'OK',
-            count: normalizedArray.length,
-            results: normalizedArray
+            count: 0,
+            results: []
           });
         }
 
-        // Kalau single object
-        if (typeof data === 'object') {
-          const normalized = normalizeStatusItem(data);
-          return res.status(200).json({
-            status: true,
-            msg: statusData.msg || 'OK',
-            count: 1,
-            results: [normalized]
-          });
-        }
+        // Normalize setiap item
+        const normalizedArray = itemsToNormalize.map(item => normalizeStatusItem(item));
 
-        // Fallback: primitive
         return res.status(200).json({
           status: true,
           msg: statusData.msg || 'OK',
-          data: data,
-          results: []
+          count: normalizedArray.length,
+          results: normalizedArray
         });
 
       } catch (fetchErr) {
@@ -325,13 +351,15 @@ export default async function handler(req, res) {
 
 // ============================================================
 // 🔧 HELPER: NORMALIZE STATUS ITEM
-// Ubah format provider jadi format konsisten
+// Fayupedia pakai `order_status` di root, tapi kita normalisasi
+// ke field `status` DAN `order_status` supaya kompatibel dengan frontend
 // ============================================================
 function normalizeStatusItem(item) {
   if (!item || typeof item !== 'object') {
     return {
       id: null,
       status: 'Unknown',
+      order_status: 'Unknown',
       start_count: 0,
       remains: 0,
       charge: 0,
@@ -340,19 +368,25 @@ function normalizeStatusItem(item) {
     };
   }
 
-  // Ambil nilai dengan fallback ke berbagai kemungkinan nama field
+  // Prioritas: order_status → orderStatus → state → status (skip boolean)
+  let statusValue = null;
+  const tryFields = ['order_status', 'orderStatus', 'state', 'status'];
+  for (const f of tryFields) {
+    const v = item[f];
+    if (v !== undefined && v !== null && typeof v !== 'boolean' && String(v).trim() !== '') {
+      statusValue = String(v).trim();
+      break;
+    }
+  }
+  if (!statusValue) statusValue = 'Unknown';
+
+  // Ambil ID pesanan
   const id = 
     item.id ?? 
     item.order ?? 
     item.order_id ?? 
     item.OrderId ?? 
     null;
-
-  const status = 
-    item.status ?? 
-    item.order_status ?? 
-    item.state ?? 
-    'Unknown';
 
   const startCount = 
     parseInt(item.start_count ?? item.startCount ?? item.start ?? 0) || 0;
@@ -363,12 +397,12 @@ function normalizeStatusItem(item) {
   const charge = 
     parseFloat(item.charge ?? item.price ?? item.cost ?? 0) || 0;
 
-  const currency = 
-    item.currency ?? 'IDR';
+  const currency = item.currency ?? 'IDR';
 
   return {
     id: id ? String(id) : null,
-    status: String(status),
+    status: statusValue,        // kompatibel dengan frontend
+    order_status: statusValue,  // juga isi order_status
     start_count: startCount,
     remains: remains,
     charge: charge,
