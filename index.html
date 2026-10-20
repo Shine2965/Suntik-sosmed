@@ -1036,7 +1036,6 @@ body.chat-open .cs-bubble-container{display:none !important}
 
 <div class="cs-bubble-container" id="csBubbleContainer"></div>
 <audio id="bgm" preload="auto"></audio>
-
 <script>
 // ============================================================
 // CONFIG
@@ -1213,8 +1212,9 @@ async function fetchProfile(userId) {
   try { const { data, error } = await supabaseClient.from('profiles').select('*').eq('id', userId).single(); if (error) throw error; return data; }
   catch (e) { return null; }
 }
+
 // ============================================================
-// ORDER SYSTEM + AUTO-REFUND
+// ORDER SYSTEM + AUTO-REFUND (VERSI PERBAIKAN)
 // ============================================================
 const SOSMED_TYPE_MAP = {
   'sosmed-1': { label: 'Sosmed-1', endpoint: '/api/lollipop-services' },
@@ -1290,69 +1290,187 @@ async function fetchProviderStatus(order) {
   } catch (err) { return { success: false, message: err.message }; }
 }
 
+// ============================================================
+// AUTO REFUND — VERSI PERBAIKAN DENGAN DEBUG LENGKAP
+// ============================================================
 async function processAutoRefund(order, newStatus) {
-  if (!supabaseClient || !order) return false;
-  if (!['partial', 'canceled'].includes(newStatus)) return false;
-  if (!order.user_id && !order.email) { console.warn('⚠️ Auto-refund skip: no user', order); return false; }
+  if (!supabaseClient || !order) {
+    console.warn('❌ Auto-refund: supabaseClient atau order null');
+    return false;
+  }
+  if (!['partial', 'canceled'].includes(newStatus)) {
+    console.log(`⏭️ Skip refund: status ${newStatus} bukan partial/canceled`);
+    return false;
+  }
+  
+  console.log('🔍 Auto-refund order:', {
+    id: order.id,
+    order_id: order.order_id,
+    user_id: order.user_id,
+    email: order.email,
+    total_payment: order.total_payment,
+    quantity: order.quantity,
+    remains: order.remains,
+    start_count: order.start_count,
+    newStatus
+  });
+  
+  if (!order.user_id) {
+    console.error('❌ Auto-refund GAGAL: order.user_id kosong/null', order);
+    const Toast = Swal.mixin({ toast: true, position: 'top', showConfirmButton: false, timer: 8000, background: '#1a0e2e', color: '#fff' });
+    Toast.fire({ icon: 'error', title: '⚠️ Auto-Refund Gagal', html: `<div style="font-size:11px;color:#ffb3b3;">Order tidak punya user_id</div>` });
+    return false;
+  }
+  if (!order.email) {
+    console.warn('⚠️ Auto-refund: order.email kosong, coba ambil dari profiles');
+    try {
+      const { data: profile } = await supabaseClient.from('profiles').select('email').eq('id', order.user_id).single();
+      if (profile?.email) order.email = profile.email;
+    } catch(e) {}
+    if (!order.email) {
+      console.error('❌ Auto-refund GAGAL: order.email tidak ditemukan');
+      return false;
+    }
+  }
+  
   const refundKey = `${order.id}_${newStatus}`;
-  if (autoRefundProcessedSet.has(refundKey)) { console.log(`⏭️ Already: ${refundKey}`); return false; }
+  if (autoRefundProcessedSet.has(refundKey)) {
+    console.log(`⏭️ Auto-refund sudah: ${refundKey}`);
+    return false;
+  }
+  
+  const trxId = String(order.order_id || order.id);
+  
   try {
-    const { data: existing } = await supabaseClient.from('refunds').select('id').eq('trx_id', order.order_id || order.id).ilike('reason', `%${newStatus.toUpperCase()}%`).limit(1);
-    if (existing && existing.length > 0) { autoRefundProcessedSet.add(refundKey); return false; }
-  } catch (e) { console.warn('⚠️ Dup check fail:', e.message); }
+    const { data: existing, error: dupErr } = await supabaseClient
+      .from('refunds')
+      .select('id')
+      .eq('trx_id', trxId)
+      .ilike('reason', `%${newStatus.toUpperCase()}%`)
+      .limit(1);
+    if (dupErr) console.warn('⚠️ Cek duplikat error:', dupErr);
+    if (existing && existing.length > 0) { 
+      console.log(`⏭️ Refund sudah ada di DB: ${refundKey}`);
+      autoRefundProcessedSet.add(refundKey); 
+      return false; 
+    }
+  } catch (e) { console.warn('⚠️ Dup check exception:', e); }
+  
   const totalPayment = parseFloat(order.total_payment || 0);
   const quantity = parseInt(order.quantity || 0);
   const remains = parseInt(order.remains || 0);
   const startCount = parseInt(order.start_count || 0);
   let refundAmount = 0, refundReason = '';
+  
   if (newStatus === 'canceled') {
     refundAmount = totalPayment;
-    refundReason = `Refund otomatis [CANCELED]: Order ${order.order_id || order.id} DIBATALKAN. Rp ${totalPayment.toLocaleString('id-ID')} dikembalikan.`;
+    refundReason = `Refund otomatis [CANCELED]: Order ${trxId} DIBATALKAN. Rp ${totalPayment.toLocaleString('id-ID')} dikembalikan.`;
   } else if (newStatus === 'partial') {
     if (quantity > 0 && remains > 0) {
       refundAmount = Math.floor((remains / quantity) * totalPayment);
-      refundReason = `Refund otomatis [PARTIAL]: Order ${order.order_id || order.id} — sisa ${remains}/${quantity} tidak terpenuhi. Rp ${refundAmount.toLocaleString('id-ID')}.`;
+      refundReason = `Refund otomatis [PARTIAL]: Order ${trxId} — sisa ${remains}/${quantity} tidak terpenuhi. Rp ${refundAmount.toLocaleString('id-ID')}.`;
     } else if (quantity > 0 && startCount > 0 && startCount < quantity) {
       const notDone = quantity - startCount;
       refundAmount = Math.floor((notDone / quantity) * totalPayment);
-      refundReason = `Refund otomatis [PARTIAL]: Order ${order.order_id || order.id} — ${startCount}/${quantity} terpenuhi. Rp ${refundAmount.toLocaleString('id-ID')}.`;
+      refundReason = `Refund otomatis [PARTIAL]: Order ${trxId} — ${startCount}/${quantity} terpenuhi. Rp ${refundAmount.toLocaleString('id-ID')}.`;
     } else {
       refundAmount = Math.floor(totalPayment * 0.5);
-      refundReason = `Refund otomatis [PARTIAL]: Order ${order.order_id || order.id} — refund 50% Rp ${refundAmount.toLocaleString('id-ID')}.`;
+      refundReason = `Refund otomatis [PARTIAL]: Order ${trxId} — refund 50% Rp ${refundAmount.toLocaleString('id-ID')}.`;
     }
   }
-  if (refundAmount <= 0) { autoRefundProcessedSet.add(refundKey); return false; }
+  
+  if (refundAmount <= 0) {
+    console.warn(`⏭️ Refund amount 0, skip: ${refundKey}`);
+    autoRefundProcessedSet.add(refundKey);
+    return false;
+  }
+  
+  console.log(`💰 Memproses refund Rp ${refundAmount.toLocaleString('id-ID')} → ${order.email}`);
+  
   try { localStorage.setItem('refund_lock_' + refundKey, Date.now().toString()); } catch(e) {}
+  
   try {
+    // ============ LANGKAH 1: Panggil RPC refund ============
+    console.log('🔍 Calling RPC auto_refund_on_failure...');
     const { data: rpcData, error: rpcError } = await supabaseClient.rpc('auto_refund_on_failure', {
-      p_user_id: order.user_id, p_amount: refundAmount, p_trx_id: order.order_id || order.id, p_reason: refundReason
+      p_user_id: order.user_id,
+      p_amount: refundAmount,
+      p_trx_id: trxId,
+      p_reason: refundReason
     });
-    if (rpcError) throw new Error('RPC: ' + rpcError.message);
-    if (!rpcData || !rpcData.success) throw new Error(rpcData?.message || 'RPC failed');
-    const { error: refundError } = await supabaseClient.from('refunds').insert({
-      user_id: order.user_id, email: order.email || rpcData.email || '-', trx_id: order.order_id || order.id,
-      amount: refundAmount, reason: refundReason, source_method: 'saldo', status: 'success',
-      approved_at: new Date().toISOString(), created_at: new Date().toISOString()
-    });
-    if (refundError) console.warn('⚠️ Insert refunds:', refundError.message);
+    
+    console.log('🔍 RPC result:', { rpcData, rpcError });
+    
+    if (rpcError) {
+      throw new Error(`RPC gagal: ${rpcError.message} (code: ${rpcError.code})`);
+    }
+    if (!rpcData) {
+      throw new Error('RPC mengembalikan data null');
+    }
+    if (rpcData.success === false) {
+      throw new Error(`RPC sukses=false: ${rpcData.message}`);
+    }
+    
+    // ============ LANGKAH 2: Insert ke refunds ============
+    console.log('🔍 Inserting to refunds table...');
+    const { data: refundData, error: refundError } = await supabaseClient.from('refunds').insert({
+      user_id: order.user_id,
+      email: order.email || rpcData.email || '-',
+      trx_id: trxId,
+      amount: refundAmount,
+      reason: refundReason,
+      source_method: 'saldo',
+      status: 'success',
+      approved_at: new Date().toISOString(),
+      created_at: new Date().toISOString()
+    }).select().single();
+    
+    console.log('🔍 Refund insert result:', { refundData, refundError });
+    
+    if (refundError) {
+      console.warn('⚠️ Refund masuk ke saldo & mutasi, tapi insert ke tabel refunds gagal:', refundError.message);
+    }
+    
     autoRefundProcessedSet.add(refundKey);
     try { localStorage.removeItem('refund_lock_' + refundKey); } catch(e) {}
-    console.log(`💰 Refund sukses: Rp ${refundAmount.toLocaleString('id-ID')} → ${order.email} [${newStatus}]`);
-    const Toast = Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 6000, timerProgressBar: true, background: '#1a0e2e', color: '#fff' });
-    Toast.fire({ icon: 'success', title: `💰 Auto-Refund ${newStatus.toUpperCase()}: Rp ${refundAmount.toLocaleString('id-ID')}`, html: `<div style="font-size:11.5px;color:#64ffc8;">→ ${order.email}<br>Saldo & mutasi tersimpan</div>` });
+    
+    console.log(`✅ Auto-refund sukses: Rp ${refundAmount.toLocaleString('id-ID')} → ${order.email} [${newStatus}]`);
+    
+    const Toast = Swal.mixin({ toast: true, position: 'top', showConfirmButton: false, timer: 6000, timerProgressBar: true, background: '#1a0e2e', color: '#fff' });
+    Toast.fire({ 
+      icon: 'success', 
+      title: `💰 Auto-Refund ${newStatus.toUpperCase()}`, 
+      html: `<div style="font-size:11.5px;color:#64ffc8;">→ ${order.email}<br>Rp ${refundAmount.toLocaleString('id-ID')} sudah masuk ke saldo</div>` 
+    });
+    
     if (order.email === currentUser?.email) setTimeout(() => refreshBalance(), 800);
     if (document.getElementById('mutasiManagerUser')?.classList.contains('open')) setTimeout(() => loadMutasiUser(), 500);
     if (isAdminOrOwner && document.getElementById('mutasiManagerAdmin')?.classList.contains('open')) setTimeout(() => loadMutasiAdmin(), 500);
+    
     return true;
   } catch (err) {
-    console.error('❌ Auto refund:', err);
+    console.error('❌ Auto-refund GAGAL:', err);
+    console.error('Error details:', {
+      message: err.message,
+      stack: err.stack,
+      order: { id: order.id, order_id: order.order_id, user_id: order.user_id, email: order.email }
+    });
+    
     try { localStorage.removeItem('refund_lock_' + refundKey); } catch(e) {}
-    const Toast = Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 8000, timerProgressBar: true, background: '#1a0e2e', color: '#fff' });
-    Toast.fire({ icon: 'error', title: `⚠️ Auto-Refund GAGAL`, html: `<div style="font-size:11.5px;color:#ffb3b3;">${escapeHtml(err.message)}</div>` });
+    
+    const Toast = Swal.mixin({ toast: true, position: 'top', showConfirmButton: false, timer: 10000, timerProgressBar: true, background: '#1a0e2e', color: '#fff' });
+    Toast.fire({ 
+      icon: 'error', 
+      title: `⚠️ Auto-Refund GAGAL`, 
+      html: `<div style="font-size:11.5px;color:#ffb3b3;">${escapeHtml(err.message)}<br><small>Order: ${escapeHtml(trxId)}</small></div>` 
+    });
     return false;
   }
 }
 
+// ============================================================
+// LOAD & RENDER ORDER HISTORY
+// ============================================================
 async function loadOrderHistory(showLoading = false) {
   if (!supabaseClient || !currentUser) return;
   const container = document.getElementById('orderListContainer');
@@ -1641,11 +1759,15 @@ async function handleLogin(event) {
     const profile = await fetchProfile(data.user.id);
     if (profile && profile.banned) {
       const until = profile.banned_until ? new Date(profile.banned_until) : null;
-      if (until && until < new Date()) { await autoUnbanUser(data.user.id); currentProfile = await fetchProfile(data.user.id); }
-      else {
+      if (until && until < new Date()) {
+        await autoUnbanUser(data.user.id);
+        currentProfile = await fetchProfile(data.user.id);
+        const Toast = Swal.mixin({ toast: true, position: 'top', showConfirmButton: false, timer: 3000, timerProgressBar: true, background: '#1a0e2e', color: '#fff' });
+        Toast.fire({ icon: 'success', title: '🎉 Banned sudah berakhir' });
+      } else {
         await supabaseClient.auth.signOut();
         showBanOverlay(profile);
-        Swal.fire({ title: '🚫 Akun Dibanned', icon: 'error', confirmButtonColor: '#ff4444', background: '#1a0e2e', color: '#fff' });
+        Swal.fire({ title: '🚫 Akun Dibanned', html: `<div style="text-align:left;color:#ddd;font-size:13px;"><p>Banned sampai:</p><p style="color:#ff8080;font-weight:800;">${until ? until.toLocaleString('id-ID') : 'PERMANEN'}</p></div>`, icon: 'error', confirmButtonColor: '#ff4444', background: '#1a0e2e', color: '#fff' });
         btn.disabled = false; btn.innerHTML = '🔑 Masuk Sekarang';
         return;
       }
@@ -1792,28 +1914,63 @@ function startUserBanCheckTimer() {
       if (profile.banned && profile.banned_until && new Date(profile.banned_until) < new Date()) {
         const { data: unbanResult } = await supabaseClient.rpc('auto_unban_user_by_id', { p_user_id: currentUser.id });
         if (unbanResult && unbanResult.success) {
-          Swal.fire({ title: '🎉 Banned Berakhir!', html: '<p style="color:#22c55e;font-weight:800;">Akun Anda aktif kembali!</p>', icon: 'success', timer: 2500, timerProgressBar: true, showConfirmButton: false, background: '#1a0e2e', color: '#fff' }).then(() => location.reload());
+          const overlay = document.getElementById('banOverlay');
+          if (overlay) overlay.classList.remove('show');
+          const Toast = Swal.mixin({ toast: true, position: 'top', showConfirmButton: false, timer: 3000, timerProgressBar: true, background: '#1a0e2e', color: '#fff' });
+          Toast.fire({ icon: 'success', title: '🎉 Banned berakhir! Akun aktif kembali', html: '<div style="font-size:11.5px;color:#64ffc8;">Selamat datang kembali 👋</div>' });
+          const freshProfile = await fetchProfile(currentUser.id);
+          if (freshProfile && !freshProfile.banned) {
+            currentProfile = freshProfile;
+            await updateAuthUI(currentUser);
+            document.getElementById('authScreen').classList.add('hidden');
+            switchPage('home');
+            stopUserBanCheckTimer();
+          }
         }
       }
-    } catch (e) {}
-  }, 15000);
+    } catch (e) { console.warn('Ban check error:', e); }
+  }, 10000);
 }
 function stopUserBanCheckTimer() { if (userBanCheckInterval) { clearInterval(userBanCheckInterval); userBanCheckInterval = null; } }
 
+// ============================================================
+// BAN OVERLAY (AUTO-UNBAN TANPA REFRESH)
+// ============================================================
 function showBanOverlay(profile) {
   const overlay = document.getElementById('banOverlay');
   overlay.classList.add('show');
   document.getElementById('banEmail').textContent = profile.email || '-';
   document.getElementById('banReason').innerHTML = (profile.banned_reason || 'Tidak ada alasan').replace(/\n/g, '<br>');
   if (banCountdownInterval) clearInterval(banCountdownInterval);
+  
   const bannedUntil = profile.banned_until ? new Date(profile.banned_until) : null;
+  
   function tick() {
     const cd = document.getElementById('banCountdown');
     if (!bannedUntil) { cd.textContent = 'PERMANEN'; return; }
     const diff = bannedUntil - new Date();
     if (diff <= 0) {
-      cd.textContent = '✅ Auto-unban...'; cd.style.color = '#64ffc8'; clearInterval(banCountdownInterval);
-      if (currentUser) supabaseClient.rpc('auto_unban_user_by_id', { p_user_id: currentUser.id }).then(r => { if (r.data && r.data.success) setTimeout(() => location.reload(), 1500); });
+      cd.textContent = '✅ Auto-unban...';
+      cd.style.color = '#64ffc8';
+      clearInterval(banCountdownInterval);
+      
+      if (currentUser) {
+        supabaseClient.rpc('auto_unban_user_by_id', { p_user_id: currentUser.id }).then(async r => {
+          if (r.data && r.data.success) {
+            overlay.classList.remove('show');
+            const Toast = Swal.mixin({ toast: true, position: 'top', showConfirmButton: false, timer: 3000, timerProgressBar: true, background: '#1a0e2e', color: '#fff' });
+            Toast.fire({ icon: 'success', title: '🎉 Banned berakhir! Akun aktif kembali', html: '<div style="font-size:11.5px;color:#64ffc8;">Selamat datang kembali 👋</div>' });
+            const freshProfile = await fetchProfile(currentUser.id);
+            if (freshProfile && !freshProfile.banned) {
+              currentProfile = freshProfile;
+              await updateAuthUI(currentUser);
+              document.getElementById('authScreen').classList.add('hidden');
+              switchPage('home');
+              stopUserBanCheckTimer();
+            }
+          }
+        });
+      }
       return;
     }
     const days = Math.floor(diff / 86400000);
@@ -1846,8 +2003,14 @@ async function updateAuthUI(user) {
     currentProfile = profile;
     if (profile && profile.banned) {
       const until = profile.banned_until ? new Date(profile.banned_until) : null;
-      if (until && until < new Date()) { await autoUnbanUser(user.id); currentProfile = await fetchProfile(user.id); }
-      else { authScreen.classList.add('hidden'); showBanOverlay(profile); return; }
+      if (until && until < new Date()) {
+        await autoUnbanUser(user.id);
+        currentProfile = await fetchProfile(user.id);
+      } else {
+        authScreen.classList.add('hidden');
+        showBanOverlay(profile);
+        return;
+      }
     }
     document.getElementById('banOverlay').classList.remove('show');
     if (banCountdownInterval) clearInterval(banCountdownInterval);
@@ -2532,15 +2695,13 @@ async function rejectRefund(refundId, btnElement) {
 }
 
 // ============================================================
-// BAN/UNBAN/MUTE — DENGAN PROTEKSI ROLE ADMIN/OWNER
+// BAN/UNBAN/MUTE — DENGAN PROTEKSI ROLE
 // ============================================================
 async function openBanDialog(email, userId, isUnbanMode) {
-  // 🔒 PROTEKSI: hanya admin/owner
   if (!currentProfile || !['admin', 'owner'].includes(currentProfile.role)) {
     Swal.fire({ title: '🔒 Akses Ditolak', html: '<div style="text-align:left;color:#ddd;font-size:13px;">Hanya <b style="color:#b388ff;">Admin</b> atau <b style="color:#ffd700;">Owner</b> yang dapat melakukan ban/unban.</div>', icon: 'error', confirmButtonColor: '#ff4444', background: '#1a0e2e', color: '#fff' });
     return;
   }
-  // 🔒 Admin tidak bisa ban owner
   if (currentProfile.role === 'admin' && !isUnbanMode) {
     const targetUser = allMembersCache.find(x => x.email === email);
     if (targetUser && targetUser.role === 'owner') {
@@ -2548,7 +2709,6 @@ async function openBanDialog(email, userId, isUnbanMode) {
       return;
     }
   }
-  
   if (isUnbanMode) {
     const confirm = await Swal.fire({ title: '✅ Unban User?', html: `<div style="text-align:left;color:#ddd;font-size:13px;line-height:1.8;"><div style="background:rgba(34,197,94,0.1);padding:12px;border-radius:10px;border-left:3px solid #22c55e;margin-bottom:12px;"><b style="color:#22c55e;">📧 Email:</b><br><span style="color:#f1e6f5;word-break:break-all;font-weight:700;">${escapeHtml(email)}</span></div><p>User akan diaktifkan kembali.</p></div>`, icon: 'question', showCancelButton: true, confirmButtonText: '✅ Ya, Unban', cancelButtonText: '❌ Batal', confirmButtonColor: '#22c55e', cancelButtonColor: '#6b4a7a', background: '#1a0e2e', color: '#fff' });
     if (!confirm.isConfirmed) return;
@@ -2561,12 +2721,11 @@ async function openBanDialog(email, userId, isUnbanMode) {
     } catch (err) { Swal.fire({ title: '❌ Gagal', text: err.message, icon: 'error', confirmButtonColor: '#ff4444', background: '#1a0e2e', color: '#fff' }); }
     return;
   }
-  
   const defaultDate = new Date(); defaultDate.setDate(defaultDate.getDate() + 7);
   const defaultDateStr = defaultDate.toISOString().slice(0, 16);
   const { value: formValues } = await Swal.fire({
     title: '🚫 Ban User',
-    html: `<div style="text-align:left;color:#ddd;font-size:13px;"><div style="background:rgba(255,68,68,0.1);padding:12px;border-radius:10px;border-left:3px solid #ff4444;margin-bottom:14px;"><b style="color:#ff6666;">📧 Email Target:</b><br><span style="color:#f1e6f5;word-break:break-all;font-weight:700;">${escapeHtml(email)}</span></div><label style="display:block;font-size:11px;font-weight:800;color:#b39ddb;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">⏰ Ban Sampai Tanggal</label><input id="swal-ban-until" type="datetime-local" value="${defaultDateStr}" style="width:100%;box-sizing:border-box;background:rgba(255,255,255,0.05);color:#fff;border:1.5px solid rgba(255,68,68,0.5);border-radius:10px;padding:11px 14px;font-family:inherit;font-size:13px;margin-bottom:14px;color-scheme:dark;"><label style="display:block;font-size:11px;font-weight:800;color:#b39ddb;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">📝 Alasan Ban (wajib)</label><textarea id="swal-ban-reason" placeholder="Contoh: Spam, penipuan, dll..." maxlength="300" style="width:100%;box-sizing:border-box;background:rgba(255,255,255,0.05);color:#fff;border:1.5px solid rgba(255,68,68,0.5);border-radius:10px;padding:11px 14px;font-family:inherit;font-size:13px;min-height:70px;resize:vertical;"></textarea><div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;"><button type="button" onclick="setBanQuick(1)" style="flex:1;padding:6px 8px;border-radius:6px;background:rgba(255,68,68,0.15);color:#ff8080;border:1px solid rgba(255,68,68,0.3);font-size:11px;font-weight:700;cursor:pointer;">1 Jam</button><button type="button" onclick="setBanQuick(24)" style="flex:1;padding:6px 8px;border-radius:6px;background:rgba(255,68,68,0.15);color:#ff8080;border:1px solid rgba(255,68,68,0.3);font-size:11px;font-weight:700;cursor:pointer;">24 Jam</button><button type="button" onclick="setBanQuick(168)" style="flex:1;padding:6px 8px;border-radius:6px;background:rgba(255,68,68,0.15);color:#ff8080;border:1px solid rgba(255,68,68,0.3);font-size:11px;font-weight:700;cursor:pointer;">7 Hari</button><button type="button" onclick="setBanQuick(720)" style="flex:1;padding:6px 8px;border-radius:6px;background:rgba(255,68,68,0.15);color:#ff8080;border:1px solid rgba(255,68,68,0.3);font-size:11px;font-weight:700;cursor:pointer;">30 Hari</button></div></div>`,
+    html: `<div style="text-align:left;color:#ddd;font-size:13px;"><div style="background:rgba(255,68,68,0.1);padding:12px;border-radius:10px;border-left:3px solid #ff4444;margin-bottom:14px;"><b style="color:#ff6666;">📧 Email Target:</b><br><span style="color:#f1e6f5;word-break:break-all;font-weight:700;">${escapeHtml(email)}</span></div><label style="display:block;font-size:11px;font-weight:800;color:#b39ddb;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">⏰ Ban Sampai Tanggal</label><input id="swal-ban-until" type="datetime-local" value="${defaultDateStr}" style="width:100%;box-sizing:border-box;background:rgba(255,255,255,0.05);color:#fff;border:1.5px solid rgba(255,68,68,0.5);border-radius:10px;padding:11px 14px;font-family:inherit;font-size:13px;margin-bottom:14px;color-scheme:dark;"><label style="display:block;font-size:11px;font-weight:800;color:#b39ddb;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">📝 Alasan Ban (wajib)</label><textarea id="swal-ban-reason" placeholder="Contoh: Spam, penipuan..." maxlength="300" style="width:100%;box-sizing:border-box;background:rgba(255,255,255,0.05);color:#fff;border:1.5px solid rgba(255,68,68,0.5);border-radius:10px;padding:11px 14px;font-family:inherit;font-size:13px;min-height:70px;resize:vertical;"></textarea><div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;"><button type="button" onclick="setBanQuick(1)" style="flex:1;padding:6px 8px;border-radius:6px;background:rgba(255,68,68,0.15);color:#ff8080;border:1px solid rgba(255,68,68,0.3);font-size:11px;font-weight:700;cursor:pointer;">1 Jam</button><button type="button" onclick="setBanQuick(24)" style="flex:1;padding:6px 8px;border-radius:6px;background:rgba(255,68,68,0.15);color:#ff8080;border:1px solid rgba(255,68,68,0.3);font-size:11px;font-weight:700;cursor:pointer;">24 Jam</button><button type="button" onclick="setBanQuick(168)" style="flex:1;padding:6px 8px;border-radius:6px;background:rgba(255,68,68,0.15);color:#ff8080;border:1px solid rgba(255,68,68,0.3);font-size:11px;font-weight:700;cursor:pointer;">7 Hari</button><button type="button" onclick="setBanQuick(720)" style="flex:1;padding:6px 8px;border-radius:6px;background:rgba(255,68,68,0.15);color:#ff8080;border:1px solid rgba(255,68,68,0.3);font-size:11px;font-weight:700;cursor:pointer;">30 Hari</button></div></div>`,
     showCancelButton: true, confirmButtonText: '🚫 Ban Sekarang', cancelButtonText: '❌ Batal', confirmButtonColor: '#ff4444', cancelButtonColor: '#6b4a7a', background: '#1a0e2e', color: '#fff', width: 500,
     preConfirm: () => {
       const until = document.getElementById('swal-ban-until').value;
@@ -2590,7 +2749,6 @@ async function openBanDialog(email, userId, isUnbanMode) {
 function setBanQuick(hours) { const d = new Date(); d.setHours(d.getHours() + hours); const input = document.getElementById('swal-ban-until'); if (input) input.value = d.toISOString().slice(0, 16); }
 
 async function openMuteDialog(email, userId, isUnmuteMode) {
-  // 🔒 PROTEKSI: hanya admin/owner
   if (!currentProfile || !['admin', 'owner'].includes(currentProfile.role)) {
     Swal.fire({ title: '🔒 Akses Ditolak', html: '<div style="text-align:left;color:#ddd;font-size:13px;">Hanya <b style="color:#b388ff;">Admin</b> atau <b style="color:#ffd700;">Owner</b> yang dapat melakukan mute/unmute.</div>', icon: 'error', confirmButtonColor: '#ff4444', background: '#1a0e2e', color: '#fff' });
     return;
@@ -2602,7 +2760,6 @@ async function openMuteDialog(email, userId, isUnmuteMode) {
       return;
     }
   }
-  
   if (isUnmuteMode) {
     const confirm = await Swal.fire({ title: '🔊 Unmute User?', html: `<div style="text-align:left;color:#ddd;font-size:13px;line-height:1.8;"><div style="background:rgba(100,255,200,0.1);padding:12px;border-radius:10px;border-left:3px solid #64ffc8;margin-bottom:12px;"><b style="color:#64ffc8;">📧 Email:</b><br><span style="color:#f1e6f5;word-break:break-all;font-weight:700;">${escapeHtml(email)}</span></div><p>User akan bisa chat lagi di Global Chat.</p></div>`, icon: 'question', showCancelButton: true, confirmButtonText: '✅ Ya, Unmute', cancelButtonText: '❌ Batal', confirmButtonColor: '#64ffc8', cancelButtonColor: '#6b4a7a', background: '#1a0e2e', color: '#fff' });
     if (!confirm.isConfirmed) return;
@@ -2615,19 +2772,18 @@ async function openMuteDialog(email, userId, isUnmuteMode) {
     } catch (err) { Swal.fire({ title: '❌ Gagal', text: err.message, icon: 'error', confirmButtonColor: '#ff4444', background: '#1a0e2e', color: '#fff' }); }
     return;
   }
-  
   const defaultDate = new Date(); defaultDate.setHours(defaultDate.getHours() + 24);
   const defaultDateStr = defaultDate.toISOString().slice(0, 16);
   const { value: formValues } = await Swal.fire({
     title: '🔇 Mute User',
-    html: `<div style="text-align:left;color:#ddd;font-size:13px;"><div style="background:rgba(255,170,0,0.1);padding:12px;border-radius:10px;border-left:3px solid #ffaa00;margin-bottom:14px;"><b style="color:#ffaa00;">📧 Email Target:</b><br><span style="color:#f1e6f5;word-break:break-all;font-weight:700;">${escapeHtml(email)}</span></div><label style="display:block;font-size:11px;font-weight:800;color:#b39ddb;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">⏰ Mute Sampai Tanggal</label><input id="swal-mute-until" type="datetime-local" value="${defaultDateStr}" style="width:100%;box-sizing:border-box;background:rgba(255,255,255,0.05);color:#fff;border:1.5px solid rgba(255,170,0,0.5);border-radius:10px;padding:11px 14px;font-family:inherit;font-size:13px;margin-bottom:14px;color-scheme:dark;"><label style="display:block;font-size:11px;font-weight:800;color:#b39ddb;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">📝 Alasan Mute (wajib)</label><textarea id="swal-mute-reason" placeholder="Contoh: Spam, toxic, dll..." maxlength="300" style="width:100%;box-sizing:border-box;background:rgba(255,255,255,0.05);color:#fff;border:1.5px solid rgba(255,170,0,0.5);border-radius:10px;padding:11px 14px;font-family:inherit;font-size:13px;min-height:70px;resize:vertical;"></textarea><div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;"><button type="button" onclick="setMuteQuick(1)" style="flex:1;padding:6px 8px;border-radius:6px;background:rgba(255,170,0,0.15);color:#ffaa00;border:1px solid rgba(255,170,0,0.3);font-size:11px;font-weight:700;cursor:pointer;">1 Jam</button><button type="button" onclick="setMuteQuick(24)" style="flex:1;padding:6px 8px;border-radius:6px;background:rgba(255,170,0,0.15);color:#ffaa00;border:1px solid rgba(255,170,0,0.3);font-size:11px;font-weight:700;cursor:pointer;">24 Jam</button><button type="button" onclick="setMuteQuick(168)" style="flex:1;padding:6px 8px;border-radius:6px;background:rgba(255,170,0,0.15);color:#ffaa00;border:1px solid rgba(255,170,0,0.3);font-size:11px;font-weight:700;cursor:pointer;">7 Hari</button><button type="button" onclick="setMuteQuick(720)" style="flex:1;padding:6px 8px;border-radius:6px;background:rgba(255,170,0,0.15);color:#ffaa00;border:1px solid rgba(255,170,0,0.3);font-size:11px;font-weight:700;cursor:pointer;">30 Hari</button></div></div>`,
+    html: `<div style="text-align:left;color:#ddd;font-size:13px;"><div style="background:rgba(255,170,0,0.1);padding:12px;border-radius:10px;border-left:3px solid #ffaa00;margin-bottom:14px;"><b style="color:#ffaa00;">📧 Email Target:</b><br><span style="color:#f1e6f5;word-break:break-all;font-weight:700;">${escapeHtml(email)}</span></div><label style="display:block;font-size:11px;font-weight:800;color:#b39ddb;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">⏰ Mute Sampai Tanggal</label><input id="swal-mute-until" type="datetime-local" value="${defaultDateStr}" style="width:100%;box-sizing:border-box;background:rgba(255,255,255,0.05);color:#fff;border:1.5px solid rgba(255,170,0,0.5);border-radius:10px;padding:11px 14px;font-family:inherit;font-size:13px;margin-bottom:14px;color-scheme:dark;"><label style="display:block;font-size:11px;font-weight:800;color:#b39ddb;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">📝 Alasan Mute (wajib)</label><textarea id="swal-mute-reason" placeholder="Contoh: Spam, toxic..." maxlength="300" style="width:100%;box-sizing:border-box;background:rgba(255,255,255,0.05);color:#fff;border:1.5px solid rgba(255,170,0,0.5);border-radius:10px;padding:11px 14px;font-family:inherit;font-size:13px;min-height:70px;resize:vertical;"></textarea><div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;"><button type="button" onclick="setMuteQuick(1)" style="flex:1;padding:6px 8px;border-radius:6px;background:rgba(255,170,0,0.15);color:#ffaa00;border:1px solid rgba(255,170,0,0.3);font-size:11px;font-weight:700;cursor:pointer;">1 Jam</button><button type="button" onclick="setMuteQuick(24)" style="flex:1;padding:6px 8px;border-radius:6px;background:rgba(255,170,0,0.15);color:#ffaa00;border:1px solid rgba(255,170,0,0.3);font-size:11px;font-weight:700;cursor:pointer;">24 Jam</button><button type="button" onclick="setMuteQuick(168)" style="flex:1;padding:6px 8px;border-radius:6px;background:rgba(255,170,0,0.15);color:#ffaa00;border:1px solid rgba(255,170,0,0.3);font-size:11px;font-weight:700;cursor:pointer;">7 Hari</button></div></div>`,
     showCancelButton: true, confirmButtonText: '🔇 Mute Sekarang', cancelButtonText: '❌ Batal', confirmButtonColor: '#ffaa00', cancelButtonColor: '#6b4a7a', background: '#1a0e2e', color: '#fff', width: 500,
     preConfirm: () => {
       const until = document.getElementById('swal-mute-until').value;
       const reason = document.getElementById('swal-mute-reason').value.trim();
       if (!until) { Swal.showValidationMessage('⚠️ Tanggal wajib'); return false; }
       if (new Date(until) <= new Date()) { Swal.showValidationMessage('⚠️ Tanggal harus masa depan'); return false; }
-      if (!reason || reason.length < 3) { Swal.showValidationMessage('⚠️ Alasan wajib (min 3)'); return false; }
+      if (!reason || reason.length < 3) { Swal.showValidationMessage('⚠️ Alasan wajib'); return false; }
       return { until: new Date(until).toISOString(), reason };
     }
   });
@@ -2643,7 +2799,6 @@ async function openMuteDialog(email, userId, isUnmuteMode) {
 }
 function setMuteQuick(hours) { const d = new Date(); d.setHours(d.getHours() + hours); const input = document.getElementById('swal-mute-until'); if (input) input.value = d.toISOString().slice(0, 16); }
 
-// Mute dari Global Chat (dengan proteksi role)
 async function muteUserChatPrompt(targetUserId, targetEmail) {
   if (!currentProfile || !['admin', 'owner'].includes(currentProfile.role)) {
     Swal.fire({ title: '🔒 Akses Ditolak', html: '<div style="text-align:left;color:#ddd;font-size:13px;">Hanya <b style="color:#b388ff;">Admin</b> atau <b style="color:#ffd700;">Owner</b> yang dapat mute user dari Global Chat.</div>', icon: 'error', confirmButtonColor: '#ff4444', background: '#1a0e2e', color: '#fff' });
@@ -2687,7 +2842,6 @@ async function unmuteUserChat(targetUserId, targetEmail) {
   } catch (err) { Swal.fire({ title: '❌ Gagal', text: err.message, icon: 'error', confirmButtonColor: '#ff4444', background: '#1a0e2e', color: '#fff' }); }
 }
 
-// Toggle Pin Message (dengan proteksi role)
 async function togglePinMessage(msgId, pinned) {
   if (!currentProfile || !['admin', 'owner'].includes(currentProfile.role)) {
     Swal.fire({ title: '🔒 Akses Ditolak', text: 'Hanya Admin/Owner yang bisa pin', icon: 'error', confirmButtonColor: '#ff4444', background: '#1a0e2e', color: '#fff' });
@@ -2703,7 +2857,7 @@ async function togglePinMessage(msgId, pinned) {
 async function quickMuteUser(userId, email) { await muteUserChatPrompt(userId, email); }
 
 // ============================================================
-// EDIT BALANCE (existing)
+// EDIT BALANCE
 // ============================================================
 async function editBalancePrompt(email, currentBalance) {
   if (!currentProfile || !['admin', 'owner'].includes(currentProfile.role)) {
@@ -2731,7 +2885,7 @@ async function handleBalanceAction(email, currentBalance, action) {
   }[action];
   const { value: formValues } = await Swal.fire({
     title: config.title,
-    html: `<div style="text-align:left;font-size:12.5px;color:#b39ddb;margin-bottom:12px;padding:12px;background:rgba(0,198,255,0.06);border-radius:10px;border-left:3px solid #00c6ff;"><b style="color:#00c6ff;">📧 User:</b> <span style="color:#f1e6f5;">${escapeHtml(email)}</span><br><b style="color:#00c6ff;">💰 Saldo:</b> <span style="color:${isCurrentMinus ? '#ff4444' : '#facc15'};font-weight:800;">${isCurrentMinus ? '-' : ''}Rp ${Math.abs(currentNum).toLocaleString('id-ID')}</span></div><div style="position:relative;margin-bottom:12px;"><span style="position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:16px;font-weight:900;color:${config.color};">${config.symbol}</span><input id="balance-input" class="swal2-input" type="number" step="1" placeholder="${config.placeholder}" value="${action === 'set' ? currentNum : ''}" style="background:rgba(255,255,255,0.05);color:#fff;border:1.5px solid ${config.color}50;width:100%;box-sizing:border-box;padding-left:40px;font-size:15px;font-weight:800;"></div><div style="text-align:left;font-size:11.5px;padding:10px;border-radius:10px;margin-bottom:8px;border-left:3px solid #facc15;background:rgba(250,204,21,0.1);"><b style="color:#facc15;">📝 Alasan (wajib):</b></div><textarea id="balance-reason-input" class="swal2-textarea" placeholder="Contoh: Bonus, koreksi, dll" style="background:rgba(255,255,255,0.05);color:#fff;border:1.5px solid rgba(250,204,21,0.5);width:100%;box-sizing:border-box;font-size:13px;min-height:60px;resize:vertical;font-family:inherit;"></textarea>`,
+    html: `<div style="text-align:left;font-size:12.5px;color:#b39ddb;margin-bottom:12px;padding:12px;background:rgba(0,198,255,0.06);border-radius:10px;border-left:3px solid #00c6ff;"><b style="color:#00c6ff;">📧 User:</b> <span style="color:#f1e6f5;">${escapeHtml(email)}</span><br><b style="color:#00c6ff;">💰 Saldo:</b> <span style="color:${isCurrentMinus ? '#ff4444' : '#facc15'};font-weight:800;">${isCurrentMinus ? '-' : ''}Rp ${Math.abs(currentNum).toLocaleString('id-ID')}</span></div><div style="position:relative;margin-bottom:12px;"><span style="position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:16px;font-weight:900;color:${config.color};">${config.symbol}</span><input id="balance-input" class="swal2-input" type="number" step="1" placeholder="${config.placeholder}" value="${action === 'set' ? currentNum : ''}" style="background:rgba(255,255,255,0.05);color:#fff;border:1.5px solid ${config.color}50;width:100%;box-sizing:border-box;padding-left:40px;font-size:15px;font-weight:800;"></div><div style="text-align:left;font-size:11.5px;padding:10px;border-radius:10px;margin-bottom:8px;border-left:3px solid #facc15;background:rgba(250,204,21,0.1);"><b style="color:#facc15;">📝 Alasan (wajib):</b></div><textarea id="balance-reason-input" class="swal2-textarea" placeholder="Contoh: Bonus, koreksi..." style="background:rgba(255,255,255,0.05);color:#fff;border:1.5px solid rgba(250,204,21,0.5);width:100%;box-sizing:border-box;font-size:13px;min-height:60px;resize:vertical;font-family:inherit;"></textarea>`,
     showCancelButton: true, confirmButtonText: `${config.icon} Konfirmasi`, cancelButtonText: '❌ Batal', confirmButtonColor: config.color, cancelButtonColor: '#6b4a7a', background: '#1a0e2e', color: '#fff', width: 450,
     didOpen: () => { setTimeout(() => document.getElementById('balance-input')?.focus(), 100); },
     preConfirm: () => {
@@ -2741,7 +2895,7 @@ async function handleBalanceAction(email, currentBalance, action) {
       const reason = reasonInput.value.trim();
       if (isNaN(val) || input.value.trim() === '') { Swal.showValidationMessage('⚠️ Angka valid'); return false; }
       if ((action === 'add' || action === 'sub') && val < 0) { Swal.showValidationMessage('⚠️ Positif'); return false; }
-      if (!reason || reason.length < 3) { Swal.showValidationMessage('⚠️ Alasan wajib (min 3)'); return false; }
+      if (!reason || reason.length < 3) { Swal.showValidationMessage('⚠️ Alasan wajib'); return false; }
       return { value: val, reason };
     }
   });
@@ -2785,7 +2939,6 @@ async function loadMemberPage(showLoading = false) {
     if (linkBadge) linkBadge.textContent = allMembersCache.length;
   } catch (err) { listEl.innerHTML = `<div class="member-empty-state" style="color:#ff8080;"><span style="font-size:48px;display:block;margin-bottom:12px;opacity:0.5;">❌</span>Gagal: ${escapeHtml(err.message)}</div>`; }
 }
-
 function updateMemberPageStats() {
   const now = Date.now();
   const sevenDays = 7 * 24 * 60 * 60 * 1000;
@@ -2802,7 +2955,6 @@ function updateMemberPageStats() {
   document.getElementById('memStatBanned').textContent = bannedCount;
   document.getElementById('memberPageCount').textContent = allMembersCache.length;
 }
-
 function renderMemberPage() {
   const listEl = document.getElementById('memberPageList');
   if (!listEl) return;
@@ -2823,10 +2975,7 @@ function renderMemberPage() {
   }
   memberPageFilteredCache = filtered;
   if (filtered.length === 0) { listEl.innerHTML = `<div class="member-empty-state"><span style="font-size:48px;display:block;margin-bottom:12px;opacity:0.5;">🔍</span>Tidak ada member yang cocok</div>`; updateMemberBulkToolbar(); return; }
-  
-  // 🔒 CEK ROLE: hanya admin/owner yang boleh ban/mute
   const canBanMute = (currentProfile?.role === 'admin' || currentProfile?.role === 'owner');
-  
   let html = '';
   filtered.forEach(m => {
     const initial = (m.email || '?').charAt(0).toUpperCase();
@@ -2849,8 +2998,6 @@ function renderMemberPage() {
     const canSelect = !isSelf && !isTargetOwnerUtama;
     const isSelected = memberPageSelectedIds.has(m.id);
     const checkboxHTML = canSelect ? `<div class="mc-checkbox ${isSelected ? 'checked' : ''}" onclick="event.stopPropagation(); toggleMemberPageSelection('${m.id}')"></div>` : `<div style="width:22px;flex-shrink:0;"></div>`;
-    
-    // BAN/UNBAN BUTTON (hanya admin/owner)
     const isBanned = m.banned === true;
     const banUntil = m.banned_until ? new Date(m.banned_until) : null;
     const banExpired = banUntil && banUntil < new Date();
@@ -2865,8 +3012,6 @@ function renderMemberPage() {
         }
       }
     }
-    
-    // MUTE/UNMUTE BUTTON (hanya admin/owner)
     const isMuted = m.is_muted === true || (m.muted_until && new Date(m.muted_until) > new Date());
     const muteUntil = m.muted_until ? new Date(m.muted_until) : null;
     const muteExpired = muteUntil && muteUntil < new Date();
@@ -2881,8 +3026,6 @@ function renderMemberPage() {
         }
       }
     }
-    
-    // Status info
     let statusInfo = '';
     if ((isBanned && !banExpired) || (isMuted && !muteExpired)) {
       statusInfo = '<div style="display:flex;flex-direction:column;gap:4px;margin-top:6px;padding:8px 10px;background:rgba(0,0,0,0.25);border-radius:8px;font-size:10px;line-height:1.5;">';
@@ -2900,14 +3043,12 @@ function renderMemberPage() {
       }
       statusInfo += '</div>';
     }
-    
     html += `<div class="member-card-full ${isBanned && !banExpired ? 'banned' : ''} ${isSelected ? 'selected' : ''}" data-user-id="${m.id}"><div class="mc-top">${checkboxHTML}<div class="mc-avatar ${avatarClass}">${initial}</div><div class="mc-info"><div class="mc-email">${escapeHtml(m.email || '-')} ${roleTag} ${ownerUtamaTag} ${newTag}</div><div class="mc-meta">📅 ${created}</div></div><div class="mc-balance ${isMinus ? 'minus' : ''}">${balanceDisplay}</div></div>${statusInfo}<div class="mc-footer"><div class="mc-joined">🆔 ${m.id ? m.id.substring(0, 8) : '-'}...</div><div class="mc-actions"><button class="mc-action-btn detail" onclick="editBalancePrompt('${escapeAttr(m.email)}', ${balanceNum})">💰 Saldo</button>${banBtn}${muteBtn}${deleteBtn}</div></div></div>`;
   });
   listEl.innerHTML = html;
   updateMemberBulkToolbar();
   startBannedCountdownTicker();
 }
-
 function getSelectableMemberPageIds() {
   return memberPageFilteredCache.filter(m => m.email !== currentProfile?.email && m.email !== OWNER_UTAMA).map(m => m.id);
 }
@@ -2976,20 +3117,18 @@ async function bulkMemberPageBalanceAction(action) {
   const finalAmount = action === 'add' ? Math.abs(formValues.amount) : -Math.abs(formValues.amount);
   Swal.fire({ title: `${actionIcon} Memproses...`, html: `<div style="text-align:center;color:#ddd;"><div class="spinner" style="width:36px;height:36px;border-width:3px;margin:0 auto 12px;"></div><p>Update <b>${selectedUsers.length}</b> member...</p></div>`, allowOutsideClick: false, allowEscapeKey: false, showConfirmButton: false, background: '#1a0e2e', color: '#fff' });
   let successCount = 0, failCount = 0;
-  const failed = [];
   for (const user of selectedUsers) {
     try {
       const { data, error } = await supabaseClient.rpc('add_user_balance', { p_target_email: user.email, p_amount: finalAmount, p_reason: formValues.reason });
       if (error) throw error;
       if (!data.success) throw new Error(data.message || 'Gagal');
       successCount++;
-    } catch (err) { failCount++; failed.push(`${user.email}: ${err.message}`); }
+    } catch (err) { failCount++; }
   }
   await loadMemberPage(false);
   memberPageSelectedIds.clear();
   await Swal.fire({ title: successCount > 0 ? '✅ Berhasil!' : '❌ Gagal', html: `<div style="text-align:left;color:#ddd;font-size:13px;line-height:1.8;"><p><b>💰 Jumlah:</b> Rp ${Math.abs(finalAmount).toLocaleString('id-ID')} per member</p><p><b>📊 Total:</b> ${selectedUsers.length}</p>${successCount > 0 ? `<p style="color:#22c55e;"><b>✅ Berhasil:</b> ${successCount}</p>` : ''}${failCount > 0 ? `<p style="color:#ef4444;"><b>❌ Gagal:</b> ${failCount}</p>` : ''}</div>`, icon: successCount > 0 ? 'success' : 'error', confirmButtonColor: '#22c55e', background: '#1a0e2e', color: '#fff' });
 }
-
 function filterMemberPage(query) { memberPageSearchQuery = (query || '').toLowerCase().trim(); const clearBtn = document.getElementById('memberPageSearchClear'); if (clearBtn) clearBtn.style.display = memberPageSearchQuery ? 'flex' : 'none'; renderMemberPage(); }
 function clearMemberPageSearch() { const input = document.getElementById('memberPageSearch'); if (input) input.value = ''; memberPageSearchQuery = ''; const clearBtn = document.getElementById('memberPageSearchClear'); if (clearBtn) clearBtn.style.display = 'none'; renderMemberPage(); }
 function filterMemberPageAge(age, btnEl) { memberPageAgeFilter = age; document.querySelectorAll('#memberAgeFilterChips .filter-chip').forEach(b => b.classList.remove('active')); if (btnEl) btnEl.classList.add('active'); renderMemberPage(); }
@@ -3181,7 +3320,6 @@ async function deleteGlobalMessageHard(msgId) {
   if (reason === undefined) return;
   try { const { error } = await chatClient.from('global_messages').delete().eq('id', msgId); if (error) throw error; loadGlobalMessages(); } catch (err) { Swal.fire({ title: '❌ Gagal', text: err.message, icon: 'error', confirmButtonColor: '#ff4444', background: '#1a0e2e', color: '#fff' }); }
 }
-
 function openSupportView() {
   if (isStaff) { document.getElementById('supportUsersView').style.display = 'flex'; document.getElementById('supportChatViewUser').style.display = 'none'; document.getElementById('supportChatViewAdmin').style.display = 'none'; loadSupportUsers(); }
   else { document.getElementById('supportUsersView').style.display = 'none'; document.getElementById('supportChatViewUser').style.display = 'flex'; document.getElementById('supportChatViewAdmin').style.display = 'none'; loadSupportChatForUser(currentUser.id); }
@@ -3442,7 +3580,7 @@ function cleanupPresence() {
   onlineUsersMap = {};
 }
 
-// MEMBER LIST (dropdown lama)
+// MEMBER LIST
 async function loadMemberList() {
   const listEl = document.getElementById('memberList');
   if (!listEl) return;
@@ -3621,9 +3759,7 @@ function updateNotifStatusDisplay() { const el = document.getElementById('notifS
 async function initNotifications() { if (!isNotificationSupported()) return; updateNotifStatusDisplay(); }
 function showNotificationPermissionBanner() { const old = document.querySelector('.notif-permission-banner'); if (old) old.remove(); if (!isNotificationSupported() || Notification.permission !== 'default') return; const banner = document.createElement('div'); banner.className = 'notif-permission-banner'; banner.innerHTML = `<span class="npb-icon">🔔</span><div class="npb-content"><div class="npb-title">Aktifkan Notifikasi</div><div class="npb-sub">Dapatkan notifikasi dari CS</div></div><button class="npb-btn" onclick="this.parentElement.remove(); requestNotificationPermission()">Aktifkan</button>`; document.body.appendChild(banner); setTimeout(() => { if (banner.parentNode) banner.remove(); }, 15000); }
 
-// ============================================================
 // INIT AUTH
-// ============================================================
 async function initAuth() {
   if (!supabaseClient) { updateAuthUI(null); return; }
   try {
