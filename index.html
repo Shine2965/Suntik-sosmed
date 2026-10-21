@@ -1143,6 +1143,11 @@ let memberPageRoleFilter = 'all';
 let memberPageSelectedIds = new Set();
 let memberPageFilteredCache = [];
 
+// ============================================================
+// 🆕 AUTO-CLEANUP ORDERS TANPA ORDER ID PROVIDER (SETIAP 5 MENIT)
+// ============================================================
+let autoCleanupOrderInterval = null;
+
 try {
   supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, storage: window.localStorage, storageKey: 'shine-shop-auth' }
@@ -1553,6 +1558,8 @@ async function syncAllOrdersStatusesSilent() {
 async function syncAllOrdersStatuses() {
   if (isSyncingOrders) return;
   if (!allOrdersCache || allOrdersCache.length === 0) return;
+  // Jalankan auto-cleanup juga saat sync manual
+  await autoCleanupOrdersWithoutProviderId(false);
   const pendingOrders = allOrdersCache.filter(o => !['success', 'failed', 'refunded', 'canceled', 'completed', 'partial'].includes(o.order_status) && o.order_id && o.order_id !== '-' && o.order_id !== '');
   if (pendingOrders.length === 0) { Swal.fire({ title: '✅ Semua Final', icon: 'success', confirmButtonColor: '#22c55e', background: '#1a0e2e', color: '#fff' }); return; }
   isSyncingOrders = true;
@@ -1622,6 +1629,174 @@ document.addEventListener('visibilitychange', () => {
     if (activePage && activePage.id === 'page-orders') syncAllOrdersStatusesSilent();
   }
 });
+
+// ============================================================
+// 🆕 AUTO-CLEANUP: HAPUS PESANAN TANPA ORDER ID + AUTO REFUND (SETIAP 5 MENIT)
+// ============================================================
+async function autoCleanupOrdersWithoutProviderId(showToast = true) {
+  if (!supabaseClient || !currentUser) return { success: false, deleted: 0, refunded: 0 };
+  try {
+    // Ambil semua order yang tidak punya order_id provider (null/kosong/'-'/'null')
+    // Gunakan or() untuk menangkap semua variasi kosong
+    const { data: candidates, error } = await supabaseClient
+      .from('orders_detail')
+      .select('*')
+      .or('order_id.is.null,order_id.eq.,order_id.eq.-,order_id.eq.null')
+      .limit(500);
+    if (error) throw error;
+    if (!candidates || candidates.length === 0) {
+      if (showToast) console.log('🧹 Auto-cleanup: tidak ada pesanan tanpa OrderID');
+      return { success: true, deleted: 0, refunded: 0 };
+    }
+
+    // Filter: jangan hapus order yang sudah sukses/refunded (sudah final dan mungkin sengaja tidak punya provider id)
+    // Hanya proses yang statusnya pending/processing/failed/canceled/partial
+    const processable = candidates.filter(o => {
+      const st = String(o.order_status || '').toLowerCase();
+      if (st === 'success' || st === 'completed' || st === 'refunded') return false;
+      // Hindari double-process dengan lock di localStorage
+      try {
+        const lockKey = 'auto_cleanup_lock_' + o.id;
+        const lockAt = localStorage.getItem(lockKey);
+        if (lockAt && (Date.now() - parseInt(lockAt)) < 10 * 60 * 1000) return false; // lock 10 menit
+      } catch (e) {}
+      return true;
+    });
+
+    if (processable.length === 0) {
+      if (showToast) console.log('🧹 Auto-cleanup: semua pesanan tanpa OrderID sudah final');
+      return { success: true, deleted: 0, refunded: 0 };
+    }
+
+    let deletedCount = 0;
+    let refundedCount = 0;
+    let failedCount = 0;
+    const deletedDetails = [];
+
+    for (const order of processable) {
+      const lockKey = 'auto_cleanup_lock_' + order.id;
+      try { localStorage.setItem(lockKey, Date.now().toString()); } catch (e) {}
+
+      try {
+        // Cek dulu apakah sudah pernah direfund via refunds table (agar HANYA SEKALI)
+        let alreadyRefunded = false;
+        try {
+          const { data: existingRefund } = await supabaseClient
+            .from('refunds')
+            .select('id, status')
+            .eq('trx_id', String(order.order_id || order.id))
+            .limit(1);
+          if (existingRefund && existingRefund.length > 0) alreadyRefunded = true;
+        } catch (e) {}
+
+        // Kalau belum pernah direfund, lakukan refund
+        if (!alreadyRefunded) {
+          const totalPayment = parseFloat(order.total_payment || 0);
+          if (totalPayment > 0) {
+            // Cari user_id dari email jika tidak ada
+            let finalUserId = order.user_id;
+            let finalEmail = order.email;
+            if (!finalUserId && order.email) {
+              try {
+                const { data: prof } = await supabaseClient.from('profiles').select('id, email').eq('email', order.email).single();
+                if (prof?.id) { finalUserId = prof.id; finalEmail = prof.email; }
+              } catch (e) {}
+            }
+            if (!finalUserId) {
+              console.warn('⚠️ Auto-cleanup: user tidak ditemukan untuk order', order.id);
+              failedCount++;
+              // Lepas lock agar bisa dicoba lagi nanti
+              try { localStorage.removeItem(lockKey); } catch (e) {}
+              continue;
+            }
+            const refundReason = `Auto-refund (tanpa OrderID provider): Order ${order.order_id || order.id} — ${order.service_name || 'Layanan'}. Rp ${totalPayment.toLocaleString('id-ID')} dikembalikan.`;
+            // Panggil RPC refund (hanya sekali, dilindungi refunds table check)
+            const { data: rpcData, error: rpcError } = await supabaseClient.rpc('auto_refund_on_failure', {
+              p_user_id: finalUserId,
+              p_amount: totalPayment,
+              p_trx_id: String(order.order_id || order.id),
+              p_reason: refundReason
+            });
+            if (rpcError) throw new Error('RPC refund: ' + rpcError.message);
+            if (!rpcData || !rpcData.success) throw new Error(rpcData?.message || 'RPC refund failed');
+            // Simpan record refund ke tabel refunds (SEBAGAI ARSIP PERMANEN — HANYA SEKALI)
+            const { error: insertRefundErr } = await supabaseClient.from('refunds').insert({
+              user_id: finalUserId,
+              email: finalEmail || '-',
+              trx_id: String(order.order_id || order.id),
+              amount: totalPayment,
+              reason: refundReason,
+              source_method: 'saldo',
+              status: 'success',
+              approved_at: new Date().toISOString(),
+              created_at: new Date().toISOString()
+            });
+            if (insertRefundErr) console.warn('⚠️ Insert refunds:', insertRefundErr.message);
+            refundedCount++;
+          }
+        }
+
+        // Hapus order dari orders_detail
+        const { error: deleteErr } = await supabaseClient.from('orders_detail').delete().eq('id', order.id);
+        if (deleteErr) throw new Error('Delete: ' + deleteErr.message);
+        deletedCount++;
+        deletedDetails.push({ id: order.id, order_id: order.order_id, email: order.email, amount: parseFloat(order.total_payment || 0) });
+        // Hapus dari cache lokal
+        allOrdersCache = allOrdersCache.filter(o => o.id !== order.id);
+      } catch (err) {
+        console.error('❌ Auto-cleanup error untuk order', order.id, err);
+        failedCount++;
+        // Lepas lock jika gagal agar dicoba lagi di siklus berikutnya
+        try { localStorage.removeItem(lockKey); } catch (e) {}
+      }
+    }
+
+    // Tampilkan toast jika ada perubahan
+    if (showToast && (deletedCount > 0 || refundedCount > 0)) {
+      const Toast = Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 6000, timerProgressBar: true, background: '#1a0e2e', color: '#fff' });
+      Toast.fire({
+        icon: 'success',
+        title: `🧹 Auto-Cleanup`,
+        html: `<div style="font-size:11.5px;color:#64ffc8;">🗑️ ${deletedCount} pesanan dihapus<br>💰 ${refundedCount} refund (sekali)<br>${failedCount > 0 ? `⚠️ ${failedCount} gagal` : ''}</div>`
+      });
+    }
+
+    // Reload list order jika ada perubahan & sedang di halaman orders
+    if (deletedCount > 0) {
+      const activePage = document.querySelector('.page.active');
+      if (activePage && activePage.id === 'page-orders') {
+        setTimeout(() => loadOrderHistory(false), 500);
+      }
+    }
+
+    // Refresh balance user jika dia sendiri yang kena refund
+    if (refundedCount > 0) {
+      setTimeout(() => refreshBalance(), 800);
+    }
+
+    return { success: true, deleted: deletedCount, refunded: refundedCount, failed: failedCount };
+  } catch (err) {
+    console.error('❌ Auto-cleanup fatal error:', err);
+    return { success: false, error: err.message, deleted: 0, refunded: 0 };
+  }
+}
+
+function startAutoCleanupOrders() {
+  if (autoCleanupOrderInterval) clearInterval(autoCleanupOrderInterval);
+  // Jalankan pertama kali setelah 15 detik login
+  setTimeout(() => {
+    if (!document.hidden && currentUser) autoCleanupOrdersWithoutProviderId(false);
+  }, 15000);
+  // Lalu setiap 5 menit sekali
+  autoCleanupOrderInterval = setInterval(() => {
+    if (!document.hidden && currentUser) autoCleanupOrdersWithoutProviderId(false);
+  }, 5 * 60 * 1000); // 5 menit
+  console.log('🧹 Auto-cleanup orders scheduler aktif (setiap 5 menit)');
+}
+
+function stopAutoCleanupOrders() {
+  if (autoCleanupOrderInterval) { clearInterval(autoCleanupOrderInterval); autoCleanupOrderInterval = null; }
+}
 
 // ============================================================
 // AUTH
@@ -1740,6 +1915,7 @@ async function handleLogout() {
     stopUserBanCheckTimer();
     stopOrderAutoRefresh();
     stopOrderSyncRealtime();
+    stopAutoCleanupOrders();
     if (window._mutasiUserRefreshInterval) { clearInterval(window._mutasiUserRefreshInterval); window._mutasiUserRefreshInterval = null; }
     if (chatClient) await chatClient.auth.signOut();
     await supabaseClient.auth.signOut();
@@ -1954,6 +2130,8 @@ async function updateAuthUI(user) {
     updateNotifStatusDisplay();
     setTimeout(() => cleanupOldMutations(), 3000);
     setTimeout(() => loadWithdrawHistory(), 1500);
+    // 🆕 START AUTO-CLEANUP ORDERS TANPA ORDERID (SETIAP 5 MENIT)
+    startAutoCleanupOrders();
   } else {
     currentUser = null; currentProfile = null;
     isAdminOrOwner = false; isCS = false; isStaff = false; isOwner = false;
@@ -1968,6 +2146,7 @@ async function updateAuthUI(user) {
     stopUserBanCheckTimer();
     stopOrderAutoRefresh();
     stopOrderSyncRealtime();
+    stopAutoCleanupOrders(); // 🆕
     if (window._mutasiUserRefreshInterval) { clearInterval(window._mutasiUserRefreshInterval); window._mutasiUserRefreshInterval = null; }
     const notifBanner = document.querySelector('.notif-permission-banner');
     if (notifBanner) notifBanner.remove();
@@ -2186,19 +2365,14 @@ async function manualCheckPayment() {
 // ⭐ FITUR BARU: UBAH ROLE USER
 // ============================================================
 async function changeRolePrompt(email, currentRole, userId) {
-  // 🔒 PROTEKSI: hanya admin/owner
   if (!currentProfile || !['admin', 'owner'].includes(currentProfile.role)) {
     Swal.fire({ title: '🔒 Akses Ditolak', html: '<div style="text-align:left;color:#ddd;font-size:13px;">Hanya <b style="color:#b388ff;">Admin</b> atau <b style="color:#ffd700;">Owner</b> yang dapat mengubah role user.</div>', icon: 'error', confirmButtonColor: '#ff4444', background: '#1a0e2e', color: '#fff' });
     return;
   }
-  
-  // 🔒 Tidak bisa ubah owner utama
   if (email === OWNER_UTAMA) {
     Swal.fire({ title: '🔒 Terkunci', text: 'Role owner utama tidak bisa diubah!', icon: 'error', confirmButtonColor: '#ff4444', background: '#1a0e2e', color: '#fff' });
     return;
   }
-  
-  // 🔒 Admin tidak bisa ubah role owner
   if (currentProfile.role === 'admin') {
     const targetUser = allMembersCache.find(x => x.email === email);
     if (targetUser && targetUser.role === 'owner') {
@@ -2206,14 +2380,10 @@ async function changeRolePrompt(email, currentRole, userId) {
       return;
     }
   }
-  
-  // 🔒 Tidak bisa ubah role diri sendiri
   if (email === currentProfile.email) {
     Swal.fire({ title: '🔒 Tidak Bisa', text: 'Tidak bisa mengubah role diri sendiri!', icon: 'error', confirmButtonColor: '#ff4444', background: '#1a0e2e', color: '#fff' });
     return;
   }
-  
-  // 🔒 Hanya owner yang bisa set role owner
   const isOwnerRole = currentProfile.role === 'owner';
   const roleOptions = {
     'user': '👤 User',
@@ -2221,7 +2391,6 @@ async function changeRolePrompt(email, currentRole, userId) {
     'admin': '🛡️ Admin'
   };
   if (isOwnerRole) roleOptions['owner'] = '👑 Owner';
-  
   const { value: newRole } = await Swal.fire({
     title: '🎭 Ubah Role User',
     html: `
@@ -2232,12 +2401,10 @@ async function changeRolePrompt(email, currentRole, userId) {
           <div style="font-size:10px;color:#b388ff;font-weight:800;text-transform:uppercase;letter-spacing:0.5px;margin-top:10px;margin-bottom:4px;">🎭 Role Saat Ini:</div>
           <div style="display:inline-flex;align-items:center;gap:4px;padding:3px 12px;border-radius:20px;font-size:11px;font-weight:800;text-transform:uppercase;background:${getRoleBgColor(currentRole)};color:${getRoleTextColor(currentRole)};">${getRoleLabel(currentRole)}</div>
         </div>
-        
         <label style="display:block;font-size:11px;font-weight:800;color:#b39ddb;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">✨ Pilih Role Baru:</label>
         <select id="swal-new-role" class="swal2-select" style="background:rgba(255,255,255,0.05);color:#fff;border:1.5px solid rgba(179,136,255,0.5);width:100%;box-sizing:border-box;font-size:14px;padding:12px;border-radius:10px;">
           ${Object.entries(roleOptions).map(([val, label]) => `<option value="${val}" ${val === currentRole ? 'selected' : ''}>${label}</option>`).join('')}
         </select>
-        
         ${!isOwnerRole ? '<div style="margin-top:14px;padding:10px;background:rgba(250,204,21,0.1);border-radius:8px;border-left:3px solid #facc15;font-size:11.5px;color:#fde68a;">⚠️ <b>Catatan:</b> Hanya <b>Owner</b> yang bisa mengangkat user menjadi Owner.</div>' : ''}
       </div>
     `,
@@ -2257,13 +2424,9 @@ async function changeRolePrompt(email, currentRole, userId) {
       return val;
     }
   });
-  
   if (!newRole || newRole === currentRole) return;
-  
   try {
     Swal.fire({ title: '⏳ Menyimpan...', html: '<div style="color:#ddd;">Mengubah role...</div>', allowOutsideClick: false, allowEscapeKey: false, showConfirmButton: false, background: '#1a0e2e', color: '#fff' });
-    
-    // Coba via RPC dulu (kalau ada)
     let success = false;
     let errorMsg = '';
     try {
@@ -2276,8 +2439,6 @@ async function changeRolePrompt(email, currentRole, userId) {
     } catch (e) {
       errorMsg = e.message;
     }
-    
-    // Fallback: update langsung (kalau RPC gagal)
     if (!success) {
       console.log('⚠️ RPC set_user_role gagal, coba update langsung:', errorMsg);
       const { error: updateErr } = await supabaseClient
@@ -2287,9 +2448,7 @@ async function changeRolePrompt(email, currentRole, userId) {
       if (updateErr) throw new Error(updateErr.message);
       success = true;
     }
-    
     if (!success) throw new Error('Gagal mengubah role');
-    
     const roleLabel = getRoleLabel(newRole);
     await Swal.fire({
       title: '✅ Role Berhasil Diubah!',
@@ -2307,11 +2466,8 @@ async function changeRolePrompt(email, currentRole, userId) {
       timer: 4000,
       timerProgressBar: true
     });
-    
-    // Refresh list
     await loadMemberPage(false);
     if (allMembersCache.length > 0) await silentRefreshMemberList();
-    
   } catch (err) {
     Swal.fire({ title: '❌ Gagal', text: err.message, icon: 'error', confirmButtonColor: '#ff4444', background: '#1a0e2e', color: '#fff' });
   }
@@ -3834,7 +3990,7 @@ window.addEventListener('load', async () => {
   if (bfTitle) bfTitle.addEventListener('input', updateBroadcastCharCount);
   if (bfMessage) bfMessage.addEventListener('input', updateBroadcastCharCount);
   document.getElementById('chatHubModal').addEventListener('click', (e) => { if (e.target.id === 'chatHubModal') closeChatHub(); });
-  console.log('🌸 Shine Shop ready! (with role change)');
+  console.log('🌸 Shine Shop ready! (auto-cleanup orders + refund sekali)');
 });
 
 document.addEventListener('keydown', function(e) {
