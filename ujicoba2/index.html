@@ -1332,25 +1332,43 @@ async function createOrGetChatFolder(targetEmail, targetUserId) {
   if (!targetEmail || !isValidEmailStrict(targetEmail)) throw new Error('Email target tidak valid');
   if (targetEmail.toLowerCase() === myEmail.toLowerCase()) throw new Error('Tidak bisa chat dengan diri sendiri');
 
-  const chatOwnerId = await getChatUserId();
-  if (!chatOwnerId) throw new Error('Sesi chat belum siap. Silakan login ulang.');
+  // === DEBUG: cek session chat ===
+  const { data: sess } = await chatClient.auth.getSession();
+  const chatUid = sess?.session?.user?.id || null;
+  console.log('🔍 DEBUG chat_folders:');
+  console.log('  - currentUser.id (project UTAMA):', currentUser.id);
+  console.log('  - chat auth session uid (project CHAT):', chatUid);
+  console.log('  - chat session email:', sess?.session?.user?.email);
+
+  if (!chatUid) {
+    throw new Error('Session chat KOSONG. Login chat gagal. Cek: user harus login ulang, atau tabel users di project chat belum ada email ini. Chat UID: null');
+  }
+
+  // Test RPC whoami di project chat
+  try {
+    const { data: who, error: wErr } = await chatClient.rpc('whoami');
+    console.log('  - rpc whoami:', who, wErr?.message);
+  } catch(e) { console.log('  - rpc whoami error:', e.message); }
 
   const now = new Date().toISOString();
   const payload = {
-    owner_id: chatOwnerId,
+    owner_id: chatUid,
     owner_email: myEmail,
     folder_email: targetEmail.toLowerCase(),
     folder_user_id: targetUserId,
     created_at: now,
     last_activity_at: now
   };
+  console.log('  - payload insert:', payload);
 
   const { data: existing, error: checkError } = await chatClient
     .from('chat_folders')
     .select('*')
-    .eq('owner_id', chatOwnerId)
+    .eq('owner_id', chatUid)
     .eq('folder_email', targetEmail.toLowerCase())
     .limit(1);
+
+  console.log('  - cek existing:', existing, checkError?.message);
 
   if (!checkError && existing && existing.length > 0) {
     await chatClient.from('chat_folders').update({ last_activity_at: now }).eq('id', existing[0].id);
@@ -1363,12 +1381,14 @@ async function createOrGetChatFolder(targetEmail, targetUserId) {
     .select()
     .single();
 
+  console.log('  - insert result:', inserted, '| error:', insertError);
+
   if (insertError) {
     if (insertError.code === '42P01' || String(insertError.message).includes('relation')) {
-      throw new Error('Tabel chat_folders belum dibuat. Jalankan SQL:\nCREATE TABLE chat_folders (\n  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,\n  owner_id UUID NOT NULL,\n  owner_email TEXT,\n  folder_email TEXT NOT NULL,\n  folder_user_id UUID,\n  created_at TIMESTAMPTZ DEFAULT now(),\n  last_activity_at TIMESTAMPTZ DEFAULT now()\n);');
+      throw new Error('Tabel chat_folders belum dibuat.');
     }
     if (String(insertError.message).toLowerCase().includes('row-level') || insertError.code === '42501') {
-      throw new Error('RLS chat_folders menolak. Jalankan SQL policy:\nCREATE POLICY "owner_all" ON chat_folders FOR ALL USING (auth.uid() = owner_id) WITH CHECK (auth.uid() = owner_id);');
+      throw new Error(`RLS tolak. auth.uid() mungkin beda dengan owner_id (${chatUid}). Cek console log lengkap.`);
     }
     throw new Error('Gagal buat folder: ' + insertError.message);
   }
