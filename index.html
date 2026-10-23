@@ -800,7 +800,25 @@ body.chat-open .cs-bubble-container{display:none !important}
     <div class="page" id="page-chat">
       <div class="section" id="newChatBoxSection" style="display:none;">
         <div class="section-title">✉️ Mulai Chat Baru<div class="line"></div></div>
-        <div class="new-chat-box"><div class="nc-label">👤 Ketik Gmail User untuk Chat</div><div class="nc-input-wrap"><input type="email" id="newChatEmail" placeholder="user@gmail.com" autocomplete="email"><button onclick="startNewChat()" id="btnStartNewChat">💬 Chat</button></div></div>
+        <div class="new-chat-box">
+          <div class="nc-label">👤 Ketik Gmail User untuk Chat</div>
+          <div class="nc-input-wrap">
+            <input
+              type="email"
+              id="newChatEmail"
+              placeholder="user@gmail.com"
+              autocomplete="email"
+              autocapitalize="none"
+              autocorrect="off"
+              spellcheck="false"
+              inputmode="email"
+              onkeydown="if(event.key==='Enter'){event.preventDefault();startNewChat();}"
+              oninput="clearNewChatError()"
+            >
+            <button onclick="startNewChat()" id="btnStartNewChat">💬 Chat</button>
+          </div>
+          <div id="newChatError" style="display:none;margin-top:8px;padding:8px 10px;background:rgba(255,80,80,0.12);border:1px solid rgba(255,80,80,0.3);border-radius:8px;font-size:11.5px;color:#ff8080;line-height:1.4;align-items:center;gap:6px;"></div>
+        </div>
       </div>
       <div class="section" id="csFolderSection" style="display:none;">
         <div class="section-title">📁 Folder Chat Customer Service<div class="line"></div></div>
@@ -1187,6 +1205,35 @@ function formatBannedCountdown(bannedUntil) {
 }
 function validateEmail(email) { return email && typeof email === 'string' && email.includes('@') && email.includes('.'); }
 
+function isValidEmailStrict(email) {
+  if (!email || typeof email !== 'string') return false;
+  const re = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+  return re.test(email.trim().toLowerCase());
+}
+
+function showNewChatError(msg) {
+  const errEl = document.getElementById('newChatError');
+  const inputEl = document.getElementById('newChatEmail');
+  if (errEl) {
+    errEl.innerHTML = `⚠️ ${escapeHtml(msg)}`;
+    errEl.style.display = 'flex';
+  }
+  if (inputEl) {
+    inputEl.style.borderColor = '#ff4444';
+    inputEl.style.background = 'rgba(255,68,68,0.06)';
+  }
+}
+
+function clearNewChatError() {
+  const errEl = document.getElementById('newChatError');
+  const inputEl = document.getElementById('newChatEmail');
+  if (errEl) errEl.style.display = 'none';
+  if (inputEl) {
+    inputEl.style.borderColor = '';
+    inputEl.style.background = '';
+  }
+}
+
 // Helper order_id provider
 function getProviderOrderId(order) {
   const pid = order && order.order_id ? String(order.order_id).trim() : '';
@@ -1257,7 +1304,7 @@ async function fetchProfile(userId) {
 }
 
 // ============================================================
-// ORDER SYSTEM + AUTO-REFUND (pakai ORDER_ID dari provider)
+// ORDER SYSTEM + AUTO-REFUND
 // ============================================================
 const SOSMED_TYPE_MAP = {
   'sosmed-1': { label: 'Sosmed-1', endpoint: '/api/lollipop-services' },
@@ -1332,7 +1379,6 @@ async function fetchProviderStatus(order) {
   } catch (err) { return { success: false, message: err.message }; }
 }
 
-// ⭐ CEK apakah OrderID ini sudah pernah direfund di DB (LINTAS DEVICE)
 async function isOrderAlreadyRefunded(orderIdKey) {
   if (!supabaseClient || !orderIdKey) return false;
   try {
@@ -1352,14 +1398,12 @@ async function processAutoRefund(order, newStatus) {
   if (!['partial', 'canceled'].includes(newStatus)) return false;
   if (!order.user_id && !order.email) { console.warn('⚠️ Auto-refund skip: no user', order); return false; }
 
-  // ⭐ ORDER_ID dari provider = kunci refund
   const providerOrderId = getProviderOrderId(order);
   const refundKeyId = providerOrderId || String(order.id);
 
   const refundKey = `${refundKeyId}_${newStatus}`;
   if (autoRefundProcessedSet.has(refundKey)) return false;
 
-  // LAPIS 1: localStorage
   try {
     if (localStorage.getItem('refund_done_' + refundKey) === '1') {
       autoRefundProcessedSet.add(refundKey);
@@ -1367,7 +1411,6 @@ async function processAutoRefund(order, newStatus) {
     }
   } catch (e) {}
 
-  // LAPIS 2: CEK SUPABASE berdasarkan order_id (LINTAS BROWSER/PERANGKAT)
   const already = await isOrderAlreadyRefunded(refundKeyId);
   if (already) {
     console.log('🛑 Refund sudah ada di DB untuk order_id:', refundKeyId);
@@ -1406,15 +1449,14 @@ async function processAutoRefund(order, newStatus) {
   }
   if (!finalUserId) { console.error('❌ Auto-refund GAGAL: user_id tidak ditemukan', order); return false; }
 
-  // LAPIS 3: INSERT refunds (status='pending') + UNIQUE INDEX di order_id → tolak dobel
   try {
     const { data: insertData, error: insertErr } = await supabaseClient
       .from('refunds')
       .insert({
         user_id: finalUserId,
         email: order.email || '-',
-        order_id: String(refundKeyId),     // ⭐ KUNCI: ORDER_ID dari provider
-        trx_id: String(refundKeyId),       // ikut diset untuk kompatibilitas
+        order_id: String(refundKeyId),
+        trx_id: String(refundKeyId),
         amount: refundAmount,
         reason: refundReason,
         source_method: 'saldo',
@@ -1436,17 +1478,15 @@ async function processAutoRefund(order, newStatus) {
       throw new Error('Insert refund: ' + insertErr.message);
     }
 
-    // LAPIS 4: RPC refund saldo
     const { data: rpcData, error: rpcError } = await supabaseClient.rpc('auto_refund_on_failure', {
       p_user_id: finalUserId,
       p_amount: refundAmount,
-      p_trx_id: String(refundKeyId),   // isi dengan ORDER_ID provider
+      p_trx_id: String(refundKeyId),
       p_reason: refundReason
     });
     if (rpcError) throw new Error('RPC: ' + rpcError.message);
     if (!rpcData || !rpcData.success) throw new Error(rpcData?.message || 'RPC failed');
 
-    // LAPIS 5: Update status sukses
     await supabaseClient.from('refunds').update({
       status: 'success',
       approved_at: new Date().toISOString(),
@@ -1465,7 +1505,6 @@ async function processAutoRefund(order, newStatus) {
     return true;
 
   } catch (err) {
-    // Rollback: hapus record pending yang gagal
     try {
       await supabaseClient.from('refunds').delete()
         .eq('order_id', String(refundKeyId))
@@ -1760,10 +1799,7 @@ async function autoCleanupOrdersWithoutProviderId(showToast = true) {
       try { localStorage.setItem(lockKey, Date.now().toString()); } catch (e) {}
 
       try {
-        // ⭐ order_id provider KOSONG (memang tidak ada) → pakai order.id sebagai kunci unik refund
         const refundKeyId = String(order.id);
-
-        // Cek lintas device
         const alreadyRefunded = await isOrderAlreadyRefunded(refundKeyId);
 
         if (!alreadyRefunded) {
@@ -1832,7 +1868,6 @@ async function autoCleanupOrdersWithoutProviderId(showToast = true) {
           }
         }
 
-        // Hapus order dari orders_detail
         const { error: deleteErr } = await supabaseClient.from('orders_detail').delete().eq('id', order.id);
         if (deleteErr) throw new Error('Delete: ' + deleteErr.message);
         deletedCount++;
@@ -3623,25 +3658,122 @@ async function loadCSFolders() {
   } catch (err) { listEl.innerHTML = `<div class="chat-empty" style="color:#ff8080;">❌ ${err.message}</div>`; }
 }
 async function openCSFolder(userId, email) { openChatHub('support'); setTimeout(async () => { await openSupportChatWith(userId, email); await markMessagesAsRead(userId); }, 300); }
+
 async function startNewChat() {
   const input = document.getElementById('newChatEmail');
   const btn = document.getElementById('btnStartNewChat');
-  const email = input.value.trim().toLowerCase();
-  if (!email || !validateEmail(email)) { Swal.fire({ title: '⚠️ Email Invalid', icon: 'warning', confirmButtonColor: '#ff6b9d', background: '#1a0e2e', color: '#fff' }); return; }
-  btn.disabled = true; btn.innerHTML = '⏳...';
+  if (!input || !btn) return;
+
+  clearNewChatError();
+
+  const rawEmail = (input.value || '').trim().toLowerCase();
+  const email = rawEmail;
+
+  if (!email) {
+    showNewChatError('Gmail wajib diisi');
+    input.focus();
+    return;
+  }
+
+  if (!isValidEmailStrict(email)) {
+    showNewChatError('Format Gmail tidak valid (contoh: nama@gmail.com)');
+    input.focus();
+    return;
+  }
+
+  if (!currentUser || !currentProfile) {
+    showNewChatError('Anda harus login terlebih dahulu');
+    return;
+  }
+
+  const myEmail = (currentProfile.email || currentUser.email || '').toLowerCase();
+  if (myEmail && email === myEmail) {
+    showNewChatError('Tidak bisa chat dengan diri sendiri');
+    return;
+  }
+
+  input.disabled = true;
+  btn.disabled = true;
+  const originalBtnHTML = btn.innerHTML;
+  btn.innerHTML = '<span class="spinner" style="width:12px;height:12px;border-width:2px;"></span>';
+
   try {
-    const { data: profiles, error } = await supabaseClient.from('profiles').select('id, email, role').eq('email', email).limit(1);
-    if (error) throw error;
-    if (!profiles || profiles.length === 0) throw new Error('User tidak ditemukan');
-    const target = profiles[0];
-    if (target.email === currentProfile.email) throw new Error('Tidak bisa chat diri sendiri');
+    let target = null;
+    let profiles = null;
+    let error = null;
+
+    const res1 = await supabaseClient.from('profiles').select('id, email, role').ilike('email', email).limit(1);
+    profiles = res1.data; error = res1.error;
+
+    if (error || !profiles || profiles.length === 0) {
+      try {
+        const { data: rpcData, error: rpcErr } = await supabaseClient.rpc('find_user_by_email', { p_email: email });
+        if (!rpcErr && rpcData && rpcData.success && Array.isArray(rpcData.data) && rpcData.data.length > 0) {
+          profiles = rpcData.data;
+          error = null;
+        }
+      } catch (e) {}
+    }
+
+    if (error) throw new Error('Query error: ' + error.message);
+    if (!profiles || profiles.length === 0) {
+      throw new Error('User dengan Gmail tersebut tidak ditemukan');
+    }
+
+    target = profiles[0];
+    if (!target.id) throw new Error('Data user tidak valid');
+
+    const targetRole = (target.role || 'user').toLowerCase();
+    if (['owner', 'admin', 'cs'].includes(targetRole) && !isAdminOrOwner) {
+      const go = await Swal.fire({
+        title: '⚠️ Perhatian',
+        html: `<div style="text-align:left;color:#ddd;font-size:13px;">Gmail yang Anda masukkan milik <b>${escapeHtml(targetRole.toUpperCase())}</b>.<br>Lanjutkan chat?</div>`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: '💬 Lanjut',
+        cancelButtonText: '❌ Batal',
+        confirmButtonColor: '#ffaa00',
+        cancelButtonColor: '#6b4a7a',
+        background: '#1a0e2e',
+        color: '#fff'
+      });
+      if (!go.isConfirmed) {
+        input.disabled = false;
+        btn.disabled = false;
+        btn.innerHTML = originalBtnHTML;
+        return;
+      }
+    }
+
     await openSupportChatWith(target.id, target.email);
     document.getElementById('chatHubTitle').textContent = `Chat - ${target.email}`;
     input.value = '';
+
     setTimeout(() => loadCSFolders(), 500);
-  } catch (err) { Swal.fire({ title: '❌ Gagal', text: err.message, icon: 'error', confirmButtonColor: '#ff4444', background: '#1a0e2e', color: '#fff' }); }
-  finally { btn.disabled = false; btn.innerHTML = '💬 Chat'; }
+
+    const Toast = Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 2500, timerProgressBar: true, background: '#1a0e2e', color: '#fff' });
+    Toast.fire({ icon: 'success', title: `💬 Chat dengan ${target.email}` });
+
+  } catch (err) {
+    console.error('❌ Start new chat error:', err);
+    const msg = String(err?.message || 'Gagal memulai chat');
+    if (msg.toLowerCase().includes('tidak ditemukan') || msg.toLowerCase().includes('no rows')) {
+      showNewChatError('Gmail tidak terdaftar. Pastikan user sudah pernah login ke aplikasi');
+    } else if (msg.toLowerCase().includes('permission') || msg.toLowerCase().includes('row-level')) {
+      showNewChatError('Akses ditolak. Silakan login ulang sebagai admin/CS');
+    } else if (msg.toLowerCase().includes('network') || msg.toLowerCase().includes('fetch')) {
+      showNewChatError('Koneksi gagal. Periksa internet Anda');
+    } else {
+      showNewChatError(msg);
+    }
+    input.focus();
+  } finally {
+    input.disabled = false;
+    btn.disabled = false;
+    btn.innerHTML = originalBtnHTML;
+  }
 }
+
 async function openSupportChatWith(userId, email) {
   currentSupportTarget = { user_id: userId, email };
   document.getElementById('supportUsersView').style.display = 'none';
