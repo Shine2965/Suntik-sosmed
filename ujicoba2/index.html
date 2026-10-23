@@ -1330,9 +1330,13 @@ async function createOrGetChatFolder(targetEmail, targetUserId) {
   if (!targetEmail || !isValidEmailStrict(targetEmail)) throw new Error('Email target tidak valid');
   if (targetEmail.toLowerCase() === myEmail.toLowerCase()) throw new Error('Tidak bisa chat dengan diri sendiri');
 
+  // ✅ FIX: pakai chat user ID (auth.uid() di project CHAT), bukan currentUser.id
+  const chatOwnerId = await getChatUserId();
+  if (!chatOwnerId) throw new Error('Sesi chat belum siap. Silakan login ulang.');
+
   const now = new Date().toISOString();
   const payload = {
-    owner_id: currentUser.id,
+    owner_id: chatOwnerId,
     owner_email: myEmail,
     folder_email: targetEmail.toLowerCase(),
     folder_user_id: targetUserId,
@@ -1343,7 +1347,7 @@ async function createOrGetChatFolder(targetEmail, targetUserId) {
   const { data: existing, error: checkError } = await chatClient
     .from('chat_folders')
     .select('*')
-    .eq('owner_id', currentUser.id)
+    .eq('owner_id', chatOwnerId)
     .eq('folder_email', targetEmail.toLowerCase())
     .limit(1);
 
@@ -1362,6 +1366,9 @@ async function createOrGetChatFolder(targetEmail, targetUserId) {
     if (insertError.code === '42P01' || String(insertError.message).includes('relation')) {
       throw new Error('Tabel chat_folders belum dibuat. Jalankan SQL:\nCREATE TABLE chat_folders (\n  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,\n  owner_id UUID NOT NULL,\n  owner_email TEXT,\n  folder_email TEXT NOT NULL,\n  folder_user_id UUID,\n  created_at TIMESTAMPTZ DEFAULT now(),\n  last_activity_at TIMESTAMPTZ DEFAULT now()\n);');
     }
+    if (String(insertError.message).toLowerCase().includes('row-level') || insertError.code === '42501') {
+      throw new Error('RLS chat_folders menolak. Jalankan SQL policy:\nCREATE POLICY "owner_all" ON chat_folders FOR ALL USING (auth.uid() = owner_id) WITH CHECK (auth.uid() = owner_id);');
+    }
     throw new Error('Gagal buat folder: ' + insertError.message);
   }
   return inserted;
@@ -1370,10 +1377,12 @@ async function createOrGetChatFolder(targetEmail, targetUserId) {
 async function touchChatFolder(targetUserId) {
   if (!chatClient || !currentUser || !targetUserId) return;
   try {
+    const chatOwnerId = await getChatUserId();
+    if (!chatOwnerId) return;
     const now = new Date().toISOString();
     await chatClient.from('chat_folders')
       .update({ last_activity_at: now })
-      .eq('owner_id', currentUser.id)
+      .eq('owner_id', chatOwnerId)
       .eq('folder_user_id', targetUserId);
   } catch (e) {}
 }
@@ -3768,16 +3777,19 @@ async function loadCSFolders() {
   try {
     await cleanupExpiredChatFolders(true);
 
-    let folders = [];
-    try {
-      const { data: folderData, error: folderErr } = await chatClient
-        .from('chat_folders')
-        .select('*')
-        .eq('owner_id', currentUser.id)
-        .order('last_activity_at', { ascending: false })
-        .limit(200);
-      if (!folderErr && folderData) folders = folderData;
-    } catch (e) {}
+    llet folders = [];
+try {
+  const chatOwnerId = await getChatUserId();
+  if (chatOwnerId) {
+    const { data: folderData, error: folderErr } = await chatClient
+      .from('chat_folders')
+      .select('*')
+      .eq('owner_id', chatOwnerId)
+      .order('last_activity_at', { ascending: false })
+      .limit(200);
+    if (!folderErr && folderData) folders = folderData;
+  }
+} catch (e) {}
 
     const { data: msgData } = await chatClient
       .from('support_messages')
