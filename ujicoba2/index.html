@@ -129,15 +129,16 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
 .cs-folder-item:hover{background:rgba(0,198,255,0.1);border-color:rgba(0,198,255,0.3);transform:translateX(4px)}
 .cs-folder-item.has-unread{background:linear-gradient(135deg,rgba(0,198,255,0.15),rgba(255,107,157,0.1));border-color:rgba(0,198,255,0.4)}
 .cs-folder-item.has-unread::after{content:'';position:absolute;top:10px;right:10px;width:9px;height:9px;border-radius:50%;background:#ff4444;box-shadow:0 0 8px #ff4444;animation:badgePulse 1.2s ease-in-out infinite}
-.cs-folder-item.expiring{border-color:rgba(255,170,0,0.5);background:rgba(255,170,0,0.08)}
 @keyframes badgePulse{0%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(255,68,68,0.7)}50%{transform:scale(1.15);box-shadow:0 0 0 6px rgba(255,68,68,0)}}
 .cs-folder-icon{width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,rgba(0,198,255,0.25),rgba(0,114,255,0.15));border:1px solid rgba(0,198,255,0.3);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;font-weight:900;color:#00c6ff;position:relative}
 .cs-folder-info{flex:1;min-width:0}
 .cs-folder-email{font-size:12.5px;font-weight:700;color:#f1e6f5;word-break:break-all;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .cs-folder-preview{font-size:11px;color:#b39ddb;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .cs-folder-time{font-size:10px;color:#6b4a7a;flex-shrink:0;text-align:right}
-.cs-folder-time .ttl{display:block;font-size:9px;color:#ffaa00;font-weight:800;margin-top:2px}
 .cs-folder-badge{display:inline-flex;align-items:center;padding:2px 7px;border-radius:10px;background:rgba(255,68,68,0.2);color:#ff8080;font-size:9px;font-weight:800}
+.cs-folder-delete{position:absolute;top:6px;right:6px;width:20px;height:20px;border-radius:50%;background:rgba(255,68,68,0.2);border:none;color:#ff8080;font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity 0.2s ease;z-index:5}
+.cs-folder-item:hover .cs-folder-delete{opacity:1}
+.cs-folder-delete:hover{background:rgba(255,68,68,0.4);transform:scale(1.1)}
 .stats-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
 .stat-card{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.06);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:4px;transition:all 0.3s ease}
 .stat-card:hover{background:rgba(255,255,255,0.08);transform:translateY(-2px)}
@@ -805,8 +806,7 @@ body.chat-open .cs-bubble-container{display:none !important}
         <div class="new-chat-box">
           <div class="nc-label">👤 Ketik Gmail User untuk Chat</div>
           <div class="nc-input-wrap">
-            <input
-              type="email"
+            <input              type="email"
               id="newChatEmail"
               placeholder="user@gmail.com"
               autocomplete="email"
@@ -825,7 +825,7 @@ body.chat-open .cs-bubble-container{display:none !important}
       <div class="section" id="csFolderSection" style="display:none;">
         <div class="section-title">📁 Folder Chat Customer Service<div class="line"></div></div>
         <div id="csFolderList"><div class="chat-empty" style="padding:20px 10px;"><span class="icon">📭</span>Belum ada folder chat</div></div>
-        <div style="font-size:10px;color:#6b4a7a;text-align:center;margin-top:8px;font-style:italic;">Folder chat otomatis terhapus jika tidak ada aktivitas >3 hari</div>
+        <div style="font-size:10px;color:#6b4a7a;text-align:center;margin-top:8px;font-style:italic;">Folder chat bisa dihapus manual lewat tombol ✕ pada tiap folder</div>
       </div>
       <div class="section">
         <div class="section-title">💬 Pilih Chat<div class="line"></div></div>
@@ -834,7 +834,8 @@ body.chat-open .cs-bubble-container{display:none !important}
       </div>
       <div class="section"><div class="section-title">ℹ️ Info<div class="line"></div></div><div class="info-banner"><span class="icon">💡</span><div><b>Global Chat</b> auto-hapus 12 jam · <b>Support Chat</b> auto-hapus 24 jam. <b>Ctrl+Enter</b> untuk kirim.</div></div></div>
     </div>
-        <!-- HALAMAN PROFILE -->
+
+    <!-- HALAMAN PROFILE -->
     <div class="page" id="page-profile">
       <div class="profile-card" style="margin-bottom:16px;">
         <div class="profile-avatar-wrapper"><div class="profile-avatar" id="profileAvatar">U</div></div>
@@ -1097,7 +1098,6 @@ const OWNER_EMAIL = 'alvinojeremy74@gmail.com';
 const OWNER_UTAMA = 'alvinojeremy74@gmail.com';
 const QRIS_CRC = '00020101021126670016COM.NOBUBANK.WWW01189360050300000907180214260818000016290303UMI51440014ID.CO.QRIS.WWW0215ID10265728797100303UMI5204481253033605802ID5918SHINE SHOP ID CELL6008SURABAYA61056011162070703A016304743A';
 const WA_NUMBER = '6289518103883';
-const CHAT_FOLDER_TTL_MS = 3 * 24 * 60 * 60 * 1000; // 3 hari
 
 let supabaseClient = null;
 let chatClient = null;
@@ -1165,7 +1165,107 @@ let memberPageRoleFilter = 'all';
 let memberPageSelectedIds = new Set();
 let memberPageFilteredCache = [];
 let autoCleanupOrderInterval = null;
-let chatFolderCleanupInterval = null;
+
+// ⭐ Cache folder manual dari SUPABASE (bukan localStorage)
+let manualFoldersCache = [];
+let manualFoldersLoaded = false;
+
+// Ambil folder manual dari Supabase
+async function fetchManualFolders(forceRefresh = false) {
+  if (!supabaseClient) return [];
+  if (manualFoldersLoaded && !forceRefresh) return manualFoldersCache;
+  try {
+    const { data, error } = await supabaseClient
+      .from('cs_manual_folders')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(500);
+    if (error) {
+      console.warn('⚠️ Fetch manual folders error:', error.message);
+      return manualFoldersCache;
+    }
+    manualFoldersCache = data || [];
+    manualFoldersLoaded = true;
+    return manualFoldersCache;
+  } catch (e) {
+    return manualFoldersCache;
+  }
+}
+
+// Tambah folder manual ke Supabase
+async function addManualFolder(userId, email, role) {
+  if (!supabaseClient || !userId || !email) return false;
+  try {
+    const { data, error } = await supabaseClient
+      .from('cs_manual_folders')
+      .upsert({
+        user_id: userId,
+        email: email,
+        role: role || 'user',
+        added_by: currentUser?.id || null,
+        added_by_email: currentUser?.email || null,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'user_id' })
+      .select()
+      .single();
+    if (error) {
+      console.warn('⚠️ Add manual folder error:', error.message);
+      return false;
+    }
+    const idx = manualFoldersCache.findIndex(x => x.user_id === userId);
+    if (idx !== -1) manualFoldersCache[idx] = data;
+    else manualFoldersCache.unshift(data);
+    manualFoldersLoaded = true;
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+// Hapus folder manual dari Supabase
+async function removeManualFolder(userId) {
+  if (!supabaseClient || !userId) return false;
+  try {
+    const { error } = await supabaseClient
+      .from('cs_manual_folders')
+      .delete()
+      .eq('user_id', userId);
+    if (error) {
+      console.warn('⚠️ Remove manual folder error:', error.message);
+      return false;
+    }
+    manualFoldersCache = manualFoldersCache.filter(x => x.user_id !== userId);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+// Konfirmasi hapus folder
+async function removeCSFolder(userId) {
+  if (!userId) return;
+  const confirm = await Swal.fire({
+    title: '🗑️ Hapus Folder?',
+    text: 'Folder chat ini akan dihapus dari daftar (pesan tetap tersimpan)',
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonText: '🗑️ Hapus',
+    cancelButtonText: '❌ Batal',
+    confirmButtonColor: '#ff4444',
+    cancelButtonColor: '#6b4a7a',
+    background: '#1a0e2e',
+    color: '#fff'
+  });
+  if (!confirm.isConfirmed) return;
+  const ok = await removeManualFolder(userId);
+  if (ok) {
+    await loadCSFolders();
+    const Toast = Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 2000, background: '#1a0e2e', color: '#fff' });
+    Toast.fire({ icon: 'success', title: 'Folder dihapus' });
+  } else {
+    Swal.fire({ title: '❌ Gagal', text: 'Gagal menghapus folder', icon: 'error', confirmButtonColor: '#ff4444', background: '#1a0e2e', color: '#fff' });
+  }
+}
 
 try {
   supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
@@ -1239,20 +1339,6 @@ function clearNewChatError() {
   }
 }
 
-function formatFolderTTL(lastActivityAt) {
-  if (!lastActivityAt) return '-';
-  const last = new Date(lastActivityAt).getTime();
-  const diff = CHAT_FOLDER_TTL_MS - (Date.now() - last);
-  if (diff <= 0) return 'expired';
-  const days = Math.floor(diff / 86400000);
-  const hours = Math.floor((diff % 86400000) / 3600000);
-  const mins = Math.floor((diff % 3600000) / 60000);
-  if (days > 0) return `${days}h ${hours}j`;
-  if (hours > 0) return `${hours}j ${mins}m`;
-  return `${mins}m`;
-}
-
-// Helper order_id provider
 function getProviderOrderId(order) {
   const pid = order && order.order_id ? String(order.order_id).trim() : '';
   if (!pid) return '';
@@ -1319,134 +1405,6 @@ async function cleanupOldMutations() {
 async function fetchProfile(userId) {
   try { const { data, error } = await supabaseClient.from('profiles').select('*').eq('id', userId).single(); if (error) throw error; return data; }
   catch (e) { return null; }
-}
-
-// ============================================================
-// CHAT FOLDER SYSTEM
-// ✅ FIX: owner_id pakai chat auth uid (auth.uid() di project CHAT),
-//    bukan currentUser.id (auth uid project UTAMA)
-// ============================================================
-async function createOrGetChatFolder(targetEmail, targetUserId) {
-  if (!chatClient || !currentUser) throw new Error('Chat client belum siap');
-  const myEmail = currentProfile?.email || currentUser.email || '';
-  if (!targetEmail || !isValidEmailStrict(targetEmail)) throw new Error('Email target tidak valid');
-  if (targetEmail.toLowerCase() === myEmail.toLowerCase()) throw new Error('Tidak bisa chat dengan diri sendiri');
-
-  // === DEBUG: cek session chat ===
-  const { data: sess } = await chatClient.auth.getSession();
-  const chatUid = sess?.session?.user?.id || null;
-  console.log('🔍 DEBUG chat_folders:');
-  console.log('  - currentUser.id (project UTAMA):', currentUser.id);
-  console.log('  - chat auth session uid (project CHAT):', chatUid);
-  console.log('  - chat session email:', sess?.session?.user?.email);
-
-  if (!chatUid) {
-    throw new Error('Session chat KOSONG. Login chat gagal. Cek: user harus login ulang, atau tabel users di project chat belum ada email ini. Chat UID: null');
-  }
-
-  // Test RPC whoami di project chat
-  try {
-    const { data: who, error: wErr } = await chatClient.rpc('whoami');
-    console.log('  - rpc whoami:', who, wErr?.message);
-  } catch(e) { console.log('  - rpc whoami error:', e.message); }
-
-  const now = new Date().toISOString();
-  const payload = {
-    owner_id: chatUid,
-    owner_email: myEmail,
-    folder_email: targetEmail.toLowerCase(),
-    folder_user_id: targetUserId,
-    created_at: now,
-    last_activity_at: now
-  };
-  console.log('  - payload insert:', payload);
-
-  const { data: existing, error: checkError } = await chatClient
-    .from('chat_folders')
-    .select('*')
-    .eq('owner_id', chatUid)
-    .eq('folder_email', targetEmail.toLowerCase())
-    .limit(1);
-
-  console.log('  - cek existing:', existing, checkError?.message);
-
-  if (!checkError && existing && existing.length > 0) {
-    await chatClient.from('chat_folders').update({ last_activity_at: now }).eq('id', existing[0].id);
-    return existing[0];
-  }
-
-  const { data: inserted, error: insertError } = await chatClient
-    .from('chat_folders')
-    .insert(payload)
-    .select()
-    .single();
-
-  console.log('  - insert result:', inserted, '| error:', insertError);
-
-  if (insertError) {
-    if (insertError.code === '42P01' || String(insertError.message).includes('relation')) {
-      throw new Error('Tabel chat_folders belum dibuat.');
-    }
-    if (String(insertError.message).toLowerCase().includes('row-level') || insertError.code === '42501') {
-      throw new Error(`RLS tolak. auth.uid() mungkin beda dengan owner_id (${chatUid}). Cek console log lengkap.`);
-    }
-    throw new Error('Gagal buat folder: ' + insertError.message);
-  }
-  return inserted;
-}
-
-async function touchChatFolder(targetUserId) {
-  if (!chatClient || !currentUser || !targetUserId) return;
-  try {
-    const chatOwnerId = await getChatUserId();
-    if (!chatOwnerId) return;
-    const now = new Date().toISOString();
-    await chatClient.from('chat_folders')
-      .update({ last_activity_at: now })
-      .eq('owner_id', chatOwnerId)
-      .eq('folder_user_id', targetUserId);
-  } catch (e) {}
-}
-
-async function cleanupExpiredChatFolders(silent = true) {
-  if (!chatClient) return;
-  try {
-    const cutoff = new Date(Date.now() - CHAT_FOLDER_TTL_MS).toISOString();
-    const { data, error } = await chatClient
-      .from('chat_folders')
-      .delete()
-      .lt('last_activity_at', cutoff)
-      .select('id');
-    if (error) {
-      if (error.code === '42P01') return { success: false, deleted: 0 };
-      throw error;
-    }
-    const count = data ? data.length : 0;
-    if (count > 0) console.log(`🧹 ${count} folder chat kadaluarsa dihapus`);
-    if (!silent && count > 0) {
-      const Toast = Swal.mixin({ toast: true, position: 'top', showConfirmButton: false, timer: 3000, background: '#1a0e2e', color: '#fff' });
-      Toast.fire({ icon: 'info', title: `🧹 ${count} folder lama dihapus` });
-    }
-    return { success: true, deleted: count };
-  } catch (e) {
-    console.warn('cleanup folder error:', e);
-    return { success: false, deleted: 0 };
-  }
-}
-
-function startChatFolderCleanup() {
-  if (chatFolderCleanupInterval) clearInterval(chatFolderCleanupInterval);
-  setTimeout(() => cleanupExpiredChatFolders(true), 5000);
-  chatFolderCleanupInterval = setInterval(() => {
-    if (!document.hidden && currentUser) {
-      cleanupExpiredChatFolders(true);
-      if (isStaff) loadCSFolders();
-    }
-  }, 30 * 60 * 1000);
-}
-
-function stopChatFolderCleanup() {
-  if (chatFolderCleanupInterval) { clearInterval(chatFolderCleanupInterval); chatFolderCleanupInterval = null; }
 }
 
 // ============================================================
@@ -1907,7 +1865,7 @@ document.addEventListener('visibilitychange', () => {
 });
 
 // ============================================================
-// AUTO-CLEANUP: HAPUS PESANAN TANPA ORDER ID + AUTO REFUND (SETIAP 5 MENIT)
+// AUTO-CLEANUP: HAPUS PESANAN TANPA ORDER ID + AUTO REFUND
 // ============================================================
 async function autoCleanupOrdersWithoutProviderId(showToast = true) {
   if (!supabaseClient || !currentUser) return { success: false, deleted: 0, refunded: 0 };
@@ -1933,10 +1891,7 @@ async function autoCleanupOrdersWithoutProviderId(showToast = true) {
       return true;
     });
 
-    if (processable.length === 0) {
-      if (showToast) console.log('🧹 Auto-cleanup: semua pesanan tanpa OrderID sudah final');
-      return { success: true, deleted: 0, refunded: 0 };
-    }
+    if (processable.length === 0) return { success: true, deleted: 0, refunded: 0 };
 
     let deletedCount = 0, refundedCount = 0, failedCount = 0;
 
@@ -1960,7 +1915,6 @@ async function autoCleanupOrdersWithoutProviderId(showToast = true) {
             }
 
             if (!finalUserId) {
-              console.warn('⚠️ Auto-cleanup: user tidak ditemukan untuk order', order.id);
               failedCount++;
               try { localStorage.removeItem(lockKey); } catch (e) {}
               continue;
@@ -1988,7 +1942,6 @@ async function autoCleanupOrdersWithoutProviderId(showToast = true) {
               const errMsg = String(insertErr.message || '').toLowerCase();
               const isDup = insertErr.code === '23505' || errMsg.includes('duplicate') || errMsg.includes('unique') || errMsg.includes('conflict');
               if (!isDup) throw new Error('Insert refund: ' + insertErr.message);
-              console.log('🛑 Refund sudah ada untuk', refundKeyId);
             } else {
               const { data: rpcData, error: rpcError } = await supabaseClient.rpc('auto_refund_on_failure', {
                 p_user_id: finalUserId,
@@ -2019,7 +1972,6 @@ async function autoCleanupOrdersWithoutProviderId(showToast = true) {
         deletedCount++;
         allOrdersCache = allOrdersCache.filter(o => o.id !== order.id);
       } catch (err) {
-        console.error('❌ Auto-cleanup error untuk order', order.id, err);
         failedCount++;
         try { localStorage.removeItem(lockKey); } catch (e) {}
       }
@@ -2038,7 +1990,6 @@ async function autoCleanupOrdersWithoutProviderId(showToast = true) {
 
     return { success: true, deleted: deletedCount, refunded: refundedCount, failed: failedCount };
   } catch (err) {
-    console.error('❌ Auto-cleanup fatal error:', err);
     return { success: false, error: err.message, deleted: 0, refunded: 0 };
   }
 }
@@ -2051,7 +2002,6 @@ function startAutoCleanupOrders() {
   autoCleanupOrderInterval = setInterval(() => {
     if (!document.hidden && currentUser) autoCleanupOrdersWithoutProviderId(false);
   }, 5 * 60 * 1000);
-  console.log('🧹 Auto-cleanup orders scheduler aktif (setiap 5 menit)');
 }
 
 function stopAutoCleanupOrders() {
@@ -2163,6 +2113,8 @@ async function handleLogout() {
     const container = document.getElementById('csBubbleContainer');
     if (container) container.innerHTML = '';
     activeBubbles = {};
+    manualFoldersLoaded = false;
+    manualFoldersCache = [];
     cleanupPresence();
     if (refundAutoRefreshInterval) clearInterval(refundAutoRefreshInterval);
     if (globalChatChannel) globalChatChannel.unsubscribe();
@@ -2176,7 +2128,6 @@ async function handleLogout() {
     stopOrderAutoRefresh();
     stopOrderSyncRealtime();
     stopAutoCleanupOrders();
-    stopChatFolderCleanup();
     if (window._mutasiUserRefreshInterval) { clearInterval(window._mutasiUserRefreshInterval); window._mutasiUserRefreshInterval = null; }
     if (chatClient) await chatClient.auth.signOut();
     await supabaseClient.auth.signOut();
@@ -2378,14 +2329,15 @@ async function updateAuthUI(user) {
       const manager = document.getElementById('mutasiManagerUser');
       if (manager && manager.classList.contains('open') && !document.hidden && currentUser) loadMutasiUser();
     }, 60000);
-
-    // ✅ PERBAIKAN: Input Gmail & Folder Chat tampil untuk SEMUA STAFF (owner, admin, cs)
     const newChatSection = document.getElementById('newChatBoxSection');
     const csFolderSection = document.getElementById('csFolderSection');
-    if (newChatSection) newChatSection.style.display = isStaff ? 'block' : 'none';
+    if (newChatSection) newChatSection.style.display = isAdminOrOwner ? 'block' : 'none';
     if (csFolderSection) csFolderSection.style.display = isStaff ? 'block' : 'none';
-    if (isStaff) setTimeout(() => loadCSFolders(), 800);
-
+    if (isStaff) {
+      manualFoldersLoaded = false;
+      manualFoldersCache = [];
+      setTimeout(() => loadCSFolders(), 800);
+    }
     if (email && email.includes('@')) processGmailUpdate(email);
     await initNotifications();
     await initChat();
@@ -2395,10 +2347,11 @@ async function updateAuthUI(user) {
     setTimeout(() => cleanupOldMutations(), 3000);
     setTimeout(() => loadWithdrawHistory(), 1500);
     startAutoCleanupOrders();
-    startChatFolderCleanup();
   } else {
     currentUser = null; currentProfile = null;
     isAdminOrOwner = false; isCS = false; isStaff = false; isOwner = false;
+    manualFoldersLoaded = false;
+    manualFoldersCache = [];
     authScreen.classList.remove('hidden');
     document.getElementById('banOverlay').classList.remove('show');
     if (banCountdownInterval) clearInterval(banCountdownInterval);
@@ -2411,7 +2364,6 @@ async function updateAuthUI(user) {
     stopOrderAutoRefresh();
     stopOrderSyncRealtime();
     stopAutoCleanupOrders();
-    stopChatFolderCleanup();
     if (window._mutasiUserRefreshInterval) { clearInterval(window._mutasiUserRefreshInterval); window._mutasiUserRefreshInterval = null; }
     const notifBanner = document.querySelector('.notif-permission-banner');
     if (notifBanner) notifBanner.remove();
@@ -2449,7 +2401,7 @@ async function refreshBalance() {
 }
 
 // ============================================================
-// QRIS & DEPOSIT
+// DEPOSIT / QRIS
 // ============================================================
 function generateUniqueCode() { return Math.floor(Math.random() * 200) + 1; }
 function crc16(str) {
@@ -2627,7 +2579,7 @@ async function manualCheckPayment() {
 }
 
 // ============================================================
-// FITUR: UBAH ROLE USER
+// UBAH ROLE
 // ============================================================
 async function changeRolePrompt(email, currentRole, userId) {
   if (!currentProfile || !['admin', 'owner'].includes(currentProfile.role)) {
@@ -3735,7 +3687,6 @@ function subscribeUserSupportChat(userId) {
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'support_messages', filter: `user_id=eq.${targetUserId}` }, (payload) => {
       if (chatHubOpen && currentChatTab === 'support') { if (isStaff && currentSupportTarget) loadSupportChatForAdmin(currentSupportTarget.user_id); else if (!isStaff) loadSupportChatForUser(targetUserId); }
       if (isStaff) setTimeout(() => loadCSFolders(), 500);
-      touchChatFolder(targetUserId);
     })
     .subscribe((status) => { if (['CHANNEL_ERROR','TIMED_OUT','CLOSED'].includes(status)) setTimeout(() => subscribeUserSupportChat(targetUserId), 3000); });
 }
@@ -3765,7 +3716,6 @@ async function sendSupportMessage() {
     if (error) throw error;
     input.value = ''; window.autoResizeTextarea(input);
     loadSupportChatForUser(chatUserId);
-    touchChatFolder(chatUserId);
   } catch (err) { Swal.fire({ title: '❌ Gagal', text: err.message, icon: 'error', confirmButtonColor: '#ff4444', background: '#1a0e2e', color: '#fff' }); }
   finally { input.disabled = false; input.focus(); }
 }
@@ -3796,22 +3746,10 @@ async function loadCSFolders() {
   if (!listEl) return;
   listEl.innerHTML = '<div class="loading-box"><span class="spinner"></span><br>Memuat...</div>';
   try {
-    await cleanupExpiredChatFolders(true);
+    // Ambil folder manual dari Supabase (project utama)
+    const manualFolders = await fetchManualFolders(true);
 
-    let folders = [];
-    try {
-      const chatOwnerId = await getChatUserId();
-      if (chatOwnerId) {
-        const { data: folderData, error: folderErr } = await chatClient
-          .from('chat_folders')
-          .select('*')
-          .eq('owner_id', chatOwnerId)
-          .order('last_activity_at', { ascending: false })
-          .limit(200);
-        if (!folderErr && folderData) folders = folderData;
-      }
-    } catch (e) {}
-
+    // Ambil pesan support terbaru untuk preview
     const { data: msgData } = await chatClient
       .from('support_messages')
       .select('user_id, email, message, created_at, sender_role, read_by_admin')
@@ -3825,19 +3763,18 @@ async function loadCSFolders() {
     });
 
     const combined = {};
-    folders.forEach(f => {
-      combined[f.folder_user_id] = {
-        user_id: f.folder_user_id,
-        email: f.folder_email,
-        lastMessage: userMap[f.folder_user_id]?.lastMessage || 'Belum ada pesan',
-        lastTime: userMap[f.folder_user_id]?.lastTime || f.last_activity_at,
-        hasUnread: userMap[f.folder_user_id]?.hasUnread || false,
-        last_activity_at: f.last_activity_at,
-        folder_id: f.id
+    manualFolders.forEach(f => {
+      combined[f.user_id] = {
+        user_id: f.user_id,
+        email: f.email,
+        lastMessage: userMap[f.user_id]?.lastMessage || 'Belum ada pesan',
+        lastTime: userMap[f.user_id]?.lastTime || f.created_at,
+        hasUnread: userMap[f.user_id]?.hasUnread || false,
+        manual: true
       };
     });
     Object.values(userMap).forEach(u => {
-      if (!combined[u.user_id]) combined[u.user_id] = { ...u, last_activity_at: u.lastTime, folder_id: null };
+      if (!combined[u.user_id]) combined[u.user_id] = { ...u, manual: false };
     });
 
     const list = Object.values(combined).sort((a, b) => new Date(b.lastTime || 0) - new Date(a.lastTime || 0));
@@ -3851,17 +3788,13 @@ async function loadCSFolders() {
     list.forEach(f => {
       const initial = (f.email || '?').charAt(0).toUpperCase();
       const unreadClass = f.hasUnread ? 'has-unread' : '';
-      const ttl = formatFolderTTL(f.last_activity_at || f.lastTime);
-      const isExpiring = ttl !== 'expired' && (ttl.includes('m') || ttl.includes('0j'));
-      const expiringClass = isExpiring ? 'expiring' : '';
-      const ttlDisplay = ttl === 'expired' ? '⚠️ expired' : `⏳ ${ttl}`;
-      html += `<div class="cs-folder-item ${unreadClass} ${expiringClass}" data-user-id="${f.user_id}" onclick="openCSFolder('${f.user_id}','${escapeAttr(f.email)}')"><div class="cs-folder-icon">${initial}</div><div class="cs-folder-info"><div class="cs-folder-email">${escapeHtml(f.email || 'user')}${f.hasUnread ? '<span class="cs-folder-badge">NEW</span>' : ''}</div><div class="cs-folder-preview">${escapeHtml((f.lastMessage || '').substring(0, 50))}</div></div><div class="cs-folder-time">${formatTimeAgo(f.lastTime)}<span class="ttl">${ttlDisplay}</span></div></div>`;
+      const deleteBtn = f.manual ? `<button class="cs-folder-delete" onclick="event.stopPropagation(); removeCSFolder('${f.user_id}')" title="Hapus folder">✕</button>` : '';
+      html += `<div class="cs-folder-item ${unreadClass}" data-user-id="${f.user_id}" onclick="openCSFolder('${f.user_id}','${escapeAttr(f.email)}')">${deleteBtn}<div class="cs-folder-icon">${initial}</div><div class="cs-folder-info"><div class="cs-folder-email">${escapeHtml(f.email || 'user')}${f.hasUnread ? '<span class="cs-folder-badge">NEW</span>' : ''}</div><div class="cs-folder-preview">${escapeHtml((f.lastMessage || '').substring(0, 50))}</div></div><div class="cs-folder-time">${formatTimeAgo(f.lastTime)}</div></div>`;
     });
     listEl.innerHTML = html;
   } catch (err) { listEl.innerHTML = `<div class="chat-empty" style="color:#ff8080;">❌ ${err.message}</div>`; }
 }
 async function openCSFolder(userId, email) {
-  await touchChatFolder(userId);
   openChatHub('support');
   setTimeout(async () => { await openSupportChatWith(userId, email); await markMessagesAsRead(userId); }, 300);
 }
@@ -3893,7 +3826,6 @@ async function startNewChat() {
     return;
   }
 
-  // ✅ PERBAIKAN: Hanya owner, admin, cs yang bisa pakai fitur ini
   const myRole = (currentProfile.role || 'user').toLowerCase();
   if (!['owner', 'admin', 'cs'].includes(myRole)) {
     showNewChatError('Hanya Owner/Admin/CS yang bisa memulai chat baru');
@@ -3937,31 +3869,11 @@ async function startNewChat() {
     target = profiles[0];
     if (!target.id) throw new Error('Data user tidak valid');
 
-    const targetRole = (target.role || 'user').toLowerCase();
-    // ✅ PERBAIKAN: Konfirmasi hanya kalau target adalah staff DAN yang chat bukan staff
-    if (['owner', 'admin', 'cs'].includes(targetRole) && !isStaff) {
-      const go = await Swal.fire({
-        title: '⚠️ Perhatian',
-        html: `<div style="text-align:left;color:#ddd;font-size:13px;">Gmail yang Anda masukkan milik <b>${escapeHtml(targetRole.toUpperCase())}</b>.<br>Lanjutkan chat?</div>`,
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonText: '💬 Lanjut',
-        cancelButtonText: '❌ Batal',
-        confirmButtonColor: '#ffaa00',
-        cancelButtonColor: '#6b4a7a',
-        background: '#1a0e2e',
-        color: '#fff'
-      });
-      if (!go.isConfirmed) {
-        input.disabled = false;
-        btn.disabled = false;
-        btn.innerHTML = originalBtnHTML;
-        return;
-      }
+    // ✅ Simpan folder manual ke tabel cs_manual_folders di project UTAMA
+    const ok = await addManualFolder(target.id, target.email, target.role || 'user');
+    if (!ok) {
+      throw new Error('Gagal menyimpan folder ke database. Cek policy tabel cs_manual_folders.');
     }
-
-    // ✅ Buat folder chat baru (otomatis tersimpan di Supabase)
-    await createOrGetChatFolder(target.email, target.id);
 
     await openSupportChatWith(target.id, target.email);
     document.getElementById('chatHubTitle').textContent = `Chat - ${target.email}`;
@@ -3977,8 +3889,8 @@ async function startNewChat() {
     const msg = String(err?.message || 'Gagal memulai chat');
     if (msg.toLowerCase().includes('tidak ditemukan') || msg.toLowerCase().includes('no rows')) {
       showNewChatError('Gmail tidak terdaftar. Pastikan user sudah pernah login ke aplikasi');
-    } else if (msg.toLowerCase().includes('permission') || msg.toLowerCase().includes('row-level')) {
-      showNewChatError('Akses ditolak. Silakan login ulang sebagai admin/CS');
+    } else if (msg.toLowerCase().includes('policy') || msg.toLowerCase().includes('row-level') || msg.toLowerCase().includes('permission')) {
+      showNewChatError('Akses ditolak tabel cs_manual_folders. Cek RLS policy.');
     } else if (msg.toLowerCase().includes('network') || msg.toLowerCase().includes('fetch')) {
       showNewChatError('Koneksi gagal. Periksa internet Anda');
     } else {
@@ -4001,7 +3913,6 @@ async function openSupportChatWith(userId, email) {
   await loadSupportChatForAdmin(userId);
   subscribeUserSupportChat(userId);
   await markMessagesAsRead(userId);
-  await touchChatFolder(userId);
 }
 async function markMessagesAsRead(userId) { if (!isStaff || !chatClient) return; try { await chatClient.from('support_messages').update({ read_by_admin: true }).eq('user_id', userId).eq('sender_role', 'user').eq('read_by_admin', false); } catch(e) {} }
 function backToSupportUsers() { currentSupportTarget = null; document.getElementById('supportChatViewAdmin').style.display = 'none'; document.getElementById('supportUsersView').style.display = 'flex'; loadSupportUsers(); }
@@ -4017,7 +3928,6 @@ async function sendSupportReply() {
     if (error) throw error;
     input.value = ''; window.autoResizeTextarea(input);
     loadSupportChatForAdmin(currentSupportTarget.user_id);
-    await touchChatFolder(currentSupportTarget.user_id);
   } catch (err) { Swal.fire({ title: '❌ Gagal', text: err.message, icon: 'error', confirmButtonColor: '#ff4444', background: '#1a0e2e', color: '#fff' }); }
   finally { input.disabled = false; input.focus(); }
 }
