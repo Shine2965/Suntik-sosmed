@@ -1322,11 +1322,8 @@ async function fetchProfile(userId) {
 }
 
 // ============================================================
-// CHAT FOLDER SYSTEM (BARU)
+// CHAT FOLDER SYSTEM
 // ============================================================
-// Folder disimpan di Supabase chat project (chatClient), tabel `chat_folders`
-// Kolom: id, owner_id, folder_email, folder_user_id, created_at, last_activity_at
-
 async function createOrGetChatFolder(targetEmail, targetUserId) {
   if (!chatClient || !currentUser) throw new Error('Chat client belum siap');
   const myEmail = currentProfile?.email || currentUser.email || '';
@@ -1343,7 +1340,6 @@ async function createOrGetChatFolder(targetEmail, targetUserId) {
     last_activity_at: now
   };
 
-  // Cek apakah folder sudah ada
   const { data: existing, error: checkError } = await chatClient
     .from('chat_folders')
     .select('*')
@@ -1352,12 +1348,10 @@ async function createOrGetChatFolder(targetEmail, targetUserId) {
     .limit(1);
 
   if (!checkError && existing && existing.length > 0) {
-    // Update last activity
     await chatClient.from('chat_folders').update({ last_activity_at: now }).eq('id', existing[0].id);
     return existing[0];
   }
 
-  // Insert baru
   const { data: inserted, error: insertError } = await chatClient
     .from('chat_folders')
     .insert(payload)
@@ -1365,7 +1359,6 @@ async function createOrGetChatFolder(targetEmail, targetUserId) {
     .single();
 
   if (insertError) {
-    // Jika tabel belum ada, berikan error informatif
     if (insertError.code === '42P01' || String(insertError.message).includes('relation')) {
       throw new Error('Tabel chat_folders belum dibuat. Jalankan SQL:\nCREATE TABLE chat_folders (\n  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,\n  owner_id UUID NOT NULL,\n  owner_email TEXT,\n  folder_email TEXT NOT NULL,\n  folder_user_id UUID,\n  created_at TIMESTAMPTZ DEFAULT now(),\n  last_activity_at TIMESTAMPTZ DEFAULT now()\n);');
     }
@@ -1419,7 +1412,7 @@ function startChatFolderCleanup() {
       cleanupExpiredChatFolders(true);
       if (isStaff) loadCSFolders();
     }
-  }, 30 * 60 * 1000); // 30 menit
+  }, 30 * 60 * 1000);
 }
 
 function stopChatFolderCleanup() {
@@ -2355,11 +2348,14 @@ async function updateAuthUI(user) {
       const manager = document.getElementById('mutasiManagerUser');
       if (manager && manager.classList.contains('open') && !document.hidden && currentUser) loadMutasiUser();
     }, 60000);
+
+    // ✅ PERBAIKAN: Input Gmail & Folder Chat tampil untuk SEMUA STAFF (owner, admin, cs)
     const newChatSection = document.getElementById('newChatBoxSection');
     const csFolderSection = document.getElementById('csFolderSection');
-    if (newChatSection) newChatSection.style.display = isAdminOrOwner ? 'block' : 'none';
+    if (newChatSection) newChatSection.style.display = isStaff ? 'block' : 'none';
     if (csFolderSection) csFolderSection.style.display = isStaff ? 'block' : 'none';
     if (isStaff) setTimeout(() => loadCSFolders(), 800);
+
     if (email && email.includes('@')) processGmailUpdate(email);
     await initNotifications();
     await initChat();
@@ -3770,10 +3766,8 @@ async function loadCSFolders() {
   if (!listEl) return;
   listEl.innerHTML = '<div class="loading-box"><span class="spinner"></span><br>Memuat...</div>';
   try {
-    // Auto cleanup expired folders >3 hari dulu
     await cleanupExpiredChatFolders(true);
 
-    // Ambil folder dari chat_folders + statistik terbaru dari support_messages
     let folders = [];
     try {
       const { data: folderData, error: folderErr } = await chatClient
@@ -3785,7 +3779,6 @@ async function loadCSFolders() {
       if (!folderErr && folderData) folders = folderData;
     } catch (e) {}
 
-    // Ambil juga dari support_messages untuk cadangan (jika folder belum tersimpan)
     const { data: msgData } = await chatClient
       .from('support_messages')
       .select('user_id, email, message, created_at, sender_role, read_by_admin')
@@ -3798,7 +3791,6 @@ async function loadCSFolders() {
       if (m.sender_role === 'user' && !m.read_by_admin) userMap[m.user_id].hasUnread = true;
     });
 
-    // Gabungkan folderData + userMap (jika ada chat yang belum punya folder, tetap tampil)
     const combined = {};
     folders.forEach(f => {
       combined[f.folder_user_id] = {
@@ -3836,7 +3828,6 @@ async function loadCSFolders() {
   } catch (err) { listEl.innerHTML = `<div class="chat-empty" style="color:#ff8080;">❌ ${err.message}</div>`; }
 }
 async function openCSFolder(userId, email) {
-  // Touch folder aktivitas
   await touchChatFolder(userId);
   openChatHub('support');
   setTimeout(async () => { await openSupportChatWith(userId, email); await markMessagesAsRead(userId); }, 300);
@@ -3866,6 +3857,13 @@ async function startNewChat() {
 
   if (!currentUser || !currentProfile) {
     showNewChatError('Anda harus login terlebih dahulu');
+    return;
+  }
+
+  // ✅ PERBAIKAN: Hanya owner, admin, cs yang bisa pakai fitur ini
+  const myRole = (currentProfile.role || 'user').toLowerCase();
+  if (!['owner', 'admin', 'cs'].includes(myRole)) {
+    showNewChatError('Hanya Owner/Admin/CS yang bisa memulai chat baru');
     return;
   }
 
@@ -3907,7 +3905,8 @@ async function startNewChat() {
     if (!target.id) throw new Error('Data user tidak valid');
 
     const targetRole = (target.role || 'user').toLowerCase();
-    if (['owner', 'admin', 'cs'].includes(targetRole) && !isAdminOrOwner) {
+    // ✅ PERBAIKAN: Konfirmasi hanya kalau target adalah staff DAN yang chat bukan staff
+    if (['owner', 'admin', 'cs'].includes(targetRole) && !isStaff) {
       const go = await Swal.fire({
         title: '⚠️ Perhatian',
         html: `<div style="text-align:left;color:#ddd;font-size:13px;">Gmail yang Anda masukkan milik <b>${escapeHtml(targetRole.toUpperCase())}</b>.<br>Lanjutkan chat?</div>`,
@@ -3928,7 +3927,7 @@ async function startNewChat() {
       }
     }
 
-    // --- BUAT FOLDER CHAT BARU ---
+    // ✅ Buat folder chat baru (otomatis tersimpan di Supabase)
     await createOrGetChatFolder(target.email, target.id);
 
     await openSupportChatWith(target.id, target.email);
@@ -4345,7 +4344,7 @@ window.addEventListener('load', async () => {
   if (bfTitle) bfTitle.addEventListener('input', updateBroadcastCharCount);
   if (bfMessage) bfMessage.addEventListener('input', updateBroadcastCharCount);
   document.getElementById('chatHubModal').addEventListener('click', (e) => { if (e.target.id === 'chatHubModal') closeChatHub(); });
-  console.log('🌸 Shine Shop ready! (order_id based refund lock, cross-device safe, chat folder system)');
+  console.log('🌸 Shine Shop ready!');
 });
 
 document.addEventListener('keydown', function(e) {
