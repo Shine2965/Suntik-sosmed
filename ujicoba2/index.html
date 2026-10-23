@@ -1323,6 +1323,8 @@ async function fetchProfile(userId) {
 
 // ============================================================
 // CHAT FOLDER SYSTEM
+// ✅ FIX: owner_id pakai chat auth uid (auth.uid() di project CHAT),
+//    bukan currentUser.id (auth uid project UTAMA)
 // ============================================================
 async function createOrGetChatFolder(targetEmail, targetUserId) {
   if (!chatClient || !currentUser) throw new Error('Chat client belum siap');
@@ -1330,7 +1332,6 @@ async function createOrGetChatFolder(targetEmail, targetUserId) {
   if (!targetEmail || !isValidEmailStrict(targetEmail)) throw new Error('Email target tidak valid');
   if (targetEmail.toLowerCase() === myEmail.toLowerCase()) throw new Error('Tidak bisa chat dengan diri sendiri');
 
-  // ✅ FIX: pakai chat user ID (auth.uid() di project CHAT), bukan currentUser.id
   const chatOwnerId = await getChatUserId();
   if (!chatOwnerId) throw new Error('Sesi chat belum siap. Silakan login ulang.');
 
@@ -3777,19 +3778,19 @@ async function loadCSFolders() {
   try {
     await cleanupExpiredChatFolders(true);
 
-    llet folders = [];
-try {
-  const chatOwnerId = await getChatUserId();
-  if (chatOwnerId) {
-    const { data: folderData, error: folderErr } = await chatClient
-      .from('chat_folders')
-      .select('*')
-      .eq('owner_id', chatOwnerId)
-      .order('last_activity_at', { ascending: false })
-      .limit(200);
-    if (!folderErr && folderData) folders = folderData;
-  }
-} catch (e) {}
+    let folders = [];
+    try {
+      const chatOwnerId = await getChatUserId();
+      if (chatOwnerId) {
+        const { data: folderData, error: folderErr } = await chatClient
+          .from('chat_folders')
+          .select('*')
+          .eq('owner_id', chatOwnerId)
+          .order('last_activity_at', { ascending: false })
+          .limit(200);
+        if (!folderErr && folderData) folders = folderData;
+      }
+    } catch (e) {}
 
     const { data: msgData } = await chatClient
       .from('support_messages')
