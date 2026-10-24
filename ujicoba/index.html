@@ -461,6 +461,19 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
 .password-btn:disabled{opacity:0.3;cursor:not-allowed}
 .password-empty{text-align:center;padding:20px;color:#94a3b8;font-size:12px;font-style:italic}
 
+/* ============ REFERRAL ADMIN PANEL ============ */
+.referral-admin-item{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:10px 12px;border-left:3px solid #b388ff}
+.referral-admin-item .ra-code{font-family:'Courier New',monospace;font-size:14px;font-weight:900;color:#b388ff;letter-spacing:1px;word-break:break-all}
+.referral-admin-item .ra-owner{font-size:11px;color:#f1e6f5;margin-top:3px;word-break:break-all}
+.referral-admin-item .ra-meta{display:flex;gap:8px;flex-wrap:wrap;font-size:9.5px;color:#94a3b8;margin-top:4px}
+.referral-admin-item .ra-downlines{margin-top:8px;padding:8px 10px;background:rgba(0,0,0,0.25);border-radius:8px;border-left:2px solid #64ffc8}
+.referral-admin-item .ra-downlines-title{font-size:9px;color:#64ffc8;text-transform:uppercase;font-weight:800;letter-spacing:0.5px;margin-bottom:4px}
+.referral-admin-item .ra-downline-row{display:flex;justify-content:space-between;gap:6px;padding:3px 0;font-size:10.5px;border-bottom:1px solid rgba(255,255,255,0.05)}
+.referral-admin-item .ra-downline-row:last-child{border-bottom:none}
+.referral-admin-item .ra-downline-email{color:#f1e6f5;word-break:break-all;flex:1}
+.referral-admin-item .ra-downline-bal{color:#94a3b8;font-size:9px;white-space:nowrap}
+.referral-admin-item .ra-no-downline{margin-top:6px;padding:6px 10px;background:rgba(0,0,0,0.15);border-radius:6px;font-size:10px;color:#6b4a7a;font-style:italic}
+
 /* ============ REFUND ============ */
 .refund-card{background:linear-gradient(135deg,rgba(250,204,21,0.08),rgba(245,158,11,0.04));border:1.5px solid rgba(250,204,21,0.3);border-radius:14px;padding:12px 14px;margin-bottom:10px}
 .refund-card .refund-header{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px}
@@ -850,10 +863,10 @@ body.chat-open .cs-bubble-container{display:none !important}
       <div class="section">
         <div class="section-title">🔗 Kode Referral Saya<div class="line"></div></div>
         <div class="withdraw-card" style="background:linear-gradient(135deg,rgba(179,136,255,0.08),rgba(139,92,246,0.04));border-color:rgba(179,136,255,0.25);">
-          <div class="wc-title" style="color:#b388ff;">🎁 Atur Kode Referral Anda</div>
-          <div class="wc-subtitle">Kode ini bisa dibagikan ke teman. Jika mereka daftar dengan kode Anda dan deposit, Anda dapat bonus dari kode unik deposit mereka.</div>
-          <div id="myReferralCodeDisplay" style="margin-bottom:10px;padding:10px;background:rgba(0,0,0,0.2);border-radius:10px;font-family:'Courier New',monospace;font-size:14px;font-weight:800;color:#b388ff;word-break:break-all;text-align:center;">Belum dibuat</div>
-          <button class="withdraw-btn" style="background:linear-gradient(135deg,#b388ff,#8b5cf6);" onclick="openSetReferralDialog()">✨ Buat / Ubah Kode Referral</button>
+          <div class="wc-title" style="color:#b388ff;">🎁 Kode Referral Anda</div>
+          <div class="wc-subtitle">Kode ini bisa dibagikan ke teman. Jika mereka daftar dengan kode Anda dan deposit, Anda dapat bonus dari kode unik deposit mereka. <b style="color:#facc15;">Kode hanya bisa dibuat sekali & tidak bisa diubah.</b></div>
+          <div id="myReferralCodeDisplay" style="margin-bottom:10px;padding:10px;background:rgba(0,0,0,0.2);border-radius:10px;font-family:'Courier New',monospace;font-size:14px;font-weight:800;color:#b388ff;word-break:break-all;text-align:center;">Memuat...</div>
+          <button class="withdraw-btn" id="btnReferralAction" style="background:linear-gradient(135deg,#b388ff,#8b5cf6);" onclick="openSetReferralDialog()">✨ Buat Kode Referral</button>
           <div style="margin-top:10px;padding:10px;background:rgba(0,0,0,0.2);border-radius:10px;font-size:10.5px;color:#94a3b8;line-height:1.5;">
             <b style="color:#b388ff;">ℹ️ Info:</b> Kode referral tidak bisa digunakan di akun sendiri. Bonus diberikan saat user yang mendaftar dengan kode Anda melakukan deposit sukses.
           </div>
@@ -918,6 +931,21 @@ body.chat-open .cs-bubble-container{display:none !important}
             <span style="font-size:18px;font-weight:900;color:#64ffc8;">%</span>
           </div>
           <button class="withdraw-btn" onclick="saveReferralPercentage()">💾 Simpan Persentase</button>
+        </div>
+
+        <!-- DAFTAR SEMUA KODE REFERRAL (ADMIN/OWNER) -->
+        <div class="section-title" style="margin-top:14px;">📋 Semua Kode Referral Member<div class="line"></div></div>
+        <div class="password-manager" id="referralAdminManager">
+          <button class="password-toggle" onclick="toggleReferralAdminManager()"><span style="font-size:18px;">📋</span><span style="flex:1;">Lihat Semua Kode Referral & Referrer</span><span class="pt-badge" id="referralAdminBadge" style="background:rgba(179,136,255,0.2);color:#b388ff;border-color:rgba(179,136,255,0.3);">-</span><span class="pt-arrow">▼</span></button>
+          <div class="password-content" id="referralAdminContent">
+            <div class="password-search-wrap">
+              <span style="font-size:14px;color:#b39ddb;">🔍</span>
+              <input type="text" id="referralAdminSearch" class="password-search-input" placeholder="Cari email / kode referral..." oninput="filterReferralAdminList(this.value)">
+              <button id="referralAdminSearchClear" onclick="clearReferralAdminSearch()" style="display:none;background:rgba(255,80,80,0.2);border:none;color:#ff8080;width:20px;height:20px;border-radius:50%;font-size:10px;cursor:pointer;">✕</button>
+            </div>
+            <div id="referralAdminList" class="password-list"><div class="loading-box"><span class="spinner"></span><br>Klik untuk memuat...</div></div>
+            <button class="auth-submit" style="background:linear-gradient(135deg,#b388ff,#8b5cf6);margin:10px 14px;padding:10px;font-size:11.5px;width:calc(100% - 28px);" onclick="loadAllReferralCodes(true)">🔄 Refresh Data Referral</button>
+          </div>
         </div>
 
         <!-- OWNER WITHDRAWAL -->
@@ -1206,14 +1234,18 @@ let memberPageSelectedIds = new Set();
 let memberPageFilteredCache = [];
 let autoCleanupOrderInterval = null;
 
-// ⭐ Cache folder manual dari SUPABASE (bukan localStorage)
+// Cache folder manual dari SUPABASE
 let manualFoldersCache = [];
 let manualFoldersLoaded = false;
 
-// ⭐ Anti double konfirmasi deposit
+// Anti double konfirmasi deposit
 let isProcessingDeposit = false;
 let depositSuccessProcessed = false;
 let referralPercentageCache = 10;
+
+// Cache referral admin
+let allReferralAdminCache = [];
+let referralAdminSearchQuery = '';
 
 // ============================================================
 // REFERRAL HELPERS
@@ -1241,7 +1273,6 @@ if (urlRef) {
 }
 const storedRef = getStoredReferral();
 
-// Inisialisasi form referral di signup
 function initSignupReferralField() {
   const input = document.getElementById('signupReferralCode');
   const hint = document.getElementById('signupReferralHint');
@@ -1268,13 +1299,6 @@ function initSignupReferralField() {
     input.style.background = '';
     if (hint) { hint.style.display = 'none'; hint.textContent = ''; }
   }
-}
-
-function clearSignupReferralField() {
-  const input = document.getElementById('signupReferralCode');
-  const hint = document.getElementById('signupReferralHint');
-  if (input && !input.readOnly) input.value = '';
-  if (hint) { hint.style.display = 'none'; }
 }
 
 // ============================================================
@@ -2237,7 +2261,6 @@ async function handleSignup(event) {
 
   btn.disabled = true; btn.innerHTML = '⏳ Membuat akun...';
 
-  // Validasi kode referral kalau diisi
   let validReferral = null;
   if (referralCode) {
     try {
@@ -2267,7 +2290,6 @@ async function handleSignup(event) {
       return;
     }
     try { if (data.user) await supabaseClient.rpc('save_user_password', { p_user_id: data.user.id, p_email: email, p_password: password }); } catch(e) {}
-    // Simpan referral ke profil user
     if (validReferral && data.user) {
       try {
         const { data: refRes, error: refErr } = await supabaseClient.rpc('apply_referral_on_signup', {
@@ -2510,6 +2532,7 @@ async function updateAuthUI(user) {
       startAutoUnbanScheduler();
       startBannedCountdownTicker();
       loadReferralPercentage();
+      setTimeout(() => { if (document.getElementById('referralAdminManager')?.classList.contains('open')) loadAllReferralCodes(); }, 1500);
       if (refundAutoRefreshInterval) clearInterval(refundAutoRefreshInterval);
       refundAutoRefreshInterval = setInterval(() => { if (isAdminOrOwner && !document.hidden && currentUser) loadPendingRefunds(); }, 30000);
     } else { adminSection.style.display = 'none'; stopMemberRealtime(); }
@@ -2529,7 +2552,6 @@ async function updateAuthUI(user) {
       setTimeout(() => loadCSFolders(), 800);
     }
     if (email && email.includes('@')) processGmailUpdate(email);
-    // Load kode referral user
     loadMyReferralCode();
     await initNotifications();
     await initChat();
@@ -2816,7 +2838,6 @@ function startDepositPolling(targetAmount) {
 function stopDepositPolling() { if (depositPollingInterval) { clearInterval(depositPollingInterval); depositPollingInterval = null; } }
 
 async function handleDepositSuccess() {
-  // ⭐ Guard anti double konfirmasi
   if (isProcessingDeposit || depositSuccessProcessed) {
     console.log('🛑 handleDepositSuccess diblok (sudah diproses)');
     return;
@@ -2833,7 +2854,6 @@ async function handleDepositSuccess() {
     const btn = document.getElementById('qrisCheckBtn');
     if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Memproses...'; }
 
-    // ⭐ Atomic: hanya update kalau status masih pending
     const { data: updatedRows, error: updateErr } = await supabaseClient
       .from('deposits')
       .update({ status: 'success', paid_at: new Date().toISOString() })
@@ -2854,21 +2874,18 @@ async function handleDepositSuccess() {
       return;
     }
 
-    // ⭐ Tambah saldo user
     const { error } = await supabaseClient.rpc('add_user_balance', {
       p_target_email: depositEmail,
       p_amount: depositAmount,
       p_reason: `Deposit QRIS sukses (Kode unik: ${uniqueCode})`
     });
     if (error) {
-      // Rollback status kalau gagal tambah saldo
       try {
         await supabaseClient.from('deposits').update({ status: 'pending', paid_at: null }).eq('id', depositId);
       } catch(e) {}
       throw error;
     }
 
-    // ⭐ Klaim bonus referral (server-side, idempotent)
     try {
       const { data: refData, error: refErr } = await supabaseClient.rpc('claim_referral_reward', {
         p_user_id: currentUser.id,
@@ -3028,10 +3045,11 @@ function getRoleBgColor(role) { const map = { 'owner': 'linear-gradient(135deg,#
 function getRoleTextColor(role) { const map = { 'owner': '#1a0e2e', 'admin': '#fff', 'cs': '#fff', 'user': '#64ffc8' }; return map[role] || '#fff'; }
 
 // ============================================================
-// REFERRAL: USER SET KODE + ADMIN ATUR PERSENTASE
+// REFERRAL: USER SET KODE (SEKALI) + ADMIN ATUR PERSENTASE
 // ============================================================
 async function loadMyReferralCode() {
   const el = document.getElementById('myReferralCodeDisplay');
+  const btn = document.getElementById('btnReferralAction');
   if (!el || !currentUser) return;
   try {
     const { data, error } = await supabaseClient
@@ -3043,9 +3061,17 @@ async function loadMyReferralCode() {
     if (data && data.code) {
       el.textContent = data.code;
       el.style.color = '#b388ff';
+      if (btn) {
+        btn.innerHTML = '🔒 Lihat Kode Referral (Terkunci)';
+        btn.style.background = 'linear-gradient(135deg,#6b4a7a,#4a3358)';
+      }
     } else {
       el.textContent = 'Belum dibuat';
       el.style.color = '#94a3b8';
+      if (btn) {
+        btn.innerHTML = '✨ Buat Kode Referral (Sekali)';
+        btn.style.background = 'linear-gradient(135deg,#b388ff,#8b5cf6)';
+      }
     }
   } catch (err) {
     el.textContent = '—';
@@ -3055,19 +3081,58 @@ async function loadMyReferralCode() {
 
 async function openSetReferralDialog() {
   if (!currentUser) return;
+
+  let existingCode = null;
+  try {
+    const { data } = await supabaseClient
+      .from('referral_codes')
+      .select('code')
+      .eq('user_id', currentUser.id)
+      .maybeSingle();
+    if (data && data.code) existingCode = data.code;
+  } catch (e) {}
+
+  if (existingCode) {
+    await Swal.fire({
+      title: '🔒 Kode Referral Terkunci',
+      html: `
+        <div style="text-align:left;color:#ddd;font-size:13px;line-height:1.7;">
+          <div style="padding:12px;background:rgba(179,136,255,0.12);border-radius:10px;border-left:3px solid #b388ff;margin-bottom:12px;">
+            <div style="font-size:10px;color:#b388ff;font-weight:800;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">🎁 Kode Referral Anda</div>
+            <div style="font-family:'Courier New',monospace;font-size:20px;font-weight:900;color:#b388ff;letter-spacing:2px;word-break:break-all;">${escapeHtml(existingCode)}</div>
+          </div>
+          <div style="padding:10px;background:rgba(250,204,21,0.1);border-radius:8px;border-left:3px solid #facc15;font-size:11.5px;color:#fde68a;">
+            ⚠️ Kode referral <b>hanya bisa dibuat sekali</b> dan <b>tidak bisa diubah</b>. Jika ingin reset, hubungi Owner.
+          </div>
+          <div style="margin-top:12px;padding:10px;background:rgba(0,0,0,0.2);border-radius:8px;font-size:11px;color:#94a3b8;word-break:break-all;">
+            🔗 Link referral Anda:<br>
+            <b style="color:#64ffc8;">${location.origin}?ref=${escapeHtml(existingCode)}</b>
+          </div>
+        </div>
+      `,
+      icon: 'info',
+      confirmButtonText: '✅ Mengerti',
+      confirmButtonColor: '#b388ff',
+      background: '#1a0e2e',
+      color: '#fff',
+      width: 450
+    });
+    return;
+  }
+
   const { value: code } = await Swal.fire({
-    title: '✨ Buat / Ubah Kode Referral',
+    title: '✨ Buat Kode Referral',
     html: `
       <div style="text-align:left;font-size:12px;color:#b39ddb;margin-bottom:12px;padding:10px;background:rgba(179,136,255,0.08);border-radius:10px;border-left:3px solid #b388ff;line-height:1.6;">
         • Kode hanya huruf & angka (3–20 karakter)<br>
         • Kode unik, tidak boleh sama dengan user lain<br>
         • Tidak bisa digunakan di akun sendiri<br>
-        • Contoh: <b>SHINEALVIN</b>, <b>VIP2024</b>
+        • <b style="color:#facc15;">⚠️ Setelah dibuat, TIDAK BISA DIUBAH lagi!</b>
       </div>
       <input id="ref-code-input" class="swal2-input" type="text" placeholder="KODE_REFERRAL" maxlength="20" autocomplete="off" autocapitalize="characters" spellcheck="false" style="background:rgba(255,255,255,0.05);color:#fff;border:1.5px solid rgba(179,136,255,0.5);width:100%;box-sizing:border-box;font-family:'Courier New',monospace;font-size:16px;font-weight:800;text-transform:uppercase;letter-spacing:1px;">
     `,
     showCancelButton: true,
-    confirmButtonText: '💾 Simpan',
+    confirmButtonText: '💾 Buat Sekali',
     cancelButtonText: '❌ Batal',
     confirmButtonColor: '#b388ff',
     cancelButtonColor: '#6b4a7a',
@@ -3082,6 +3147,25 @@ async function openSetReferralDialog() {
     }
   });
   if (!code) return;
+
+  const confirm = await Swal.fire({
+    title: '⚠️ Yakin?',
+    html: `<div style="text-align:left;color:#ddd;font-size:13px;line-height:1.7;">
+      <p>Kode referral Anda akan menjadi:</p>
+      <div style="text-align:center;font-family:'Courier New',monospace;font-size:22px;font-weight:900;color:#b388ff;letter-spacing:2px;padding:12px;background:rgba(179,136,255,0.15);border-radius:10px;margin:10px 0;">${escapeHtml(code)}</div>
+      <p style="color:#facc15;font-weight:700;">⚠️ Kode ini TIDAK BISA DIUBAH setelah disimpan!</p>
+    </div>`,
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonText: '✅ Ya, Buat',
+    cancelButtonText: '❌ Batal',
+    confirmButtonColor: '#b388ff',
+    cancelButtonColor: '#6b4a7a',
+    background: '#1a0e2e',
+    color: '#fff'
+  });
+  if (!confirm.isConfirmed) return;
+
   try {
     Swal.fire({ title: '⏳ Menyimpan...', allowOutsideClick: false, allowEscapeKey: false, showConfirmButton: false, background: '#1a0e2e', color: '#fff' });
     const { data, error } = await supabaseClient.rpc('set_user_referral_code', {
@@ -3093,9 +3177,9 @@ async function openSetReferralDialog() {
     if (!data.success) throw new Error(data.message || 'Gagal menyimpan kode');
     await loadMyReferralCode();
     Swal.fire({
-      title: '✅ Kode Referral Disimpan!',
-      html: `<div style="text-align:center;color:#ddd;font-size:13px;"><p>Kode referral Anda:</p><div style="font-family:'Courier New',monospace;font-size:22px;font-weight:900;color:#b388ff;letter-spacing:2px;padding:12px;background:rgba(179,136,255,0.15);border-radius:10px;margin-top:8px;">${escapeHtml(code)}</div><p style="margin-top:10px;font-size:11.5px;color:#94a3b8;">Bagikan link: <b>${location.origin}?ref=${code}</b></p></div>`,
-      icon: 'success', confirmButtonColor: '#b388ff', background: '#1a0e2e', color: '#fff', timer: 5000, timerProgressBar: true
+      title: '✅ Kode Referral Dibuat!',
+      html: `<div style="text-align:center;color:#ddd;font-size:13px;"><p>Kode referral Anda:</p><div style="font-family:'Courier New',monospace;font-size:22px;font-weight:900;color:#b388ff;letter-spacing:2px;padding:12px;background:rgba(179,136,255,0.15);border-radius:10px;margin-top:8px;">${escapeHtml(code)}</div><p style="margin-top:10px;font-size:11.5px;color:#94a3b8;">Bagikan link: <b style="word-break:break-all;">${location.origin}?ref=${code}</b></p><p style="margin-top:8px;font-size:11px;color:#facc15;">🔒 Kode tidak bisa diubah lagi.</p></div>`,
+      icon: 'success', confirmButtonColor: '#b388ff', background: '#1a0e2e', color: '#fff', timer: 6000, timerProgressBar: true
     });
   } catch (err) {
     let msg = err.message || 'Gagal';
@@ -3147,6 +3231,156 @@ async function saveReferralPercentage() {
   } catch (err) {
     Swal.fire({ title: '❌ Gagal', text: err.message, icon: 'error', confirmButtonColor: '#ff4444', background: '#1a0e2e', color: '#fff' });
   }
+}
+
+// ============================================================
+// ADMIN/OWNER: LIHAT SEMUA KODE REFERRAL + DOWNLINE
+// ============================================================
+function toggleReferralAdminManager() {
+  const mgr = document.getElementById('referralAdminManager');
+  if (!mgr) return;
+  mgr.classList.toggle('open');
+  if (mgr.classList.contains('open')) {
+    if (allReferralAdminCache.length === 0) loadAllReferralCodes();
+    setTimeout(() => document.getElementById('referralAdminSearch')?.focus(), 300);
+  }
+}
+
+async function loadAllReferralCodes(force = false) {
+  const listEl = document.getElementById('referralAdminList');
+  if (!listEl || !isAdminOrOwner) return;
+  listEl.innerHTML = '<div class="loading-box"><span class="spinner"></span><br>Memuat data referral...</div>';
+  try {
+    const { data: codes, error: codesErr } = await supabaseClient
+      .from('referral_codes')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(2000);
+    if (codesErr) throw codesErr;
+
+    const { data: profiles, error: profErr } = await supabaseClient
+      .from('profiles')
+      .select('id, email, role, referred_by_code, referred_by_user_id, balance')
+      .limit(5000);
+    if (profErr) throw profErr;
+
+    const profMap = {};
+    (profiles || []).forEach(p => { profMap[p.id] = p; });
+
+    const downlineMap = {};
+    (profiles || []).forEach(p => {
+      if (p.referred_by_user_id) {
+        if (!downlineMap[p.referred_by_user_id]) downlineMap[p.referred_by_user_id] = [];
+        downlineMap[p.referred_by_user_id].push(p);
+      }
+    });
+
+    allReferralAdminCache = (codes || []).map(c => {
+      const owner = profMap[c.user_id];
+      const downlines = downlineMap[c.user_id] || [];
+      return {
+        code: c.code,
+        owner_user_id: c.user_id,
+        owner_email: c.email,
+        owner_role: owner?.role || '-',
+        owner_balance: parseFloat(owner?.balance || 0),
+        created_at: c.created_at,
+        downlines: downlines,
+        downline_count: downlines.length
+      };
+    });
+
+    const badge = document.getElementById('referralAdminBadge');
+    if (badge) {
+      badge.textContent = allReferralAdminCache.length;
+      badge.style.background = 'rgba(179,136,255,0.25)';
+      badge.style.color = '#b388ff';
+    }
+    renderReferralAdminList(allReferralAdminCache);
+  } catch (err) {
+    listEl.innerHTML = `<div class="password-empty" style="color:#ff8080;">❌ ${escapeHtml(err.message)}</div>`;
+  }
+}
+
+function renderReferralAdminList(data) {
+  const listEl = document.getElementById('referralAdminList');
+  if (!listEl) return;
+  if (!data || data.length === 0) {
+    listEl.innerHTML = `<div class="password-empty"><span style="font-size:28px;display:block;margin-bottom:6px;opacity:0.5;">📭</span>Belum ada kode referral</div>`;
+    return;
+  }
+  const roleBadge = (role) => {
+    const map = {
+      owner: '<span style="background:#ffd700;color:#1a0e2e;padding:1px 6px;border-radius:4px;font-size:8px;font-weight:900;text-transform:uppercase;">Owner</span>',
+      admin: '<span style="background:#b388ff;color:#fff;padding:1px 6px;border-radius:4px;font-size:8px;font-weight:900;text-transform:uppercase;">Admin</span>',
+      cs: '<span style="background:#00c6ff;color:#fff;padding:1px 6px;border-radius:4px;font-size:8px;font-weight:900;text-transform:uppercase;">CS</span>',
+      user: '<span style="background:rgba(100,255,200,0.2);color:#64ffc8;padding:1px 6px;border-radius:4px;font-size:8px;font-weight:900;text-transform:uppercase;">User</span>'
+    };
+    return map[role] || '';
+  };
+  let html = '';
+  data.forEach(r => {
+    const createdStr = r.created_at ? new Date(r.created_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-';
+    let downlineHtml = '';
+    if (r.downlines && r.downlines.length > 0) {
+      downlineHtml = `
+        <div class="ra-downlines">
+          <div class="ra-downlines-title">👥 ${r.downlines.length} Referral (Downline)</div>
+          ${r.downlines.map(d => `
+            <div class="ra-downline-row">
+              <span class="ra-downline-email">📧 ${escapeHtml(d.email || '-')}</span>
+              <span class="ra-downline-bal">💰 Rp ${parseFloat(d.balance || 0).toLocaleString('id-ID')}</span>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    } else {
+      downlineHtml = `<div class="ra-no-downline">Belum ada downline</div>`;
+    }
+
+    html += `
+      <div class="referral-admin-item">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:6px;flex-wrap:wrap;">
+          <div style="flex:1;min-width:0;">
+            <div class="ra-code">${escapeHtml(r.code)}</div>
+            <div class="ra-owner">📧 ${escapeHtml(r.owner_email)}</div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0;">
+            ${roleBadge(r.owner_role)}
+            <span style="font-size:9px;color:#94a3b8;">💰 Rp ${r.owner_balance.toLocaleString('id-ID')}</span>
+          </div>
+        </div>
+        <div class="ra-meta">
+          <span>🕐 Dibuat: ${createdStr} WIB</span>
+          <span style="color:#64ffc8;font-weight:800;">👥 ${r.downline_count} downline</span>
+        </div>
+        ${downlineHtml}
+      </div>
+    `;
+  });
+  listEl.innerHTML = html;
+}
+
+function filterReferralAdminList(query) {
+  referralAdminSearchQuery = (query || '').toLowerCase().trim();
+  const clearBtn = document.getElementById('referralAdminSearchClear');
+  if (clearBtn) clearBtn.style.display = referralAdminSearchQuery ? 'flex' : 'none';
+  if (!referralAdminSearchQuery) { renderReferralAdminList(allReferralAdminCache); return; }
+  const filtered = allReferralAdminCache.filter(r =>
+    (r.code || '').toLowerCase().includes(referralAdminSearchQuery) ||
+    (r.owner_email || '').toLowerCase().includes(referralAdminSearchQuery) ||
+    (r.downlines || []).some(d => (d.email || '').toLowerCase().includes(referralAdminSearchQuery))
+  );
+  renderReferralAdminList(filtered);
+}
+
+function clearReferralAdminSearch() {
+  const input = document.getElementById('referralAdminSearch');
+  if (input) input.value = '';
+  referralAdminSearchQuery = '';
+  const clearBtn = document.getElementById('referralAdminSearchClear');
+  if (clearBtn) clearBtn.style.display = 'none';
+  renderReferralAdminList(allReferralAdminCache);
 }
 
 // ============================================================
