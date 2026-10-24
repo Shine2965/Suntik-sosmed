@@ -811,18 +811,7 @@ body.chat-open .cs-bubble-container{display:none !important}
         <div class="new-chat-box">
           <div class="nc-label">👤 Ketik Gmail User untuk Chat</div>
           <div class="nc-input-wrap">
-            <input
-              type="email"
-              id="newChatEmail"
-              placeholder="user@gmail.com"
-              autocomplete="email"
-              autocapitalize="none"
-              autocorrect="off"
-              spellcheck="false"
-              inputmode="email"
-              onkeydown="if(event.key==='Enter'){event.preventDefault();startNewChat();}"
-              oninput="clearNewChatError()"
-            >
+            <input type="email" id="newChatEmail" placeholder="user@gmail.com" autocomplete="email" autocapitalize="none" autocorrect="off" spellcheck="false" inputmode="email" onkeydown="if(event.key==='Enter'){event.preventDefault();startNewChat();}" oninput="clearNewChatError()">
             <button onclick="startNewChat()" id="btnStartNewChat">💬 Chat</button>
           </div>
           <div id="newChatError" style="display:none;margin-top:8px;padding:8px 10px;background:rgba(255,80,80,0.12);border:1px solid rgba(255,80,80,0.3);border-radius:8px;font-size:11.5px;color:#ff8080;line-height:1.4;align-items:center;gap:6px;"></div>
@@ -1335,7 +1324,6 @@ async function openCreateReferralDialog() {
 async function applyReferralOnSignup(userId, email, referralCode) {
   if (!referralCode || !referralCode.trim()) return { success: true };
   try {
-    // Guard: cegah pemilik kode memakai kodenya sendiri
     const { data: refOwner } = await supabaseClient
       .from('user_referral_codes')
       .select('email, user_id, referral_code')
@@ -1351,7 +1339,6 @@ async function applyReferralOnSignup(userId, email, referralCode) {
     }
     const { data, error } = await supabaseClient.rpc('apply_referral_code', { p_user_id: userId, p_email: email, p_referral_code: referralCode.trim().toUpperCase() });
     if (error) return { success: false, message: error.message };
-    // Guard kedua: kalau RPC return referrer_email == email user → tolak
     if (data && data.success && data.referrer_email && String(data.referrer_email).toLowerCase() === String(email).toLowerCase()) {
       return { success: false, message: 'Tidak bisa memakai kode referral milik sendiri' };
     }
@@ -1359,36 +1346,124 @@ async function applyReferralOnSignup(userId, email, referralCode) {
   } catch (e) { return { success: false, message: e.message }; }
 }
 
-// ⭐ ANTI-SELF-REFERRAL: guard saat bonus deposit
-async function processReferralBonus(depositId) {
-  if (!supabaseClient || !depositId) return;
+// ============================================================
+// ⭐ BONUS REFERRAL: 10% dari kode unik → ke pemilik kode referral
+// ============================================================
+/**
+ * Proses bonus referral dari deposit sukses:
+ * - Cari pemilik kode referral dari user yang deposit
+ * - Bonus = 10% dari KODE UNIK (bukan dari total/nominal)
+ * - Guard anti self-referral
+ * - Idempotent: pakai deposit_id sebagai kunci di reason, cek via balance_mutations
+ */
+async function processReferralBonus(depositId, depositSnapshot) {
+  if (!supabaseClient || !depositId) return { success: false, bonus: 0 };
   try {
-    // Ambil data deposit dulu untuk cek self-referral
-    let depositEmail = null;
+    // Ambil data deposit lengkap
+    let deposit = depositSnapshot || null;
+    if (!deposit) {
+      const { data: dep, error: depErr } = await supabaseClient
+        .from('deposits')
+        .select('id, user_id, email, amount, unique_code, total_amount')
+        .eq('id', depositId)
+        .single();
+      if (depErr || !dep) { console.warn('⚠️ Bonus referral: deposit tidak ditemukan', depErr?.message); return { success: false, bonus: 0 }; }
+      deposit = dep;
+    }
+
+    const depositEmail = deposit.email;
+    const depositUserId = deposit.user_id;
+    const uniqueCode = parseInt(deposit.unique_code) || 0;
+    if (uniqueCode <= 0) {
+      console.log('ℹ️ Bonus referral: kode unik 0, skip');
+      return { success: false, bonus: 0 };
+    }
+
+    // ⭐ Hitung bonus = 10% dari kode unik
+    const bonusAmount = Math.floor(uniqueCode * 0.10);
+    if (bonusAmount <= 0) {
+      console.log('ℹ️ Bonus referral: bonus 0 (kode unik terlalu kecil), skip');
+      return { success: false, bonus: 0 };
+    }
+
+    // ⭐ Guard anti-double: cek apakah bonus untuk deposit ini sudah pernah diberikan
+    const idempotencyMarker = `[REFBONUS:${depositId}]`;
+    const { data: existingBonus } = await supabaseClient
+      .from('balance_mutations')
+      .select('id')
+      .ilike('reason', `%${idempotencyMarker}%`)
+      .limit(1);
+    if (existingBonus && existingBonus.length > 0) {
+      console.log('⏸️ Bonus referral untuk deposit', depositId, 'sudah pernah diberikan, skip');
+      return { success: true, bonus: 0, alreadyGiven: true };
+    }
+
+    // Cari user yang referral_code-nya dipakai oleh deposit user ini
+    // via tabel referrals (hasil apply_referral_code saat signup)
+    let referrerEmail = null;
     try {
-      const { data: dep } = await supabaseClient.from('deposits').select('email, user_id').eq('id', depositId).single();
-      depositEmail = dep?.email || null;
-    } catch (e) {}
-
-    // Guard: kalau deposit milik pemilik kode → skip bonus
-    if (depositEmail) {
-      const { data: myCodeRows } = await supabaseClient
-        .from('user_referral_codes')
-        .select('email')
-        .ilike('email', depositEmail)
+      const { data: refRows, error: refErr } = await supabaseClient
+        .from('referrals')
+        .select('referrer_id, referrer_email, referee_id, referee_email, status')
+        .or(`referee_id.eq.${depositUserId},referee_email.eq.${depositEmail}`)
         .limit(1);
-      if (myCodeRows && myCodeRows.length > 0) {
-        console.log('🛑 Self-referral terdeteksi untuk', depositEmail, '— bonus dilewati');
-        return;
+      if (!refErr && refRows && refRows.length > 0) {
+        referrerEmail = refRows[0].referrer_email;
       }
+    } catch (e) { console.warn('Cek referrals error:', e.message); }
+
+    // Fallback: cek via user_referral_codes & profiles (jika tabel referrals tidak ada)
+    if (!referrerEmail) {
+      try {
+        const { data: prof } = await supabaseClient
+          .from('profiles')
+          .select('referred_by, referred_by_email')
+          .eq('id', depositUserId)
+          .single();
+        if (prof) referrerEmail = prof.referred_by_email || null;
+      } catch (e) {}
     }
 
-    const { data, error } = await supabaseClient.rpc('process_deposit_referral_bonus', { p_deposit_id: depositId });
-    if (error) { console.warn('Bonus referral error:', error.message); return; }
-    if (data && data.success && data.bonus > 0) {
-      console.log('✅ Bonus referral diberikan: Rp', data.bonus);
+    if (!referrerEmail) {
+      console.log('ℹ️ Bonus referral: user', depositEmail, 'tidak punya referrer');
+      return { success: false, bonus: 0 };
     }
-  } catch (e) { console.warn('Bonus referral exception:', e); }
+
+    // ⭐ Guard anti self-referral
+    if (String(referrerEmail).toLowerCase() === String(depositEmail).toLowerCase()) {
+      console.log('🛑 Self-referral terdeteksi untuk', depositEmail, '— bonus dilewati');
+      return { success: false, bonus: 0 };
+    }
+
+    // Validasi: referrer harus punya kode referral aktif
+    const { data: refCode } = await supabaseClient
+      .from('user_referral_codes')
+      .select('referral_code')
+      .ilike('email', referrerEmail)
+      .limit(1);
+    if (!refCode || refCode.length === 0) {
+      console.log('ℹ️ Bonus referral: referrer', referrerEmail, 'tidak punya kode aktif');
+      return { success: false, bonus: 0 };
+    }
+
+    // ⭐ Tambah saldo ke referrer via add_user_balance (RPC resmi)
+    const reason = `Bonus referral 10% dari kode unik (Rp ${uniqueCode}) deposit ${depositEmail} ${idempotencyMarker}`;
+    const { data: rpcData, error: rpcErr } = await supabaseClient.rpc('add_user_balance', {
+      p_target_email: referrerEmail,
+      p_amount: bonusAmount,
+      p_reason: reason
+    });
+    if (rpcErr) throw rpcErr;
+    if (rpcData && rpcData.success === false) throw new Error(rpcData.message || 'add_user_balance gagal');
+
+    console.log(`✅ Bonus referral Rp ${bonusAmount} (10% × ${uniqueCode}) diberikan ke ${referrerEmail}`);
+
+    // Notifikasi toast (jika yang deposit = user ini, kasih tahu ke pemilik referrer via toast global — kalau referrer sedang online, mereka lihat di mutasi)
+    return { success: true, bonus: bonusAmount, referrerEmail, uniqueCode };
+  } catch (e) {
+    console.warn('❌ Bonus referral exception:', e.message);
+    return { success: false, bonus: 0, error: e.message };
+  }
 }
 
 // ============================================================
@@ -1829,7 +1904,6 @@ function switchAuthTab(tab) {
   else { tabSignup.classList.add('active'); tabLogin.classList.remove('active'); formSignup.classList.add('active'); formLogin.classList.remove('active'); setTimeout(applyAutoReferralToSignup, 50); }
 }
 
-// ⭐ AUTO-ISI & KUNCI KODE REFERRAL DI FORM DAFTAR
 function applyAutoReferralToSignup() {
   const input = document.getElementById('signupReferralCode');
   const hint = document.getElementById('referralLockedHint');
@@ -1910,7 +1984,6 @@ async function handleSignup(event) {
   const password = document.getElementById('signupPassword').value;
   const passwordConfirm = document.getElementById('signupPasswordConfirm').value;
   const referralCodeInput = document.getElementById('signupReferralCode');
-  // Kode referral bisa disabled (readonly), tetap baca .value
   const referralCode = referralCodeInput ? (referralCodeInput.value || '').trim().toUpperCase() : '';
   if (!email || !password) return;
   if (password !== passwordConfirm) { Swal.fire({ title: '⚠️ Password Tidak Cocok', icon: 'warning', confirmButtonColor: '#ff6b9d', background: '#1a0e2e', color: '#fff' }); return; }
@@ -2165,7 +2238,6 @@ async function updateAuthUI(user) {
     stopAutoCleanupOrders();
     if (window._mutasiUserRefreshInterval) { clearInterval(window._mutasiUserRefreshInterval); window._mutasiUserRefreshInterval = null; }
     const notifBanner = document.querySelector('.notif-permission-banner'); if (notifBanner) notifBanner.remove();
-    // ⭐ Reset form referral supaya bisa diisi ulang
     const refInput = document.getElementById('signupReferralCode');
     if (refInput) { refInput.value = ''; refInput.disabled = false; refInput.readOnly = false; refInput.style = ''; }
     const hint = document.getElementById('referralLockedHint'); if (hint) hint.style.display = 'none';
@@ -2203,7 +2275,7 @@ async function refreshBalance() {
 }
 
 // ============================================================
-// DEPOSIT / QRIS (FIXED — anti-double + auto-refresh balance)
+// DEPOSIT / QRIS (FIXED v2 — saldo + bonus referral 10% kode unik)
 // ============================================================
 function generateUniqueCode() { return Math.floor(Math.random() * 200) + 1; }
 function crc16(str) { let crc = 0xFFFF; for (let i = 0; i < str.length; i++) { crc ^= str.charCodeAt(i) << 8; for (let j = 0; j < 8; j++) { if (crc & 0x8000) crc = (crc << 1) ^ 0x1021; else crc <<= 1; crc &= 0xFFFF; } } return crc.toString(16).toUpperCase().padStart(4, '0'); }
@@ -2265,7 +2337,7 @@ async function openDepositDialog() {
   if (!currentUser) return;
   const { value: amountInput } = await Swal.fire({
     title: '💵 Deposit Saldo',
-    html: `<div style="text-align:left;font-size:12.5px;color:#b39ddb;"><p>Minimal <b style="color:#ffd700;">Rp 1.000</b></p></div>`,
+    html: `<div style="text-align:left;font-size:12.5px;color:#b39ddb;"><p>Minimal <b style="color:#ffd700;">Rp 1.000</b></p><p style="margin-top:8px;font-size:11.5px;color:#64ffc8;">💡 Saldo masuk = nominal deposit (tanpa kode unik)</p><p style="font-size:11.5px;color:#ffd700;">🎁 Bonus referral = 10% dari kode unik</p></div>`,
     input: 'number', inputPlaceholder: 'Contoh: 10000',
     inputAttributes: { min: 1000, step: 1, style: 'color:#fff;background:rgba(255,255,255,0.05);border:1.5px solid rgba(255,107,157,0.3);' },
     showCancelButton: true, confirmButtonText: '💳 Buat QRIS', cancelButtonText: '❌ Batal', confirmButtonColor: '#ffd700', cancelButtonColor: '#6b4a7a', background: '#1a0e2e', color: '#fff',
@@ -2291,7 +2363,7 @@ async function createDeposit(amount) {
     const { data, error } = await supabaseClient.from('deposits').insert({ user_id: currentUser.id, email: currentUser.email, amount, unique_code: uniqueCode, total_amount: totalAmount, status: 'pending', expires_at: expiresAt.toISOString() }).select().single();
     if (error) throw error;
     currentDeposit = data;
-    depositProcessing = false; // ⭐ reset hanya saat deposit baru dibuat
+    depositProcessing = false;
     document.getElementById('qrisAmount').textContent = 'Rp ' + totalAmount.toLocaleString('id-ID');
     document.getElementById('qrisAmountDetail').innerHTML = `Nominal: Rp ${amount.toLocaleString('id-ID')} + Kode Unik: <b style="color:#ffd700;">${uniqueCode}</b>`;
     document.getElementById('qrisModal').classList.add('show');
@@ -2344,7 +2416,7 @@ function startDepositPolling(targetAmount) {
 }
 function stopDepositPolling() { if (depositPollingInterval) { clearInterval(depositPollingInterval); depositPollingInterval = null; } }
 
-// ⭐ FIXED: Deposit success dengan anti-double + auto-refresh saldo
+// ⭐ FIXED v2: Deposit success — saldo = nominal (tanpa kode unik) + bonus referral 10% kode unik
 async function handleDepositSuccess() {
   if (!currentDeposit) return;
   if (depositProcessing) { console.log('⏸️ Deposit sudah diproses, skip'); return; }
@@ -2354,8 +2426,9 @@ async function handleDepositSuccess() {
   if (depositTimerInterval) { clearInterval(depositTimerInterval); depositTimerInterval = null; }
 
   const depositSnapshot = { ...currentDeposit };
+  let bonusInfo = null;
   try {
-    // Cek status DB dulu
+    // 1. Cek status DB dulu
     const { data: checkDeposit, error: checkErr } = await supabaseClient.from('deposits').select('status').eq('id', depositSnapshot.id).single();
     if (checkErr) throw checkErr;
     if (checkDeposit && checkDeposit.status === 'success') {
@@ -2367,7 +2440,7 @@ async function handleDepositSuccess() {
       return;
     }
 
-    // Update kondisional: hanya kalau masih pending
+    // 2. Update kondisional (anti race condition)
     const { data: updatedRows, error: updateErr } = await supabaseClient.from('deposits').update({ status: 'success', paid_at: new Date().toISOString() }).eq('id', depositSnapshot.id).eq('status', 'pending').select();
     if (updateErr) throw updateErr;
     if (!updatedRows || updatedRows.length === 0) {
@@ -2379,25 +2452,57 @@ async function handleDepositSuccess() {
       return;
     }
 
-    // Tambah saldo
-    const { error } = await supabaseClient.rpc('add_user_balance', { p_target_email: currentUser.email, p_amount: depositSnapshot.amount, p_reason: `Deposit QRIS sukses (Kode unik: ${depositSnapshot.unique_code})` });
-    if (error) throw error;
+    // 3. ⭐ Tambah saldo user = NOMINAL DEPOSIT (tanpa kode unik)
+    const depositAmount = parseFloat(depositSnapshot.amount) || 0;
+    if (depositAmount > 0) {
+      const { error: rpcErr } = await supabaseClient.rpc('add_user_balance', {
+        p_target_email: currentUser.email,
+        p_amount: depositAmount,
+        p_reason: `Deposit QRIS sukses (Nominal: Rp ${depositAmount.toLocaleString('id-ID')} · Kode unik: ${depositSnapshot.unique_code})`
+      });
+      if (rpcErr) throw rpcErr;
+      console.log(`✅ Saldo user ditambahkan: Rp ${depositAmount} (nominal, tanpa kode unik)`);
+    }
 
-    // Bonus referral (anti self-referral di dalam)
-    await processReferralBonus(depositSnapshot.id);
+    // 4. ⭐ Proses bonus referral = 10% dari KODE UNIK → ke pemilik kode referral
+    bonusInfo = await processReferralBonus(depositSnapshot.id, depositSnapshot);
+    if (bonusInfo && bonusInfo.success && bonusInfo.bonus > 0) {
+      console.log(`✅ Bonus referral Rp ${bonusInfo.bonus} (10% × kode unik ${bonusInfo.uniqueCode}) → ${bonusInfo.referrerEmail}`);
+    }
 
     document.getElementById('qrisStatus').className = 'qris-status';
     document.getElementById('qrisStatusText').textContent = '✅ Berhasil!';
 
-    // ⭐ WAJIB: refresh profil + UI saldo setelah RPC sukses
+    // 5. ⭐ Refresh profil + UI saldo user
     try {
       const freshProfile = await fetchProfile(currentUser.id);
       if (freshProfile) { currentProfile = freshProfile; updateBalanceDisplay(freshProfile.balance || 0); }
     } catch (e) { console.warn('refresh profile setelah deposit gagal:', e); }
 
-    await Swal.fire({ title: '🎉 Deposit Berhasil!', html: `Saldo +<b style="color:#ffd700;">Rp ${depositSnapshot.amount.toLocaleString('id-ID')}</b>`, icon: 'success', confirmButtonColor: '#ff6b9d', background: '#1a0e2e', color: '#fff', timer: 3000, timerProgressBar: true });
+    // 6. Tampilkan notifikasi
+    let bonusHtml = '';
+    if (bonusInfo && bonusInfo.success && bonusInfo.bonus > 0) {
+      bonusHtml = `<div style="margin-top:12px;padding:10px;background:rgba(255,215,0,0.12);border-radius:10px;border-left:3px solid #ffd700;text-align:left;font-size:11.5px;color:#ffd700;">🎁 <b>Bonus referral:</b> Rp ${bonusInfo.bonus.toLocaleString('id-ID')} (10% × kode unik ${bonusInfo.uniqueCode}) → ${escapeHtml(bonusInfo.referrerEmail)}</div>`;
+    } else if (bonusInfo && bonusInfo.error) {
+      bonusHtml = `<div style="margin-top:12px;padding:10px;background:rgba(250,204,21,0.08);border-radius:10px;border-left:3px solid #facc15;text-align:left;font-size:11px;color:#fde68a;">⚠️ Bonus referral gagal: ${escapeHtml(bonusInfo.error)}</div>`;
+    }
+
+    await Swal.fire({
+      title: '🎉 Deposit Berhasil!',
+      html: `<div style="text-align:left;font-size:13px;color:#ddd;"><p>💰 Saldo bertambah: <b style="color:#22c55e;">Rp ${depositAmount.toLocaleString('id-ID')}</b></p><p style="font-size:11px;color:#94a3b8;margin-top:4px;">(nominal deposit, tanpa kode unik)</p></div>${bonusHtml}`,
+      icon: 'success',
+      confirmButtonColor: '#ff6b9d',
+      background: '#1a0e2e',
+      color: '#fff',
+      timer: bonusInfo && bonusInfo.bonus > 0 ? 5000 : 3000,
+      timerProgressBar: true
+    });
     closeQrisModal();
     await refreshBalance();
+
+    // 7. ⭐ Kalau user login = pemilik referral sendiri (tidak mungkin karena guard), tetap tidak ada tambahan
+    // 8. Refresh mutasi
+    if (document.getElementById('mutasiManagerUser')?.classList.contains('open')) setTimeout(() => loadMutasiUser(), 500);
   } catch (err) {
     console.error('❌ Deposit error:', err);
     depositProcessing = false;
@@ -2409,7 +2514,6 @@ function closeQrisModal() {
   if (depositTimerInterval) { clearInterval(depositTimerInterval); depositTimerInterval = null; }
   stopDepositPolling();
   currentDeposit = null;
-  // ⭐ JANGAN reset depositProcessing di sini
   const btn = document.getElementById('qrisCheckBtn');
   if (btn) { btn.disabled = false; btn.innerHTML = '🔍 Cek Status Pembayaran'; }
 }
@@ -2707,6 +2811,7 @@ function renderMutasiUserList(data) {
     let typeStr = String(m.type || '').toLowerCase().trim();
     const reasonStr = String(m.reason || m.description || '').toLowerCase();
     if (!typeStr && (reasonStr.includes('refund') || reasonStr.includes('pengembalian'))) typeStr = 'refund';
+    if (!typeStr && reasonStr.includes('bonus referral')) typeStr = 'referral_bonus';
     const typeInfo = getMutasiTypeInfo(typeStr);
     html += `<div class="mutasi-item ${typeClass}"><div class="mutasi-icon">${icon}</div><div class="mutasi-info"><div class="mutasi-top"><div class="mutasi-email">${escapeHtml(m.reason || m.description || 'Tidak ada keterangan')}</div><div class="mutasi-amount">${prefix}Rp ${amountFormatted}</div></div><div class="mutasi-meta"><span class="mutasi-type-badge ${typeInfo.cls}">${typeInfo.icon} ${typeInfo.label}</span><span>🕐 ${createdAt} WIB</span></div></div></div>`;
   });
@@ -3610,7 +3715,6 @@ async function handleButtonClick(dest) {
 window.addEventListener('load', async () => {
   updateGmailDisplay();
   await initAuth();
-  // ⭐ Auto-isi & kunci kode referral saat load
   applyAutoReferralToSignup();
   ['globalChatInput', 'supportChatInput', 'supportChatInputAdmin'].forEach(id => {
     const el = document.getElementById(id);
