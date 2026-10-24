@@ -648,7 +648,6 @@ textarea {
 
 /* ============================================
    CUSTOM SELECT — DESKTOP FIX
-   Desktop (≥640px): dropdown tanpa backdrop fixed
 ============================================ */
 .cselect {
   position: relative;
@@ -657,7 +656,6 @@ textarea {
   z-index: 1;
 }
 
-/* Saat terbuka, naikkan z-index container */
 .cselect.open {
   z-index: 250;
 }
@@ -730,7 +728,6 @@ textarea {
   height: 12px;
 }
 
-/* Backdrop — hanya dipakai di MOBILE bottom sheet */
 .cselect-backdrop {
   position: fixed;
   inset: 0;
@@ -746,7 +743,6 @@ textarea {
   pointer-events: auto;
 }
 
-/* Panel default = MOBILE bottom sheet */
 .cselect-panel {
   position: fixed;
   left: 0;
@@ -910,7 +906,6 @@ textarea {
   font-size: 14px;
 }
 
-/* ===== DESKTOP (≥640px): dropdown di bawah trigger ===== */
 @media (min-width: 640px) {
   .cselect-panel {
     position: absolute;
@@ -1182,7 +1177,7 @@ button.primary:disabled {
   .logo { width: 32px; height: 32px; }
   input, select, textarea {
     padding: 10px 12px;
-    font-size: 16px; /* cegah auto-zoom iOS */
+    font-size: 16px;
     min-height: 40px;
   }
   select { min-height: 40px; padding-right: 32px; background-position: right 10px center; }
@@ -1463,12 +1458,139 @@ cekAkses();
 
 </main>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 (function () {
   'use strict';
 
   // ===== SALDO PROVIDER STATE =====
   let providerBalance = 0;
+
+  // ===== SUPABASE (untuk hitung rata-rata waktu selesai) =====
+  const SUPABASE_URL = 'https://vvzgpbiesvupuhqqoxrg.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ2emdwYmllc3Z1cHVocXFveHJnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIwNzE3MTUsImV4cCI6MjEwNzY0NzcxNX0.W3_Ck8B5Q-nEfNlsyeufJsLsTqbM8xPcAeHoAHfGRwY';
+  let supabaseClient = null;
+  try {
+    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false }
+    });
+  } catch (e) { console.warn('Supabase init error:', e); }
+
+  // ⭐ Halaman ini = Suntik Sosmed 1
+  const SOSMED_TYPE = 'sosmed-1';
+
+  // Cache rata-rata: key = `${type_sosmed}|${service_id}`, value = detik rata-rata
+  const averageCache = {};
+  const averageLoading = {};
+
+  /**
+   * Ambil rata-rata waktu selesai dari Supabase.
+   * completed_at - created_at, filter by sosmed_type + service_id.
+   */
+  async function fetchAverageDuration(sosmedType, serviceId) {
+    const key = `${sosmedType}|${serviceId}`;
+    if (averageCache[key] !== undefined) return averageCache[key];
+    if (averageLoading[key]) return null;
+    if (!supabaseClient) return null;
+
+    averageLoading[key] = true;
+    try {
+      const { data, error } = await supabaseClient
+        .from('orders_detail')
+        .select('created_at, completed_at, order_status, sosmed_type, service_id')
+        .eq('sosmed_type', sosmedType)
+        .eq('service_id', String(serviceId))
+        .in('order_status', ['success', 'completed'])
+        .not('completed_at', 'is', null)
+        .not('created_at', 'is', null)
+        .order('completed_at', { ascending: false })
+        .limit(500);
+
+      if (error) {
+        console.warn('⚠️ Gagal ambil data rata-rata:', error.message);
+        averageLoading[key] = false;
+        return null;
+      }
+      if (!data || data.length === 0) {
+        averageCache[key] = 0;
+        averageLoading[key] = false;
+        return 0;
+      }
+
+      let totalSeconds = 0, validCount = 0;
+      for (const row of data) {
+        const created = new Date(row.created_at).getTime();
+        const completed = new Date(row.completed_at).getTime();
+        if (isNaN(created) || isNaN(completed)) continue;
+        const diff = (completed - created) / 1000;
+        if (diff <= 0) continue;
+        if (diff > 30 * 24 * 60 * 60) continue;
+        totalSeconds += diff;
+        validCount++;
+      }
+
+      if (validCount === 0) {
+        averageCache[key] = 0;
+        averageLoading[key] = false;
+        return 0;
+      }
+
+      const avgSeconds = Math.round(totalSeconds / validCount);
+      averageCache[key] = avgSeconds;
+      averageLoading[key] = false;
+      return avgSeconds;
+    } catch (e) {
+      console.warn('⚠️ fetchAverageDuration error:', e);
+      averageLoading[key] = false;
+      return null;
+    }
+  }
+
+  function formatDuration(seconds) {
+    if (!seconds || seconds <= 0) return '-';
+    const s = Math.round(seconds);
+    const day = Math.floor(s / 86400);
+    const hour = Math.floor((s % 86400) / 3600);
+    const min = Math.floor((s % 3600) / 60);
+    if (day > 0) return `${day} hari ${hour} jam`;
+    if (hour > 0) return `${hour} jam ${min} menit`;
+    return `${min} menit`;
+  }
+
+  async function renderAverageForService(service) {
+    const averageEl = document.getElementById('average');
+    if (!averageEl) return;
+    if (!service) { averageEl.innerHTML = '—'; return; }
+
+    const key = `${SOSMED_TYPE}|${service.id}`;
+
+    if (averageCache[key] !== undefined) {
+      const cached = averageCache[key];
+      if (cached > 0) {
+        averageEl.innerHTML = '<b>' + formatDuration(cached) + '</b>' +
+          ' <span style="color:#64748b;font-size:11px;">(berdasarkan riwayat order)</span>';
+      } else {
+        averageEl.innerHTML = '<b>' + (service.average || '-') + '</b>' +
+          ' <span style="color:#64748b;font-size:11px;">(default)</span>';
+      }
+      return;
+    }
+
+    averageEl.innerHTML = '<span style="color:#94a3b8">⏳ Menghitung rata-rata...</span>';
+
+    const avgSeconds = await fetchAverageDuration(SOSMED_TYPE, service.id);
+
+    const currentLayanan = document.getElementById('layanan').value;
+    if (String(currentLayanan) !== String(service.id)) return;
+
+    if (avgSeconds && avgSeconds > 0) {
+      averageEl.innerHTML = '<b>' + formatDuration(avgSeconds) + '</b>' +
+        ' <span style="color:#64748b;font-size:11px;">(berdasarkan riwayat order)</span>';
+    } else {
+      averageEl.innerHTML = '<b>' + (service.average || '-') + '</b>' +
+        ' <span style="color:#64748b;font-size:11px;">(default)</span>';
+    }
+  }
 
   // ===== MENU =====
   const toggleBtn = document.getElementById('menuToggle');
@@ -1665,10 +1787,7 @@ cekAkses();
   }
 
   /* ============================================================
-     CUSTOM SELECT ENGINE — FIXED
-     Desktop (≥640px): dropdown tanpa backdrop.
-     Close-outside via document click listener.
-     Mobile (<640px): bottom sheet + backdrop.
+     CUSTOM SELECT ENGINE
   ============================================================ */
   let activeCSelect = null;
   let kategoriItems = [];
@@ -1761,7 +1880,6 @@ cekAkses();
   }
 
   function openCSelect(cselectEl, title, items, selectedValue, onPick) {
-    // Toggle behavior
     if (activeCSelect === cselectEl && cselectEl.classList.contains('open')) {
       closeAllCSelect();
       return;
@@ -1784,7 +1902,6 @@ cekAkses();
     const listEl = panel.querySelector('.cselect-list');
     const searchEl = panel.querySelector('.cselect-search');
 
-    // Cegah klik di dalam panel menutup dropdown
     panel.addEventListener('click', function (e) {
       e.stopPropagation();
     });
@@ -1813,7 +1930,6 @@ cekAkses();
     });
 
     if (mobile) {
-      // ===== MOBILE: bottom sheet + backdrop =====
       const backdrop = document.createElement('div');
       backdrop.className = 'cselect-backdrop';
       backdrop.addEventListener('click', closeAllCSelect);
@@ -1832,7 +1948,6 @@ cekAkses();
         setTimeout(function () { searchEl.focus(); }, 280);
       });
     } else {
-      // ===== DESKTOP: dropdown inline, tanpa backdrop =====
       cselectEl.appendChild(panel);
 
       void panel.offsetHeight;
@@ -1844,7 +1959,6 @@ cekAkses();
         searchEl.focus();
       });
 
-      // Click-outside untuk desktop
       setTimeout(function () {
         outsideClickHandler = function (e) {
           if (activeCSelect && !activeCSelect.contains(e.target)) {
@@ -2019,7 +2133,9 @@ cekAkses();
       commentInfo.classList.remove('show');
     }
 
-    document.getElementById('average').innerHTML = '<b>' + (selectedService.average || '-') + '</b>';
+    // ⭐ Rata-rata dari Supabase (based on service_id + sosmed_type 'sosmed-1')
+    renderAverageForService(selectedService);
+
     document.getElementById('infoLayanan').innerHTML =
       '<b>' + selectedService.name + '</b><br>' +
       'ID Produk: ' + selectedService.id + '<br>' +
