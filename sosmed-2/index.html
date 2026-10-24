@@ -10,6 +10,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <title>Shine Shop - SMM</title>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <link rel="stylesheet" href="mobile.css" media="screen and (max-width: 767px)">
 <link rel="stylesheet" href="desktop.css" media="screen and (min-width: 768px)">
 </head>
@@ -211,6 +212,149 @@
   'use strict';
 
   let providerBalance = 0;
+
+  // ===== SUPABASE (untuk hitung rata-rata waktu selesai) =====
+  const SUPABASE_URL = 'https://vvzgpbiesvupuhqqoxrg.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ2emdwYmllc3Z1cHVocXFveHJnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIwNzE3MTUsImV4cCI6MjEwNzY0NzcxNX0.W3_Ck8B5Q-nEfNlsyeufJsLsTqbM8xPcAeHoAHfGRwY';
+  let supabaseClient = null;
+  try {
+    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false }
+    });
+  } catch (e) { console.warn('Supabase init error:', e); }
+
+  // Cache rata-rata: key = `${type_sosmed}|${service_id}`, value = detik rata-rata
+  const averageCache = {};
+  // Sedang loading per key
+  const averageLoading = {};
+
+  /**
+   * Ambil rata-rata waktu selesai dari Supabase.
+   * Rata-rata = completed_at - created_at, dikelompokkan berdasarkan
+   * sosmed_type + service_id.
+   * Hanya yang status success/completed DAN completed_at tidak null.
+   */
+  async function fetchAverageDuration(sosmedType, serviceId) {
+    const key = `${sosmedType}|${serviceId}`;
+    if (averageCache[key] !== undefined) return averageCache[key];
+    if (averageLoading[key]) return null;
+
+    if (!supabaseClient) return null;
+
+    averageLoading[key] = true;
+    try {
+      const { data, error } = await supabaseClient
+        .from('orders_detail')
+        .select('created_at, completed_at, order_status, sosmed_type, service_id')
+        .eq('sosmed_type', sosmedType)
+        .eq('service_id', String(serviceId))
+        .in('order_status', ['success', 'completed'])
+        .not('completed_at', 'is', null)
+        .not('created_at', 'is', null)
+        .order('completed_at', { ascending: false })
+        .limit(500);
+
+      if (error) {
+        console.warn('⚠️ Gagal ambil data rata-rata:', error.message);
+        averageLoading[key] = false;
+        return null;
+      }
+      if (!data || data.length === 0) {
+        averageCache[key] = 0;
+        averageLoading[key] = false;
+        return 0;
+      }
+
+      // Hitung rata-rata selisih (detik) antara created_at → completed_at
+      let totalSeconds = 0, validCount = 0;
+      for (const row of data) {
+        const created = new Date(row.created_at).getTime();
+        const completed = new Date(row.completed_at).getTime();
+        if (isNaN(created) || isNaN(completed)) continue;
+        const diff = (completed - created) / 1000;
+        if (diff <= 0) continue;
+        // buang outlier ekstrem (>30 hari) biar rata-rata tidak rusak
+        if (diff > 30 * 24 * 60 * 60) continue;
+        totalSeconds += diff;
+        validCount++;
+      }
+
+      if (validCount === 0) {
+        averageCache[key] = 0;
+        averageLoading[key] = false;
+        return 0;
+      }
+
+      const avgSeconds = Math.round(totalSeconds / validCount);
+      averageCache[key] = avgSeconds;
+      averageLoading[key] = false;
+      return avgSeconds;
+    } catch (e) {
+      console.warn('⚠️ fetchAverageDuration error:', e);
+      averageLoading[key] = false;
+      return null;
+    }
+  }
+
+  /**
+   * Format detik → "X hari Y jam" / "X jam Y menit" / "X menit"
+   */
+  function formatDuration(seconds) {
+    if (!seconds || seconds <= 0) return '-';
+    const s = Math.round(seconds);
+    const day = Math.floor(s / 86400);
+    const hour = Math.floor((s % 86400) / 3600);
+    const min = Math.floor((s % 3600) / 60);
+
+    if (day > 0) return `${day} hari ${hour} jam`;
+    if (hour > 0) return `${hour} jam ${min} menit`;
+    return `${min} menit`;
+  }
+
+  /**
+   * Tampilkan rata-rata waktu selesai untuk service yang sedang dipilih
+   * berdasarkan sosmed_type (default sosmed-2 karena halaman ini Suntik Sosmed 2)
+   */
+  async function renderAverageForService(service) {
+    const averageEl = document.getElementById('average');
+    if (!averageEl) return;
+    if (!service) { averageEl.innerHTML = '—'; return; }
+
+    // Halaman ini adalah Suntik Sosmed 2
+    const sosmedType = 'sosmed-2';
+    const key = `${sosmedType}|${service.id}`;
+
+    // Kalau sudah ada di cache → langsung tampil
+    if (averageCache[key] !== undefined) {
+      const cached = averageCache[key];
+      if (cached > 0) {
+        averageEl.innerHTML = '<b>' + formatDuration(cached) + '</b>' +
+          ' <span style="color:#64748b;font-size:11px;">(berdasarkan riwayat order)</span>';
+      } else {
+        averageEl.innerHTML = '<b>' + (service.average || '-') + '</b>' +
+          ' <span style="color:#64748b;font-size:11px;">(default)</span>';
+      }
+      return;
+    }
+
+    // Selagi loading → tampilkan "Menghitung..."
+    averageEl.innerHTML = '<span style="color:#94a3b8">⏳ Menghitung rata-rata...</span>';
+
+    const avgSeconds = await fetchAverageDuration(sosmedType, service.id);
+
+    // Pastikan service yang dipilih masih sama (user mungkin ganti cepat)
+    const currentLayanan = document.getElementById('layanan').value;
+    if (String(currentLayanan) !== String(service.id)) return;
+
+    if (avgSeconds && avgSeconds > 0) {
+      averageEl.innerHTML = '<b>' + formatDuration(avgSeconds) + '</b>' +
+        ' <span style="color:#64748b;font-size:11px;">(berdasarkan riwayat order)</span>';
+    } else {
+      // Fallback ke data default dari API provider
+      averageEl.innerHTML = '<b>' + (service.average || '-') + '</b>' +
+        ' <span style="color:#64748b;font-size:11px;">(default)</span>';
+    }
+  }
 
   // ===== MENU =====
   const toggleBtn = document.getElementById('menuToggle');
@@ -429,7 +573,6 @@
   }
 
   function closeAllCSelect() {
-    // hapus listener click-outside
     cleanupOutsideListener();
 
     document.querySelectorAll('.cselect.open').forEach(function (el) {
@@ -455,7 +598,6 @@
 
     activeCSelect = null;
 
-    // hanya reset overflow untuk mobile
     if (isMobileViewport()) {
       document.body.style.overflow = '';
     }
@@ -505,7 +647,6 @@
   }
 
   function openCSelect(cselectEl, title, items, selectedValue, onPick) {
-    // Kalau cselect yang sama sudah terbuka → tutup saja (toggle)
     if (activeCSelect === cselectEl && cselectEl.classList.contains('open')) {
       closeAllCSelect();
       return;
@@ -528,7 +669,6 @@
     const listEl = panel.querySelector('.cselect-list');
     const searchEl = panel.querySelector('.cselect-search');
 
-    // Cegah klik di dalam panel menutup dropdown
     panel.addEventListener('click', function (e) {
       e.stopPropagation();
     });
@@ -557,7 +697,6 @@
     });
 
     if (mobile) {
-      // ===== MOBILE: bottom sheet + backdrop =====
       const backdrop = document.createElement('div');
       backdrop.className = 'cselect-backdrop';
       backdrop.addEventListener('click', closeAllCSelect);
@@ -576,7 +715,6 @@
         setTimeout(function () { searchEl.focus(); }, 280);
       });
     } else {
-      // ===== DESKTOP: dropdown, tanpa backdrop =====
       cselectEl.appendChild(panel);
 
       void panel.offsetHeight;
@@ -588,7 +726,6 @@
         searchEl.focus();
       });
 
-      // Listener click-outside: tutup hanya kalau klik di luar cselect & panel
       setTimeout(function () {
         outsideClickHandler = function (e) {
           if (activeCSelect && !activeCSelect.contains(e.target)) {
@@ -749,7 +886,9 @@
       commentInfo.classList.remove('show');
     }
 
-    document.getElementById('average').innerHTML = '<b>' + (selectedService.average || '-') + '</b>';
+    // ⭐ Rata-rata waktu selesai diambil dari Supabase (based on service_id + sosmed_type)
+    renderAverageForService(selectedService);
+
     document.getElementById('infoLayanan').innerHTML =
       '<b>' + selectedService.name + '</b><br>' +
       'ID Produk: ' + selectedService.id + '<br>' +
@@ -1257,7 +1396,6 @@
   });
 
   // ===== EVENT BINDING TRIGGER =====
-  // Pakai e.preventDefault + stopPropagation agar tidak bentrok dengan listener click-outside
   document.getElementById('cselectKategori')
     .querySelector('.cselect-trigger')
     .addEventListener('click', openKategoriPicker);
