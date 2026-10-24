@@ -822,17 +822,7 @@ body.chat-open .cs-bubble-container{display:none !important}
         <div class="new-chat-box">
           <div class="nc-label">👤 Ketik Gmail User untuk Chat</div>
           <div class="nc-input-wrap">
-            <input              type="email"
-              id="newChatEmail"
-              placeholder="user@gmail.com"
-              autocomplete="email"
-              autocapitalize="none"
-              autocorrect="off"
-              spellcheck="false"
-              inputmode="email"
-              onkeydown="if(event.key==='Enter'){event.preventDefault();startNewChat();}"
-              oninput="clearNewChatError()"
-            >
+            <input type="email" id="newChatEmail" placeholder="user@gmail.com" autocomplete="email" autocapitalize="none" autocorrect="off" spellcheck="false" inputmode="email" onkeydown="if(event.key==='Enter'){event.preventDefault();startNewChat();}" oninput="clearNewChatError()">
             <button onclick="startNewChat()" id="btnStartNewChat">💬 Chat</button>
           </div>
           <div id="newChatError" style="display:none;margin-top:8px;padding:8px 10px;background:rgba(255,80,80,0.12);border:1px solid rgba(255,80,80,0.3);border-radius:8px;font-size:11.5px;color:#ff8080;line-height:1.4;align-items:center;gap:6px;"></div>
@@ -1538,8 +1528,13 @@ async function cleanupOldMutations() {
 }
 
 async function fetchProfile(userId) {
-  try { const { data, error } = await supabaseClient.from('profiles').select('*').eq('id', userId).single(); if (error) throw error; return data; }
-  catch (e) { return null; }
+  try {
+    const { data, error } = await supabaseClient.from('profiles').select('*').eq('id', userId).maybeSingle();
+    if (error) throw error;
+    return data;
+  } catch (e) {
+    return null;
+  }
 }
 
 // ============================================================
@@ -2604,14 +2599,45 @@ function updateBalanceDisplay(balance) {
 
 async function refreshBalance() {
   if (!currentUser) return;
-  const profile = await fetchProfile(currentUser.id);
-  if (profile) {
-    currentProfile = profile;
-    updateBalanceDisplay(profile.balance || 0);
-    const num = parseFloat(profile.balance) || 0;
-    const isMinus = num < 0;
-    Swal.fire({ title: isMinus ? '⚠️ Saldo MINUS' : '✅ Diperbarui', html: `Saldo: <b style="color:${isMinus ? '#ff4444' : '#ffd700'};">${isMinus ? '-' : ''}Rp ${Math.abs(num).toLocaleString('id-ID')}</b>`, icon: isMinus ? 'warning' : 'success', confirmButtonColor: isMinus ? '#ff4444' : '#ff6b9d', background: '#1a0e2e', color: '#fff', timer: 1500, timerProgressBar: true, showConfirmButton: false });
+  try {
+    const { data: profile, error } = await supabaseClient
+      .from('profiles')
+      .select('*')
+      .ilike('email', currentUser.email)
+      .maybeSingle();
+    if (error) throw error;
+    if (profile) {
+      currentProfile = profile;
+      updateBalanceDisplay(profile.balance || 0);
+      const num = parseFloat(profile.balance) || 0;
+      const isMinus = num < 0;
+      Swal.fire({ title: isMinus ? '⚠️ Saldo MINUS' : '✅ Diperbarui', html: `Saldo: <b style="color:${isMinus ? '#ff4444' : '#ffd700'};">${isMinus ? '-' : ''}Rp ${Math.abs(num).toLocaleString('id-ID')}</b>`, icon: isMinus ? 'warning' : 'success', confirmButtonColor: isMinus ? '#ff4444' : '#ff6b9d', background: '#1a0e2e', color: '#fff', timer: 1500, timerProgressBar: true, showConfirmButton: false });
+    }
+  } catch (err) {
+    console.warn('refreshBalance error:', err.message);
   }
+}
+
+// ⭐ Helper baru: paksa refresh saldo dari DB tanpa popup
+async function forceRefreshBalanceFromDB() {
+  if (!currentUser) return null;
+  try {
+    const { data: prof, error } = await supabaseClient
+      .from('profiles')
+      .select('balance')
+      .ilike('email', currentUser.email)
+      .maybeSingle();
+    if (error) throw error;
+    if (prof) {
+      const bal = parseFloat(prof.balance) || 0;
+      if (currentProfile) currentProfile.balance = bal;
+      updateBalanceDisplay(bal);
+      return bal;
+    }
+  } catch (e) {
+    console.warn('⚠️ forceRefreshBalanceFromDB error:', e.message);
+  }
+  return null;
 }
 
 // ============================================================
@@ -2815,8 +2841,9 @@ function startDepositTimer(expiresAt) {
   depositTimerInterval = setInterval(tick, 1000);
 }
 function startDepositPolling(targetAmount) {
-  if (depositPollingInterval) clearInterval(depositPollingInterval);
+  if (depositPollingInterval) { clearInterval(depositPollingInterval); depositPollingInterval = null; }
   async function checkMutation() {
+    // ⭐ Guard ganda
     if (depositSuccessProcessed || isProcessingDeposit || !currentDeposit) return;
     try {
       const res = await fetch(`/api/mutasi?amount=${targetAmount}&t=${Date.now()}`);
@@ -2829,8 +2856,17 @@ function startDepositPolling(targetAmount) {
       else if (Array.isArray(raw?.mutasi)) mutasiList = raw.mutasi;
       else if (Array.isArray(raw?.result)) mutasiList = raw.result;
       else if (Array.isArray(raw)) mutasiList = raw;
-      for (const m of mutasiList) { if (isTransactionMatch(m, targetAmount).match) { clearInterval(depositPollingInterval); if (depositTimerInterval) clearInterval(depositTimerInterval); await handleDepositSuccess(); return; } }
-    } catch (err) {}
+      for (const m of mutasiList) {
+        if (isTransactionMatch(m, targetAmount).match) {
+          // ⭐ Stop polling SEGERA sebelum handle
+          clearInterval(depositPollingInterval);
+          depositPollingInterval = null;
+          if (depositTimerInterval) { clearInterval(depositTimerInterval); depositTimerInterval = null; }
+          await handleDepositSuccess();
+          return;
+        }
+      }
+    } catch (err) { /* silent */ }
   }
   checkMutation();
   depositPollingInterval = setInterval(checkMutation, 5000);
@@ -2838,22 +2874,27 @@ function startDepositPolling(targetAmount) {
 function stopDepositPolling() { if (depositPollingInterval) { clearInterval(depositPollingInterval); depositPollingInterval = null; } }
 
 async function handleDepositSuccess() {
+  // ⭐ GUARD: cegah double proses
   if (isProcessingDeposit || depositSuccessProcessed) {
     console.log('🛑 handleDepositSuccess diblok (sudah diproses)');
     return;
   }
   if (!currentDeposit) return;
+
   isProcessingDeposit = true;
+  // ⭐ Set flag SEGERA agar polling tidak trigger lagi
+  depositSuccessProcessed = true;
 
   const depositId = currentDeposit.id;
-  const depositAmount = currentDeposit.amount;
+  const depositAmount = parseFloat(currentDeposit.amount) || 0;
   const uniqueCode = currentDeposit.unique_code;
-  const depositEmail = currentUser?.email;
+  const depositEmail = (currentUser?.email || '').trim().toLowerCase();
+
+  const btn = document.getElementById('qrisCheckBtn');
+  if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Memproses...'; }
 
   try {
-    const btn = document.getElementById('qrisCheckBtn');
-    if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Memproses...'; }
-
+    // ===== STEP 1: Atomic update status deposit (pending -> success) =====
     const { data: updatedRows, error: updateErr } = await supabaseClient
       .from('deposits')
       .update({ status: 'success', paid_at: new Date().toISOString() })
@@ -2865,27 +2906,67 @@ async function handleDepositSuccess() {
 
     if (!updatedRows || updatedRows.length === 0) {
       console.log('🛑 Deposit sudah diproses sebelumnya (bukan pending).');
-      depositSuccessProcessed = true;
-      isProcessingDeposit = false;
       if (document.getElementById('qrisModal').classList.contains('show')) {
         document.getElementById('qrisStatus').className = 'qris-status';
         document.getElementById('qrisStatusText').textContent = '✅ Sudah diproses';
       }
+      // ⭐ Tetap refresh balance (kalau-kalau deposit sudah sukses di sesi lain)
+      await forceRefreshBalanceFromDB();
       return;
     }
 
-    const { error } = await supabaseClient.rpc('add_user_balance', {
+    // ===== STEP 2: Tambah saldo user (RPC) =====
+    const { data: rpcResult, error: balanceErr } = await supabaseClient.rpc('add_user_balance', {
       p_target_email: depositEmail,
       p_amount: depositAmount,
       p_reason: `Deposit QRIS sukses (Kode unik: ${uniqueCode})`
     });
-    if (error) {
+
+    if (balanceErr) {
+      // ⭐ Rollback status deposit karena saldo gagal ditambah
+      try {
+        await supabaseClient.from('deposits').update({
+          status: 'pending',
+          paid_at: null
+        }).eq('id', depositId);
+      } catch(e) { console.warn('⚠️ Rollback deposit status gagal:', e.message); }
+      throw new Error('Gagal menambah saldo: ' + balanceErr.message);
+    }
+
+    if (!rpcResult) {
       try {
         await supabaseClient.from('deposits').update({ status: 'pending', paid_at: null }).eq('id', depositId);
       } catch(e) {}
-      throw error;
+      throw new Error('RPC add_user_balance tidak mengembalikan data');
     }
 
+    if (rpcResult.success === false) {
+      try {
+        await supabaseClient.from('deposits').update({ status: 'pending', paid_at: null }).eq('id', depositId);
+      } catch(e) {}
+      throw new Error(rpcResult.message || 'RPC add_user_balance gagal');
+    }
+
+    // ⭐ VERIFIKASI: pastikan saldo benar-benar bertambah di DB
+    let verifiedBalance = null;
+    for (let i = 0; i < 3; i++) {
+      const { data: prof } = await supabaseClient
+        .from('profiles')
+        .select('balance')
+        .ilike('email', depositEmail)
+        .maybeSingle();
+      if (prof) {
+        verifiedBalance = parseFloat(prof.balance) || 0;
+        break;
+      }
+      await new Promise(r => setTimeout(r, 500));
+    }
+
+    if (verifiedBalance === null) {
+      console.warn('⚠️ Tidak bisa verifikasi saldo setelah RPC. Tetap lanjut update UI.');
+    }
+
+    // ===== STEP 3: Klaim bonus referral (non-blocking, idempotent) =====
     try {
       const { data: refData, error: refErr } = await supabaseClient.rpc('claim_referral_reward', {
         p_user_id: currentUser.id,
@@ -2894,12 +2975,18 @@ async function handleDepositSuccess() {
       });
       if (refErr) console.warn('⚠️ Claim referral error:', refErr.message);
       else if (refData && refData.success && refData.reward_amount > 0) {
-        const Toast = Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 5000, timerBackgroundBar: true, background: '#1a0e2e', color: '#fff' });
+        const Toast = Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 5000, timerProgressBar: true, background: '#1a0e2e', color: '#fff' });
         Toast.fire({ icon: 'success', title: `🎁 Bonus Referral`, html: `<div style="font-size:11.5px;color:#64ffc8;">Reward Rp ${parseFloat(refData.reward_amount).toLocaleString('id-ID')} diberikan ke upline.</div>` });
       }
     } catch(e) { console.warn('⚠️ Claim referral exception:', e.message); }
 
-    depositSuccessProcessed = true;
+    // ===== STEP 4: Update UI saldo (paksa dari DB) =====
+    if (verifiedBalance !== null) {
+      updateBalanceDisplay(verifiedBalance);
+      if (currentProfile) currentProfile.balance = verifiedBalance;
+    }
+    // Refresh lagi untuk kepastian
+    await forceRefreshBalanceFromDB();
 
     document.getElementById('qrisStatus').className = 'qris-status';
     document.getElementById('qrisStatusText').textContent = '✅ Berhasil!';
@@ -2914,21 +3001,21 @@ async function handleDepositSuccess() {
     stopDepositPolling();
     if (depositTimerInterval) clearInterval(depositTimerInterval);
     closeQrisModal();
-    refreshBalance();
 
   } catch (err) {
     console.error('❌ handleDepositSuccess error:', err);
+    // ⭐ Kalau error, izinkan retry (jangan biarkan flag nyangkut)
+    depositSuccessProcessed = false;
     Swal.fire({ title: '❌ Gagal Proses Deposit', text: err.message, icon: 'error', confirmButtonColor: '#ff4444', background: '#1a0e2e', color: '#fff' });
   } finally {
     isProcessingDeposit = false;
-    const btn = document.getElementById('qrisCheckBtn');
     if (btn) { btn.disabled = false; btn.innerHTML = '🔍 Cek Status'; }
   }
 }
 
 function closeQrisModal() {
   document.getElementById('qrisModal').classList.remove('show');
-  if (depositTimerInterval) clearInterval(depositTimerInterval);
+  if (depositTimerInterval) { clearInterval(depositTimerInterval); depositTimerInterval = null; }
   stopDepositPolling();
   currentDeposit = null;
   depositSuccessProcessed = false;
@@ -2944,21 +3031,33 @@ async function manualCheckPayment() {
     return;
   }
   const btn = document.getElementById('qrisCheckBtn');
-  btn.disabled = true; btn.innerHTML = '⏳ Memeriksa...';
+  if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Memeriksa...'; }
   try {
     const targetAmount = currentDeposit.total_amount;
     const res = await fetch(`/api/mutasi?amount=${targetAmount}&t=${Date.now()}`);
     const json = await res.json();
-    if (!json.success) throw new Error('Gagal ambil data');
+    if (!json.success) throw new Error('Gagal ambil data mutasi');
     const raw = json.raw || {};
     let mutasiList = [];
     if (Array.isArray(raw?.data)) mutasiList = raw.data;
     else if (Array.isArray(raw?.mutasi)) mutasiList = raw.mutasi;
     else if (Array.isArray(raw?.result)) mutasiList = raw.result;
-    for (const m of mutasiList) { if (isTransactionMatch(m, targetAmount).match) { await handleDepositSuccess(); return; } }
+    else if (Array.isArray(raw)) mutasiList = raw;
+    for (const m of mutasiList) {
+      if (isTransactionMatch(m, targetAmount).match) {
+        await handleDepositSuccess();
+        return;
+      }
+    }
     Swal.fire({ title: '⏳ Belum Ada', text: 'Coba lagi beberapa saat.', icon: 'info', confirmButtonColor: '#00c6ff', background: '#1a0e2e', color: '#fff' });
-  } catch (err) { Swal.fire({ title: '❌ Gagal', text: err.message, icon: 'error', confirmButtonColor: '#ff4444', background: '#1a0e2e', color: '#fff' }); }
-  finally { if (!depositSuccessProcessed) { btn.disabled = false; btn.innerHTML = '🔍 Cek Status'; } }
+  } catch (err) {
+    Swal.fire({ title: '❌ Gagal', text: err.message, icon: 'error', confirmButtonColor: '#ff4444', background: '#1a0e2e', color: '#fff' });
+  } finally {
+    if (!depositSuccessProcessed && btn) {
+      btn.disabled = false;
+      btn.innerHTML = '🔍 Cek Status';
+    }
+  }
 }
 
 // ============================================================
