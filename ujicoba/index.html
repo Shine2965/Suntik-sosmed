@@ -2886,7 +2886,7 @@ function startDepositPolling(targetAmount) {
 function stopDepositPolling() { if (depositPollingInterval) { clearInterval(depositPollingInterval); depositPollingInterval = null; } }
 
 // ============================================================
-// ⭐ VERSI BARU handleDepositSuccess() — IDEMPOTENT & ROBUST
+// ⭐ VERSI BARU handleDepositSuccess() — ROBUST + NO-THROW PADA v_profile BUG
 // ============================================================
 async function handleDepositSuccess() {
   if (isProcessingDeposit) {
@@ -2905,30 +2905,25 @@ async function handleDepositSuccess() {
   const btn = document.getElementById('qrisCheckBtn');
   if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Memproses...'; }
 
+  let credited = false;
+
   try {
     // ========== STEP 1: Cek status deposit terkini ==========
     const depositStatus = await getDepositStatusFromDB(depositId);
     if (!depositStatus) throw new Error('Deposit tidak ditemukan di database');
     console.log('📋 Status deposit:', depositStatus);
 
-    // Kalau sudah dikredit → cukup refresh UI, JANGAN credit lagi
     if (depositStatus.balance_credited === true) {
       console.log('✅ Deposit sudah dikreditkan sebelumnya, refresh UI saja');
       await forceRefreshBalanceFromDB();
       document.getElementById('qrisStatus').className = 'qris-status';
       document.getElementById('qrisStatusText').textContent = '✅ Sudah diproses';
-
       Swal.fire({
         title: '✅ Deposit Sudah Dikonfirmasi',
         html: `Saldo <b style="color:#ffd700;">Rp ${depositAmount.toLocaleString('id-ID')}</b> sudah ditambahkan ke akun Anda.`,
-        icon: 'success',
-        confirmButtonColor: '#22c55e',
-        background: '#1a0e2e',
-        color: '#fff',
-        timer: 3000,
-        timerProgressBar: true
+        icon: 'success', confirmButtonColor: '#22c55e', background: '#1a0e2e', color: '#fff',
+        timer: 3000, timerProgressBar: true
       });
-
       depositSuccessProcessed = true;
       stopDepositPolling();
       if (depositTimerInterval) clearInterval(depositTimerInterval);
@@ -2936,101 +2931,112 @@ async function handleDepositSuccess() {
       return;
     }
 
-    // ========== STEP 2: Simpan balance SEBELUM kredit (untuk verifikasi delta) ==========
+    // ========== STEP 2: Simpan balance SEBELUM kredit ==========
     const balanceBefore = await getBalanceFromDB();
     console.log('💰 Balance sebelum kredit:', balanceBefore);
 
-    // ========== STEP 3: Panggil RPC credit_deposit (ATOMIC + IDEMPOTENT) ==========
+    // ========== STEP 3: Panggil RPC credit_deposit ==========
     const { data: creditResult, error: creditErr } = await supabaseClient.rpc('credit_deposit', {
       p_deposit_id: depositId,
       p_credited_via: 'rpc'
     });
 
+    // ⭐ PATCH KRITIS: jangan throw dulu untuk error v_profile / field missing
+    let needsFallback = false;
+
     if (creditErr) {
+      const msg = String(creditErr.message || '').toLowerCase();
       console.error('❌ RPC credit_deposit error:', creditErr);
-      throw new Error('Gagal kredit saldo: ' + creditErr.message);
-    }
-
-    console.log('✅ RPC credit_deposit result:', creditResult);
-
-    if (!creditResult || creditResult.success === false) {
-      throw new Error(creditResult?.message || 'RPC credit_deposit gagal');
-    }
-
-    if (creditResult.already_credited === true) {
-      console.log('ℹ️ Server: deposit sudah credited (mungkin dari tab lain)');
+      if (msg.includes('v_profile') || msg.includes('has no field') || msg.includes('does not exist')) {
+        console.warn('⚠️ Terdeteksi bug schema (v_profile). Akan fallback add_user_balance.');
+        needsFallback = true;
+      } else {
+        throw new Error('Gagal kredit saldo: ' + creditErr.message);
+      }
+    } else if (!creditResult || creditResult.success === false) {
+      console.warn('⚠️ credit_deposit return success=false:', creditResult);
+      needsFallback = true;
+    } else if (creditResult.already_credited === true) {
+      console.log('ℹ️ Server: deposit sudah credited');
+      credited = true;
+    } else {
+      console.log('✅ RPC credit_deposit OK:', creditResult);
+      credited = true;
     }
 
     // ========== STEP 4: VERIFIKASI DELTA BALANCE ==========
     let verifiedBalance = null;
-    for (let i = 0; i < 3; i++) {
-      await new Promise(r => setTimeout(r, 500));
-      const bal = await getBalanceFromDB();
-      if (bal !== null) {
-        verifiedBalance = bal;
-        break;
+    if (!needsFallback) {
+      for (let i = 0; i < 3; i++) {
+        await new Promise(r => setTimeout(r, 500));
+        const bal = await getBalanceFromDB();
+        if (bal !== null) { verifiedBalance = bal; break; }
       }
-    }
 
-    if (verifiedBalance === null) {
-      console.warn('⚠️ Tidak bisa verifikasi balance dari DB');
-    } else {
-      console.log('💰 Balance setelah kredit:', verifiedBalance);
-
-      if (balanceBefore !== null) {
+      if (verifiedBalance !== null && balanceBefore !== null) {
         const delta = verifiedBalance - balanceBefore;
-        const expectedDelta = depositAmount;
-
-        if (delta < expectedDelta) {
-          console.warn(`⚠️ Delta balance kurang! Expected: ${expectedDelta}, Got: ${delta}`);
-          console.log('🔄 Fallback: panggil add_user_balance');
-
-          const { data: fallbackResult, error: fbErr } = await supabaseClient.rpc('add_user_balance', {
-            p_target_email: depositEmail,
-            p_amount: depositAmount,
-            p_reason: `Fallback deposit ${depositId} (Kode unik: ${uniqueCode})`
-          });
-
-          if (fbErr) {
-            console.error('❌ Fallback juga error:', fbErr);
-            throw new Error('Saldo gagal ditambahkan: ' + fbErr.message);
-          }
-
-          if (!fallbackResult || fallbackResult.success === false) {
-            throw new Error(fallbackResult?.message || 'Fallback add_user_balance gagal');
-          }
-
-          try {
-            await supabaseClient
-              .from('deposits')
-              .update({
-                balance_credited: true,
-                credited_at: new Date().toISOString(),
-                credited_amount: depositAmount,
-                credited_via: 'fallback',
-                status: 'success',
-                paid_at: new Date().toISOString()
-              })
-              .eq('id', depositId);
-          } catch (e) {
-            console.warn('⚠️ Gagal update flag balance_credited:', e.message);
-          }
-
-          verifiedBalance = await getBalanceFromDB();
-          console.log('💰 Balance setelah fallback:', verifiedBalance);
+        console.log(`💰 Delta balance: ${delta} (expected: ${depositAmount})`);
+        if (delta < depositAmount) {
+          console.warn('⚠️ Delta kurang → fallback add_user_balance');
+          needsFallback = true;
         }
       }
     }
 
-    // ========== STEP 5: Update UI dari DB ==========
-    if (verifiedBalance !== null) {
-      updateBalanceDisplay(verifiedBalance);
-      if (currentProfile) currentProfile.balance = verifiedBalance;
-    } else {
-      await forceRefreshBalanceFromDB();
+    // ========== STEP 5: FALLBACK add_user_balance ==========
+    if (needsFallback && !credited) {
+      // Recheck anti double-credit
+      const recheck = await getDepositStatusFromDB(depositId);
+      if (recheck && recheck.balance_credited === true) {
+        console.log('✅ Recheck: ternyata sudah credited, skip fallback');
+        credited = true;
+      } else {
+        console.log('🔄 Menjalankan fallback add_user_balance...');
+        const { data: fbResult, error: fbErr } = await supabaseClient.rpc('add_user_balance', {
+          p_target_email: depositEmail,
+          p_amount: depositAmount,
+          p_reason: `Fallback deposit ${depositId} (Kode unik: ${uniqueCode})`
+        });
+
+        if (fbErr) {
+          console.error('❌ Fallback juga error:', fbErr);
+          throw new Error('Saldo gagal ditambahkan: ' + fbErr.message);
+        }
+        if (!fbResult || fbResult.success === false) {
+          throw new Error(fbResult?.message || 'Fallback add_user_balance gagal');
+        }
+
+        // Update flag deposit manual (idempotent)
+        try {
+          const { error: updErr } = await supabaseClient
+            .from('deposits')
+            .update({
+              balance_credited: true,
+              credited_at: new Date().toISOString(),
+              credited_amount: depositAmount,
+              credited_via: 'fallback',
+              status: 'success',
+              paid_at: new Date().toISOString()
+            })
+            .eq('id', depositId)
+            .eq('balance_credited', false);
+          if (updErr) console.warn('⚠️ Gagal update flag balance_credited:', updErr.message);
+        } catch (e) {
+          console.warn('⚠️ Exception update flag:', e.message);
+        }
+        credited = true;
+      }
     }
 
-    // ========== STEP 6: Klaim bonus referral ==========
+    if (!credited) {
+      throw new Error('Saldo tidak terkonfirmasi masuk (credit & fallback gagal)');
+    }
+
+    // ========== STEP 6: Refresh UI ==========
+    verifiedBalance = await forceRefreshBalanceFromDB();
+    if (verifiedBalance === null) verifiedBalance = currentProfile?.balance ?? 0;
+
+    // ========== STEP 7: Klaim bonus referral ==========
     try {
       const { data: refData, error: refErr } = await supabaseClient.rpc('claim_referral_reward', {
         p_user_id: currentUser.id,
@@ -3042,23 +3048,18 @@ async function handleDepositSuccess() {
         const Toast = Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 5000, timerProgressBar: true, background: '#1a0e2e', color: '#fff' });
         Toast.fire({ icon: 'success', title: `🎁 Bonus Referral`, html: `<div style="font-size:11.5px;color:#64ffc8;">Reward Rp ${parseFloat(refData.reward_amount).toLocaleString('id-ID')} diberikan ke upline.</div>` });
       }
-    } catch(e) { console.warn('⚠️ Claim referral exception:', e.message); }
+    } catch (e) { console.warn('⚠️ Claim referral exception:', e.message); }
 
-    // ========== STEP 7: Success UI ==========
+    // ========== STEP 8: Success UI ==========
     depositSuccessProcessed = true;
-
     document.getElementById('qrisStatus').className = 'qris-status';
     document.getElementById('qrisStatusText').textContent = '✅ Berhasil!';
 
     await Swal.fire({
       title: '🎉 Deposit Berhasil!',
-      html: `Saldo +<b style="color:#ffd700;">Rp ${depositAmount.toLocaleString('id-ID')}</b><br><small style="color:#94a3b8;">Saldo sekarang: Rp ${(verifiedBalance ?? currentProfile?.balance ?? 0).toLocaleString('id-ID')}</small>`,
-      icon: 'success',
-      confirmButtonColor: '#ff6b9d',
-      background: '#1a0e2e',
-      color: '#fff',
-      timer: 3500,
-      timerProgressBar: true
+      html: `Saldo +<b style="color:#ffd700;">Rp ${depositAmount.toLocaleString('id-ID')}</b><br><small style="color:#94a3b8;">Saldo sekarang: Rp ${(verifiedBalance || 0).toLocaleString('id-ID')}</small>`,
+      icon: 'success', confirmButtonColor: '#ff6b9d', background: '#1a0e2e', color: '#fff',
+      timer: 3500, timerProgressBar: true
     });
 
     stopDepositPolling();
@@ -3071,12 +3072,9 @@ async function handleDepositSuccess() {
       title: '❌ Gagal Proses Deposit',
       html: `<div style="text-align:left;color:#ddd;font-size:13px;">
         <p>${escapeHtml(err.message)}</p>
-        <p style="margin-top:8px;font-size:11.5px;color:#facc15;">⚠️ Kalau pembayaran Anda sudah masuk, klik "Cek Status" lagi atau hubungi CS.</p>
+        <p style="margin-top:8px;font-size:11.5px;color:#facc15;">⚠️ Kalau pembayaran sudah masuk, klik "Cek Status" lagi atau hubungi CS.</p>
       </div>`,
-      icon: 'error',
-      confirmButtonColor: '#ff4444',
-      background: '#1a0e2e',
-      color: '#fff'
+      icon: 'error', confirmButtonColor: '#ff4444', background: '#1a0e2e', color: '#fff'
     });
     await forceRefreshBalanceFromDB();
   } finally {
