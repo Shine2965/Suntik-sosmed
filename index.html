@@ -852,6 +852,7 @@ body.chat-open .cs-bubble-container{display:none !important}
           <div class="wc-subtitle">Kode ini bisa dibagikan ke teman. Jika mereka daftar dengan kode Anda dan deposit, Anda dapat bonus dari kode unik deposit mereka. <b style="color:#facc15;">Kode hanya bisa dibuat sekali & tidak bisa diubah.</b></div>
           <div id="myReferralCodeDisplay" style="margin-bottom:10px;padding:10px;background:rgba(0,0,0,0.2);border-radius:10px;font-family:'Courier New',monospace;font-size:14px;font-weight:800;color:#b388ff;word-break:break-all;text-align:center;">Memuat...</div>
           <button class="withdraw-btn" id="btnReferralAction" style="background:linear-gradient(135deg,#b388ff,#8b5cf6);" onclick="openSetReferralDialog()">✨ Buat Kode Referral</button>
+          <button class="withdraw-btn" id="btnCopyReferralLink" style="display:none;margin-top:8px;background:linear-gradient(135deg,#00c6ff,#0072ff);box-shadow:0 4px 15px rgba(0,114,255,0.35);" onclick="copyReferralLink()">📋 Salin Link Referral</button>
           <div style="margin-top:10px;padding:10px;background:rgba(0,0,0,0.2);border-radius:10px;font-size:10.5px;color:#94a3b8;line-height:1.5;">
             <b style="color:#b388ff;">ℹ️ Info:</b> Kode referral tidak bisa digunakan di akun sendiri. Bonus diberikan saat user yang mendaftar dengan kode Anda melakukan deposit sukses.
           </div>
@@ -3133,9 +3134,75 @@ function getRoleTextColor(role) { const map = { 'owner': '#1a0e2e', 'admin': '#f
 // ============================================================
 // REFERRAL: USER SET KODE + ADMIN ATUR PERSENTASE
 // ============================================================
+
+async function copyReferralLink() {
+  let code = window._myReferralCode;
+  if (!code && currentUser) {
+    try {
+      const { data } = await supabaseClient.from('referral_codes').select('code').eq('user_id', currentUser.id).maybeSingle();
+      if (data && data.code) {
+        code = data.code;
+        window._myReferralCode = code;
+      }
+    } catch (e) {}
+  }
+  if (!code) {
+    Swal.fire({ title: '⚠️ Belum Ada Kode', text: 'Buat kode referral dulu.', icon: 'warning', confirmButtonColor: '#ff6b9d', background: '#1a0e2e', color: '#fff' });
+    return;
+  }
+  const link = `${location.origin}?ref=${code}`;
+  const btn = document.getElementById('btnCopyReferralLink');
+  try {
+    await navigator.clipboard.writeText(link);
+    if (btn) {
+      const prev = btn.innerHTML;
+      btn.innerHTML = '✅ Link Disalin!';
+      btn.style.background = 'linear-gradient(135deg,#22c55e,#16a34a)';
+      setTimeout(() => {
+        btn.innerHTML = prev || '📋 Salin Link Referral';
+        btn.style.background = 'linear-gradient(135deg,#00c6ff,#0072ff)';
+      }, 2000);
+    }
+    const Toast = Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 2200, timerProgressBar: true, background: '#1a0e2e', color: '#fff' });
+    Toast.fire({ icon: 'success', title: '📋 Link referral disalin!' });
+  } catch (err) {
+    // fallback
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = link;
+      ta.style.position = 'fixed';
+      ta.style.left = '-9999px';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      const Toast = Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 2200, background: '#1a0e2e', color: '#fff' });
+      Toast.fire({ icon: 'success', title: '📋 Link referral disalin!' });
+      if (btn) {
+        btn.innerHTML = '✅ Link Disalin!';
+        btn.style.background = 'linear-gradient(135deg,#22c55e,#16a34a)';
+        setTimeout(() => {
+          btn.innerHTML = '📋 Salin Link Referral';
+          btn.style.background = 'linear-gradient(135deg,#00c6ff,#0072ff)';
+        }, 2000);
+      }
+    } catch (e2) {
+      Swal.fire({
+        title: '📋 Salin Manual',
+        html: `<div style="text-align:left;font-size:12px;color:#ddd;word-break:break-all;"><p>Salin link di bawah:</p><div style="padding:10px;background:rgba(0,0,0,0.3);border-radius:8px;color:#64ffc8;font-family:monospace;margin-top:8px;">${escapeHtml(link)}</div></div>`,
+        confirmButtonText: 'OK',
+        confirmButtonColor: '#00c6ff',
+        background: '#1a0e2e',
+        color: '#fff'
+      });
+    }
+  }
+}
+
 async function loadMyReferralCode() {
   const el = document.getElementById('myReferralCodeDisplay');
   const btn = document.getElementById('btnReferralAction');
+  const copyBtn = document.getElementById('btnCopyReferralLink');
   if (!el || !currentUser) return;
   try {
     const { data, error } = await supabaseClient
@@ -3147,20 +3214,29 @@ async function loadMyReferralCode() {
     if (data && data.code) {
       el.textContent = data.code;
       el.style.color = '#b388ff';
+      window._myReferralCode = data.code;
       if (btn) {
         btn.innerHTML = '🔒 Lihat Kode Referral (Terkunci)';
         btn.style.background = 'linear-gradient(135deg,#6b4a7a,#4a3358)';
       }
+      if (copyBtn) {
+        copyBtn.style.display = 'flex';
+        copyBtn.innerHTML = '📋 Salin Link Referral';
+      }
     } else {
       el.textContent = 'Belum dibuat';
       el.style.color = '#94a3b8';
+      window._myReferralCode = null;
       if (btn) {
         btn.innerHTML = '✨ Buat Kode Referral (Sekali)';
         btn.style.background = 'linear-gradient(135deg,#b388ff,#8b5cf6)';
       }
+      if (copyBtn) copyBtn.style.display = 'none';
     }
   } catch (err) {
     el.textContent = '—';
+    window._myReferralCode = null;
+    if (copyBtn) copyBtn.style.display = 'none';
     console.warn('loadMyReferralCode:', err.message);
   }
 }
@@ -3179,6 +3255,7 @@ async function openSetReferralDialog() {
   } catch (e) {}
 
   if (existingCode) {
+    const refLink = `${location.origin}?ref=${existingCode}`;
     await Swal.fire({
       title: '🔒 Kode Referral Terkunci',
       html: `
@@ -3192,16 +3269,43 @@ async function openSetReferralDialog() {
           </div>
           <div style="margin-top:12px;padding:10px;background:rgba(0,0,0,0.2);border-radius:8px;font-size:11px;color:#94a3b8;word-break:break-all;">
             🔗 Link referral Anda:<br>
-            <b style="color:#64ffc8;">${location.origin}?ref=${escapeHtml(existingCode)}</b>
+            <b style="color:#64ffc8;">${escapeHtml(refLink)}</b>
           </div>
+          <button type="button" id="swalCopyRefBtn" style="margin-top:12px;width:100%;padding:12px;border:none;border-radius:10px;background:linear-gradient(135deg,#00c6ff,#0072ff);color:#fff;font-family:'Quicksand',sans-serif;font-size:13px;font-weight:800;cursor:pointer;box-shadow:0 4px 15px rgba(0,114,255,0.35);">📋 Salin Link Referral</button>
         </div>
       `,
       icon: 'info',
+      showConfirmButton: true,
       confirmButtonText: '✅ Mengerti',
       confirmButtonColor: '#b388ff',
       background: '#1a0e2e',
       color: '#fff',
-      width: 450
+      width: 450,
+      didOpen: () => {
+        const btn = document.getElementById('swalCopyRefBtn');
+        if (!btn) return;
+        btn.addEventListener('click', async () => {
+          try {
+            await navigator.clipboard.writeText(refLink);
+            btn.innerHTML = '✅ Link Disalin!';
+            btn.style.background = 'linear-gradient(135deg,#22c55e,#16a34a)';
+            setTimeout(() => {
+              btn.innerHTML = '📋 Salin Link Referral';
+              btn.style.background = 'linear-gradient(135deg,#00c6ff,#0072ff)';
+            }, 2000);
+          } catch (e) {
+            // fallback
+            const ta = document.createElement('textarea');
+            ta.value = refLink;
+            ta.style.position = 'fixed';
+            ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.select();
+            try { document.execCommand('copy'); btn.innerHTML = '✅ Link Disalin!'; btn.style.background = 'linear-gradient(135deg,#22c55e,#16a34a)'; } catch (_) {}
+            document.body.removeChild(ta);
+          }
+        });
+      }
     });
     return;
   }
