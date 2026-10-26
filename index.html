@@ -1168,6 +1168,8 @@ let lastPolledTime = null;
 const CS_BUBBLE_DURATION = 10000;
 const CS_BUBBLE_MAX = 3;
 let presenceChannelRealtime = null;
+let balanceRealtimeChannel = null;
+let balancePollInterval = null;
 let lastSeenInterval = null;
 let presenceRefreshInterval = null;
 let presenceUsersCache = {};
@@ -2492,6 +2494,7 @@ async function updateAuthUI(user) {
     const roleHTML = role === 'owner' ? '👑 Owner' : role === 'admin' ? '🛡️ Admin' : role === 'cs' ? '💼 Customer Service' : '👤 User';
     ['homeRole', 'profileRole'].forEach(id => { const el = document.getElementById(id); if (el) { el.className = 'profile-role ' + role; el.textContent = roleHTML; } });
     updateBalanceDisplay(profile?.balance || 0);
+    startBalanceRealtime();
     isCS = (role === 'cs');
     isAdminOrOwner = (role === 'admin' || role === 'owner');
     isOwner = (role === 'owner');
@@ -2539,6 +2542,7 @@ async function updateAuthUI(user) {
     setTimeout(() => loadWithdrawHistory(), 1500);
     startAutoCleanupOrders();
   } else {
+    stopBalanceRealtime();
     currentUser = null; currentProfile = null;
     isAdminOrOwner = false; isCS = false; isStaff = false; isOwner = false;
     manualFoldersLoaded = false;
@@ -2564,6 +2568,88 @@ async function updateAuthUI(user) {
 // ============================================================
 // BALANCE
 // ============================================================
+
+// ============================================================
+// REALTIME BALANCE SYNC
+// ============================================================
+function stopBalanceRealtime() {
+  if (balanceRealtimeChannel) {
+    try { supabaseClient.removeChannel(balanceRealtimeChannel); } catch (e) {
+      try { balanceRealtimeChannel.unsubscribe(); } catch (e2) {}
+    }
+    balanceRealtimeChannel = null;
+  }
+  if (balancePollInterval) {
+    clearInterval(balancePollInterval);
+    balancePollInterval = null;
+  }
+}
+
+function startBalanceRealtime() {
+  stopBalanceRealtime();
+  if (!supabaseClient || !currentUser) return;
+
+  const uid = currentUser.id;
+  const email = (currentUser.email || '').toLowerCase();
+
+  // Realtime: UPDATE profiles (saldo berubah di server → UI ikut)
+  try {
+    balanceRealtimeChannel = supabaseClient
+      .channel('balance_sync_' + uid + '_' + Date.now())
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'profiles',
+          filter: 'id=eq.' + uid
+        },
+        (payload) => {
+          try {
+            const row = payload.new || {};
+            if (row.balance == null && row.balance !== 0) return;
+            const bal = parseFloat(row.balance) || 0;
+            if (currentProfile) {
+              currentProfile.balance = bal;
+              if (row.referral_earnings != null) currentProfile.referral_earnings = row.referral_earnings;
+            }
+            updateBalanceDisplay(bal);
+            console.log('💰 Balance realtime update:', bal);
+          } catch (e) {
+            console.warn('balance realtime handler:', e.message);
+          }
+        }
+      )
+      .subscribe((status) => {
+        console.log('💰 Balance channel:', status);
+        if (['CHANNEL_ERROR', 'TIMED_OUT', 'CLOSED'].includes(status)) {
+          setTimeout(() => {
+            if (currentUser && currentUser.id === uid) startBalanceRealtime();
+          }, 4000);
+        }
+      });
+  } catch (e) {
+    console.warn('startBalanceRealtime channel error:', e.message);
+  }
+
+  // Fallback polling tiap 20 detik (kalau realtime publication/RLS bermasalah)
+  balancePollInterval = setInterval(async () => {
+    if (!currentUser || document.hidden) return;
+    try {
+      await forceRefreshBalanceFromDB();
+    } catch (e) {}
+  }, 20000);
+
+  // Visibility: langsung sync saat tab aktif lagi
+  document.addEventListener('visibilitychange', onBalanceVisibilityChange);
+}
+
+function onBalanceVisibilityChange() {
+  if (!document.hidden && currentUser) {
+    forceRefreshBalanceFromDB().catch(() => {});
+  }
+}
+
 function updateBalanceDisplay(balance) {
   const val = document.getElementById('balanceValue');
   const card = document.getElementById('balanceCard');
