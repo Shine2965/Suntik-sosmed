@@ -737,6 +737,34 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
   .cs-bubble-message{font-size:12px;-webkit-line-clamp:2}
 }
 body.chat-open .cs-bubble-container{display:none !important}
+
+/* Leaderboard & Mission */
+.lb-card{background:rgba(255,255,255,0.04);border:1px solid rgba(255,215,0,0.25);border-radius:14px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:12px}
+.lb-rank{width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:13px;flex-shrink:0;background:rgba(255,215,0,0.15);color:#ffd700}
+.lb-rank.top1{background:linear-gradient(135deg,#ffd700,#ffb300);color:#1a0e2e}
+.lb-rank.top2{background:linear-gradient(135deg,#c0c0c0,#a8a8a8);color:#1a0e2e}
+.lb-rank.top3{background:linear-gradient(135deg,#cd7f32,#a0522d);color:#fff}
+.lb-info{flex:1;min-width:0}
+.lb-email{font-size:12px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lb-meta{font-size:10px;color:#b39ddb;margin-top:2px}
+.lb-amount{font-size:12px;font-weight:900;color:#ffd700;flex-shrink:0}
+.mission-card{background:rgba(255,255,255,0.04);border:1.5px solid rgba(100,255,200,0.2);border-radius:16px;padding:14px;margin-bottom:10px}
+.mission-card.done{border-color:rgba(34,197,94,0.4);background:rgba(34,197,94,0.08)}
+.mission-card.claimed{border-color:rgba(179,136,255,0.4);background:rgba(179,136,255,0.08)}
+.mission-card.expired{opacity:0.55;border-color:rgba(148,163,184,0.3)}
+.mission-title{font-size:13.5px;font-weight:800;color:#fff;margin-bottom:4px}
+.mission-desc{font-size:11px;color:#b39ddb;margin-bottom:8px;line-height:1.4}
+.mission-progress-bar{height:8px;background:rgba(255,255,255,0.08);border-radius:20px;overflow:hidden;margin:8px 0}
+.mission-progress-fill{height:100%;background:linear-gradient(90deg,#64ffc8,#00c6ff);border-radius:20px;transition:width 0.4s ease}
+.mission-meta{display:flex;flex-wrap:wrap;gap:6px;font-size:10px;color:#94a3b8;margin-bottom:8px}
+.mission-chip{padding:2px 8px;border-radius:8px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.08)}
+.mission-chip.reward{color:#ffd700;border-color:rgba(255,215,0,0.3);background:rgba(255,215,0,0.1)}
+.mission-actions{display:flex;gap:8px}
+.mission-btn{flex:1;padding:10px;border:none;border-radius:10px;font-family:Quicksand,sans-serif;font-size:12px;font-weight:800;cursor:pointer}
+.mission-btn.claim{background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff}
+.mission-btn.claim:disabled{opacity:0.5;cursor:not-allowed}
+.mission-btn.progress{background:rgba(0,198,255,0.15);color:#00c6ff;border:1px solid rgba(0,198,255,0.3)}
+
 </style>
 </head>
 <body>
@@ -765,6 +793,18 @@ body.chat-open .cs-bubble-container{display:none !important}
           <div class="balance-actions"><button class="balance-btn deposit" onclick="openDepositDialog()">💵 Deposit</button><button class="balance-btn refresh" onclick="refreshBalance()">🔄</button></div>
           <div class="balance-actions" style="margin-top:8px;"><button class="balance-btn transfer" onclick="openTransferDialog()">💸 Transfer Saldo</button></div>
         </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">🏆 Top 10 Transaksi Bulan Ini<div class="line"></div></div>
+        <div style="font-size:10px;color:#94a3b8;margin:-4px 0 10px 4px;" id="lbPeriodLabel">Periode: tanggal 1 – akhir bulan</div>
+        <div id="leaderboardList"><div class="mutasi-empty">Memuat...</div></div>
+        <button class="auth-submit" style="background:linear-gradient(135deg,#1a0e2e,#ffb300);margin-top:8px;padding:10px;font-size:11.5px;width:100%;" onclick="loadMonthlyLeaderboard()">🔄 Refresh Ranking</button>
+      </div>
+      <div class="section">
+        <div class="section-title">🎯 Mission & Reward<div class="line"></div></div>
+        <div id="missionListUser"><div class="mutasi-empty">Memuat misi...</div></div>
+        <button class="auth-submit" style="background:linear-gradient(135deg,#1a0e2e,#00c6ff);margin-top:8px;padding:10px;font-size:11.5px;width:100%;" onclick="loadUserMissions()">🔄 Refresh Misi</button>
       </div>
       <div class="section"><div class="section-title">🔗 Referral<div class="line"></div></div><div class="status-box"><div class="status-icon">📌</div><div id="status-ref">Memeriksa...</div></div></div>
       <div class="section">
@@ -852,6 +892,7 @@ body.chat-open .cs-bubble-container{display:none !important}
           <div class="wc-subtitle">Kode ini bisa dibagikan ke teman. Jika mereka daftar dengan kode Anda dan deposit, Anda dapat bonus dari kode unik deposit mereka. <b style="color:#facc15;">Kode hanya bisa dibuat sekali & tidak bisa diubah.</b></div>
           <div id="myReferralCodeDisplay" style="margin-bottom:10px;padding:10px;background:rgba(0,0,0,0.2);border-radius:10px;font-family:'Courier New',monospace;font-size:14px;font-weight:800;color:#b388ff;word-break:break-all;text-align:center;">Memuat...</div>
           <button class="withdraw-btn" id="btnReferralAction" style="background:linear-gradient(135deg,#b388ff,#8b5cf6);" onclick="openSetReferralDialog()">✨ Buat Kode Referral</button>
+          <button class="withdraw-btn" id="btnCopyReferralLink" style="display:none;margin-top:8px;background:linear-gradient(135deg,#00c6ff,#0072ff);box-shadow:0 4px 15px rgba(0,114,255,0.35);" onclick="copyReferralLink()">📋 Salin Link Referral</button>
           <div style="margin-top:10px;padding:10px;background:rgba(0,0,0,0.2);border-radius:10px;font-size:10.5px;color:#94a3b8;line-height:1.5;">
             <b style="color:#b388ff;">ℹ️ Info:</b> Kode referral tidak bisa digunakan di akun sendiri. Bonus diberikan saat user yang mendaftar dengan kode Anda melakukan deposit sukses.
           </div>
@@ -904,7 +945,16 @@ body.chat-open .cs-bubble-container{display:none !important}
         </div>
 
         <div class="section-title" style="margin-top:14px;">⚙️ Pengaturan Referral<div class="line"></div></div>
-        <div class="withdraw-card" style="background:linear-gradient(135deg,rgba(100,255,200,0.08),rgba(64,224,208,0.04));border-color:rgba(100,255,200,0.25);margin-bottom:14px;">
+        
+        <div class="section-title" style="margin-top:16px;">🎯 Kelola Mission & Reward<div class="line"></div></div>
+        <div class="withdraw-card" style="margin-bottom:12px;">
+          <div class="wc-title" style="color:#64ffc8;">➕ Buat Mission Baru</div>
+          <div class="wc-subtitle">Tipe: deposit minimal / jumlah transaksi / total nominal transaksi. User bisa klaim reward otomatis saat target tercapai (sebelum deadline).</div>
+          <button class="withdraw-btn" style="background:linear-gradient(135deg,#00c6ff,#0072ff);" onclick="openCreateMissionDialog()">✨ Buat Mission</button>
+        </div>
+        <div id="missionListAdmin"><div class="mutasi-empty">Klik refresh untuk memuat</div></div>
+        <button class="auth-submit" style="background:linear-gradient(135deg,#1a0e2e,#8b5cf6);margin:8px 0 12px;padding:10px;font-size:11.5px;width:100%;" onclick="loadAdminMissions()">🔄 Refresh Daftar Mission</button>
+<div class="withdraw-card" style="background:linear-gradient(135deg,rgba(100,255,200,0.08),rgba(64,224,208,0.04));border-color:rgba(100,255,200,0.25);margin-bottom:14px;">
           <div class="wc-title" style="color:#64ffc8;">🎁 Persentase Bonus Referral</div>
           <div class="wc-subtitle">Bonus diberikan ke pemilik kode referral dari kode unik deposit downline mereka.</div>
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
@@ -1167,6 +1217,8 @@ let lastPolledTime = null;
 const CS_BUBBLE_DURATION = 10000;
 const CS_BUBBLE_MAX = 3;
 let presenceChannelRealtime = null;
+let balanceRealtimeChannel = null;
+let balancePollInterval = null;
 let lastSeenInterval = null;
 let presenceRefreshInterval = null;
 let presenceUsersCache = {};
@@ -2491,6 +2543,7 @@ async function updateAuthUI(user) {
     const roleHTML = role === 'owner' ? '👑 Owner' : role === 'admin' ? '🛡️ Admin' : role === 'cs' ? '💼 Customer Service' : '👤 User';
     ['homeRole', 'profileRole'].forEach(id => { const el = document.getElementById(id); if (el) { el.className = 'profile-role ' + role; el.textContent = roleHTML; } });
     updateBalanceDisplay(profile?.balance || 0);
+    startBalanceRealtime();
     isCS = (role === 'cs');
     isAdminOrOwner = (role === 'admin' || role === 'owner');
     isOwner = (role === 'owner');
@@ -2503,7 +2556,7 @@ async function updateAuthUI(user) {
       document.getElementById('adminIcon').textContent = role === 'owner' ? '👑' : '🛡️';
       loadChatStats();
       loadPendingRefunds();
-      if (isOwner) loadOwnerWithdrawals();
+      if (isOwner) { loadOwnerWithdrawals(); setTimeout(loadAdminMissions, 1500); }
       startMemberRealtime();
       startAutoUnbanScheduler();
       startBannedCountdownTicker();
@@ -2529,6 +2582,8 @@ async function updateAuthUI(user) {
     }
     if (email && email.includes('@')) processGmailUpdate(email);
     loadMyReferralCode();
+    setTimeout(() => { loadMonthlyLeaderboard(); loadUserMissions(); }, 1200);
+    if (isAdminOrOwner) setTimeout(() => loadAdminMissions(), 1500);
     await initNotifications();
     await initChat();
     await initBroadcastListener();
@@ -2538,6 +2593,7 @@ async function updateAuthUI(user) {
     setTimeout(() => loadWithdrawHistory(), 1500);
     startAutoCleanupOrders();
   } else {
+    stopBalanceRealtime();
     currentUser = null; currentProfile = null;
     isAdminOrOwner = false; isCS = false; isStaff = false; isOwner = false;
     manualFoldersLoaded = false;
@@ -2563,6 +2619,88 @@ async function updateAuthUI(user) {
 // ============================================================
 // BALANCE
 // ============================================================
+
+// ============================================================
+// REALTIME BALANCE SYNC
+// ============================================================
+function stopBalanceRealtime() {
+  if (balanceRealtimeChannel) {
+    try { supabaseClient.removeChannel(balanceRealtimeChannel); } catch (e) {
+      try { balanceRealtimeChannel.unsubscribe(); } catch (e2) {}
+    }
+    balanceRealtimeChannel = null;
+  }
+  if (balancePollInterval) {
+    clearInterval(balancePollInterval);
+    balancePollInterval = null;
+  }
+}
+
+function startBalanceRealtime() {
+  stopBalanceRealtime();
+  if (!supabaseClient || !currentUser) return;
+
+  const uid = currentUser.id;
+  const email = (currentUser.email || '').toLowerCase();
+
+  // Realtime: UPDATE profiles (saldo berubah di server → UI ikut)
+  try {
+    balanceRealtimeChannel = supabaseClient
+      .channel('balance_sync_' + uid + '_' + Date.now())
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'profiles',
+          filter: 'id=eq.' + uid
+        },
+        (payload) => {
+          try {
+            const row = payload.new || {};
+            if (row.balance == null && row.balance !== 0) return;
+            const bal = parseFloat(row.balance) || 0;
+            if (currentProfile) {
+              currentProfile.balance = bal;
+              if (row.referral_earnings != null) currentProfile.referral_earnings = row.referral_earnings;
+            }
+            updateBalanceDisplay(bal);
+            console.log('💰 Balance realtime update:', bal);
+          } catch (e) {
+            console.warn('balance realtime handler:', e.message);
+          }
+        }
+      )
+      .subscribe((status) => {
+        console.log('💰 Balance channel:', status);
+        if (['CHANNEL_ERROR', 'TIMED_OUT', 'CLOSED'].includes(status)) {
+          setTimeout(() => {
+            if (currentUser && currentUser.id === uid) startBalanceRealtime();
+          }, 4000);
+        }
+      });
+  } catch (e) {
+    console.warn('startBalanceRealtime channel error:', e.message);
+  }
+
+  // Fallback polling tiap 20 detik (kalau realtime publication/RLS bermasalah)
+  balancePollInterval = setInterval(async () => {
+    if (!currentUser || document.hidden) return;
+    try {
+      await forceRefreshBalanceFromDB();
+    } catch (e) {}
+  }, 20000);
+
+  // Visibility: langsung sync saat tab aktif lagi
+  document.addEventListener('visibilitychange', onBalanceVisibilityChange);
+}
+
+function onBalanceVisibilityChange() {
+  if (!document.hidden && currentUser) {
+    forceRefreshBalanceFromDB().catch(() => {});
+  }
+}
+
 function updateBalanceDisplay(balance) {
   const val = document.getElementById('balanceValue');
   const card = document.getElementById('balanceCard');
@@ -2886,6 +3024,360 @@ function startDepositPolling(targetAmount) {
 function stopDepositPolling() { if (depositPollingInterval) { clearInterval(depositPollingInterval); depositPollingInterval = null; } }
 
 // ============================================================
+
+// ============================================================
+// Referral bonus: kode unik × persen → upline + mutasi
+// ============================================================
+async function processReferralBonusOnDeposit({ userId, userEmail, depositId, depositAmount, uniqueCode }) {
+  const uniqueNum = parseFloat(uniqueCode) || 0;
+  if (!userId || !depositId || uniqueNum <= 0) {
+    return { reward: 0, message: 'no_unique_code' };
+  }
+
+  // 0) RPC server-side paling andal (trigger-compatible)
+  try {
+    const { data: payData, error: payErr } = await supabaseClient.rpc('pay_referral_bonus_for_deposit', {
+      p_deposit_id: depositId
+    });
+    if (!payErr && payData) {
+      if (payData.success && parseFloat(payData.reward_amount) > 0) {
+        return {
+          reward: parseFloat(payData.reward_amount),
+          pct: parseFloat(payData.percentage) || referralPercentageCache || 10,
+          uplineEmail: payData.upline_email || '',
+          message: 'pay_rpc_ok'
+        };
+      }
+      if (payData.message === 'already_claimed') return { reward: 0, message: 'already_claimed' };
+      if (payData.message && payData.message !== 'no_upline') {
+        console.warn('pay_referral_bonus_for_deposit:', payData);
+      }
+    } else if (payErr) {
+      console.warn('pay_referral_bonus_for_deposit error:', payErr.message);
+    }
+  } catch (e) {
+    console.warn('pay_referral_bonus_for_deposit exception:', e.message);
+  }
+
+  // 1) Coba RPC claim_referral_reward (dengan p_unique_code)
+  try {
+    const { data, error } = await supabaseClient.rpc('claim_referral_reward', {
+      p_user_id: userId,
+      p_deposit_id: depositId,
+      p_deposit_amount: depositAmount,
+      p_unique_code: uniqueNum
+    });
+    if (!error && data) {
+      if (data.success && parseFloat(data.reward_amount) > 0) {
+        return {
+          reward: parseFloat(data.reward_amount),
+          pct: parseFloat(data.percentage) || referralPercentageCache || 10,
+          uplineEmail: data.upline_email || '',
+          message: 'rpc_ok'
+        };
+      }
+      // RPC jalan tapi 0 — bisa no_upline / already_claimed
+      if (data.message === 'already_claimed') return { reward: 0, message: 'already_claimed' };
+      if (data.message === 'no_upline' || data.message === 'self_referral') {
+        // lanjut fallback resolve upline di client
+      } else if (data.success === false) {
+        console.warn('claim_referral_reward failed:', data.message);
+      } else {
+        return { reward: 0, message: data.message || 'rpc_zero' };
+      }
+    } else if (error) {
+      console.warn('claim_referral_reward error:', error.message);
+      // fallback: coba signature lama tanpa p_unique_code
+      try {
+        const { data: d2, error: e2 } = await supabaseClient.rpc('claim_referral_reward', {
+          p_user_id: userId,
+          p_deposit_id: depositId,
+          p_deposit_amount: uniqueNum // beberapa versi lama salah pakai amount = unique
+        });
+        if (!e2 && d2 && d2.success && parseFloat(d2.reward_amount) > 0) {
+          return {
+            reward: parseFloat(d2.reward_amount),
+            pct: parseFloat(d2.percentage) || referralPercentageCache || 10,
+            uplineEmail: d2.upline_email || '',
+            message: 'rpc_legacy_ok'
+          };
+        }
+      } catch (_) {}
+    }
+  } catch (e) {
+    console.warn('RPC claim exception:', e.message);
+  }
+
+  // 2) Fallback client-side: cari upline + kredit + tulis mutasi
+  try {
+    const fallback = await claimReferralBonusFallback({
+      userId, userEmail, depositId, uniqueNum
+    });
+    return fallback;
+  } catch (e) {
+    console.warn('Fallback claim failed:', e.message);
+    return { reward: 0, message: e.message || 'fallback_failed' };
+  }
+}
+
+async function claimReferralBonusFallback({ userId, userEmail, depositId, uniqueNum }) {
+  // Cegah double claim (kalau tabel claims ada)
+  try {
+    const { data: existing } = await supabaseClient
+      .from('referral_claims')
+      .select('id')
+      .eq('deposit_id', depositId)
+      .maybeSingle();
+    if (existing) return { reward: 0, message: 'already_claimed' };
+  } catch (_) {}
+
+  // Cari upline dari referral_usage (beberapa kemungkinan skema)
+  let uplineId = null;
+  let uplineEmail = null;
+  let referralCode = null;
+
+  // skema A: downline_user_id + upline_user_id
+  try {
+    const { data } = await supabaseClient
+      .from('referral_usage')
+      .select('upline_user_id, referral_code, code')
+      .eq('downline_user_id', userId)
+      .limit(1)
+      .maybeSingle();
+    if (data && data.upline_user_id) {
+      uplineId = data.upline_user_id;
+      referralCode = data.referral_code || data.code || null;
+    }
+  } catch (_) {}
+
+  // skema B: user_id = downline
+  if (!uplineId) {
+    try {
+      const { data } = await supabaseClient
+        .from('referral_usage')
+        .select('upline_user_id, referrer_id, referral_code, code, referred_by')
+        .eq('user_id', userId)
+        .limit(1)
+        .maybeSingle();
+      if (data) {
+        uplineId = data.upline_user_id || data.referrer_id || data.referred_by || null;
+        referralCode = data.referral_code || data.code || referralCode;
+      }
+    } catch (_) {}
+  }
+
+  // skema C: lewat profiles.referred_by / referral_code
+  if (!uplineId) {
+    try {
+      const { data: prof } = await supabaseClient
+        .from('profiles')
+        .select('referred_by, referral_code, used_referral_code')
+        .eq('id', userId)
+        .maybeSingle();
+      if (prof) {
+        if (prof.referred_by) uplineId = prof.referred_by;
+        referralCode = prof.used_referral_code || prof.referral_code || referralCode;
+      }
+    } catch (_) {}
+  }
+
+  // skema D: referral_code → referral_codes / user_referral_codes
+  if (!uplineId && referralCode) {
+    const codeUp = String(referralCode).toUpperCase().trim();
+    try {
+      const { data: rc } = await supabaseClient
+        .from('referral_codes')
+        .select('user_id, email, code')
+        .ilike('code', codeUp)
+        .limit(1)
+        .maybeSingle();
+      if (rc && rc.user_id) {
+        uplineId = rc.user_id;
+        uplineEmail = rc.email || null;
+      }
+    } catch (_) {}
+    if (!uplineId) {
+      try {
+        const { data: urc } = await supabaseClient
+          .from('user_referral_codes')
+          .select('user_id, email, code')
+          .ilike('code', codeUp)
+          .limit(1)
+          .maybeSingle();
+        if (urc && urc.user_id) {
+          uplineId = urc.user_id;
+          uplineEmail = urc.email || null;
+        }
+      } catch (_) {}
+    }
+  }
+
+  // skema E: profiles.referred_by_code / invite_code
+  if (!uplineId) {
+    try {
+      const { data: p2 } = await supabaseClient
+        .from('profiles')
+        .select('referred_by, referred_by_code, invite_code, used_referral_code')
+        .eq('id', userId)
+        .maybeSingle();
+      if (p2) {
+        if (p2.referred_by) uplineId = p2.referred_by;
+        const c = p2.referred_by_code || p2.used_referral_code || p2.invite_code;
+        if (!uplineId && c) {
+          const { data: rc2 } = await supabaseClient.from('referral_codes').select('user_id, email').ilike('code', String(c).toUpperCase()).limit(1).maybeSingle();
+          if (rc2) { uplineId = rc2.user_id; uplineEmail = rc2.email || null; }
+        }
+      }
+    } catch (_) {}
+  }
+
+  if (!uplineId) {
+    console.warn('ℹ️ Tidak ada upline untuk user', userId);
+    return { reward: 0, message: 'no_upline' };
+  }
+  if (uplineId === userId) return { reward: 0, message: 'self_referral' };
+
+  // Email upline
+  if (!uplineEmail) {
+    try {
+      const { data: up } = await supabaseClient
+        .from('profiles')
+        .select('email, balance')
+        .eq('id', uplineId)
+        .maybeSingle();
+      if (up) uplineEmail = up.email;
+    } catch (_) {}
+  }
+  if (!uplineEmail) return { reward: 0, message: 'upline_email_missing' };
+
+  // Persen
+  let pct = parseFloat(referralPercentageCache) || 10;
+  try {
+    const { data: pctData } = await supabaseClient.rpc('get_referral_percentage');
+    if (pctData && pctData.success && !isNaN(parseFloat(pctData.percentage))) {
+      pct = parseFloat(pctData.percentage);
+      referralPercentageCache = pct;
+    }
+  } catch (_) {
+    try {
+      const { data: s } = await supabaseClient.from('settings').select('value').eq('key', 'referral_percentage').maybeSingle();
+      if (s && s.value != null) pct = parseFloat(s.value) || pct;
+    } catch (_) {}
+  }
+  if (pct < 0) pct = 0;
+  if (pct > 100) pct = 100;
+
+  const reward = Math.floor(uniqueNum * pct / 100);
+  if (reward < 1) return { reward: 0, pct, message: 'reward_too_small', uplineEmail };
+
+  const reason = `Bonus referral ${pct}% dari kode unik Rp ${uniqueNum} (downline: ${userEmail || userId})`;
+
+  // Kredit saldo upline via RPC add_user_balance (sama seperti deposit)
+  let credited = false;
+  try {
+    const { data: balRes, error: balErr } = await supabaseClient.rpc('add_user_balance', {
+      p_target_email: uplineEmail,
+      p_amount: reward,
+      p_reason: reason
+    });
+    if (balErr) throw balErr;
+    if (balRes && balRes.success === false) throw new Error(balRes.message || 'add_user_balance failed');
+    credited = true;
+  } catch (e) {
+    console.warn('add_user_balance upline failed:', e.message);
+    // coba update profiles langsung
+    try {
+      const { data: up } = await supabaseClient.from('profiles').select('balance').eq('id', uplineId).maybeSingle();
+      const before = parseFloat(up?.balance) || 0;
+      const after = before + reward;
+      const { error: uErr } = await supabaseClient.from('profiles').update({ balance: after }).eq('id', uplineId);
+      if (uErr) throw uErr;
+      credited = true;
+    } catch (e2) {
+      console.error('Gagal kredit upline:', e2.message);
+      return { reward: 0, message: 'credit_failed: ' + e2.message };
+    }
+  }
+
+  // Tulis mutasi (jika add_user_balance belum otomatis, atau pastikan type referral_bonus)
+  try {
+    // cek apakah sudah ada mutasi sejenis untuk deposit ini
+    let alreadyMutasi = false;
+    try {
+      const { data: m } = await supabaseClient
+        .from('balance_mutations')
+        .select('id')
+        .eq('email', uplineEmail)
+        .eq('type', 'referral_bonus')
+        .ilike('reason', `%${depositId}%`)
+        .limit(1);
+      if (m && m.length) alreadyMutasi = true;
+    } catch (_) {}
+
+    if (!alreadyMutasi) {
+      // ambil saldo terbaru untuk before/after opsional
+      let balBefore = null, balAfter = null;
+      try {
+        const { data: up2 } = await supabaseClient.from('profiles').select('balance').eq('id', uplineId).maybeSingle();
+        balAfter = parseFloat(up2?.balance);
+        if (!isNaN(balAfter)) balBefore = balAfter - reward;
+      } catch (_) {}
+
+      const row = {
+        user_id: uplineId,
+        email: uplineEmail,
+        amount: reward,
+        type: 'referral_bonus',
+        reason: reason + ` [deposit:${depositId}]`,
+        created_at: new Date().toISOString()
+      };
+      if (balBefore != null) row.balance_before = balBefore;
+      if (balAfter != null) row.balance_after = balAfter;
+
+      const { error: mErr } = await supabaseClient.from('balance_mutations').insert(row);
+      if (mErr) {
+        // coba tanpa kolom optional
+        console.warn('mutasi insert full gagal, coba minimal:', mErr.message);
+        await supabaseClient.from('balance_mutations').insert({
+          user_id: uplineId,
+          email: uplineEmail,
+          amount: reward,
+          type: 'referral_bonus',
+          reason: reason + ` [deposit:${depositId}]`
+        });
+      }
+    }
+  } catch (e) {
+    console.warn('Tulis mutasi referral gagal (saldo mungkin sudah masuk):', e.message);
+  }
+
+  // Log claim agar tidak double
+  try {
+    await supabaseClient.from('referral_claims').insert({
+      deposit_id: depositId,
+      downline_user_id: userId,
+      upline_user_id: uplineId,
+      unique_code: uniqueNum,
+      percentage: pct,
+      reward_amount: reward
+    });
+  } catch (_) {}
+  try {
+    await supabaseClient.from('referral_bonuses').insert({
+      upline_user_id: uplineId,
+      upline_email: uplineEmail,
+      downline_user_id: userId,
+      downline_email: userEmail,
+      deposit_id: depositId,
+      unique_code: uniqueNum,
+      percentage: pct,
+      reward_amount: reward
+    });
+  } catch (_) {}
+
+  return { reward, pct, uplineEmail, message: credited ? 'fallback_ok' : 'fallback_partial' };
+}
+
 // handleDepositSuccess — stabil (referensi HTML kedua) + guard anti-double + referral
 // ============================================================
 async function handleDepositSuccess() {
@@ -2935,17 +3427,30 @@ async function handleDepositSuccess() {
       console.warn('⚠️ refresh balance:', e.message);
     }
 
-    // 4) Klaim bonus referral (jika ada)
+    // 4) Klaim bonus referral (kode unik × persen) + fallback mutasi
     try {
-      const { data: refData, error: refErr } = await supabaseClient.rpc('claim_referral_reward', {
-        p_user_id: currentUser.id,
-        p_deposit_id: depositId,
-        p_deposit_amount: depositAmount
+      const uniqueNum = parseFloat(uniqueCode) || 0;
+      const claimResult = await processReferralBonusOnDeposit({
+        userId: currentUser.id,
+        userEmail: currentUser.email,
+        depositId,
+        depositAmount,
+        uniqueCode: uniqueNum
       });
-      if (refErr) console.warn('⚠️ Claim referral error:', refErr.message);
-      else if (refData && refData.success && refData.reward_amount > 0) {
-        const Toast = Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 4000, timerProgressBar: true, background: '#1a0e2e', color: '#fff' });
-        Toast.fire({ icon: 'success', title: `🎁 Bonus Referral`, html: `<div style="font-size:11.5px;color:#64ffc8;">Reward Rp ${parseFloat(refData.reward_amount).toLocaleString('id-ID')} diberikan ke upline.</div>` });
+      console.log('🎁 Referral claim result:', claimResult);
+      if (claimResult && claimResult.reward > 0) {
+        const Toast = Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 5000, timerProgressBar: true, background: '#1a0e2e', color: '#fff' });
+        Toast.fire({
+          icon: 'success',
+          title: '🎁 Bonus Referral',
+          html: `<div style="font-size:11.5px;color:#64ffc8;line-height:1.5;">Kode unik Rp ${uniqueNum.toLocaleString('id-ID')} × ${claimResult.pct}%<br>→ Upline <b>${escapeHtml(claimResult.uplineEmail || '')}</b> +Rp ${claimResult.reward.toLocaleString('id-ID')}</div>`
+        });
+      } else if (claimResult && claimResult.message) {
+        console.log('ℹ️ Referral claim:', claimResult.message);
+        // Tampilkan info ringkas di console; admin bisa cek relasi upline
+        if (['no_upline', 'credit_failed'].some(x => String(claimResult.message).includes(x))) {
+          console.warn('⚠️ Bonus referral tidak masuk. Penyebab:', claimResult.message, '- Pastikan downline daftar dengan kode referral & jalankan SQL claim_referral_reward di Supabase.');
+        }
       }
     } catch (e) {
       console.warn('⚠️ Claim referral exception:', e.message);
@@ -3133,9 +3638,75 @@ function getRoleTextColor(role) { const map = { 'owner': '#1a0e2e', 'admin': '#f
 // ============================================================
 // REFERRAL: USER SET KODE + ADMIN ATUR PERSENTASE
 // ============================================================
+
+async function copyReferralLink() {
+  let code = window._myReferralCode;
+  if (!code && currentUser) {
+    try {
+      const { data } = await supabaseClient.from('referral_codes').select('code').eq('user_id', currentUser.id).maybeSingle();
+      if (data && data.code) {
+        code = data.code;
+        window._myReferralCode = code;
+      }
+    } catch (e) {}
+  }
+  if (!code) {
+    Swal.fire({ title: '⚠️ Belum Ada Kode', text: 'Buat kode referral dulu.', icon: 'warning', confirmButtonColor: '#ff6b9d', background: '#1a0e2e', color: '#fff' });
+    return;
+  }
+  const link = `${location.origin}?ref=${code}`;
+  const btn = document.getElementById('btnCopyReferralLink');
+  try {
+    await navigator.clipboard.writeText(link);
+    if (btn) {
+      const prev = btn.innerHTML;
+      btn.innerHTML = '✅ Link Disalin!';
+      btn.style.background = 'linear-gradient(135deg,#22c55e,#16a34a)';
+      setTimeout(() => {
+        btn.innerHTML = prev || '📋 Salin Link Referral';
+        btn.style.background = 'linear-gradient(135deg,#00c6ff,#0072ff)';
+      }, 2000);
+    }
+    const Toast = Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 2200, timerProgressBar: true, background: '#1a0e2e', color: '#fff' });
+    Toast.fire({ icon: 'success', title: '📋 Link referral disalin!' });
+  } catch (err) {
+    // fallback
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = link;
+      ta.style.position = 'fixed';
+      ta.style.left = '-9999px';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      const Toast = Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 2200, background: '#1a0e2e', color: '#fff' });
+      Toast.fire({ icon: 'success', title: '📋 Link referral disalin!' });
+      if (btn) {
+        btn.innerHTML = '✅ Link Disalin!';
+        btn.style.background = 'linear-gradient(135deg,#22c55e,#16a34a)';
+        setTimeout(() => {
+          btn.innerHTML = '📋 Salin Link Referral';
+          btn.style.background = 'linear-gradient(135deg,#00c6ff,#0072ff)';
+        }, 2000);
+      }
+    } catch (e2) {
+      Swal.fire({
+        title: '📋 Salin Manual',
+        html: `<div style="text-align:left;font-size:12px;color:#ddd;word-break:break-all;"><p>Salin link di bawah:</p><div style="padding:10px;background:rgba(0,0,0,0.3);border-radius:8px;color:#64ffc8;font-family:monospace;margin-top:8px;">${escapeHtml(link)}</div></div>`,
+        confirmButtonText: 'OK',
+        confirmButtonColor: '#00c6ff',
+        background: '#1a0e2e',
+        color: '#fff'
+      });
+    }
+  }
+}
+
 async function loadMyReferralCode() {
   const el = document.getElementById('myReferralCodeDisplay');
   const btn = document.getElementById('btnReferralAction');
+  const copyBtn = document.getElementById('btnCopyReferralLink');
   if (!el || !currentUser) return;
   try {
     const { data, error } = await supabaseClient
@@ -3147,20 +3718,29 @@ async function loadMyReferralCode() {
     if (data && data.code) {
       el.textContent = data.code;
       el.style.color = '#b388ff';
+      window._myReferralCode = data.code;
       if (btn) {
         btn.innerHTML = '🔒 Lihat Kode Referral (Terkunci)';
         btn.style.background = 'linear-gradient(135deg,#6b4a7a,#4a3358)';
       }
+      if (copyBtn) {
+        copyBtn.style.display = 'flex';
+        copyBtn.innerHTML = '📋 Salin Link Referral';
+      }
     } else {
       el.textContent = 'Belum dibuat';
       el.style.color = '#94a3b8';
+      window._myReferralCode = null;
       if (btn) {
         btn.innerHTML = '✨ Buat Kode Referral (Sekali)';
         btn.style.background = 'linear-gradient(135deg,#b388ff,#8b5cf6)';
       }
+      if (copyBtn) copyBtn.style.display = 'none';
     }
   } catch (err) {
     el.textContent = '—';
+    window._myReferralCode = null;
+    if (copyBtn) copyBtn.style.display = 'none';
     console.warn('loadMyReferralCode:', err.message);
   }
 }
@@ -3179,6 +3759,7 @@ async function openSetReferralDialog() {
   } catch (e) {}
 
   if (existingCode) {
+    const refLink = `${location.origin}?ref=${existingCode}`;
     await Swal.fire({
       title: '🔒 Kode Referral Terkunci',
       html: `
@@ -3192,16 +3773,43 @@ async function openSetReferralDialog() {
           </div>
           <div style="margin-top:12px;padding:10px;background:rgba(0,0,0,0.2);border-radius:8px;font-size:11px;color:#94a3b8;word-break:break-all;">
             🔗 Link referral Anda:<br>
-            <b style="color:#64ffc8;">${location.origin}?ref=${escapeHtml(existingCode)}</b>
+            <b style="color:#64ffc8;">${escapeHtml(refLink)}</b>
           </div>
+          <button type="button" id="swalCopyRefBtn" style="margin-top:12px;width:100%;padding:12px;border:none;border-radius:10px;background:linear-gradient(135deg,#00c6ff,#0072ff);color:#fff;font-family:'Quicksand',sans-serif;font-size:13px;font-weight:800;cursor:pointer;box-shadow:0 4px 15px rgba(0,114,255,0.35);">📋 Salin Link Referral</button>
         </div>
       `,
       icon: 'info',
+      showConfirmButton: true,
       confirmButtonText: '✅ Mengerti',
       confirmButtonColor: '#b388ff',
       background: '#1a0e2e',
       color: '#fff',
-      width: 450
+      width: 450,
+      didOpen: () => {
+        const btn = document.getElementById('swalCopyRefBtn');
+        if (!btn) return;
+        btn.addEventListener('click', async () => {
+          try {
+            await navigator.clipboard.writeText(refLink);
+            btn.innerHTML = '✅ Link Disalin!';
+            btn.style.background = 'linear-gradient(135deg,#22c55e,#16a34a)';
+            setTimeout(() => {
+              btn.innerHTML = '📋 Salin Link Referral';
+              btn.style.background = 'linear-gradient(135deg,#00c6ff,#0072ff)';
+            }, 2000);
+          } catch (e) {
+            // fallback
+            const ta = document.createElement('textarea');
+            ta.value = refLink;
+            ta.style.position = 'fixed';
+            ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.select();
+            try { document.execCommand('copy'); btn.innerHTML = '✅ Link Disalin!'; btn.style.background = 'linear-gradient(135deg,#22c55e,#16a34a)'; } catch (_) {}
+            document.body.removeChild(ta);
+          }
+        });
+      }
     });
     return;
   }
@@ -3278,15 +3886,27 @@ async function loadReferralPercentage() {
   const input = document.getElementById('referralPercentInput');
   if (!input || !isAdminOrOwner) return;
   try {
-    const { data, error } = await supabaseClient.rpc('get_referral_percentage');
-    if (error) throw error;
-    if (data && data.success) {
-      const pct = parseFloat(data.percentage);
-      if (!isNaN(pct)) {
-        input.value = pct;
-        referralPercentageCache = pct;
+    // RPC dulu
+    try {
+      const { data, error } = await supabaseClient.rpc('get_referral_percentage');
+      if (!error && data && (data.success || data.percentage != null)) {
+        const pct = parseFloat(data.percentage);
+        if (!isNaN(pct)) {
+          input.value = pct;
+          referralPercentageCache = pct;
+          return;
+        }
       }
+    } catch (_) {}
+    // Fallback tabel settings
+    const { data: s } = await supabaseClient.from('settings').select('value').eq('key', 'referral_percentage').maybeSingle();
+    if (s && s.value != null && !isNaN(parseFloat(s.value))) {
+      const pct = parseFloat(s.value);
+      input.value = pct;
+      referralPercentageCache = pct;
+      return;
     }
+    input.value = referralPercentageCache;
   } catch (err) {
     console.warn('loadReferralPercentage:', err.message);
     input.value = referralPercentageCache;
@@ -3301,22 +3921,44 @@ async function saveReferralPercentage() {
     Swal.fire({ title: '⚠️ Tidak Valid', text: 'Persentase harus 0–100.', icon: 'warning', confirmButtonColor: '#facc15', background: '#1a0e2e', color: '#fff' });
     return;
   }
+  let saved = false;
+  let lastErr = null;
+  // 1) RPC
   try {
     const { data, error } = await supabaseClient.rpc('set_referral_percentage', {
       p_percentage: val,
       p_admin_id: currentUser.id
     });
     if (error) throw error;
-    if (!data.success) throw new Error(data.message || 'Gagal menyimpan');
-    referralPercentageCache = val;
-    Swal.fire({
-      title: '✅ Tersimpan!',
-      html: `<div style="color:#ddd;font-size:13px;">Bonus referral = <b style="color:#64ffc8;">${val}%</b> dari kode unik deposit downline.</div>`,
-      icon: 'success', confirmButtonColor: '#22c55e', background: '#1a0e2e', color: '#fff', timer: 2500, timerProgressBar: true
-    });
-  } catch (err) {
-    Swal.fire({ title: '❌ Gagal', text: err.message, icon: 'error', confirmButtonColor: '#ff4444', background: '#1a0e2e', color: '#fff' });
+    if (data && data.success === false) throw new Error(data.message || 'Gagal menyimpan');
+    saved = true;
+  } catch (e) {
+    lastErr = e;
+    console.warn('set_referral_percentage RPC gagal, coba settings:', e.message);
   }
+  // 2) Fallback langsung ke settings
+  if (!saved) {
+    try {
+      const { error } = await supabaseClient.from('settings').upsert(
+        { key: 'referral_percentage', value: String(val), updated_at: new Date().toISOString() },
+        { onConflict: 'key' }
+      );
+      if (error) throw error;
+      saved = true;
+    } catch (e2) {
+      lastErr = e2;
+    }
+  }
+  if (!saved) {
+    Swal.fire({ title: '❌ Gagal', text: (lastErr && lastErr.message) || 'Tidak bisa simpan persen', icon: 'error', confirmButtonColor: '#ff4444', background: '#1a0e2e', color: '#fff' });
+    return;
+  }
+  referralPercentageCache = val;
+  Swal.fire({
+    title: '✅ Tersimpan!',
+    html: `<div style="color:#ddd;font-size:13px;line-height:1.6;">Bonus referral = <b style="color:#64ffc8;">${val}%</b> dari <b style="color:#ffd700;">kode unik</b> deposit downline.<br><small style="color:#94a3b8;">Contoh: kode unik 80 → upline dapat Rp ${Math.floor(80 * val / 100).toLocaleString('id-ID')}</small></div>`,
+    icon: 'success', confirmButtonColor: '#22c55e', background: '#1a0e2e', color: '#fff', timer: 3500, timerProgressBar: true
+  });
 }
 
 function toggleReferralAdminManager() {
@@ -3712,6 +4354,457 @@ async function changePasswordPrompt(targetEmail) {
 }
 
 // ============================================================
+
+// ============================================================
+// TOP 10 LEADERBOARD (bulan berjalan)
+// ============================================================
+async function loadMonthlyLeaderboard() {
+  const listEl = document.getElementById('leaderboardList');
+  const periodEl = document.getElementById('lbPeriodLabel');
+  if (!listEl) return;
+  listEl.innerHTML = '<div class="loading-box"><span class="spinner"></span><br>Memuat ranking...</div>';
+  try {
+    const now = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth(), 1);
+    const end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+    if (periodEl) {
+      periodEl.textContent = 'Periode: ' + start.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) +
+        ' – ' + end.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+    }
+
+    // Coba RPC dulu
+    try {
+      const { data, error } = await supabaseClient.rpc('get_monthly_leaderboard', { p_limit: 10 });
+      if (!error && data && Array.isArray(data) && data.length) {
+        renderLeaderboard(data);
+        return;
+      }
+    } catch (_) {}
+
+    // Fallback: agregasi dari orders + deposits
+    const startISO = start.toISOString();
+    const endISO = end.toISOString();
+    const map = {};
+
+    // Orders sukses
+    try {
+      const { data: orders } = await supabaseClient
+        .from('orders')
+        .select('user_id, email, amount, total, price, status, created_at')
+        .gte('created_at', startISO)
+        .lte('created_at', endISO)
+        .limit(5000);
+      (orders || []).forEach(o => {
+        const st = String(o.status || '').toLowerCase();
+        if (st && !['success', 'completed', 'paid', 'done', 'settlement'].includes(st) && st !== 'pending') {
+          // skip failed/cancel
+          if (['failed', 'cancel', 'cancelled', 'rejected', 'refund'].includes(st)) return;
+        }
+        const uid = o.user_id || o.email || 'unknown';
+        if (!map[uid]) map[uid] = { user_id: o.user_id, email: o.email || '-', tx_count: 0, tx_amount: 0 };
+        if (o.email) map[uid].email = o.email;
+        map[uid].tx_count += 1;
+        map[uid].tx_amount += parseFloat(o.amount || o.total || o.price || 0) || 0;
+      });
+    } catch (e) { console.warn('leaderboard orders:', e.message); }
+
+    // Deposits sukses
+    try {
+      const { data: deps } = await supabaseClient
+        .from('deposits')
+        .select('user_id, email, amount, status, created_at')
+        .gte('created_at', startISO)
+        .lte('created_at', endISO)
+        .limit(3000);
+      (deps || []).forEach(d => {
+        const st = String(d.status || '').toLowerCase();
+        if (!['success', 'paid', 'completed', 'settlement'].includes(st)) return;
+        const uid = d.user_id || d.email || 'unknown';
+        if (!map[uid]) map[uid] = { user_id: d.user_id, email: d.email || '-', tx_count: 0, tx_amount: 0 };
+        if (d.email) map[uid].email = d.email;
+        map[uid].tx_count += 1;
+        map[uid].tx_amount += parseFloat(d.amount || 0) || 0;
+      });
+    } catch (e) { console.warn('leaderboard deposits:', e.message); }
+
+    const ranked = Object.values(map)
+      .sort((a, b) => b.tx_count - a.tx_count || b.tx_amount - a.tx_amount)
+      .slice(0, 10)
+      .map((r, i) => ({ rank: i + 1, ...r }));
+    renderLeaderboard(ranked);
+  } catch (err) {
+    listEl.innerHTML = `<div class="mutasi-empty" style="color:#ff8080;">❌ ${escapeHtml(err.message || 'Gagal memuat')}</div>`;
+  }
+}
+
+function renderLeaderboard(rows) {
+  const listEl = document.getElementById('leaderboardList');
+  if (!listEl) return;
+  if (!rows || !rows.length) {
+    listEl.innerHTML = '<div class="mutasi-empty"><span class="icon">🏆</span>Belum ada transaksi bulan ini</div>';
+    return;
+  }
+  let html = '';
+  rows.forEach((r, idx) => {
+    const rank = r.rank || (idx + 1);
+    const rankCls = rank === 1 ? 'top1' : rank === 2 ? 'top2' : rank === 3 ? 'top3' : '';
+    const email = r.email || r.user_email || '-';
+    const cnt = parseInt(r.tx_count || r.count || 0, 10) || 0;
+    const amt = parseFloat(r.tx_amount || r.total_amount || 0) || 0;
+    html += `<div class="lb-item">
+      <div class="lb-rank ${rankCls}">${rank}</div>
+      <div class="lb-info">
+        <div class="lb-email">${escapeHtml(email)}</div>
+        <div class="lb-meta">${cnt} transaksi</div>
+      </div>
+      <div class="lb-amount">Rp ${amt.toLocaleString('id-ID')}</div>
+    </div>`;
+  });
+  listEl.innerHTML = html;
+}
+
+// ============================================================
+// MISSION & REWARD
+// ============================================================
+function missionTypeLabel(t) {
+  const m = {
+    deposit_min: '💵 Deposit minimal',
+    tx_count: '🧾 Jumlah transaksi',
+    tx_amount: '💰 Total nominal transaksi'
+  };
+  return m[t] || t;
+}
+
+async function loadUserMissions() {
+  const listEl = document.getElementById('missionListUser');
+  if (!listEl) return;
+  if (!currentUser) {
+    listEl.innerHTML = '<div class="mutasi-empty">Login dulu untuk lihat misi</div>';
+    return;
+  }
+  listEl.innerHTML = '<div class="loading-box"><span class="spinner"></span><br>Memuat misi...</div>';
+  try {
+    let missions = [];
+    try {
+      const { data, error } = await supabaseClient.rpc('get_active_missions_for_user', { p_user_id: currentUser.id });
+      if (!error && data) missions = Array.isArray(data) ? data : (data.missions || []);
+    } catch (_) {}
+
+    if (!missions.length) {
+      const { data, error } = await supabaseClient
+        .from('missions')
+        .select('*')
+        .eq('is_active', true)
+        .order('created_at', { ascending: false })
+        .limit(50);
+      if (error) throw error;
+      missions = data || [];
+      // progress client-side
+      for (const m of missions) {
+        const prog = await computeMissionProgress(m, currentUser.id);
+        m.progress_value = prog.value;
+        m.target_value = parseFloat(m.target_value) || 0;
+        m.can_claim = prog.value >= m.target_value && !prog.claimed && !prog.expired;
+        m.claimed = prog.claimed;
+        m.expired = prog.expired;
+        m.claim_count = prog.claim_count;
+      }
+    }
+    renderUserMissions(missions);
+  } catch (err) {
+    listEl.innerHTML = `<div class="mutasi-empty" style="color:#ff8080;">❌ ${escapeHtml(err.message)}</div>`;
+  }
+}
+
+async function computeMissionProgress(mission, userId) {
+  const now = new Date();
+  const deadline = mission.deadline ? new Date(mission.deadline) : null;
+  const expired = deadline && now > deadline;
+  let claimed = false;
+  let claim_count = 0;
+  try {
+    const { data: claims } = await supabaseClient
+      .from('mission_claims')
+      .select('id')
+      .eq('mission_id', mission.id)
+      .eq('user_id', userId);
+    claim_count = (claims || []).length;
+    claimed = claim_count > 0;
+  } catch (_) {}
+
+  let value = 0;
+  const type = mission.mission_type || mission.type;
+  const since = mission.created_at || mission.starts_at || null;
+  try {
+    if (type === 'deposit_min') {
+      // max single deposit success
+      let q = supabaseClient.from('deposits').select('amount, status, created_at').eq('user_id', userId);
+      if (since) q = q.gte('created_at', since);
+      if (deadline) q = q.lte('created_at', deadline.toISOString());
+      const { data } = await q.limit(500);
+      (data || []).forEach(d => {
+        if (['success', 'paid', 'completed', 'settlement'].includes(String(d.status || '').toLowerCase())) {
+          value = Math.max(value, parseFloat(d.amount) || 0);
+        }
+      });
+    } else if (type === 'tx_count') {
+      let qo = supabaseClient.from('orders').select('id, status, created_at').eq('user_id', userId);
+      if (since) qo = qo.gte('created_at', since);
+      if (deadline) qo = qo.lte('created_at', deadline.toISOString());
+      const { data: orders } = await qo.limit(2000);
+      value = (orders || []).filter(o => {
+        const st = String(o.status || '').toLowerCase();
+        return !['failed', 'cancel', 'cancelled', 'rejected'].includes(st);
+      }).length;
+    } else if (type === 'tx_amount') {
+      let qo = supabaseClient.from('orders').select('amount, total, price, status, created_at').eq('user_id', userId);
+      if (since) qo = qo.gte('created_at', since);
+      if (deadline) qo = qo.lte('created_at', deadline.toISOString());
+      const { data: orders } = await qo.limit(2000);
+      (orders || []).forEach(o => {
+        const st = String(o.status || '').toLowerCase();
+        if (['failed', 'cancel', 'cancelled', 'rejected'].includes(st)) return;
+        value += parseFloat(o.amount || o.total || o.price || 0) || 0;
+      });
+    }
+  } catch (e) {
+    console.warn('computeMissionProgress:', e.message);
+  }
+  return { value, claimed, expired, claim_count };
+}
+
+function renderUserMissions(missions) {
+  const listEl = document.getElementById('missionListUser');
+  if (!listEl) return;
+  if (!missions || !missions.length) {
+    listEl.innerHTML = '<div class="mutasi-empty"><span class="icon">🎯</span>Belum ada mission aktif</div>';
+    return;
+  }
+  let html = '';
+  missions.forEach(m => {
+    const target = parseFloat(m.target_value) || 0;
+    const progress = parseFloat(m.progress_value) || 0;
+    const pct = target > 0 ? Math.min(100, Math.floor(progress / target * 100)) : 0;
+    const reward = parseFloat(m.reward_amount) || 0;
+    const claimed = !!m.claimed;
+    const expired = !!m.expired || (m.deadline && new Date(m.deadline) < new Date());
+    const canClaim = !!m.can_claim || (!claimed && !expired && progress >= target);
+    const maxClaims = parseInt(m.max_claims_total || m.max_claims || 0, 10) || 0;
+    const claimCount = parseInt(m.claim_count || m.total_claims || 0, 10) || 0;
+    let cls = '';
+    if (claimed) cls = 'claimed';
+    else if (expired) cls = 'expired';
+    else if (canClaim) cls = 'done';
+
+    const deadlineStr = m.deadline
+      ? new Date(m.deadline).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) + ' WIB'
+      : 'Tanpa batas';
+
+    let btn = '';
+    if (claimed) {
+      btn = `<button class="mission-btn progress" disabled>✅ Sudah diklaim</button>`;
+    } else if (expired) {
+      btn = `<button class="mission-btn progress" disabled>⏰ Kedaluwarsa</button>`;
+    } else if (canClaim) {
+      btn = `<button class="mission-btn claim" onclick="claimMissionReward('${m.id}', this)">🎁 Klaim Rp ${reward.toLocaleString('id-ID')}</button>`;
+    } else {
+      btn = `<button class="mission-btn progress" disabled>⏳ ${pct}% — lanjutkan</button>`;
+    }
+
+    html += `<div class="mission-card ${cls}">
+      <div class="mission-title">${escapeHtml(m.title || 'Mission')}</div>
+      <div class="mission-desc">${escapeHtml(m.description || missionTypeLabel(m.mission_type || m.type))}</div>
+      <div class="mission-meta">
+        <span class="mission-chip">${missionTypeLabel(m.mission_type || m.type)}</span>
+        <span class="mission-chip">Target: ${target.toLocaleString('id-ID')}</span>
+        <span class="mission-chip reward">🎁 Rp ${reward.toLocaleString('id-ID')}</span>
+        <span class="mission-chip">⏰ ${deadlineStr}</span>
+        ${maxClaims ? `<span class="mission-chip">Max claim global: ${claimCount}/${maxClaims}</span>` : ''}
+      </div>
+      <div class="mission-progress-bar"><div class="mission-progress-fill" style="width:${pct}%"></div></div>
+      <div style="font-size:10.5px;color:#94a3b8;margin-bottom:8px;">Progress: <b style="color:#64ffc8;">${progress.toLocaleString('id-ID')}</b> / ${target.toLocaleString('id-ID')} (${pct}%)</div>
+      <div class="mission-actions">${btn}</div>
+    </div>`;
+  });
+  listEl.innerHTML = html;
+}
+
+async function claimMissionReward(missionId, btnEl) {
+  if (!currentUser || !missionId) return;
+  if (btnEl) { btnEl.disabled = true; btnEl.textContent = '⏳...'; }
+  try {
+    const { data, error } = await supabaseClient.rpc('claim_mission_reward', {
+      p_user_id: currentUser.id,
+      p_mission_id: missionId
+    });
+    if (error) throw error;
+    if (data && data.success === false) throw new Error(data.message || 'Gagal klaim');
+    const reward = parseFloat(data?.reward_amount || data?.reward || 0) || 0;
+    await forceRefreshBalanceFromDB();
+    await Swal.fire({
+      title: '🎉 Reward diklaim!',
+      html: `<div style="color:#ddd;">Saldo +<b style="color:#ffd700;">Rp ${reward.toLocaleString('id-ID')}</b></div>`,
+      icon: 'success', confirmButtonColor: '#22c55e', background: '#1a0e2e', color: '#fff', timer: 2800, timerProgressBar: true
+    });
+    loadUserMissions();
+    try { loadMutasiUser(); } catch (_) {}
+  } catch (err) {
+    Swal.fire({ title: '❌ Gagal klaim', text: err.message, icon: 'error', confirmButtonColor: '#ff4444', background: '#1a0e2e', color: '#fff' });
+    if (btnEl) { btnEl.disabled = false; btnEl.innerHTML = '🎁 Klaim'; }
+  }
+}
+
+async function loadAdminMissions() {
+  const listEl = document.getElementById('missionListAdmin');
+  if (!listEl || !isOwner) return;
+  listEl.innerHTML = '<div class="loading-box"><span class="spinner"></span><br>Memuat...</div>';
+  try {
+    const { data, error } = await supabaseClient
+      .from('missions')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(100);
+    if (error) throw error;
+    const rows = data || [];
+    if (!rows.length) {
+      listEl.innerHTML = '<div class="mutasi-empty">Belum ada mission</div>';
+      return;
+    }
+    let html = '';
+    rows.forEach(m => {
+      const active = m.is_active !== false;
+      const deadlineStr = m.deadline
+        ? new Date(m.deadline).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
+        : '-';
+      html += `<div class="mission-card ${active ? '' : 'expired'}">
+        <div class="mission-title">${escapeHtml(m.title || '-')} ${active ? '' : '(nonaktif)'}</div>
+        <div class="mission-desc">${escapeHtml(m.description || '')}</div>
+        <div class="mission-meta">
+          <span class="mission-chip">${missionTypeLabel(m.mission_type)}</span>
+          <span class="mission-chip">Target ${parseFloat(m.target_value || 0).toLocaleString('id-ID')}</span>
+          <span class="mission-chip reward">Rp ${parseFloat(m.reward_amount || 0).toLocaleString('id-ID')}</span>
+          <span class="mission-chip">Max ${m.max_claims_total || '∞'}</span>
+          <span class="mission-chip">⏰ ${deadlineStr}</span>
+        </div>
+        <div class="mission-actions">
+          <button class="mission-btn progress" onclick="toggleMissionActive('${m.id}', ${active ? 'false' : 'true'})">${active ? '⏸ Nonaktifkan' : '▶️ Aktifkan'}</button>
+          <button class="mission-btn claim" style="background:linear-gradient(135deg,#ef4444,#b91c1c);" onclick="deleteMission('${m.id}')">🗑 Hapus</button>
+        </div>
+      </div>`;
+    });
+    listEl.innerHTML = html;
+  } catch (err) {
+    listEl.innerHTML = `<div class="mutasi-empty" style="color:#ff8080;">❌ ${escapeHtml(err.message)}</div>`;
+  }
+}
+
+async function openCreateMissionDialog() {
+  if (!isOwner) {
+    Swal.fire({ title: '🔒 Owner only', icon: 'warning', confirmButtonColor: '#ff6b9d', background: '#1a0e2e', color: '#fff' });
+    return;
+  }
+  const { value: form } = await Swal.fire({
+    title: '🎯 Buat Mission',
+    html: `
+      <input id="m-title" class="swal2-input" placeholder="Judul mission" style="width:100%;box-sizing:border-box;background:rgba(255,255,255,0.05);color:#fff;border:1.5px solid rgba(100,255,200,0.4);">
+      <textarea id="m-desc" class="swal2-textarea" placeholder="Deskripsi (opsional)" style="width:100%;box-sizing:border-box;background:rgba(255,255,255,0.05);color:#fff;border:1.5px solid rgba(100,255,200,0.4);"></textarea>
+      <select id="m-type" class="swal2-select" style="width:100%;box-sizing:border-box;background:rgba(255,255,255,0.05);color:#fff;border:1.5px solid rgba(100,255,200,0.4);margin-bottom:10px;">
+        <option value="deposit_min">💵 Deposit minimal (Rp)</option>
+        <option value="tx_count">🧾 Jumlah transaksi (x)</option>
+        <option value="tx_amount">💰 Total nominal transaksi (Rp)</option>
+      </select>
+      <input id="m-target" class="swal2-input" type="number" min="1" placeholder="Target (angka)" style="width:100%;box-sizing:border-box;background:rgba(255,255,255,0.05);color:#fff;border:1.5px solid rgba(100,255,200,0.4);">
+      <input id="m-reward" class="swal2-input" type="number" min="1" placeholder="Reward saldo (Rp)" style="width:100%;box-sizing:border-box;background:rgba(255,255,255,0.05);color:#fff;border:1.5px solid rgba(100,255,200,0.4);">
+      <input id="m-max" class="swal2-input" type="number" min="0" placeholder="Max claim global (0 = unlimited)" style="width:100%;box-sizing:border-box;background:rgba(255,255,255,0.05);color:#fff;border:1.5px solid rgba(100,255,200,0.4);">
+      <input id="m-deadline" class="swal2-input" type="datetime-local" style="width:100%;box-sizing:border-box;background:rgba(255,255,255,0.05);color:#fff;border:1.5px solid rgba(100,255,200,0.4);">
+      <div style="font-size:11px;color:#94a3b8;text-align:left;margin-top:6px;">Deadline kosong = tanpa batas waktu</div>
+    `,
+    showCancelButton: true,
+    confirmButtonText: '✅ Buat',
+    cancelButtonText: 'Batal',
+    confirmButtonColor: '#16a34a',
+    cancelButtonColor: '#6b4a7a',
+    background: '#1a0e2e',
+    color: '#fff',
+    width: 480,
+    preConfirm: () => {
+      const title = document.getElementById('m-title').value.trim();
+      const description = document.getElementById('m-desc').value.trim();
+      const mission_type = document.getElementById('m-type').value;
+      const target_value = parseFloat(document.getElementById('m-target').value);
+      const reward_amount = parseFloat(document.getElementById('m-reward').value);
+      const max_claims_total = parseInt(document.getElementById('m-max').value || '0', 10) || 0;
+      const dl = document.getElementById('m-deadline').value;
+      if (!title) { Swal.showValidationMessage('Judul wajib'); return false; }
+      if (!target_value || target_value <= 0) { Swal.showValidationMessage('Target harus > 0'); return false; }
+      if (!reward_amount || reward_amount <= 0) { Swal.showValidationMessage('Reward harus > 0'); return false; }
+      return {
+        title, description, mission_type, target_value, reward_amount, max_claims_total,
+        deadline: dl ? new Date(dl).toISOString() : null
+      };
+    }
+  });
+  if (!form) return;
+  try {
+    Swal.fire({ title: '⏳ Menyimpan...', allowOutsideClick: false, showConfirmButton: false, background: '#1a0e2e', color: '#fff' });
+    const row = {
+      title: form.title,
+      description: form.description || null,
+      mission_type: form.mission_type,
+      target_value: form.target_value,
+      reward_amount: form.reward_amount,
+      max_claims_total: form.max_claims_total,
+      deadline: form.deadline,
+      is_active: true,
+      created_by: currentUser.id,
+      created_at: new Date().toISOString()
+    };
+    const { error } = await supabaseClient.from('missions').insert(row);
+    if (error) throw error;
+    await Swal.fire({ title: '✅ Mission dibuat', icon: 'success', confirmButtonColor: '#22c55e', background: '#1a0e2e', color: '#fff', timer: 2000, timerProgressBar: true });
+    loadAdminMissions();
+    loadUserMissions();
+  } catch (err) {
+    Swal.fire({ title: '❌ Gagal', text: err.message, icon: 'error', confirmButtonColor: '#ff4444', background: '#1a0e2e', color: '#fff' });
+  }
+}
+
+async function toggleMissionActive(missionId, makeActive) {
+  if (!isOwner) return;
+  try {
+    const { error } = await supabaseClient.from('missions').update({ is_active: makeActive === true || makeActive === 'true' }).eq('id', missionId);
+    if (error) throw error;
+    loadAdminMissions();
+    loadUserMissions();
+  } catch (err) {
+    Swal.fire({ title: '❌ Gagal', text: err.message, icon: 'error', confirmButtonColor: '#ff4444', background: '#1a0e2e', color: '#fff' });
+  }
+}
+
+async function deleteMission(missionId) {
+  if (!isOwner) return;
+  const conf = await Swal.fire({
+    title: 'Hapus mission?',
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonText: '🗑 Hapus',
+    cancelButtonText: 'Batal',
+    confirmButtonColor: '#ef4444',
+    background: '#1a0e2e',
+    color: '#fff'
+  });
+  if (!conf.isConfirmed) return;
+  try {
+    const { error } = await supabaseClient.from('missions').delete().eq('id', missionId);
+    if (error) throw error;
+    loadAdminMissions();
+    loadUserMissions();
+  } catch (err) {
+    Swal.fire({ title: '❌ Gagal', text: err.message, icon: 'error', confirmButtonColor: '#ff4444', background: '#1a0e2e', color: '#fff' });
+  }
+}
+
+
 // MUTASI
 // ============================================================
 function toggleMutasiUser() {
@@ -3728,7 +4821,8 @@ function getMutasiTypeInfo(type) {
     'admin_sub': { label: 'Saldo Dikurangi', cls: 'admin_sub', icon: '➖' }, 'withdraw': { label: 'Pencairan', cls: 'withdraw', icon: '💸' },
     'topup': { label: 'Top Up', cls: 'deposit', icon: '💵' }, 'order': { label: 'Pembelian', cls: 'purchase', icon: '🛒' },
     'transfer_out': { label: 'Transfer Keluar', cls: 'admin_sub', icon: '📤' }, 'transfer_in': { label: 'Transfer Masuk', cls: 'admin_add', icon: '📥' },
-    'referral_bonus': { label: 'Bonus Referral', cls: 'admin_add', icon: '🎁' }
+    'referral_bonus': { label: 'Bonus Referral', cls: 'admin_add', icon: '🎁' },
+    'mission_reward': { label: 'Reward Mission', cls: 'admin_add', icon: '🎯' }
   };
   return map[t] || { label: type || 'Mutasi', cls: 'deposit', icon: '💸' };
 }
