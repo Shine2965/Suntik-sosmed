@@ -2936,17 +2936,23 @@ async function handleDepositSuccess() {
       console.warn('⚠️ refresh balance:', e.message);
     }
 
-    // 4) Klaim bonus referral (jika ada)
+    // 4) Klaim bonus referral dari KODE UNIK deposit downline × persen setting
     try {
+      const uniqueNum = parseFloat(uniqueCode) || 0;
       const { data: refData, error: refErr } = await supabaseClient.rpc('claim_referral_reward', {
         p_user_id: currentUser.id,
         p_deposit_id: depositId,
-        p_deposit_amount: depositAmount
+        p_deposit_amount: depositAmount,
+        p_unique_code: uniqueNum
       });
       if (refErr) console.warn('⚠️ Claim referral error:', refErr.message);
-      else if (refData && refData.success && refData.reward_amount > 0) {
-        const Toast = Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 4000, timerProgressBar: true, background: '#1a0e2e', color: '#fff' });
-        Toast.fire({ icon: 'success', title: `🎁 Bonus Referral`, html: `<div style="font-size:11.5px;color:#64ffc8;">Reward Rp ${parseFloat(refData.reward_amount).toLocaleString('id-ID')} diberikan ke upline.</div>` });
+      else if (refData && refData.success && parseFloat(refData.reward_amount) > 0) {
+        const Toast = Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 4500, timerProgressBar: true, background: '#1a0e2e', color: '#fff' });
+        Toast.fire({
+          icon: 'success',
+          title: '🎁 Bonus Referral',
+          html: `<div style="font-size:11.5px;color:#64ffc8;line-height:1.5;">Kode unik Rp ${uniqueNum.toLocaleString('id-ID')} × ${refData.percentage || '?'}%<br>→ Upline dapat <b>Rp ${parseFloat(refData.reward_amount).toLocaleString('id-ID')}</b></div>`
+        });
       }
     } catch (e) {
       console.warn('⚠️ Claim referral exception:', e.message);
