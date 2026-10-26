@@ -949,7 +949,7 @@ body.chat-open .cs-bubble-container{display:none !important}
         <div class="section-title" style="margin-top:16px;">🎯 Kelola Mission & Reward<div class="line"></div></div>
         <div class="withdraw-card" style="margin-bottom:12px;">
           <div class="wc-title" style="color:#64ffc8;">➕ Buat Mission Baru</div>
-          <div class="wc-subtitle">Tipe: deposit minimal / jumlah transaksi / total nominal transaksi. User bisa klaim reward otomatis saat target tercapai (sebelum deadline).</div>
+          <div class="wc-subtitle">Deposit & total nominal dihitung kumulatif (bisa dicicil banyak kali). Klaim reward saat target tercapai sebelum deadline.</div>
           <button class="withdraw-btn" style="background:linear-gradient(135deg,#00c6ff,#0072ff);" onclick="openCreateMissionDialog()">✨ Buat Mission</button>
         </div>
         <div id="missionListAdmin"><div class="mutasi-empty">Klik refresh untuk memuat</div></div>
@@ -4461,9 +4461,9 @@ function renderLeaderboard(rows) {
 // ============================================================
 function missionTypeLabel(t) {
   const m = {
-    deposit_min: '💵 Deposit minimal',
+    deposit_min: '💵 Total deposit (bisa dicicil)',
     tx_count: '🧾 Jumlah transaksi',
-    tx_amount: '💰 Total nominal transaksi'
+    tx_amount: '💰 Total nominal order (bisa dicicil)'
   };
   return m[t] || t;
 }
@@ -4530,14 +4530,14 @@ async function computeMissionProgress(mission, userId) {
   const since = mission.created_at || mission.starts_at || null;
   try {
     if (type === 'deposit_min') {
-      // max single deposit success
+      // Kumulatif / bisa dicicil: jumlah semua deposit sukses
       let q = supabaseClient.from('deposits').select('amount, status, created_at').eq('user_id', userId);
       if (since) q = q.gte('created_at', since);
       if (deadline) q = q.lte('created_at', deadline.toISOString());
-      const { data } = await q.limit(500);
+      const { data } = await q.limit(1000);
       (data || []).forEach(d => {
         if (['success', 'paid', 'completed', 'settlement'].includes(String(d.status || '').toLowerCase())) {
-          value = Math.max(value, parseFloat(d.amount) || 0);
+          value += parseFloat(d.amount) || 0;
         }
       });
     } else if (type === 'tx_count') {
@@ -4702,9 +4702,9 @@ async function openCreateMissionDialog() {
       <input id="m-title" class="swal2-input" placeholder="Judul mission" style="width:100%;box-sizing:border-box;background:rgba(255,255,255,0.05);color:#fff;border:1.5px solid rgba(100,255,200,0.4);">
       <textarea id="m-desc" class="swal2-textarea" placeholder="Deskripsi (opsional)" style="width:100%;box-sizing:border-box;background:rgba(255,255,255,0.05);color:#fff;border:1.5px solid rgba(100,255,200,0.4);"></textarea>
       <select id="m-type" class="swal2-select" style="width:100%;box-sizing:border-box;background:rgba(255,255,255,0.05);color:#fff;border:1.5px solid rgba(100,255,200,0.4);margin-bottom:10px;">
-        <option value="deposit_min">💵 Deposit minimal (Rp)</option>
+        <option value="deposit_min">💵 Total deposit kumulatif — bisa dicicil (Rp)</option>
         <option value="tx_count">🧾 Jumlah transaksi (x)</option>
-        <option value="tx_amount">💰 Total nominal transaksi (Rp)</option>
+        <option value="tx_amount">💰 Total nominal order kumulatif — bisa dicicil (Rp)</option>
       </select>
       <input id="m-target" class="swal2-input" type="number" min="1" placeholder="Target (angka)" style="width:100%;box-sizing:border-box;background:rgba(255,255,255,0.05);color:#fff;border:1.5px solid rgba(100,255,200,0.4);">
       <input id="m-reward" class="swal2-input" type="number" min="1" placeholder="Reward saldo (Rp)" style="width:100%;box-sizing:border-box;background:rgba(255,255,255,0.05);color:#fff;border:1.5px solid rgba(100,255,200,0.4);">
