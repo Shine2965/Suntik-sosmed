@@ -2887,6 +2887,300 @@ function startDepositPolling(targetAmount) {
 function stopDepositPolling() { if (depositPollingInterval) { clearInterval(depositPollingInterval); depositPollingInterval = null; } }
 
 // ============================================================
+
+// ============================================================
+// Referral bonus: kode unik × persen → upline + mutasi
+// ============================================================
+async function processReferralBonusOnDeposit({ userId, userEmail, depositId, depositAmount, uniqueCode }) {
+  const uniqueNum = parseFloat(uniqueCode) || 0;
+  if (!userId || !depositId || uniqueNum <= 0) {
+    return { reward: 0, message: 'no_unique_code' };
+  }
+
+  // 1) Coba RPC utama (dengan p_unique_code)
+  try {
+    const { data, error } = await supabaseClient.rpc('claim_referral_reward', {
+      p_user_id: userId,
+      p_deposit_id: depositId,
+      p_deposit_amount: depositAmount,
+      p_unique_code: uniqueNum
+    });
+    if (!error && data) {
+      if (data.success && parseFloat(data.reward_amount) > 0) {
+        return {
+          reward: parseFloat(data.reward_amount),
+          pct: parseFloat(data.percentage) || referralPercentageCache || 10,
+          uplineEmail: data.upline_email || '',
+          message: 'rpc_ok'
+        };
+      }
+      // RPC jalan tapi 0 — bisa no_upline / already_claimed
+      if (data.message === 'already_claimed') return { reward: 0, message: 'already_claimed' };
+      if (data.message === 'no_upline' || data.message === 'self_referral') {
+        // lanjut fallback resolve upline di client
+      } else if (data.success === false) {
+        console.warn('claim_referral_reward failed:', data.message);
+      } else {
+        return { reward: 0, message: data.message || 'rpc_zero' };
+      }
+    } else if (error) {
+      console.warn('claim_referral_reward error:', error.message);
+      // fallback: coba signature lama tanpa p_unique_code
+      try {
+        const { data: d2, error: e2 } = await supabaseClient.rpc('claim_referral_reward', {
+          p_user_id: userId,
+          p_deposit_id: depositId,
+          p_deposit_amount: uniqueNum // beberapa versi lama salah pakai amount = unique
+        });
+        if (!e2 && d2 && d2.success && parseFloat(d2.reward_amount) > 0) {
+          return {
+            reward: parseFloat(d2.reward_amount),
+            pct: parseFloat(d2.percentage) || referralPercentageCache || 10,
+            uplineEmail: d2.upline_email || '',
+            message: 'rpc_legacy_ok'
+          };
+        }
+      } catch (_) {}
+    }
+  } catch (e) {
+    console.warn('RPC claim exception:', e.message);
+  }
+
+  // 2) Fallback client-side: cari upline + kredit + tulis mutasi
+  try {
+    const fallback = await claimReferralBonusFallback({
+      userId, userEmail, depositId, uniqueNum
+    });
+    return fallback;
+  } catch (e) {
+    console.warn('Fallback claim failed:', e.message);
+    return { reward: 0, message: e.message || 'fallback_failed' };
+  }
+}
+
+async function claimReferralBonusFallback({ userId, userEmail, depositId, uniqueNum }) {
+  // Cegah double claim (kalau tabel claims ada)
+  try {
+    const { data: existing } = await supabaseClient
+      .from('referral_claims')
+      .select('id')
+      .eq('deposit_id', depositId)
+      .maybeSingle();
+    if (existing) return { reward: 0, message: 'already_claimed' };
+  } catch (_) {}
+
+  // Cari upline dari referral_usage (beberapa kemungkinan skema)
+  let uplineId = null;
+  let uplineEmail = null;
+  let referralCode = null;
+
+  // skema A: downline_user_id + upline_user_id
+  try {
+    const { data } = await supabaseClient
+      .from('referral_usage')
+      .select('upline_user_id, referral_code, code')
+      .eq('downline_user_id', userId)
+      .limit(1)
+      .maybeSingle();
+    if (data && data.upline_user_id) {
+      uplineId = data.upline_user_id;
+      referralCode = data.referral_code || data.code || null;
+    }
+  } catch (_) {}
+
+  // skema B: user_id = downline
+  if (!uplineId) {
+    try {
+      const { data } = await supabaseClient
+        .from('referral_usage')
+        .select('upline_user_id, referrer_id, referral_code, code, referred_by')
+        .eq('user_id', userId)
+        .limit(1)
+        .maybeSingle();
+      if (data) {
+        uplineId = data.upline_user_id || data.referrer_id || data.referred_by || null;
+        referralCode = data.referral_code || data.code || referralCode;
+      }
+    } catch (_) {}
+  }
+
+  // skema C: lewat profiles.referred_by / referral_code
+  if (!uplineId) {
+    try {
+      const { data: prof } = await supabaseClient
+        .from('profiles')
+        .select('referred_by, referral_code, used_referral_code')
+        .eq('id', userId)
+        .maybeSingle();
+      if (prof) {
+        if (prof.referred_by) uplineId = prof.referred_by;
+        referralCode = prof.used_referral_code || prof.referral_code || referralCode;
+      }
+    } catch (_) {}
+  }
+
+  // skema D: referral_code → referral_codes.user_id
+  if (!uplineId && referralCode) {
+    try {
+      const { data: rc } = await supabaseClient
+        .from('referral_codes')
+        .select('user_id, email')
+        .eq('code', String(referralCode).toUpperCase())
+        .maybeSingle();
+      if (rc && rc.user_id) {
+        uplineId = rc.user_id;
+        uplineEmail = rc.email || null;
+      }
+    } catch (_) {}
+  }
+
+  if (!uplineId) {
+    console.warn('ℹ️ Tidak ada upline untuk user', userId);
+    return { reward: 0, message: 'no_upline' };
+  }
+  if (uplineId === userId) return { reward: 0, message: 'self_referral' };
+
+  // Email upline
+  if (!uplineEmail) {
+    try {
+      const { data: up } = await supabaseClient
+        .from('profiles')
+        .select('email, balance')
+        .eq('id', uplineId)
+        .maybeSingle();
+      if (up) uplineEmail = up.email;
+    } catch (_) {}
+  }
+  if (!uplineEmail) return { reward: 0, message: 'upline_email_missing' };
+
+  // Persen
+  let pct = parseFloat(referralPercentageCache) || 10;
+  try {
+    const { data: pctData } = await supabaseClient.rpc('get_referral_percentage');
+    if (pctData && pctData.success && !isNaN(parseFloat(pctData.percentage))) {
+      pct = parseFloat(pctData.percentage);
+      referralPercentageCache = pct;
+    }
+  } catch (_) {
+    try {
+      const { data: s } = await supabaseClient.from('settings').select('value').eq('key', 'referral_percentage').maybeSingle();
+      if (s && s.value != null) pct = parseFloat(s.value) || pct;
+    } catch (_) {}
+  }
+  if (pct < 0) pct = 0;
+  if (pct > 100) pct = 100;
+
+  const reward = Math.floor(uniqueNum * pct / 100);
+  if (reward < 1) return { reward: 0, pct, message: 'reward_too_small', uplineEmail };
+
+  const reason = `Bonus referral ${pct}% dari kode unik Rp ${uniqueNum} (downline: ${userEmail || userId})`;
+
+  // Kredit saldo upline via RPC add_user_balance (sama seperti deposit)
+  let credited = false;
+  try {
+    const { data: balRes, error: balErr } = await supabaseClient.rpc('add_user_balance', {
+      p_target_email: uplineEmail,
+      p_amount: reward,
+      p_reason: reason
+    });
+    if (balErr) throw balErr;
+    if (balRes && balRes.success === false) throw new Error(balRes.message || 'add_user_balance failed');
+    credited = true;
+  } catch (e) {
+    console.warn('add_user_balance upline failed:', e.message);
+    // coba update profiles langsung
+    try {
+      const { data: up } = await supabaseClient.from('profiles').select('balance').eq('id', uplineId).maybeSingle();
+      const before = parseFloat(up?.balance) || 0;
+      const after = before + reward;
+      const { error: uErr } = await supabaseClient.from('profiles').update({ balance: after }).eq('id', uplineId);
+      if (uErr) throw uErr;
+      credited = true;
+    } catch (e2) {
+      console.error('Gagal kredit upline:', e2.message);
+      return { reward: 0, message: 'credit_failed: ' + e2.message };
+    }
+  }
+
+  // Tulis mutasi (jika add_user_balance belum otomatis, atau pastikan type referral_bonus)
+  try {
+    // cek apakah sudah ada mutasi sejenis untuk deposit ini
+    let alreadyMutasi = false;
+    try {
+      const { data: m } = await supabaseClient
+        .from('balance_mutations')
+        .select('id')
+        .eq('email', uplineEmail)
+        .eq('type', 'referral_bonus')
+        .ilike('reason', `%${depositId}%`)
+        .limit(1);
+      if (m && m.length) alreadyMutasi = true;
+    } catch (_) {}
+
+    if (!alreadyMutasi) {
+      // ambil saldo terbaru untuk before/after opsional
+      let balBefore = null, balAfter = null;
+      try {
+        const { data: up2 } = await supabaseClient.from('profiles').select('balance').eq('id', uplineId).maybeSingle();
+        balAfter = parseFloat(up2?.balance);
+        if (!isNaN(balAfter)) balBefore = balAfter - reward;
+      } catch (_) {}
+
+      const row = {
+        user_id: uplineId,
+        email: uplineEmail,
+        amount: reward,
+        type: 'referral_bonus',
+        reason: reason + ` [deposit:${depositId}]`,
+        created_at: new Date().toISOString()
+      };
+      if (balBefore != null) row.balance_before = balBefore;
+      if (balAfter != null) row.balance_after = balAfter;
+
+      const { error: mErr } = await supabaseClient.from('balance_mutations').insert(row);
+      if (mErr) {
+        // coba tanpa kolom optional
+        console.warn('mutasi insert full gagal, coba minimal:', mErr.message);
+        await supabaseClient.from('balance_mutations').insert({
+          user_id: uplineId,
+          email: uplineEmail,
+          amount: reward,
+          type: 'referral_bonus',
+          reason: reason + ` [deposit:${depositId}]`
+        });
+      }
+    }
+  } catch (e) {
+    console.warn('Tulis mutasi referral gagal (saldo mungkin sudah masuk):', e.message);
+  }
+
+  // Log claim agar tidak double
+  try {
+    await supabaseClient.from('referral_claims').insert({
+      deposit_id: depositId,
+      downline_user_id: userId,
+      upline_user_id: uplineId,
+      unique_code: uniqueNum,
+      percentage: pct,
+      reward_amount: reward
+    });
+  } catch (_) {}
+  try {
+    await supabaseClient.from('referral_bonuses').insert({
+      upline_user_id: uplineId,
+      upline_email: uplineEmail,
+      downline_user_id: userId,
+      downline_email: userEmail,
+      deposit_id: depositId,
+      unique_code: uniqueNum,
+      percentage: pct,
+      reward_amount: reward
+    });
+  } catch (_) {}
+
+  return { reward, pct, uplineEmail, message: credited ? 'fallback_ok' : 'fallback_partial' };
+}
+
 // handleDepositSuccess — stabil (referensi HTML kedua) + guard anti-double + referral
 // ============================================================
 async function handleDepositSuccess() {
@@ -2936,23 +3230,25 @@ async function handleDepositSuccess() {
       console.warn('⚠️ refresh balance:', e.message);
     }
 
-    // 4) Klaim bonus referral dari KODE UNIK deposit downline × persen setting
+    // 4) Klaim bonus referral (kode unik × persen) + fallback mutasi
     try {
       const uniqueNum = parseFloat(uniqueCode) || 0;
-      const { data: refData, error: refErr } = await supabaseClient.rpc('claim_referral_reward', {
-        p_user_id: currentUser.id,
-        p_deposit_id: depositId,
-        p_deposit_amount: depositAmount,
-        p_unique_code: uniqueNum
+      const claimResult = await processReferralBonusOnDeposit({
+        userId: currentUser.id,
+        userEmail: currentUser.email,
+        depositId,
+        depositAmount,
+        uniqueCode: uniqueNum
       });
-      if (refErr) console.warn('⚠️ Claim referral error:', refErr.message);
-      else if (refData && refData.success && parseFloat(refData.reward_amount) > 0) {
-        const Toast = Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 4500, timerProgressBar: true, background: '#1a0e2e', color: '#fff' });
+      if (claimResult && claimResult.reward > 0) {
+        const Toast = Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 5000, timerProgressBar: true, background: '#1a0e2e', color: '#fff' });
         Toast.fire({
           icon: 'success',
           title: '🎁 Bonus Referral',
-          html: `<div style="font-size:11.5px;color:#64ffc8;line-height:1.5;">Kode unik Rp ${uniqueNum.toLocaleString('id-ID')} × ${refData.percentage || '?'}%<br>→ Upline dapat <b>Rp ${parseFloat(refData.reward_amount).toLocaleString('id-ID')}</b></div>`
+          html: `<div style="font-size:11.5px;color:#64ffc8;line-height:1.5;">Kode unik Rp ${uniqueNum.toLocaleString('id-ID')} × ${claimResult.pct}%<br>→ Upline <b>${escapeHtml(claimResult.uplineEmail || '')}</b> +Rp ${claimResult.reward.toLocaleString('id-ID')}</div>`
         });
+      } else if (claimResult && claimResult.message) {
+        console.log('ℹ️ Referral claim:', claimResult.message);
       }
     } catch (e) {
       console.warn('⚠️ Claim referral exception:', e.message);
