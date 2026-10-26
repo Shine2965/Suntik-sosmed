@@ -2897,7 +2897,32 @@ async function processReferralBonusOnDeposit({ userId, userEmail, depositId, dep
     return { reward: 0, message: 'no_unique_code' };
   }
 
-  // 1) Coba RPC utama (dengan p_unique_code)
+  // 0) RPC server-side paling andal (trigger-compatible)
+  try {
+    const { data: payData, error: payErr } = await supabaseClient.rpc('pay_referral_bonus_for_deposit', {
+      p_deposit_id: depositId
+    });
+    if (!payErr && payData) {
+      if (payData.success && parseFloat(payData.reward_amount) > 0) {
+        return {
+          reward: parseFloat(payData.reward_amount),
+          pct: parseFloat(payData.percentage) || referralPercentageCache || 10,
+          uplineEmail: payData.upline_email || '',
+          message: 'pay_rpc_ok'
+        };
+      }
+      if (payData.message === 'already_claimed') return { reward: 0, message: 'already_claimed' };
+      if (payData.message && payData.message !== 'no_upline') {
+        console.warn('pay_referral_bonus_for_deposit:', payData);
+      }
+    } else if (payErr) {
+      console.warn('pay_referral_bonus_for_deposit error:', payErr.message);
+    }
+  } catch (e) {
+    console.warn('pay_referral_bonus_for_deposit exception:', e.message);
+  }
+
+  // 1) Coba RPC claim_referral_reward (dengan p_unique_code)
   try {
     const { data, error } = await supabaseClient.rpc('claim_referral_reward', {
       p_user_id: userId,
