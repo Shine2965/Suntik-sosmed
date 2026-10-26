@@ -796,7 +796,7 @@ body.chat-open .cs-bubble-container{display:none !important}
       </div>
 
       <div class="section">
-        <div class="section-title">🏆 Top 10 Transaksi Bulan Ini<div class="line"></div></div>
+        <div class="section-title">🏆 Top 10 Order Bulan Ini<div class="line"></div></div>
         <div style="font-size:10px;color:#94a3b8;margin:-4px 0 10px 4px;" id="lbPeriodLabel">Periode: tanggal 1 – akhir bulan</div>
         <div id="leaderboardList"><div class="mutasi-empty">Memuat...</div></div>
         <button class="auth-submit" style="background:linear-gradient(135deg,#1a0e2e,#ffb300);margin-top:8px;padding:10px;font-size:11.5px;width:100%;" onclick="loadMonthlyLeaderboard()">🔄 Refresh Ranking</button>
@@ -4365,67 +4365,59 @@ async function loadMonthlyLeaderboard() {
   listEl.innerHTML = '<div class="loading-box"><span class="spinner"></span><br>Memuat ranking...</div>';
   try {
     const now = new Date();
-    const start = new Date(now.getFullYear(), now.getMonth(), 1);
+    const start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0);
     const end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
     if (periodEl) {
-      periodEl.textContent = 'Periode: ' + start.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) +
-        ' – ' + end.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+      periodEl.textContent = 'Periode order: ' + start.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) +
+        ' – ' + end.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) + ' (dari riwayat transaksi)';
     }
 
-    // Coba RPC dulu
+    // RPC server-side (jika ada)
     try {
       const { data, error } = await supabaseClient.rpc('get_monthly_leaderboard', { p_limit: 10 });
-      if (!error && data && Array.isArray(data) && data.length) {
-        renderLeaderboard(data);
-        return;
+      if (!error && data) {
+        const rows = Array.isArray(data) ? data : (typeof data === 'string' ? JSON.parse(data) : []);
+        if (rows && rows.length) {
+          renderLeaderboard(rows);
+          return;
+        }
       }
     } catch (_) {}
 
-    // Fallback: agregasi dari orders + deposits
+    // Sumber: orders_detail = riwayat transaksi (sama seperti halaman Orders)
     const startISO = start.toISOString();
     const endISO = end.toISOString();
     const map = {};
-
-    // Orders sukses
-    try {
-      const { data: orders } = await supabaseClient
-        .from('orders')
-        .select('user_id, email, amount, total, price, status, created_at')
+    const pageSize = 1000;
+    let from = 0;
+    let keep = true;
+    while (keep) {
+      const { data, error } = await supabaseClient
+        .from('orders_detail')
+        .select('user_id, email, total_payment, price, amount, order_status, status, created_at')
         .gte('created_at', startISO)
         .lte('created_at', endISO)
-        .limit(5000);
-      (orders || []).forEach(o => {
-        const st = String(o.status || '').toLowerCase();
-        if (st && !['success', 'completed', 'paid', 'done', 'settlement'].includes(st) && st !== 'pending') {
-          // skip failed/cancel
-          if (['failed', 'cancel', 'cancelled', 'rejected', 'refund'].includes(st)) return;
-        }
-        const uid = o.user_id || o.email || 'unknown';
-        if (!map[uid]) map[uid] = { user_id: o.user_id, email: o.email || '-', tx_count: 0, tx_amount: 0 };
+        .order('created_at', { ascending: false })
+        .range(from, from + pageSize - 1);
+      if (error) throw error;
+      const batch = data || [];
+      if (batch.length < pageSize) keep = false;
+      from += pageSize;
+      if (from > 20000) keep = false; // safety
+
+      batch.forEach(o => {
+        const st = String(o.order_status || o.status || '').toLowerCase();
+        // ikut hitung semua order di riwayat kecuali yang jelas gagal/batal/refund (opsional: hitung semua)
+        // Ranking = jumlah order di riwayat bulan ini
+        if (['failed', 'canceled', 'cancelled', 'refunded'].includes(st)) return;
+        const uid = o.user_id || (o.email || '').toLowerCase() || 'unknown';
+        if (!map[uid]) map[uid] = { user_id: o.user_id || null, email: o.email || '-', tx_count: 0, tx_amount: 0 };
         if (o.email) map[uid].email = o.email;
         map[uid].tx_count += 1;
-        map[uid].tx_amount += parseFloat(o.amount || o.total || o.price || 0) || 0;
+        const amt = parseFloat(o.total_payment ?? o.price ?? o.amount ?? 0) || 0;
+        map[uid].tx_amount += amt;
       });
-    } catch (e) { console.warn('leaderboard orders:', e.message); }
-
-    // Deposits sukses
-    try {
-      const { data: deps } = await supabaseClient
-        .from('deposits')
-        .select('user_id, email, amount, status, created_at')
-        .gte('created_at', startISO)
-        .lte('created_at', endISO)
-        .limit(3000);
-      (deps || []).forEach(d => {
-        const st = String(d.status || '').toLowerCase();
-        if (!['success', 'paid', 'completed', 'settlement'].includes(st)) return;
-        const uid = d.user_id || d.email || 'unknown';
-        if (!map[uid]) map[uid] = { user_id: d.user_id, email: d.email || '-', tx_count: 0, tx_amount: 0 };
-        if (d.email) map[uid].email = d.email;
-        map[uid].tx_count += 1;
-        map[uid].tx_amount += parseFloat(d.amount || 0) || 0;
-      });
-    } catch (e) { console.warn('leaderboard deposits:', e.message); }
+    }
 
     const ranked = Object.values(map)
       .sort((a, b) => b.tx_count - a.tx_count || b.tx_amount - a.tx_amount)
@@ -4433,9 +4425,11 @@ async function loadMonthlyLeaderboard() {
       .map((r, i) => ({ rank: i + 1, ...r }));
     renderLeaderboard(ranked);
   } catch (err) {
-    listEl.innerHTML = `<div class="mutasi-empty" style="color:#ff8080;">❌ ${escapeHtml(err.message || 'Gagal memuat')}</div>`;
+    console.error('loadMonthlyLeaderboard:', err);
+    listEl.innerHTML = `<div class="mutasi-empty" style="color:#ff8080;">❌ ${escapeHtml(err.message || 'Gagal memuat ranking')}</div>`;
   }
 }
+
 
 function renderLeaderboard(rows) {
   const listEl = document.getElementById('leaderboardList');
@@ -4548,23 +4542,23 @@ async function computeMissionProgress(mission, userId) {
         }
       });
     } else if (type === 'tx_count') {
-      let qo = supabaseClient.from('orders').select('id, status, created_at').eq('user_id', userId);
+      let qo = supabaseClient.from('orders_detail').select('id, order_status, status, created_at').eq('user_id', userId);
       if (since) qo = qo.gte('created_at', since);
       if (deadline) qo = qo.lte('created_at', deadline.toISOString());
       const { data: orders } = await qo.limit(2000);
       value = (orders || []).filter(o => {
-        const st = String(o.status || '').toLowerCase();
-        return !['failed', 'cancel', 'cancelled', 'rejected'].includes(st);
+        const st = String(o.order_status || o.status || '').toLowerCase();
+        return !['failed', 'canceled', 'cancelled', 'refunded'].includes(st);
       }).length;
     } else if (type === 'tx_amount') {
-      let qo = supabaseClient.from('orders').select('amount, total, price, status, created_at').eq('user_id', userId);
+      let qo = supabaseClient.from('orders_detail').select('total_payment, price, amount, order_status, status, created_at').eq('user_id', userId);
       if (since) qo = qo.gte('created_at', since);
       if (deadline) qo = qo.lte('created_at', deadline.toISOString());
       const { data: orders } = await qo.limit(2000);
       (orders || []).forEach(o => {
-        const st = String(o.status || '').toLowerCase();
-        if (['failed', 'cancel', 'cancelled', 'rejected'].includes(st)) return;
-        value += parseFloat(o.amount || o.total || o.price || 0) || 0;
+        const st = String(o.order_status || o.status || '').toLowerCase();
+        if (['failed', 'canceled', 'cancelled', 'refunded'].includes(st)) return;
+        value += parseFloat(o.total_payment ?? o.price ?? o.amount ?? 0) || 0;
       });
     }
   } catch (e) {
