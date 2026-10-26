@@ -4368,33 +4368,37 @@ async function loadMonthlyLeaderboard() {
     const start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0);
     const end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
     if (periodEl) {
-      periodEl.textContent = 'Periode order: ' + start.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) +
-        ' – ' + end.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) + ' (dari riwayat transaksi)';
+      periodEl.textContent = 'Periode: ' + start.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) +
+        ' – ' + end.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) + ' · ranking by total Rp (orders_detail)';
     }
 
-    // RPC server-side (jika ada)
+    // RPC (opsional)
     try {
       const { data, error } = await supabaseClient.rpc('get_monthly_leaderboard', { p_limit: 10 });
       if (!error && data) {
-        const rows = Array.isArray(data) ? data : (typeof data === 'string' ? JSON.parse(data) : []);
-        if (rows && rows.length) {
+        let rows = data;
+        if (typeof data === 'string') {
+          try { rows = JSON.parse(data); } catch (_) { rows = []; }
+        }
+        if (Array.isArray(rows) && rows.length) {
           renderLeaderboard(rows);
           return;
         }
       }
     } catch (_) {}
 
-    // Sumber: orders_detail = riwayat transaksi (sama seperti halaman Orders)
+    // Sumber: orders_detail — kolom yang pasti ada: total_payment, order_status
     const startISO = start.toISOString();
     const endISO = end.toISOString();
     const map = {};
     const pageSize = 1000;
     let from = 0;
     let keep = true;
+
     while (keep) {
       const { data, error } = await supabaseClient
         .from('orders_detail')
-        .select('user_id, email, total_payment, price, amount, order_status, status, created_at')
+        .select('user_id, email, total_payment, order_status, created_at')
         .gte('created_at', startISO)
         .lte('created_at', endISO)
         .order('created_at', { ascending: false })
@@ -4403,24 +4407,22 @@ async function loadMonthlyLeaderboard() {
       const batch = data || [];
       if (batch.length < pageSize) keep = false;
       from += pageSize;
-      if (from > 20000) keep = false; // safety
+      if (from > 30000) keep = false;
 
       batch.forEach(o => {
-        const st = String(o.order_status || o.status || '').toLowerCase();
-        // ikut hitung semua order di riwayat kecuali yang jelas gagal/batal/refund (opsional: hitung semua)
-        // Ranking = jumlah order di riwayat bulan ini
+        const st = String(o.order_status || '').toLowerCase();
         if (['failed', 'canceled', 'cancelled', 'refunded'].includes(st)) return;
         const uid = o.user_id || (o.email || '').toLowerCase() || 'unknown';
         if (!map[uid]) map[uid] = { user_id: o.user_id || null, email: o.email || '-', tx_count: 0, tx_amount: 0 };
         if (o.email) map[uid].email = o.email;
         map[uid].tx_count += 1;
-        const amt = parseFloat(o.total_payment ?? o.price ?? o.amount ?? 0) || 0;
-        map[uid].tx_amount += amt;
+        map[uid].tx_amount += parseFloat(o.total_payment) || 0;
       });
     }
 
+    // Ranking utama: total Rupiah terbanyak
     const ranked = Object.values(map)
-      .sort((a, b) => b.tx_count - a.tx_count || b.tx_amount - a.tx_amount)
+      .sort((a, b) => b.tx_amount - a.tx_amount || b.tx_count - a.tx_count)
       .slice(0, 10)
       .map((r, i) => ({ rank: i + 1, ...r }));
     renderLeaderboard(ranked);
@@ -4449,7 +4451,7 @@ function renderLeaderboard(rows) {
       <div class="lb-rank ${rankCls}">${rank}</div>
       <div class="lb-info">
         <div class="lb-email">${escapeHtml(email)}</div>
-        <div class="lb-meta">${cnt} transaksi</div>
+        <div class="lb-meta">${cnt} order · total belanja</div>
       </div>
       <div class="lb-amount">Rp ${amt.toLocaleString('id-ID')}</div>
     </div>`;
@@ -4551,14 +4553,14 @@ async function computeMissionProgress(mission, userId) {
         return !['failed', 'canceled', 'cancelled', 'refunded'].includes(st);
       }).length;
     } else if (type === 'tx_amount') {
-      let qo = supabaseClient.from('orders_detail').select('total_payment, price, amount, order_status, status, created_at').eq('user_id', userId);
+      let qo = supabaseClient.from('orders_detail').select('total_payment, order_status, created_at').eq('user_id', userId);
       if (since) qo = qo.gte('created_at', since);
       if (deadline) qo = qo.lte('created_at', deadline.toISOString());
       const { data: orders } = await qo.limit(2000);
       (orders || []).forEach(o => {
         const st = String(o.order_status || o.status || '').toLowerCase();
         if (['failed', 'canceled', 'cancelled', 'refunded'].includes(st)) return;
-        value += parseFloat(o.total_payment ?? o.price ?? o.amount ?? 0) || 0;
+        value += parseFloat(o.total_payment) || 0;
       });
     }
   } catch (e) {
