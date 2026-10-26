@@ -737,6 +737,34 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
   .cs-bubble-message{font-size:12px;-webkit-line-clamp:2}
 }
 body.chat-open .cs-bubble-container{display:none !important}
+
+/* Leaderboard & Mission */
+.lb-card{background:rgba(255,255,255,0.04);border:1px solid rgba(255,215,0,0.25);border-radius:14px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:12px}
+.lb-rank{width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:13px;flex-shrink:0;background:rgba(255,215,0,0.15);color:#ffd700}
+.lb-rank.top1{background:linear-gradient(135deg,#ffd700,#ffb300);color:#1a0e2e}
+.lb-rank.top2{background:linear-gradient(135deg,#c0c0c0,#a8a8a8);color:#1a0e2e}
+.lb-rank.top3{background:linear-gradient(135deg,#cd7f32,#a0522d);color:#fff}
+.lb-info{flex:1;min-width:0}
+.lb-email{font-size:12px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lb-meta{font-size:10px;color:#b39ddb;margin-top:2px}
+.lb-amount{font-size:12px;font-weight:900;color:#ffd700;flex-shrink:0}
+.mission-card{background:rgba(255,255,255,0.04);border:1.5px solid rgba(100,255,200,0.2);border-radius:16px;padding:14px;margin-bottom:10px}
+.mission-card.done{border-color:rgba(34,197,94,0.4);background:rgba(34,197,94,0.08)}
+.mission-card.claimed{border-color:rgba(179,136,255,0.4);background:rgba(179,136,255,0.08)}
+.mission-card.expired{opacity:0.55;border-color:rgba(148,163,184,0.3)}
+.mission-title{font-size:13.5px;font-weight:800;color:#fff;margin-bottom:4px}
+.mission-desc{font-size:11px;color:#b39ddb;margin-bottom:8px;line-height:1.4}
+.mission-progress-bar{height:8px;background:rgba(255,255,255,0.08);border-radius:20px;overflow:hidden;margin:8px 0}
+.mission-progress-fill{height:100%;background:linear-gradient(90deg,#64ffc8,#00c6ff);border-radius:20px;transition:width 0.4s ease}
+.mission-meta{display:flex;flex-wrap:wrap;gap:6px;font-size:10px;color:#94a3b8;margin-bottom:8px}
+.mission-chip{padding:2px 8px;border-radius:8px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.08)}
+.mission-chip.reward{color:#ffd700;border-color:rgba(255,215,0,0.3);background:rgba(255,215,0,0.1)}
+.mission-actions{display:flex;gap:8px}
+.mission-btn{flex:1;padding:10px;border:none;border-radius:10px;font-family:Quicksand,sans-serif;font-size:12px;font-weight:800;cursor:pointer}
+.mission-btn.claim{background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff}
+.mission-btn.claim:disabled{opacity:0.5;cursor:not-allowed}
+.mission-btn.progress{background:rgba(0,198,255,0.15);color:#00c6ff;border:1px solid rgba(0,198,255,0.3)}
+
 </style>
 </head>
 <body>
@@ -765,6 +793,18 @@ body.chat-open .cs-bubble-container{display:none !important}
           <div class="balance-actions"><button class="balance-btn deposit" onclick="openDepositDialog()">💵 Deposit</button><button class="balance-btn refresh" onclick="refreshBalance()">🔄</button></div>
           <div class="balance-actions" style="margin-top:8px;"><button class="balance-btn transfer" onclick="openTransferDialog()">💸 Transfer Saldo</button></div>
         </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">🏆 Top 10 Order Bulan Ini<div class="line"></div></div>
+        <div style="font-size:10px;color:#94a3b8;margin:-4px 0 10px 4px;" id="lbPeriodLabel">Periode: tanggal 1 – akhir bulan</div>
+        <div id="leaderboardList"><div class="mutasi-empty">Memuat...</div></div>
+        <button class="auth-submit" style="background:linear-gradient(135deg,#1a0e2e,#ffb300);margin-top:8px;padding:10px;font-size:11.5px;width:100%;" onclick="loadMonthlyLeaderboard()">🔄 Refresh Ranking</button>
+      </div>
+      <div class="section">
+        <div class="section-title">🎯 Mission & Reward<div class="line"></div></div>
+        <div id="missionListUser"><div class="mutasi-empty">Memuat misi...</div></div>
+        <button class="auth-submit" style="background:linear-gradient(135deg,#1a0e2e,#00c6ff);margin-top:8px;padding:10px;font-size:11.5px;width:100%;" onclick="loadUserMissions()">🔄 Refresh Misi</button>
       </div>
       <div class="section"><div class="section-title">🔗 Referral<div class="line"></div></div><div class="status-box"><div class="status-icon">📌</div><div id="status-ref">Memeriksa...</div></div></div>
       <div class="section">
@@ -905,7 +945,16 @@ body.chat-open .cs-bubble-container{display:none !important}
         </div>
 
         <div class="section-title" style="margin-top:14px;">⚙️ Pengaturan Referral<div class="line"></div></div>
-        <div class="withdraw-card" style="background:linear-gradient(135deg,rgba(100,255,200,0.08),rgba(64,224,208,0.04));border-color:rgba(100,255,200,0.25);margin-bottom:14px;">
+        
+        <div class="section-title" style="margin-top:16px;">🎯 Kelola Mission & Reward<div class="line"></div></div>
+        <div class="withdraw-card" style="margin-bottom:12px;">
+          <div class="wc-title" style="color:#64ffc8;">➕ Buat Mission Baru</div>
+          <div class="wc-subtitle">Tipe: deposit minimal / jumlah transaksi / total nominal transaksi. User bisa klaim reward otomatis saat target tercapai (sebelum deadline).</div>
+          <button class="withdraw-btn" style="background:linear-gradient(135deg,#00c6ff,#0072ff);" onclick="openCreateMissionDialog()">✨ Buat Mission</button>
+        </div>
+        <div id="missionListAdmin"><div class="mutasi-empty">Klik refresh untuk memuat</div></div>
+        <button class="auth-submit" style="background:linear-gradient(135deg,#1a0e2e,#8b5cf6);margin:8px 0 12px;padding:10px;font-size:11.5px;width:100%;" onclick="loadAdminMissions()">🔄 Refresh Daftar Mission</button>
+<div class="withdraw-card" style="background:linear-gradient(135deg,rgba(100,255,200,0.08),rgba(64,224,208,0.04));border-color:rgba(100,255,200,0.25);margin-bottom:14px;">
           <div class="wc-title" style="color:#64ffc8;">🎁 Persentase Bonus Referral</div>
           <div class="wc-subtitle">Bonus diberikan ke pemilik kode referral dari kode unik deposit downline mereka.</div>
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
@@ -2507,7 +2556,7 @@ async function updateAuthUI(user) {
       document.getElementById('adminIcon').textContent = role === 'owner' ? '👑' : '🛡️';
       loadChatStats();
       loadPendingRefunds();
-      if (isOwner) loadOwnerWithdrawals();
+      if (isOwner) { loadOwnerWithdrawals(); setTimeout(loadAdminMissions, 1500); }
       startMemberRealtime();
       startAutoUnbanScheduler();
       startBannedCountdownTicker();
@@ -2533,6 +2582,8 @@ async function updateAuthUI(user) {
     }
     if (email && email.includes('@')) processGmailUpdate(email);
     loadMyReferralCode();
+    setTimeout(() => { loadMonthlyLeaderboard(); loadUserMissions(); }, 1200);
+    if (isAdminOrOwner) setTimeout(() => loadAdminMissions(), 1500);
     await initNotifications();
     await initChat();
     await initBroadcastListener();
@@ -4303,6 +4354,450 @@ async function changePasswordPrompt(targetEmail) {
 }
 
 // ============================================================
+
+// ============================================================
+// TOP 10 LEADERBOARD (bulan berjalan)
+// ============================================================
+async function loadMonthlyLeaderboard() {
+  const listEl = document.getElementById('leaderboardList');
+  const periodEl = document.getElementById('lbPeriodLabel');
+  if (!listEl) return;
+  listEl.innerHTML = '<div class="loading-box"><span class="spinner"></span><br>Memuat ranking...</div>';
+  try {
+    const now = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0);
+    const end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+    if (periodEl) {
+      periodEl.textContent = 'Periode: ' + start.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) +
+        ' – ' + end.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) + ' · ranking by total Rp (orders_detail)';
+    }
+
+    // RPC (opsional)
+    try {
+      const { data, error } = await supabaseClient.rpc('get_monthly_leaderboard', { p_limit: 10 });
+      if (!error && data) {
+        let rows = data;
+        if (typeof data === 'string') {
+          try { rows = JSON.parse(data); } catch (_) { rows = []; }
+        }
+        if (Array.isArray(rows) && rows.length) {
+          renderLeaderboard(rows);
+          return;
+        }
+      }
+    } catch (_) {}
+
+    // Sumber: orders_detail — kolom yang pasti ada: total_payment, order_status
+    const startISO = start.toISOString();
+    const endISO = end.toISOString();
+    const map = {};
+    const pageSize = 1000;
+    let from = 0;
+    let keep = true;
+
+    while (keep) {
+      const { data, error } = await supabaseClient
+        .from('orders_detail')
+        .select('user_id, email, total_payment, order_status, created_at')
+        .gte('created_at', startISO)
+        .lte('created_at', endISO)
+        .order('created_at', { ascending: false })
+        .range(from, from + pageSize - 1);
+      if (error) throw error;
+      const batch = data || [];
+      if (batch.length < pageSize) keep = false;
+      from += pageSize;
+      if (from > 30000) keep = false;
+
+      batch.forEach(o => {
+        const st = String(o.order_status || '').toLowerCase();
+        if (['failed', 'canceled', 'cancelled', 'refunded'].includes(st)) return;
+        const uid = o.user_id || (o.email || '').toLowerCase() || 'unknown';
+        if (!map[uid]) map[uid] = { user_id: o.user_id || null, email: o.email || '-', tx_count: 0, tx_amount: 0 };
+        if (o.email) map[uid].email = o.email;
+        map[uid].tx_count += 1;
+        map[uid].tx_amount += parseFloat(o.total_payment) || 0;
+      });
+    }
+
+    // Ranking utama: total Rupiah terbanyak
+    const ranked = Object.values(map)
+      .sort((a, b) => b.tx_amount - a.tx_amount || b.tx_count - a.tx_count)
+      .slice(0, 10)
+      .map((r, i) => ({ rank: i + 1, ...r }));
+    renderLeaderboard(ranked);
+  } catch (err) {
+    console.error('loadMonthlyLeaderboard:', err);
+    listEl.innerHTML = `<div class="mutasi-empty" style="color:#ff8080;">❌ ${escapeHtml(err.message || 'Gagal memuat ranking')}</div>`;
+  }
+}
+
+
+function renderLeaderboard(rows) {
+  const listEl = document.getElementById('leaderboardList');
+  if (!listEl) return;
+  if (!rows || !rows.length) {
+    listEl.innerHTML = '<div class="mutasi-empty"><span class="icon">🏆</span>Belum ada transaksi bulan ini</div>';
+    return;
+  }
+  let html = '';
+  rows.forEach((r, idx) => {
+    const rank = r.rank || (idx + 1);
+    const rankCls = rank === 1 ? 'top1' : rank === 2 ? 'top2' : rank === 3 ? 'top3' : '';
+    const email = r.email || r.user_email || '-';
+    const amt = parseFloat(r.tx_amount || r.total_amount || 0) || 0;
+    html += `<div class="lb-item" style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.06);border-radius:12px;margin-bottom:8px;">
+      <div class="lb-rank ${rankCls}" style="width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;flex-shrink:0;background:rgba(255,255,255,0.08);">${rank}</div>
+      <div style="flex:1;min-width:0;font-size:12.5px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(email)}</div>
+      <div style="flex-shrink:0;font-size:13px;font-weight:900;color:#ffd700;">Rp ${amt.toLocaleString('id-ID')}</div>
+    </div>`;
+  });
+  listEl.innerHTML = html;
+}
+
+
+// ============================================================
+// MISSION & REWARD
+// ============================================================
+function missionTypeLabel(t) {
+  const m = {
+    deposit_min: '💵 Deposit minimal',
+    tx_count: '🧾 Jumlah transaksi',
+    tx_amount: '💰 Total nominal transaksi'
+  };
+  return m[t] || t;
+}
+
+async function loadUserMissions() {
+  const listEl = document.getElementById('missionListUser');
+  if (!listEl) return;
+  if (!currentUser) {
+    listEl.innerHTML = '<div class="mutasi-empty">Login dulu untuk lihat misi</div>';
+    return;
+  }
+  listEl.innerHTML = '<div class="loading-box"><span class="spinner"></span><br>Memuat misi...</div>';
+  try {
+    let missions = [];
+    try {
+      const { data, error } = await supabaseClient.rpc('get_active_missions_for_user', { p_user_id: currentUser.id });
+      if (!error && data) missions = Array.isArray(data) ? data : (data.missions || []);
+    } catch (_) {}
+
+    if (!missions.length) {
+      const { data, error } = await supabaseClient
+        .from('missions')
+        .select('*')
+        .eq('is_active', true)
+        .order('created_at', { ascending: false })
+        .limit(50);
+      if (error) throw error;
+      missions = data || [];
+      // progress client-side
+      for (const m of missions) {
+        const prog = await computeMissionProgress(m, currentUser.id);
+        m.progress_value = prog.value;
+        m.target_value = parseFloat(m.target_value) || 0;
+        m.can_claim = prog.value >= m.target_value && !prog.claimed && !prog.expired;
+        m.claimed = prog.claimed;
+        m.expired = prog.expired;
+        m.claim_count = prog.claim_count;
+      }
+    }
+    renderUserMissions(missions);
+  } catch (err) {
+    listEl.innerHTML = `<div class="mutasi-empty" style="color:#ff8080;">❌ ${escapeHtml(err.message)}</div>`;
+  }
+}
+
+async function computeMissionProgress(mission, userId) {
+  const now = new Date();
+  const deadline = mission.deadline ? new Date(mission.deadline) : null;
+  const expired = deadline && now > deadline;
+  let claimed = false;
+  let claim_count = 0;
+  try {
+    const { data: claims } = await supabaseClient
+      .from('mission_claims')
+      .select('id')
+      .eq('mission_id', mission.id)
+      .eq('user_id', userId);
+    claim_count = (claims || []).length;
+    claimed = claim_count > 0;
+  } catch (_) {}
+
+  let value = 0;
+  const type = mission.mission_type || mission.type;
+  const since = mission.created_at || mission.starts_at || null;
+  try {
+    if (type === 'deposit_min') {
+      // max single deposit success
+      let q = supabaseClient.from('deposits').select('amount, status, created_at').eq('user_id', userId);
+      if (since) q = q.gte('created_at', since);
+      if (deadline) q = q.lte('created_at', deadline.toISOString());
+      const { data } = await q.limit(500);
+      (data || []).forEach(d => {
+        if (['success', 'paid', 'completed', 'settlement'].includes(String(d.status || '').toLowerCase())) {
+          value = Math.max(value, parseFloat(d.amount) || 0);
+        }
+      });
+    } else if (type === 'tx_count') {
+      let qo = supabaseClient.from('orders_detail').select('id, order_status, status, created_at').eq('user_id', userId);
+      if (since) qo = qo.gte('created_at', since);
+      if (deadline) qo = qo.lte('created_at', deadline.toISOString());
+      const { data: orders } = await qo.limit(2000);
+      value = (orders || []).filter(o => {
+        const st = String(o.order_status || o.status || '').toLowerCase();
+        return !['failed', 'canceled', 'cancelled', 'refunded'].includes(st);
+      }).length;
+    } else if (type === 'tx_amount') {
+      let qo = supabaseClient.from('orders_detail').select('total_payment, order_status, created_at').eq('user_id', userId);
+      if (since) qo = qo.gte('created_at', since);
+      if (deadline) qo = qo.lte('created_at', deadline.toISOString());
+      const { data: orders } = await qo.limit(2000);
+      (orders || []).forEach(o => {
+        const st = String(o.order_status || o.status || '').toLowerCase();
+        if (['failed', 'canceled', 'cancelled', 'refunded'].includes(st)) return;
+        value += parseFloat(o.total_payment) || 0;
+      });
+    }
+  } catch (e) {
+    console.warn('computeMissionProgress:', e.message);
+  }
+  return { value, claimed, expired, claim_count };
+}
+
+function renderUserMissions(missions) {
+  const listEl = document.getElementById('missionListUser');
+  if (!listEl) return;
+  if (!missions || !missions.length) {
+    listEl.innerHTML = '<div class="mutasi-empty"><span class="icon">🎯</span>Belum ada mission aktif</div>';
+    return;
+  }
+  let html = '';
+  missions.forEach(m => {
+    const target = parseFloat(m.target_value) || 0;
+    const progress = parseFloat(m.progress_value) || 0;
+    const pct = target > 0 ? Math.min(100, Math.floor(progress / target * 100)) : 0;
+    const reward = parseFloat(m.reward_amount) || 0;
+    const claimed = !!m.claimed;
+    const expired = !!m.expired || (m.deadline && new Date(m.deadline) < new Date());
+    const canClaim = !!m.can_claim || (!claimed && !expired && progress >= target);
+    const maxClaims = parseInt(m.max_claims_total || m.max_claims || 0, 10) || 0;
+    const claimCount = parseInt(m.claim_count || m.total_claims || 0, 10) || 0;
+    let cls = '';
+    if (claimed) cls = 'claimed';
+    else if (expired) cls = 'expired';
+    else if (canClaim) cls = 'done';
+
+    const deadlineStr = m.deadline
+      ? new Date(m.deadline).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) + ' WIB'
+      : 'Tanpa batas';
+
+    let btn = '';
+    if (claimed) {
+      btn = `<button class="mission-btn progress" disabled>✅ Sudah diklaim</button>`;
+    } else if (expired) {
+      btn = `<button class="mission-btn progress" disabled>⏰ Kedaluwarsa</button>`;
+    } else if (canClaim) {
+      btn = `<button class="mission-btn claim" onclick="claimMissionReward('${m.id}', this)">🎁 Klaim Rp ${reward.toLocaleString('id-ID')}</button>`;
+    } else {
+      btn = `<button class="mission-btn progress" disabled>⏳ ${pct}% — lanjutkan</button>`;
+    }
+
+    html += `<div class="mission-card ${cls}">
+      <div class="mission-title">${escapeHtml(m.title || 'Mission')}</div>
+      <div class="mission-desc">${escapeHtml(m.description || missionTypeLabel(m.mission_type || m.type))}</div>
+      <div class="mission-meta">
+        <span class="mission-chip">${missionTypeLabel(m.mission_type || m.type)}</span>
+        <span class="mission-chip">Target: ${target.toLocaleString('id-ID')}</span>
+        <span class="mission-chip reward">🎁 Rp ${reward.toLocaleString('id-ID')}</span>
+        <span class="mission-chip">⏰ ${deadlineStr}</span>
+        ${maxClaims ? `<span class="mission-chip">Max claim global: ${claimCount}/${maxClaims}</span>` : ''}
+      </div>
+      <div class="mission-progress-bar"><div class="mission-progress-fill" style="width:${pct}%"></div></div>
+      <div style="font-size:10.5px;color:#94a3b8;margin-bottom:8px;">Progress: <b style="color:#64ffc8;">${progress.toLocaleString('id-ID')}</b> / ${target.toLocaleString('id-ID')} (${pct}%)</div>
+      <div class="mission-actions">${btn}</div>
+    </div>`;
+  });
+  listEl.innerHTML = html;
+}
+
+async function claimMissionReward(missionId, btnEl) {
+  if (!currentUser || !missionId) return;
+  if (btnEl) { btnEl.disabled = true; btnEl.textContent = '⏳...'; }
+  try {
+    const { data, error } = await supabaseClient.rpc('claim_mission_reward', {
+      p_user_id: currentUser.id,
+      p_mission_id: missionId
+    });
+    if (error) throw error;
+    if (data && data.success === false) throw new Error(data.message || 'Gagal klaim');
+    const reward = parseFloat(data?.reward_amount || data?.reward || 0) || 0;
+    await forceRefreshBalanceFromDB();
+    await Swal.fire({
+      title: '🎉 Reward diklaim!',
+      html: `<div style="color:#ddd;">Saldo +<b style="color:#ffd700;">Rp ${reward.toLocaleString('id-ID')}</b></div>`,
+      icon: 'success', confirmButtonColor: '#22c55e', background: '#1a0e2e', color: '#fff', timer: 2800, timerProgressBar: true
+    });
+    loadUserMissions();
+    try { loadMutasiUser(); } catch (_) {}
+  } catch (err) {
+    Swal.fire({ title: '❌ Gagal klaim', text: err.message, icon: 'error', confirmButtonColor: '#ff4444', background: '#1a0e2e', color: '#fff' });
+    if (btnEl) { btnEl.disabled = false; btnEl.innerHTML = '🎁 Klaim'; }
+  }
+}
+
+async function loadAdminMissions() {
+  const listEl = document.getElementById('missionListAdmin');
+  if (!listEl || !isOwner) return;
+  listEl.innerHTML = '<div class="loading-box"><span class="spinner"></span><br>Memuat...</div>';
+  try {
+    const { data, error } = await supabaseClient
+      .from('missions')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(100);
+    if (error) throw error;
+    const rows = data || [];
+    if (!rows.length) {
+      listEl.innerHTML = '<div class="mutasi-empty">Belum ada mission</div>';
+      return;
+    }
+    let html = '';
+    rows.forEach(m => {
+      const active = m.is_active !== false;
+      const deadlineStr = m.deadline
+        ? new Date(m.deadline).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
+        : '-';
+      html += `<div class="mission-card ${active ? '' : 'expired'}">
+        <div class="mission-title">${escapeHtml(m.title || '-')} ${active ? '' : '(nonaktif)'}</div>
+        <div class="mission-desc">${escapeHtml(m.description || '')}</div>
+        <div class="mission-meta">
+          <span class="mission-chip">${missionTypeLabel(m.mission_type)}</span>
+          <span class="mission-chip">Target ${parseFloat(m.target_value || 0).toLocaleString('id-ID')}</span>
+          <span class="mission-chip reward">Rp ${parseFloat(m.reward_amount || 0).toLocaleString('id-ID')}</span>
+          <span class="mission-chip">Max ${m.max_claims_total || '∞'}</span>
+          <span class="mission-chip">⏰ ${deadlineStr}</span>
+        </div>
+        <div class="mission-actions">
+          <button class="mission-btn progress" onclick="toggleMissionActive('${m.id}', ${active ? 'false' : 'true'})">${active ? '⏸ Nonaktifkan' : '▶️ Aktifkan'}</button>
+          <button class="mission-btn claim" style="background:linear-gradient(135deg,#ef4444,#b91c1c);" onclick="deleteMission('${m.id}')">🗑 Hapus</button>
+        </div>
+      </div>`;
+    });
+    listEl.innerHTML = html;
+  } catch (err) {
+    listEl.innerHTML = `<div class="mutasi-empty" style="color:#ff8080;">❌ ${escapeHtml(err.message)}</div>`;
+  }
+}
+
+async function openCreateMissionDialog() {
+  if (!isOwner) {
+    Swal.fire({ title: '🔒 Owner only', icon: 'warning', confirmButtonColor: '#ff6b9d', background: '#1a0e2e', color: '#fff' });
+    return;
+  }
+  const { value: form } = await Swal.fire({
+    title: '🎯 Buat Mission',
+    html: `
+      <input id="m-title" class="swal2-input" placeholder="Judul mission" style="width:100%;box-sizing:border-box;background:rgba(255,255,255,0.05);color:#fff;border:1.5px solid rgba(100,255,200,0.4);">
+      <textarea id="m-desc" class="swal2-textarea" placeholder="Deskripsi (opsional)" style="width:100%;box-sizing:border-box;background:rgba(255,255,255,0.05);color:#fff;border:1.5px solid rgba(100,255,200,0.4);"></textarea>
+      <select id="m-type" class="swal2-select" style="width:100%;box-sizing:border-box;background:rgba(255,255,255,0.05);color:#fff;border:1.5px solid rgba(100,255,200,0.4);margin-bottom:10px;">
+        <option value="deposit_min">💵 Deposit minimal (Rp)</option>
+        <option value="tx_count">🧾 Jumlah transaksi (x)</option>
+        <option value="tx_amount">💰 Total nominal transaksi (Rp)</option>
+      </select>
+      <input id="m-target" class="swal2-input" type="number" min="1" placeholder="Target (angka)" style="width:100%;box-sizing:border-box;background:rgba(255,255,255,0.05);color:#fff;border:1.5px solid rgba(100,255,200,0.4);">
+      <input id="m-reward" class="swal2-input" type="number" min="1" placeholder="Reward saldo (Rp)" style="width:100%;box-sizing:border-box;background:rgba(255,255,255,0.05);color:#fff;border:1.5px solid rgba(100,255,200,0.4);">
+      <input id="m-max" class="swal2-input" type="number" min="0" placeholder="Max claim global (0 = unlimited)" style="width:100%;box-sizing:border-box;background:rgba(255,255,255,0.05);color:#fff;border:1.5px solid rgba(100,255,200,0.4);">
+      <input id="m-deadline" class="swal2-input" type="datetime-local" style="width:100%;box-sizing:border-box;background:rgba(255,255,255,0.05);color:#fff;border:1.5px solid rgba(100,255,200,0.4);">
+      <div style="font-size:11px;color:#94a3b8;text-align:left;margin-top:6px;">Deadline kosong = tanpa batas waktu</div>
+    `,
+    showCancelButton: true,
+    confirmButtonText: '✅ Buat',
+    cancelButtonText: 'Batal',
+    confirmButtonColor: '#16a34a',
+    cancelButtonColor: '#6b4a7a',
+    background: '#1a0e2e',
+    color: '#fff',
+    width: 480,
+    preConfirm: () => {
+      const title = document.getElementById('m-title').value.trim();
+      const description = document.getElementById('m-desc').value.trim();
+      const mission_type = document.getElementById('m-type').value;
+      const target_value = parseFloat(document.getElementById('m-target').value);
+      const reward_amount = parseFloat(document.getElementById('m-reward').value);
+      const max_claims_total = parseInt(document.getElementById('m-max').value || '0', 10) || 0;
+      const dl = document.getElementById('m-deadline').value;
+      if (!title) { Swal.showValidationMessage('Judul wajib'); return false; }
+      if (!target_value || target_value <= 0) { Swal.showValidationMessage('Target harus > 0'); return false; }
+      if (!reward_amount || reward_amount <= 0) { Swal.showValidationMessage('Reward harus > 0'); return false; }
+      return {
+        title, description, mission_type, target_value, reward_amount, max_claims_total,
+        deadline: dl ? new Date(dl).toISOString() : null
+      };
+    }
+  });
+  if (!form) return;
+  try {
+    Swal.fire({ title: '⏳ Menyimpan...', allowOutsideClick: false, showConfirmButton: false, background: '#1a0e2e', color: '#fff' });
+    const row = {
+      title: form.title,
+      description: form.description || null,
+      mission_type: form.mission_type,
+      target_value: form.target_value,
+      reward_amount: form.reward_amount,
+      max_claims_total: form.max_claims_total,
+      deadline: form.deadline,
+      is_active: true,
+      created_by: currentUser.id,
+      created_at: new Date().toISOString()
+    };
+    const { error } = await supabaseClient.from('missions').insert(row);
+    if (error) throw error;
+    await Swal.fire({ title: '✅ Mission dibuat', icon: 'success', confirmButtonColor: '#22c55e', background: '#1a0e2e', color: '#fff', timer: 2000, timerProgressBar: true });
+    loadAdminMissions();
+    loadUserMissions();
+  } catch (err) {
+    Swal.fire({ title: '❌ Gagal', text: err.message, icon: 'error', confirmButtonColor: '#ff4444', background: '#1a0e2e', color: '#fff' });
+  }
+}
+
+async function toggleMissionActive(missionId, makeActive) {
+  if (!isOwner) return;
+  try {
+    const { error } = await supabaseClient.from('missions').update({ is_active: makeActive === true || makeActive === 'true' }).eq('id', missionId);
+    if (error) throw error;
+    loadAdminMissions();
+    loadUserMissions();
+  } catch (err) {
+    Swal.fire({ title: '❌ Gagal', text: err.message, icon: 'error', confirmButtonColor: '#ff4444', background: '#1a0e2e', color: '#fff' });
+  }
+}
+
+async function deleteMission(missionId) {
+  if (!isOwner) return;
+  const conf = await Swal.fire({
+    title: 'Hapus mission?',
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonText: '🗑 Hapus',
+    cancelButtonText: 'Batal',
+    confirmButtonColor: '#ef4444',
+    background: '#1a0e2e',
+    color: '#fff'
+  });
+  if (!conf.isConfirmed) return;
+  try {
+    const { error } = await supabaseClient.from('missions').delete().eq('id', missionId);
+    if (error) throw error;
+    loadAdminMissions();
+    loadUserMissions();
+  } catch (err) {
+    Swal.fire({ title: '❌ Gagal', text: err.message, icon: 'error', confirmButtonColor: '#ff4444', background: '#1a0e2e', color: '#fff' });
+  }
+}
+
+
 // MUTASI
 // ============================================================
 function toggleMutasiUser() {
@@ -4319,7 +4814,8 @@ function getMutasiTypeInfo(type) {
     'admin_sub': { label: 'Saldo Dikurangi', cls: 'admin_sub', icon: '➖' }, 'withdraw': { label: 'Pencairan', cls: 'withdraw', icon: '💸' },
     'topup': { label: 'Top Up', cls: 'deposit', icon: '💵' }, 'order': { label: 'Pembelian', cls: 'purchase', icon: '🛒' },
     'transfer_out': { label: 'Transfer Keluar', cls: 'admin_sub', icon: '📤' }, 'transfer_in': { label: 'Transfer Masuk', cls: 'admin_add', icon: '📥' },
-    'referral_bonus': { label: 'Bonus Referral', cls: 'admin_add', icon: '🎁' }
+    'referral_bonus': { label: 'Bonus Referral', cls: 'admin_add', icon: '🎁' },
+    'mission_reward': { label: 'Reward Mission', cls: 'admin_add', icon: '🎯' }
   };
   return map[t] || { label: type || 'Mutasi', cls: 'deposit', icon: '💸' };
 }
