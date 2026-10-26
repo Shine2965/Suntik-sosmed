@@ -3019,17 +3019,52 @@ async function claimReferralBonusFallback({ userId, userEmail, depositId, unique
     } catch (_) {}
   }
 
-  // skema D: referral_code → referral_codes.user_id
+  // skema D: referral_code → referral_codes / user_referral_codes
   if (!uplineId && referralCode) {
+    const codeUp = String(referralCode).toUpperCase().trim();
     try {
       const { data: rc } = await supabaseClient
         .from('referral_codes')
-        .select('user_id, email')
-        .eq('code', String(referralCode).toUpperCase())
+        .select('user_id, email, code')
+        .ilike('code', codeUp)
+        .limit(1)
         .maybeSingle();
       if (rc && rc.user_id) {
         uplineId = rc.user_id;
         uplineEmail = rc.email || null;
+      }
+    } catch (_) {}
+    if (!uplineId) {
+      try {
+        const { data: urc } = await supabaseClient
+          .from('user_referral_codes')
+          .select('user_id, email, code')
+          .ilike('code', codeUp)
+          .limit(1)
+          .maybeSingle();
+        if (urc && urc.user_id) {
+          uplineId = urc.user_id;
+          uplineEmail = urc.email || null;
+        }
+      } catch (_) {}
+    }
+  }
+
+  // skema E: profiles.referred_by_code / invite_code
+  if (!uplineId) {
+    try {
+      const { data: p2 } = await supabaseClient
+        .from('profiles')
+        .select('referred_by, referred_by_code, invite_code, used_referral_code')
+        .eq('id', userId)
+        .maybeSingle();
+      if (p2) {
+        if (p2.referred_by) uplineId = p2.referred_by;
+        const c = p2.referred_by_code || p2.used_referral_code || p2.invite_code;
+        if (!uplineId && c) {
+          const { data: rc2 } = await supabaseClient.from('referral_codes').select('user_id, email').ilike('code', String(c).toUpperCase()).limit(1).maybeSingle();
+          if (rc2) { uplineId = rc2.user_id; uplineEmail = rc2.email || null; }
+        }
       }
     } catch (_) {}
   }
@@ -3240,6 +3275,7 @@ async function handleDepositSuccess() {
         depositAmount,
         uniqueCode: uniqueNum
       });
+      console.log('🎁 Referral claim result:', claimResult);
       if (claimResult && claimResult.reward > 0) {
         const Toast = Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 5000, timerProgressBar: true, background: '#1a0e2e', color: '#fff' });
         Toast.fire({
@@ -3249,6 +3285,10 @@ async function handleDepositSuccess() {
         });
       } else if (claimResult && claimResult.message) {
         console.log('ℹ️ Referral claim:', claimResult.message);
+        // Tampilkan info ringkas di console; admin bisa cek relasi upline
+        if (['no_upline', 'credit_failed'].some(x => String(claimResult.message).includes(x))) {
+          console.warn('⚠️ Bonus referral tidak masuk. Penyebab:', claimResult.message, '- Pastikan downline daftar dengan kode referral & jalankan SQL claim_referral_reward di Supabase.');
+        }
       }
     } catch (e) {
       console.warn('⚠️ Claim referral exception:', e.message);
@@ -3684,15 +3724,27 @@ async function loadReferralPercentage() {
   const input = document.getElementById('referralPercentInput');
   if (!input || !isAdminOrOwner) return;
   try {
-    const { data, error } = await supabaseClient.rpc('get_referral_percentage');
-    if (error) throw error;
-    if (data && data.success) {
-      const pct = parseFloat(data.percentage);
-      if (!isNaN(pct)) {
-        input.value = pct;
-        referralPercentageCache = pct;
+    // RPC dulu
+    try {
+      const { data, error } = await supabaseClient.rpc('get_referral_percentage');
+      if (!error && data && (data.success || data.percentage != null)) {
+        const pct = parseFloat(data.percentage);
+        if (!isNaN(pct)) {
+          input.value = pct;
+          referralPercentageCache = pct;
+          return;
+        }
       }
+    } catch (_) {}
+    // Fallback tabel settings
+    const { data: s } = await supabaseClient.from('settings').select('value').eq('key', 'referral_percentage').maybeSingle();
+    if (s && s.value != null && !isNaN(parseFloat(s.value))) {
+      const pct = parseFloat(s.value);
+      input.value = pct;
+      referralPercentageCache = pct;
+      return;
     }
+    input.value = referralPercentageCache;
   } catch (err) {
     console.warn('loadReferralPercentage:', err.message);
     input.value = referralPercentageCache;
@@ -3707,22 +3759,44 @@ async function saveReferralPercentage() {
     Swal.fire({ title: '⚠️ Tidak Valid', text: 'Persentase harus 0–100.', icon: 'warning', confirmButtonColor: '#facc15', background: '#1a0e2e', color: '#fff' });
     return;
   }
+  let saved = false;
+  let lastErr = null;
+  // 1) RPC
   try {
     const { data, error } = await supabaseClient.rpc('set_referral_percentage', {
       p_percentage: val,
       p_admin_id: currentUser.id
     });
     if (error) throw error;
-    if (!data.success) throw new Error(data.message || 'Gagal menyimpan');
-    referralPercentageCache = val;
-    Swal.fire({
-      title: '✅ Tersimpan!',
-      html: `<div style="color:#ddd;font-size:13px;">Bonus referral = <b style="color:#64ffc8;">${val}%</b> dari kode unik deposit downline.</div>`,
-      icon: 'success', confirmButtonColor: '#22c55e', background: '#1a0e2e', color: '#fff', timer: 2500, timerProgressBar: true
-    });
-  } catch (err) {
-    Swal.fire({ title: '❌ Gagal', text: err.message, icon: 'error', confirmButtonColor: '#ff4444', background: '#1a0e2e', color: '#fff' });
+    if (data && data.success === false) throw new Error(data.message || 'Gagal menyimpan');
+    saved = true;
+  } catch (e) {
+    lastErr = e;
+    console.warn('set_referral_percentage RPC gagal, coba settings:', e.message);
   }
+  // 2) Fallback langsung ke settings
+  if (!saved) {
+    try {
+      const { error } = await supabaseClient.from('settings').upsert(
+        { key: 'referral_percentage', value: String(val), updated_at: new Date().toISOString() },
+        { onConflict: 'key' }
+      );
+      if (error) throw error;
+      saved = true;
+    } catch (e2) {
+      lastErr = e2;
+    }
+  }
+  if (!saved) {
+    Swal.fire({ title: '❌ Gagal', text: (lastErr && lastErr.message) || 'Tidak bisa simpan persen', icon: 'error', confirmButtonColor: '#ff4444', background: '#1a0e2e', color: '#fff' });
+    return;
+  }
+  referralPercentageCache = val;
+  Swal.fire({
+    title: '✅ Tersimpan!',
+    html: `<div style="color:#ddd;font-size:13px;line-height:1.6;">Bonus referral = <b style="color:#64ffc8;">${val}%</b> dari <b style="color:#ffd700;">kode unik</b> deposit downline.<br><small style="color:#94a3b8;">Contoh: kode unik 80 → upline dapat Rp ${Math.floor(80 * val / 100).toLocaleString('id-ID')}</small></div>`,
+    icon: 'success', confirmButtonColor: '#22c55e', background: '#1a0e2e', color: '#fff', timer: 3500, timerProgressBar: true
+  });
 }
 
 function toggleReferralAdminManager() {
