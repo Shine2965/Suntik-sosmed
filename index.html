@@ -791,6 +791,28 @@ body.chat-open .cs-bubble-container{display:none !important}
 .war-tab.active{background:rgba(255,107,157,0.2);border-color:rgba(255,107,157,0.5);color:#ff6b9d}
 .war-log{font-size:10.5px;color:#94a3b8;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.05)}
 
+
+/* Moderation board + toast */
+.mod-board{background:rgba(255,68,68,0.06);border:1px solid rgba(255,68,68,0.22);border-radius:16px;padding:12px;margin-bottom:8px}
+.mod-board-item{background:rgba(0,0,0,0.22);border-radius:12px;padding:10px 12px;margin-bottom:8px;border-left:3px solid #ff4444}
+.mod-board-item:last-child{margin-bottom:0}
+.mod-board-item .mb-email{font-size:12px;font-weight:800;color:#fff;word-break:break-all}
+.mod-board-item .mb-meta{font-size:10.5px;color:#b39ddb;margin-top:4px;line-height:1.45}
+.mod-board-item .mb-reason{font-size:11px;color:#ffb3b3;margin-top:4px}
+.mod-toast-wrap{position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:99999;width:min(420px,92vw);pointer-events:none}
+.mod-toast{background:linear-gradient(135deg,rgba(26,14,46,0.98),rgba(40,16,50,0.98));border:1.5px solid rgba(255,68,68,0.45);border-radius:16px;padding:14px 16px;box-shadow:0 12px 40px rgba(0,0,0,0.45);animation:modToastIn 0.35s ease both;pointer-events:auto}
+.mod-toast.mute{border-color:rgba(255,170,0,0.5)}
+.mod-toast.unmute{border-color:rgba(100,255,200,0.45)}
+.mod-toast.unban{border-color:rgba(34,197,94,0.45)}
+.mod-toast .mt-title{font-size:13px;font-weight:900;color:#fff;margin-bottom:4px}
+.mod-toast .mt-body{font-size:12px;color:#ddd;line-height:1.5}
+.mod-toast .mt-bar{height:3px;background:rgba(255,255,255,0.12);border-radius:99px;margin-top:10px;overflow:hidden}
+.mod-toast .mt-bar>i{display:block;height:100%;width:100%;background:linear-gradient(90deg,#ff6b9d,#ff4444);animation:modToastBar 10s linear forwards}
+.mod-toast.mute .mt-bar>i{background:linear-gradient(90deg,#ffaa00,#ff6b00)}
+.mod-toast.unmute .mt-bar>i,.mod-toast.unban .mt-bar>i{background:linear-gradient(90deg,#64ffc8,#22c55e)}
+@keyframes modToastIn{from{opacity:0;transform:translateY(-12px)}to{opacity:1;transform:translateY(0)}}
+@keyframes modToastBar{from{width:100%}to{width:0%}}
+
 </style>
 </head>
 <body>
@@ -825,7 +847,7 @@ body.chat-open .cs-bubble-container{display:none !important}
         <div class="section-title">🏆 Top 10 Order Bulan Ini<div class="line"></div></div>
         <div style="font-size:10px;color:#94a3b8;margin:-4px 0 10px 4px;" id="lbPeriodLabel">Periode: tanggal 1 – akhir bulan</div>
         <div id="leaderboardList"><div class="mutasi-empty">Memuat...</div></div>
-        <button class="auth-submit" style="background:linear-gradient(135deg,#1a0e2e,#ffb300);margin-top:8px;padding:10px;font-size:11.5px;width:100%;" onclick="loadMonthlyLeaderboard()">🔄 Refresh Ranking</button>
+        <button class="auth-submit" style="background:linear-gradient(135deg,#1a0e2e,#ffb300);margin-top:8px;padding:10px;font-size:11.5px;width:100%;" onclick="loadBannedPublicList(); initModerationRealtime(); loadMonthlyLeaderboard()">🔄 Refresh Ranking</button>
       </div>
       <div class="section">
         <div class="section-title">🎯 Mission & Reward<div class="line"></div></div>
@@ -840,6 +862,8 @@ body.chat-open .cs-bubble-container{display:none !important}
           <div class="menu-item gold" onclick="handleButtonClick('event')"><div class="icon">💲</div><div><div class="label">Event</div><div class="sub">Promo & Bonus</div></div><div class="arrow">→</div></div>
           <div class="menu-item purple" onclick="handleButtonClick('sewaweb')"><div class="icon">🌐</div><div><div class="label">Sewa Website</div><div class="sub">Website premium</div></div><div class="arrow">→</div></div>
           <div class="menu-item green" onclick="handleButtonClick('tutorial')"><div class="icon">📕</div><div><div class="label">Tutorial</div><div class="sub">Cara order</div></div><div class="arrow">→</div></div>
+          <div class="menu-item" style="--accent:linear-gradient(90deg,#ff4444,#ff8080)" onclick="switchPage('banned')"><div class="icon" style="background:rgba(255,68,68,0.2);color:#ff8080;">🚫</div><div><div class="label">Daftar Banned</div><div class="sub">Siapa yang di-ban</div></div><div class="arrow">→</div></div>
+
         </div>
       </div>
       <div class="section">
@@ -861,6 +885,21 @@ body.chat-open .cs-bubble-container{display:none !important}
         </div>
       </div>
       <div class="section"><div class="info-banner"><span class="icon">⚠️</span><div><b>Hati-hati penipuan!</b> Hubungi WhatsApp resmi <b>+62 895-1810-3883</b> atau IG <b>onivla_</b>.</div></div></div>
+    </div>
+
+    
+    <div class="page" id="page-banned">
+      <div class="section">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+          <button onclick="switchPage('home')" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);color:#fff;border-radius:10px;padding:8px 12px;font-weight:800;font-size:12px;cursor:pointer;font-family:inherit;">← Kembali</button>
+          <div class="section-title" style="margin:0;flex:1;">🚫 Daftar Banned<div class="line"></div></div>
+        </div>
+        <div style="font-size:11px;color:#b39ddb;margin-bottom:12px;line-height:1.5;">
+          Semua role dapat melihat daftar user yang sedang di-ban, beserta alasan dan sisa waktu.
+        </div>
+        <div id="bannedPublicList" class="mod-board"><div class="mutasi-empty">Memuat daftar banned...</div></div>
+        <button class="auth-submit" style="background:linear-gradient(135deg,#1a0e2e,#ff4444);margin-top:12px;padding:12px;font-size:12px;width:100%;" onclick="loadBannedPublicList()">🔄 Refresh Daftar Banned</button>
+      </div>
     </div>
 
     <div class="page" id="page-orders">
@@ -1555,6 +1594,7 @@ function switchPage(pageName) {
   const body = document.querySelector('.app-body');
   if (body) body.scrollTop = 0;
   if (pageName === 'chat' && isStaff) setTimeout(() => loadCSFolders(), 300);
+  if (pageName === 'banned') { try { loadBannedPublicList(); } catch(e) {} }
   if (pageName === 'orders') {
     loadOrderHistory(true);
     startOrderAutoRefresh();
@@ -2591,7 +2631,7 @@ async function updateAuthUI(user) {
       document.getElementById('adminIcon').textContent = role === 'owner' ? '👑' : '🛡️';
       loadChatStats();
       loadPendingRefunds();
-      if (isOwner) { loadOwnerWithdrawals(); setTimeout(loadAdminMissions, 1500); }
+      if (isOwner) { loadOwnerWithdrawals(); setTimeout(loadAdminMissions, 1500); setTimeout(loadBannedPublicList, 600); setTimeout(initModerationRealtime, 800); }
       startMemberRealtime();
       startAutoUnbanScheduler();
       startBannedCountdownTicker();
@@ -5079,6 +5119,167 @@ async function rejectRefund(refundId, btnElement) {
 // ============================================================
 // BAN/UNBAN/MUTE
 // ============================================================
+
+// ============================================================
+// MODERATION: public banned list + toast 10s (ban/mute/unmute)
+// ============================================================
+let moderationRealtimeChannel = null;
+const modToastSeen = new Set();
+
+function maskEmailPublic(email) {
+  if (!email || typeof email !== 'string') return '-';
+  const parts = email.split('@');
+  if (parts.length < 2) return email.slice(0, 2) + '***';
+  const name = parts[0];
+  const domain = parts[1];
+  const show = name.length <= 2 ? name[0] + '*' : name.slice(0, 2) + '***' + name.slice(-1);
+  return show + '@' + domain;
+}
+
+function formatModUntil(iso) {
+  if (!iso) return 'Permanent / tidak ditentukan';
+  try {
+    return new Date(iso).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) + ' WIB';
+  } catch (_) { return String(iso); }
+}
+
+function showModerationToast(type, email, reason, untilIso) {
+  const wrap = document.getElementById('modToastWrap');
+  if (!wrap) return;
+  const key = type + '|' + (email || '') + '|' + (untilIso || '') + '|' + (reason || '');
+  // avoid spam same event within 12s
+  if (modToastSeen.has(key)) return;
+  modToastSeen.add(key);
+  setTimeout(() => modToastSeen.delete(key), 12000);
+
+  const titles = {
+    ban: '🚫 User Di-BAN',
+    unban: '✅ User Di-UNBAN',
+    mute: '🔇 User Di-MUTE',
+    unmute: '🔊 User Di-UNMUTE'
+  };
+  const cls = type === 'mute' ? 'mute' : (type === 'unmute' ? 'unmute' : (type === 'unban' ? 'unban' : ''));
+  const el = document.createElement('div');
+  el.className = 'mod-toast ' + cls;
+  el.innerHTML = `
+    <div class="mt-title">${titles[type] || 'Notifikasi Moderasi'}</div>
+    <div class="mt-body">
+      <b style="color:#ffd700;">${escapeHtml(email || '-')}</b><br>
+      ${reason ? ('Alasan: <span style="color:#ffb3b3;">' + escapeHtml(reason) + '</span><br>') : ''}
+      ${untilIso ? ('Sampai: <span style="color:#94a3b8;">' + escapeHtml(formatModUntil(untilIso)) + '</span>') : ''}
+    </div>
+    <div class="mt-bar"><i></i></div>`;
+  wrap.innerHTML = '';
+  wrap.appendChild(el);
+  setTimeout(() => {
+    try { if (el.parentNode) el.parentNode.removeChild(el); } catch (_) {}
+  }, 10000);
+}
+
+async function loadBannedPublicList() {
+  const box = document.getElementById('bannedPublicList');
+  if (!box || !supabaseClient) return;
+  box.innerHTML = '<div class="mutasi-empty">Memuat daftar banned...</div>';
+  try {
+    const nowIso = new Date().toISOString();
+    // Ambil yang banned=true; filter expired di client
+    let q = supabaseClient.from('profiles')
+      .select('id, email, banned, banned_reason, banned_until, banned_at, banned_by')
+      .eq('banned', true)
+      .order('banned_at', { ascending: false })
+      .limit(50);
+    let { data, error } = await q;
+    if (error) {
+      // fallback kolom minimal
+      const r2 = await supabaseClient.from('profiles').select('id, email, banned, banned_reason, banned_until').eq('banned', true).limit(50);
+      if (r2.error) throw r2.error;
+      data = r2.data;
+    }
+    const rows = (data || []).filter(p => {
+      if (!p.banned) return false;
+      if (p.banned_until && new Date(p.banned_until) <= new Date()) return false;
+      return true;
+    });
+    if (!rows.length) {
+      box.innerHTML = '<div class="mutasi-empty">✅ Tidak ada user yang sedang di-ban</div>';
+      return;
+    }
+    let html = '';
+    rows.forEach(p => {
+      const reason = p.banned_reason || p.ban_reason || '-';
+      const until = p.banned_until ? formatModUntil(p.banned_until) : 'Permanent';
+      const sisa = p.banned_until ? formatBannedCountdown(p.banned_until) : '-';
+      html += `<div class="mod-board-item">
+        <div class="mb-email">📧 ${escapeHtml(p.email || '-')}</div>
+        <div class="mb-reason">📝 ${escapeHtml(reason)}</div>
+        <div class="mb-meta">⏰ Sampai: <b style="color:#ff8080;">${escapeHtml(until)}</b>${p.banned_until ? ' · Sisa: ' + escapeHtml(sisa) : ''}</div>
+      </div>`;
+    });
+    box.innerHTML = html;
+  } catch (e) {
+    console.warn('loadBannedPublicList', e.message);
+    box.innerHTML = `<div class="mutasi-empty" style="color:#ff8080;">❌ ${escapeHtml(e.message || 'Gagal memuat')}</div>`;
+  }
+}
+
+function initModerationRealtime() {
+  if (!supabaseClient) return;
+  try {
+    if (moderationRealtimeChannel) {
+      try { moderationRealtimeChannel.unsubscribe(); } catch (_) {}
+      moderationRealtimeChannel = null;
+    }
+    moderationRealtimeChannel = supabaseClient
+      .channel('moderation_public_' + Date.now())
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles' }, (payload) => {
+        try {
+          const n = payload.new || {};
+          const o = payload.old || {};
+          const email = n.email || o.email || '-';
+          // BAN
+          if (n.banned === true && o.banned !== true) {
+            showModerationToast('ban', email, n.banned_reason || n.ban_reason || '-', n.banned_until);
+            loadBannedPublicList();
+          } else if (n.banned === false && o.banned === true) {
+            showModerationToast('unban', email, 'Ban dicabut', null);
+            loadBannedPublicList();
+          } else if (n.banned === true && o.banned === true && (n.banned_until !== o.banned_until || n.banned_reason !== o.banned_reason)) {
+            showModerationToast('ban', email, n.banned_reason || '-', n.banned_until);
+            loadBannedPublicList();
+          }
+          // MUTE via profiles columns (jika ada)
+          if ((n.is_muted === true && o.is_muted !== true) ||
+              (n.muted_until && n.muted_until !== o.muted_until && new Date(n.muted_until) > new Date())) {
+            showModerationToast('mute', email, n.mute_reason || '-', n.muted_until);
+          } else if (n.is_muted === false && o.is_muted === true) {
+            showModerationToast('unmute', email, 'Mute dicabut', null);
+          }
+        } catch (e) { console.warn('moderation profiles handler', e.message); }
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_mutes' }, (payload) => {
+        try {
+          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+            const n = payload.new || {};
+            if (n.muted_until && new Date(n.muted_until) > new Date()) {
+              showModerationToast('mute', n.email || '-', n.reason || '-', n.muted_until);
+            }
+          } else if (payload.eventType === 'DELETE') {
+            const o = payload.old || {};
+            showModerationToast('unmute', o.email || '-', 'Mute dicabut', null);
+          }
+        } catch (e) { console.warn('moderation chat_mutes handler', e.message); }
+      })
+      .subscribe((status) => {
+        if (['CHANNEL_ERROR', 'TIMED_OUT', 'CLOSED'].includes(status)) {
+          setTimeout(initModerationRealtime, 4000);
+        }
+      });
+  } catch (e) {
+    console.warn('initModerationRealtime', e.message);
+  }
+}
+
+
 async function openBanDialog(email, userId, isUnbanMode) {
   if (!currentProfile || !['admin', 'owner'].includes(currentProfile.role)) {
     Swal.fire({ title: '🔒 Akses Ditolak', text: 'Hanya Admin/Owner yang bisa ban/unban.', icon: 'error', confirmButtonColor: '#ff4444', background: '#1a0e2e', color: '#fff' });
