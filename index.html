@@ -990,25 +990,6 @@ body.chat-open .cs-bubble-container{display:none !important}
           <div style="margin-top:8px;font-size:10.5px;color:#94a3b8;line-height:1.45;">Contoh: persen 10% · kode unik deposit 80 → upline dapat <b style="color:#ffd700;">Rp 8</b>. Bonus + mutasi otomatis saat deposit status sukses.</div>
         </div>
 
-        <div class="section-title" style="margin-top:16px;">💹 Keuntungan Harga Sosmed (%)<div class="line"></div></div>
-        <div class="withdraw-card" style="margin-bottom:12px;background:linear-gradient(135deg,rgba(250,204,21,0.08),rgba(245,158,11,0.04));border-color:rgba(250,204,21,0.3);">
-          <div class="wc-title" style="color:#facc15;">Owner — Set markup persen</div>
-          <div class="wc-subtitle">Nilai wajib persen (contoh 10 = harga jual = modal + 10%). Berlaku ke daftar layanan Sosmed-1 / 2 / 4.</div>
-          <div style="display:grid;gap:10px;margin-top:10px;">
-            <label style="font-size:11px;color:#facc15;font-weight:700;">Sosmed-1 (Lollipop) %
-              <input type="number" id="markupSosmed1" min="0" max="500" step="0.1" placeholder="contoh 10" style="width:100%;margin-top:4px;padding:10px;border-radius:10px;border:1.5px solid rgba(250,204,21,0.35);background:rgba(0,0,0,0.25);color:#fff;font-weight:700;">
-            </label>
-            <label style="font-size:11px;color:#facc15;font-weight:700;">Sosmed-2 (Fayupedia) %
-              <input type="number" id="markupSosmed2" min="0" max="500" step="0.1" placeholder="contoh 7.5" style="width:100%;margin-top:4px;padding:10px;border-radius:10px;border:1.5px solid rgba(250,204,21,0.35);background:rgba(0,0,0,0.25);color:#fff;font-weight:700;">
-            </label>
-            <label style="font-size:11px;color:#facc15;font-weight:700;">Sosmed-4 (Djuragan) %
-              <input type="number" id="markupSosmed4" min="0" max="500" step="0.1" placeholder="contoh 15" style="width:100%;margin-top:4px;padding:10px;border-radius:10px;border:1.5px solid rgba(250,204,21,0.35);background:rgba(0,0,0,0.25);color:#fff;font-weight:700;">
-            </label>
-          </div>
-          <button class="withdraw-btn" style="margin-top:12px;background:linear-gradient(135deg,#facc15,#f59e0b);color:#1a0e2e;" onclick="saveSosmedMarkups()">💾 Simpan Keuntungan</button>
-          <button class="withdraw-btn" style="margin-top:8px;background:rgba(255,255,255,0.08);color:#facc15;border:1px solid rgba(250,204,21,0.3);" onclick="loadSosmedMarkups()">🔄 Muat Nilai Saat Ini</button>
-        </div>
-
         <div class="section-title" style="margin-top:16px;">🎯 Kelola Mission & Reward<div class="line"></div></div>
         <div class="withdraw-card" style="margin-bottom:12px;">
           <div class="wc-title" style="color:#64ffc8;">➕ Buat Mission Baru</div>
@@ -2610,7 +2591,7 @@ async function updateAuthUI(user) {
       document.getElementById('adminIcon').textContent = role === 'owner' ? '👑' : '🛡️';
       loadChatStats();
       loadPendingRefunds();
-      if (isOwner) { loadOwnerWithdrawals(); setTimeout(loadAdminMissions, 1500); setTimeout(loadSosmedMarkups, 900); }
+      if (isOwner) { loadOwnerWithdrawals(); setTimeout(loadAdminMissions, 1500); }
       startMemberRealtime();
       startAutoUnbanScheduler();
       startBannedCountdownTicker();
@@ -4496,96 +4477,6 @@ async function changePasswordPrompt(targetEmail) {
 // ============================================================
 // TOP 10 LEADERBOARD (bulan berjalan)
 // ============================================================
-
-// ============================================================
-// OWNER: MARKUP % SOSMED
-// ============================================================
-const MARKUP_KEYS = {
-  sosmed1: 'markup_sosmed1',
-  sosmed2: 'markup_sosmed2',
-  sosmed4: 'markup_sosmed4'
-};
-
-async function loadSosmedMarkups() {
-  if (!supabaseClient) return;
-  try {
-    const keys = Object.values(MARKUP_KEYS);
-    const { data, error } = await supabaseClient
-      .from('settings')
-      .select('key, value')
-      .in('key', keys);
-    if (error) throw error;
-    const map = {};
-    (data || []).forEach(r => { map[r.key] = r.value; });
-    const el1 = document.getElementById('markupSosmed1');
-    const el2 = document.getElementById('markupSosmed2');
-    const el4 = document.getElementById('markupSosmed4');
-    if (el1) el1.value = map[MARKUP_KEYS.sosmed1] != null ? map[MARKUP_KEYS.sosmed1] : '';
-    if (el2) el2.value = map[MARKUP_KEYS.sosmed2] != null ? map[MARKUP_KEYS.sosmed2] : '';
-    if (el4) el4.value = map[MARKUP_KEYS.sosmed4] != null ? map[MARKUP_KEYS.sosmed4] : '';
-  } catch (e) {
-    console.warn('loadSosmedMarkups:', e.message);
-  }
-}
-
-async function saveSosmedMarkups() {
-  if (!isOwner) {
-    Swal.fire({ title: '🔒 Owner only', icon: 'warning', confirmButtonColor: '#ff6b9d', background: '#1a0e2e', color: '#fff' });
-    return;
-  }
-  const v1 = document.getElementById('markupSosmed1')?.value;
-  const v2 = document.getElementById('markupSosmed2')?.value;
-  const v4 = document.getElementById('markupSosmed4')?.value;
-  const parsePct = (v, label) => {
-    if (v === '' || v == null) return null;
-    const n = parseFloat(String(v).replace(',', '.'));
-    if (isNaN(n) || n < 0 || n > 500) throw new Error(label + ' harus angka persen 0–500');
-    return n;
-  };
-  try {
-    const p1 = parsePct(v1, 'Sosmed-1');
-    const p2 = parsePct(v2, 'Sosmed-2');
-    const p4 = parsePct(v4, 'Sosmed-4');
-    if (p1 == null && p2 == null && p4 == null) throw new Error('Isi minimal satu nilai persen');
-
-    Swal.fire({ title: '⏳ Menyimpan...', allowOutsideClick: false, showConfirmButton: false, background: '#1a0e2e', color: '#fff' });
-    const rows = [];
-    if (p1 != null) rows.push({ key: MARKUP_KEYS.sosmed1, value: String(p1) });
-    if (p2 != null) rows.push({ key: MARKUP_KEYS.sosmed2, value: String(p2) });
-    if (p4 != null) rows.push({ key: MARKUP_KEYS.sosmed4, value: String(p4) });
-
-    // upsert per key
-    for (const row of rows) {
-      const { error } = await supabaseClient.from('settings').upsert(row, { onConflict: 'key' });
-      if (error) {
-        // fallback: delete+insert or update
-        const { data: exist } = await supabaseClient.from('settings').select('key').eq('key', row.key).maybeSingle();
-        if (exist) {
-          const { error: e2 } = await supabaseClient.from('settings').update({ value: row.value }).eq('key', row.key);
-          if (e2) throw e2;
-        } else {
-          const { error: e3 } = await supabaseClient.from('settings').insert(row);
-          if (e3) throw e3;
-        }
-      }
-    }
-
-    await Swal.fire({
-      title: '✅ Tersimpan',
-      html: `<div style="text-align:left;font-size:13px;color:#ddd;">
-        ${p1 != null ? `<div>Sosmed-1 (Lollipop): <b style="color:#facc15;">${p1}%</b></div>` : ''}
-        ${p2 != null ? `<div>Sosmed-2 (Fayupedia): <b style="color:#facc15;">${p2}%</b></div>` : ''}
-        ${p4 != null ? `<div>Sosmed-4 (Djuragan): <b style="color:#facc15;">${p4}%</b></div>` : ''}
-        <div style="margin-top:8px;font-size:11px;color:#94a3b8;">Harga layanan memakai markup baru (cache API ±15 detik).</div>
-      </div>`,
-      icon: 'success', confirmButtonColor: '#f59e0b', background: '#1a0e2e', color: '#fff'
-    });
-  } catch (err) {
-    Swal.fire({ title: '❌ Gagal', text: err.message, icon: 'error', confirmButtonColor: '#ff4444', background: '#1a0e2e', color: '#fff' });
-  }
-}
-
-
 async function loadMonthlyLeaderboard() {
   const listEl = document.getElementById('leaderboardList');
   const periodEl = document.getElementById('lbPeriodLabel');
