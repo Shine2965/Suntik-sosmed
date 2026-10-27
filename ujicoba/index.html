@@ -767,6 +767,22 @@ body.chat-open .cs-bubble-container{display:none !important}
 
 
 /* WAR EMPIRE */
+
+.war-map-wrap{position:relative;width:100%;aspect-ratio:1.2/1;min-height:280px;max-height:420px;border-radius:16px;overflow:hidden;border:1.5px solid rgba(255,107,157,0.35);background:radial-gradient(ellipse at 30% 20%,#1a3a4a 0%,#0d1b2a 40%,#0a1220 100%);touch-action:manipulation;user-select:none;-webkit-user-select:none}
+.war-map-grid{position:absolute;inset:0;background-image:linear-gradient(rgba(100,255,200,0.04) 1px,transparent 1px),linear-gradient(90deg,rgba(100,255,200,0.04) 1px,transparent 1px);background-size:24px 24px;pointer-events:none}
+.war-map-svg{position:absolute;inset:0;width:100%;height:100%}
+.war-node{cursor:pointer;touch-action:manipulation}
+.war-node circle{stroke-width:2;transition:all 0.2s}
+.war-node.mine circle{fill:rgba(34,197,94,0.85);stroke:#86efac}
+.war-node.enemy circle{fill:rgba(255,64,128,0.8);stroke:#ff8ab3}
+.war-node.ai circle{fill:rgba(148,163,184,0.75);stroke:#cbd5e1}
+.war-node:active circle,.war-node:hover circle{filter:brightness(1.25);stroke-width:3}
+.war-node text{font-size:9px;font-weight:800;fill:#fff;pointer-events:none;text-anchor:middle}
+.war-map-legend{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0;font-size:10px;color:#94a3b8}
+.war-map-legend span{display:inline-flex;align-items:center;gap:4px}
+.war-map-legend i{width:10px;height:10px;border-radius:50%;display:inline-block}
+.war-detail-panel{margin-top:10px}
+
 .war-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
 .war-stat{background:rgba(255,255,255,0.05);border:1px solid rgba(255,107,157,0.2);border-radius:12px;padding:10px;text-align:center}
 .war-stat .v{font-size:16px;font-weight:900;color:#ffd700;font-family:Poppins,sans-serif}
@@ -1113,7 +1129,18 @@ body.chat-open .cs-bubble-container{display:none !important}
         </div>
 
         <div id="warTab-terr">
-          <div id="warTerrList"><div class="mutasi-empty">Memuat teritori...</div></div>
+          <div class="war-map-legend">
+            <span><i style="background:#22c55e"></i> Milikmu</span>
+            <span><i style="background:#ff4080"></i> Musuh</span>
+            <span><i style="background:#94a3b8"></i> AI / Digulingkan</span>
+          </div>
+          <div class="war-map-wrap" id="warMapWrap">
+            <div class="war-map-grid"></div>
+            <svg class="war-map-svg" id="warMapSvg" viewBox="0 0 1000 800" preserveAspectRatio="xMidYMid meet"></svg>
+          </div>
+          <div style="font-size:10px;color:#64748b;margin:6px 0 10px;text-align:center">Tap / sentuh wilayah di peta untuk aksi</div>
+          <div id="warTerrDetail" class="war-detail-panel"></div>
+          <div id="warTerrList" style="display:none"></div>
         </div>
         <div id="warTab-prod" style="display:none">
           <div class="war-card">
@@ -6497,6 +6524,151 @@ function warSwitchTab(name, el) {
   if (name === 'prod') warLoadFactories();
 }
 
+
+// Nama pasukan per level (semakin tinggi semakin modern)
+function warTroopName(type, level) {
+  const lv = Math.max(1, parseInt(level || 1, 10));
+  const tables = {
+    sword: [
+      [1, 'Pasukan Berpedang'], [5, 'Pedang Baja'], [10, 'Ksatria'],
+      [15, 'Ksatria Berat'], [20, 'Infanteri Modern'], [25, 'Marinir'],
+      [30, 'Spetsnaz'], [40, 'Unit Elite'], [50, 'Cyber Infantry']
+    ],
+    horse: [
+      [1, 'Pasukan Berkuda'], [5, 'Kavaleri'], [10, 'Kavaleri Berat'],
+      [15, 'Dragoon'], [20, 'Mekanis Ringan'], [25, 'Tank Ringan'],
+      [30, 'Tank Tempur'], [40, 'MBT'], [50, 'Hover Tank']
+    ],
+    shield: [
+      [1, 'Pasukan Berperisai'], [5, 'Perisai Baja'], [10, 'Phalanx'],
+      [15, 'Guard'], [20, 'Riot Shield'], [25, 'Armor Infantry'],
+      [30, 'Exo-Shield'], [40, 'Barrier Unit'], [50, 'Force Field Troop']
+    ],
+    spear: [
+      [1, 'Pasukan Bertombak'], [5, 'Tombak Panjang'], [10, 'Halberdier'],
+      [15, 'Lancer'], [20, 'Anti-Armor'], [25, 'Roket RPG'],
+      [30, 'Anti-Tank'], [40, 'Missile Infantry'], [50, 'Rail Spear']
+    ],
+    archer: [
+      [1, 'Pemanah'], [5, 'Pemanah Panjang'], [10, 'Crossbow'],
+      [15, 'Senapan'], [20, 'Marksman'], [25, 'Sniper'],
+      [30, 'Artileri'], [40, 'Howitzer'], [50, 'Railgun Battery']
+    ]
+  };
+  const arr = tables[type] || tables.sword;
+  let name = arr[0][1];
+  for (const [min, n] of arr) {
+    if (lv >= min) name = n;
+  }
+  return name;
+}
+
+function warTroopNameAll(level) {
+  return {
+    sword: warTroopName('sword', level),
+    horse: warTroopName('horse', level),
+    shield: warTroopName('shield', level),
+    spear: warTroopName('spear', level),
+    archer: warTroopName('archer', level)
+  };
+}
+
+function warUpdateTroopSelectLabels() {
+  const lv = warPlayer?.troop_level || 1;
+  const sel = document.getElementById('warTroopType');
+  if (!sel) return;
+  const map = {
+    sword: '⚔️ ' + warTroopName('sword', lv),
+    horse: '🐴 ' + warTroopName('horse', lv),
+    shield: '🛡️ ' + warTroopName('shield', lv),
+    spear: '🗡️ ' + warTroopName('spear', lv),
+    archer: '🏹 ' + warTroopName('archer', lv)
+  };
+  Array.from(sel.options).forEach(opt => {
+    if (map[opt.value]) opt.textContent = map[opt.value] + ' (Lv ' + lv + ')';
+  });
+}
+
+// Posisi stabil di peta dari hash nama/id
+function warNodePosition(idOrName, index, total) {
+  const s = String(idOrName || index);
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0;
+  // sebar di area peta dengan jitter
+  const col = (Math.abs(h) % 10);
+  const row = (Math.abs(h >> 4) % 8);
+  const x = 80 + col * 90 + (Math.abs(h >> 8) % 30);
+  const y = 60 + row * 90 + (Math.abs(h >> 12) % 30);
+  return { x: Math.min(920, Math.max(60, x)), y: Math.min(740, Math.max(50, y)) };
+}
+
+function warRenderMap(territories) {
+  const svg = document.getElementById('warMapSvg');
+  if (!svg) return;
+  const uid = currentUser?.id;
+  let html = '';
+  // jalur samar antar node
+  const pts = territories.map((t, i) => warNodePosition(t.id || t.name, i, territories.length));
+  for (let i = 0; i < pts.length - 1; i++) {
+    const a = pts[i], b = pts[i + 1];
+    if (i % 3 === 0) {
+      html += `<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="rgba(100,255,200,0.12)" stroke-width="2" stroke-dasharray="6 6"/>`;
+    }
+  }
+  territories.forEach((t, i) => {
+    const pos = warNodePosition(t.id || t.name, i, territories.length);
+    const mine = t.owner_user_id === uid && !t.is_ai;
+    const ai = !!t.is_ai || !t.owner_user_id;
+    const cls = mine ? 'mine' : (ai ? 'ai' : 'enemy');
+    const r = mine ? 22 : 18;
+    const label = (t.name || 'Wilayah').length > 14 ? (t.name || '').slice(0, 12) + '…' : (t.name || 'Wilayah');
+    html += `<g class="war-node ${cls}" data-tid="${t.id}" onclick="warSelectTerritory('${t.id}')">
+      <circle cx="${pos.x}" cy="${pos.y}" r="${r + 6}" fill="rgba(0,0,0,0.25)"/>
+      <circle cx="${pos.x}" cy="${pos.y}" r="${r}"/>
+      <text x="${pos.x}" y="${pos.y + r + 14}">${escapeHtml(label)}</text>
+    </g>`;
+  });
+  svg.innerHTML = html;
+}
+
+function warSelectTerritory(tid) {
+  const t = warTerritories.find(x => x.id === tid);
+  if (!t) return;
+  const panel = document.getElementById('warTerrDetail');
+  if (!panel) return;
+  const lv = warPlayer?.troop_level || 1;
+  const mine = t.owner_user_id === currentUser?.id && !t.is_ai;
+  const ai = !!t.is_ai || !t.owner_user_id;
+  const total = (t.troops_sword||0)+(t.troops_horse||0)+(t.troops_shield||0)+(t.troops_spear||0)+(t.troops_archer||0);
+  let ownerLabel = mine ? 'MILIKMU' : (ai ? 'AI / DIGULINGKAN' : 'MUSUH');
+  let html = `<div class="war-card war-terr ${mine?'mine':(ai?'ai':'')}">
+    <h4>🗺️ ${escapeHtml(t.name)} <span style="font-size:10px;color:${mine?'#22c55e':(ai?'#94a3b8':'#ff6b9d')}">${ownerLabel}</span></h4>
+    <div style="font-size:11px;color:#b39ddb;line-height:1.55">
+      🛡️ Bunker Lv <b style="color:#fff">${t.bunker_level}</b> · 🎖️ Base Lv <b style="color:#fff">${t.base_level}</b><br>
+      👥 Rakyat: ${t.population||0}<br>
+      <div style="margin-top:6px;padding:8px;background:rgba(0,0,0,0.25);border-radius:8px">
+        <div>⚔️ ${escapeHtml(warTroopName('sword', lv))}: <b style="color:#fff">${t.troops_sword||0}</b></div>
+        <div>🐴 ${escapeHtml(warTroopName('horse', lv))}: <b style="color:#fff">${t.troops_horse||0}</b></div>
+        <div>🛡️ ${escapeHtml(warTroopName('shield', lv))}: <b style="color:#fff">${t.troops_shield||0}</b></div>
+        <div>🗡️ ${escapeHtml(warTroopName('spear', lv))}: <b style="color:#fff">${t.troops_spear||0}</b></div>
+        <div>🏹 ${escapeHtml(warTroopName('archer', lv))}: <b style="color:#fff">${t.troops_archer||0}</b></div>
+        <div style="margin-top:4px;color:#ffd700">Total: ${total.toLocaleString('id-ID')}</div>
+      </div>
+    </div>`;
+  if (mine) {
+    html += `<button class="war-btn dark" onclick="warUpgradeBunker('${t.id}')">⬆️ Upgrade Bunker (+def)</button>`;
+    html += `<button class="war-btn dark" onclick="warUpgradeBase('${t.id}')">⬆️ Upgrade Base Militer (+atk)</button>`;
+    html += `<button class="war-btn blue" onclick="warOpenMove('${t.id}')">📦 Pindah Pasukan</button>`;
+  } else {
+    html += `<button class="war-btn primary" onclick="warOpenAttack('${t.id}','${escapeAttr(t.name)}')">⚔️ Serang / Invasi</button>`;
+    html += `<button class="war-btn green" onclick="warRebel('${t.id}')">🔥 Pemberontakan (25.000 eco)</button>`;
+  }
+  html += `</div>`;
+  panel.innerHTML = html;
+  panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+
 async function warRefreshAll() {
   if (!currentUser) {
     Swal.fire({ title: 'Login dulu', icon: 'info', background: '#1a0e2e', color: '#fff', confirmButtonColor: '#ff6b9d' });
@@ -6530,47 +6702,24 @@ async function warRefreshAll() {
 
 async function warLoadTerritories() {
   const list = document.getElementById('warTerrList');
-  if (!list) return;
-  list.innerHTML = '<div class="loading-box"><span class="spinner"></span></div>';
+  const detail = document.getElementById('warTerrDetail');
   try {
     const { data, error } = await supabaseClient.from('war_territories').select('*').order('name');
     if (error) throw error;
     warTerritories = data || [];
-    if (!warTerritories.length) {
-      list.innerHTML = '<div class="mutasi-empty">Belum ada teritori. Klik Refresh Empire.</div>';
-      return;
+    warRenderMap(warTerritories);
+    if (detail) {
+      detail.innerHTML = warTerritories.length
+        ? `<div class="mutasi-empty" style="padding:12px;font-size:11px">Tap wilayah di peta · ${warTerritories.length} wilayah multiplayer</div>`
+        : `<div class="mutasi-empty">Belum ada teritori. Klik Refresh Empire.</div>`;
     }
-    let html = '';
-    warTerritories.forEach(t => {
-      const mine = t.owner_user_id === currentUser?.id && !t.is_ai;
-      const ai = t.is_ai;
-      const total = (t.troops_sword||0)+(t.troops_horse||0)+(t.troops_shield||0)+(t.troops_spear||0)+(t.troops_archer||0);
-      let cls = mine ? 'mine' : (ai ? 'ai' : '');
-      html += `<div class="war-card war-terr ${cls}">
-        <h4>🗺️ ${escapeHtml(t.name)} ${mine?'<span style="color:#22c55e;font-size:10px">MILIKMU</span>':ai?'<span style="color:#94a3b8;font-size:10px">AI / DIGULINGKAN</span>':'<span style="color:#ff6b9d;font-size:10px">MUSUH</span>'}</h4>
-        <div style="font-size:11px;color:#b39ddb;line-height:1.5;">
-          🛡️ Bunker Lv <b style="color:#fff">${t.bunker_level}</b> · 🎖️ Base Lv <b style="color:#fff">${t.base_level}</b><br>
-          👥 Rakyat: ${t.population||0}<br>
-          ⚔️${t.troops_sword||0} 🐴${t.troops_horse||0} 🛡️${t.troops_shield||0} 🗡️${t.troops_spear||0} 🏹${t.troops_archer||0}
-          <div style="margin-top:4px;color:#ffd700">Total pasukan: ${total.toLocaleString('id-ID')}</div>
-        </div>`;
-      if (mine) {
-        html += `<button class="war-btn dark" onclick="warUpgradeBunker('${t.id}')">⬆️ Upgrade Bunker (+def · 8.000 eco · 800 SDA)</button>`;
-        html += `<button class="war-btn dark" onclick="warUpgradeBase('${t.id}')">⬆️ Upgrade Base Militer (+atk · 8.000 eco · 800 SDA)</button>`;
-        html += `<button class="war-btn blue" onclick="warOpenMove('${t.id}')">📦 Atur / Pindah Pasukan</button>`;
-      } else if (!mine) {
-        html += `<button class="war-btn primary" onclick="warOpenAttack('${t.id}','${escapeAttr(t.name)}')">⚔️ Serang / Invasi</button>`;
-        if (ai || t.owner_user_id !== currentUser?.id) {
-          html += `<button class="war-btn green" onclick="warRebel('${t.id}')">🔥 Pemberontakan (25.000 eco)</button>`;
-        }
-      }
-      html += `</div>`;
-    });
-    list.innerHTML = html;
+    if (list) list.innerHTML = '';
   } catch (e) {
-    list.innerHTML = `<div class="mutasi-empty" style="color:#ff8080">❌ ${escapeHtml(e.message)} — jalankan war-empire-schema.sql</div>`;
+    if (detail) detail.innerHTML = `<div class="mutasi-empty" style="color:#ff8080">❌ ${escapeHtml(e.message)} — jalankan war-empire-schema.sql</div>`;
+    console.warn('warLoadTerritories', e.message);
   }
 }
+
 
 async function warCollectIncome() {
   if (!currentUser) return;
@@ -6656,12 +6805,12 @@ async function warOpenAttack(tid, name) {
   if (!currentUser) return;
   const { value: form } = await Swal.fire({
     title: '⚔️ Serang ' + name,
-    html: `<div style="text-align:left;font-size:12px;color:#ccc">Isi jumlah pasukan yang dikirim (dari teritori terkuatmu):</div>
-      <input id="a-sword" class="swal2-input" type="number" min="0" value="100" placeholder="Pedang">
-      <input id="a-horse" class="swal2-input" type="number" min="0" value="0" placeholder="Kuda">
-      <input id="a-shield" class="swal2-input" type="number" min="0" value="0" placeholder="Perisai">
-      <input id="a-spear" class="swal2-input" type="number" min="0" value="0" placeholder="Tombak">
-      <input id="a-archer" class="swal2-input" type="number" min="0" value="0" placeholder="Panah">`,
+    html: (() => { const lv = warPlayer?.troop_level || 1; return `<div style="text-align:left;font-size:12px;color:#ccc">Isi jumlah pasukan (Lv ${lv}):</div>
+      <input id="a-sword" class="swal2-input" type="number" min="0" value="100" placeholder="${warTroopName('sword', lv)}">
+      <input id="a-horse" class="swal2-input" type="number" min="0" value="0" placeholder="${warTroopName('horse', lv)}">
+      <input id="a-shield" class="swal2-input" type="number" min="0" value="0" placeholder="${warTroopName('shield', lv)}">
+      <input id="a-spear" class="swal2-input" type="number" min="0" value="0" placeholder="${warTroopName('spear', lv)}">
+      <input id="a-archer" class="swal2-input" type="number" min="0" value="0" placeholder="${warTroopName('archer', lv)}">`; })(),
     showCancelButton: true, confirmButtonText: 'Serang', background:'#1a0e2e', color:'#fff', confirmButtonColor:'#ff4080',
     preConfirm: () => ({
       sword: parseInt(document.getElementById('a-sword').value||0,10),
