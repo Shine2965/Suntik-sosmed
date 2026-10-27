@@ -786,7 +786,7 @@ body.chat-open .cs-bubble-container{display:none !important}
 .war-tab{flex-shrink:0;padding:8px 12px;border-radius:20px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04);color:#b39ddb;font-size:11px;font-weight:800;cursor:pointer}
 .war-tab.active{background:rgba(255,107,157,0.2);border-color:rgba(255,107,157,0.5);color:#ff6b9d}
 .war-log{font-size:10.5px;color:#94a3b8;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.05)}
-.war-map-wrap{position:relative;width:100%;height:380px;min-height:380px;border-radius:12px;overflow:hidden;border:3px solid #3d2b1f;background:#c4a574;touch-action:manipulation;user-select:none;-webkit-user-select:none;box-shadow:inset 0 0 30px rgba(60,40,20,0.35),0 8px 24px rgba(0,0,0,0.4)}
+.war-map-wrap{position:relative;width:100%;height:400px;min-height:400px;border-radius:12px;overflow:hidden;border:3px solid #3d2b1f;background:#c4a574;touch-action:manipulation;user-select:none;-webkit-user-select:none;box-shadow:inset 0 0 30px rgba(60,40,20,0.35),0 8px 24px rgba(0,0,0,0.4)}
 .war-map-grid{display:none}
 .war-map-svg{position:absolute;inset:0;width:100%;height:100%;z-index:2;display:block}
 .war-map-legend{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0;font-size:10px;color:#94a3b8}
@@ -6625,189 +6625,219 @@ function warRenderMap(territories) {
   const svg = document.getElementById('warMapSvg');
   const wrap = document.getElementById('warMapWrap');
   if (!svg) return;
-  if (wrap) { wrap.style.height = '380px'; wrap.style.minHeight = '380px'; wrap.style.display = 'block'; }
+  if (wrap) {
+    wrap.style.height = '400px';
+    wrap.style.minHeight = '400px';
+    wrap.style.display = 'block';
+    wrap.style.background = '#c4a574';
+  }
 
   const list = Array.isArray(territories) ? territories.slice() : [];
   while (svg.firstChild) svg.removeChild(svg.firstChild);
+
   const NS = 'http://www.w3.org/2000/svg';
-  const add = (parent, tag, attrs, textContent) => {
+  const add = (tag, attrs, txt) => {
     const el = document.createElementNS(NS, tag);
     Object.entries(attrs || {}).forEach(([k, v]) => el.setAttribute(k, String(v)));
-    if (textContent != null) el.textContent = textContent;
-    (parent || svg).appendChild(el);
+    if (txt != null) el.textContent = txt;
+    svg.appendChild(el);
     return el;
   };
 
-  // Kertas peta gaya World Conqueror
-  add(svg, 'rect', { x: 0, y: 0, width: 1000, height: 800, fill: '#d4b896' });
-  // laut
-  add(svg, 'rect', { x: 0, y: 0, width: 1000, height: 800, fill: '#5b8fa8', opacity: 0.55 });
+  // Background parchment + sea
+  add('rect', { x: 0, y: 0, width: 1000, height: 820, fill: '#d4b896' });
+  add('rect', { x: 0, y: 0, width: 1000, height: 820, fill: '#4a7c8c', opacity: '0.5' });
 
-  // Grid provinsi (baris x kolom) menutupi "daratan"
-  const COLS = 6, ROWS = 5;
-  const cells = [];
-  const marginX = 40, marginY = 50;
+  // Dynamic grid: 1 province = 1 territory (max 48)
+  const n = Math.max(list.length, 1);
+  const COLS = Math.min(6, Math.ceil(Math.sqrt(n * 1.3)));
+  const ROWS = Math.ceil(n / COLS);
+  const marginX = 36, marginY = 56;
   const cellW = (1000 - marginX * 2) / COLS;
-  const cellH = (800 - marginY * 2) / ROWS;
+  const cellH = (760 - marginY) / ROWS;
 
-  // seed random stabil
   function rnd(seed) {
-    let x = Math.sin(seed * 999) * 10000;
+    const x = Math.sin(seed * 999.13) * 10000;
     return x - Math.floor(x);
   }
 
-  for (let r = 0; r < ROWS; r++) {
-    for (let c = 0; c < COLS; c++) {
-      const i = r * COLS + c;
-      const x0 = marginX + c * cellW;
-      const y0 = marginY + r * cellH;
-      // polygon sedikit irregular (province shape)
-      const j = (v) => (rnd(i * 13 + v) - 0.5) * Math.min(cellW, cellH) * 0.28;
-      const pts = [
-        [x0 + j(1), y0 + j(2)],
-        [x0 + cellW * 0.5 + j(3), y0 + j(4)],
-        [x0 + cellW + j(5), y0 + j(6)],
-        [x0 + cellW + j(7), y0 + cellH * 0.5 + j(8)],
-        [x0 + cellW + j(9), y0 + cellH + j(10)],
-        [x0 + cellW * 0.5 + j(11), y0 + cellH + j(12)],
-        [x0 + j(13), y0 + cellH + j(14)],
-        [x0 + j(15), y0 + cellH * 0.5 + j(16)]
-      ];
-      const cx = x0 + cellW / 2;
-      const cy = y0 + cellH / 2;
-      cells.push({ i, pts, cx, cy, poly: pts.map(p => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ') });
-    }
-  }
-
-  // warna pemilik stabil
   const ownerColor = {};
-  const palette = ['#c0392b','#2980b9','#27ae60','#8e44ad','#d35400','#16a085','#2c3e50','#e67e22','#1abc9c','#9b59b6','#34495e','#e74c3c','#3498db','#2ecc71','#f39c12'];
+  const palette = ['#c0392b','#2980b9','#8e44ad','#d35400','#16a085','#2c3e50','#e67e22','#1abc9c','#9b59b6','#e74c3c','#3498db','#f39c12','#1f618d','#6c3483'];
   let pidx = 0;
   function colorFor(t) {
     const uid = currentUser && currentUser.id;
-    if (t && t.owner_user_id === uid && !t.is_ai) return '#2ecc71'; // milikmu hijau
-    if (!t || t.is_ai || !t.owner_user_id) return '#7f8c8d'; // AI abu
-    const key = t.owner_user_id;
-    if (!ownerColor[key]) {
-      ownerColor[key] = palette[pidx % palette.length];
+    if (t && t.owner_user_id === uid && !t.is_ai) return '#27ae60';
+    if (!t || t.is_ai || !t.owner_user_id) return '#7f8c8d';
+    if (!ownerColor[t.owner_user_id]) {
+      ownerColor[t.owner_user_id] = palette[pidx % palette.length];
       pidx++;
     }
-    return ownerColor[key];
+    return ownerColor[t.owner_user_id];
   }
 
-  // assign territories ke cell (ulang jika lebih banyak cell)
-  const assigned = cells.map((cell, idx) => {
-    const t = list.length ? list[idx % list.length] : null;
-    return { cell, t, idx };
-  });
-
-  // gambar province
   window._warProvSelected = window._warProvSelected || null;
-  assigned.forEach(({ cell, t, idx }) => {
-    const fill = t ? colorFor(t) : '#95a5a6';
+
+  if (!list.length) {
+    add('text', { x: 500, y: 400, fill: '#2c1810', 'font-size': 18, 'font-weight': 800, 'text-anchor': 'middle' }, 'Belum ada wilayah');
+    add('text', { x: 500, y: 430, fill: '#3d2b1f', 'font-size': 13, 'text-anchor': 'middle' }, 'Klik Refresh Empire / jalankan SQL war-empire');
+  }
+
+  list.forEach((t, idx) => {
+    const c = idx % COLS;
+    const r = Math.floor(idx / COLS);
+    const x0 = marginX + c * cellW;
+    const y0 = marginY + r * cellH;
+    const j = (v) => (rnd(idx * 17 + v) - 0.5) * Math.min(cellW, cellH) * 0.22;
+    const pts = [
+      [x0 + 4 + j(1), y0 + 4 + j(2)],
+      [x0 + cellW * 0.5 + j(3), y0 + 2 + j(4)],
+      [x0 + cellW - 4 + j(5), y0 + 4 + j(6)],
+      [x0 + cellW - 2 + j(7), y0 + cellH * 0.5 + j(8)],
+      [x0 + cellW - 4 + j(9), y0 + cellH - 4 + j(10)],
+      [x0 + cellW * 0.5 + j(11), y0 + cellH - 2 + j(12)],
+      [x0 + 4 + j(13), y0 + cellH - 4 + j(14)],
+      [x0 + 2 + j(15), y0 + cellH * 0.5 + j(16)]
+    ];
+    const polyPts = pts.map(p => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ');
+    const cx = x0 + cellW / 2;
+    const cy = y0 + cellH / 2;
+    const fill = colorFor(t);
+    const mine = currentUser && t.owner_user_id === currentUser.id && !t.is_ai;
+    const enemy = t.owner_user_id && currentUser && t.owner_user_id !== currentUser.id && !t.is_ai;
+    const selected = window._warProvSelected === t.id;
+
     const g = document.createElementNS(NS, 'g');
-    g.classList.add('war-prov');
-    if (t && t.id && window._warProvSelected === t.id) g.classList.add('selected');
     g.style.cursor = 'pointer';
+    g.setAttribute('data-tid', t.id || '');
 
     const poly = document.createElementNS(NS, 'polygon');
-    poly.setAttribute('points', cell.poly);
+    poly.setAttribute('points', polyPts);
     poly.setAttribute('fill', fill);
-    poly.setAttribute('stroke', '#2c1810');
-    poly.setAttribute('stroke-width', '2.5');
-    poly.setAttribute('opacity', '0.92');
+    poly.setAttribute('stroke', selected ? '#f1c40f' : '#1a120a');
+    poly.setAttribute('stroke-width', selected ? '4' : '2.2');
+    poly.setAttribute('opacity', '0.93');
     g.appendChild(poly);
 
-    // highlight border dalam
-    const poly2 = document.createElementNS(NS, 'polygon');
-    poly2.setAttribute('points', cell.poly);
-    poly2.setAttribute('fill', 'none');
-    poly2.setAttribute('stroke', 'rgba(255,255,255,0.25)');
-    poly2.setAttribute('stroke-width', '1');
-    g.appendChild(poly2);
+    // name
+    const name = String(t.name || 'Wilayah');
+    const short = name.length > 14 ? name.slice(0, 12) + '…' : name;
+    const t1 = document.createElementNS(NS, 'text');
+    t1.setAttribute('x', cx);
+    t1.setAttribute('y', cy - 4);
+    t1.setAttribute('text-anchor', 'middle');
+    t1.setAttribute('fill', '#fff');
+    t1.setAttribute('font-size', '11');
+    t1.setAttribute('font-weight', '800');
+    t1.style.pointerEvents = 'none';
+    t1.style.textShadow = '0 1px 2px #000';
+    t1.textContent = short;
+    g.appendChild(t1);
 
-    const name = t ? String(t.name || 'Wilayah') : ('Prov-' + (idx + 1));
-    const short = name.length > 12 ? name.slice(0, 10) + '…' : name;
-    const label = document.createElementNS(NS, 'text');
-    label.setAttribute('x', cell.cx);
-    label.setAttribute('y', cell.cy + 4);
-    label.setAttribute('text-anchor', 'middle');
-    label.setAttribute('fill', '#fff');
-    label.setAttribute('font-size', '11');
-    label.setAttribute('font-weight', '800');
-    label.setAttribute('style', 'text-shadow:0 1px 2px #000;pointer-events:none');
-    label.textContent = short;
-    g.appendChild(label);
+    // owner tag
+    let ownerTag = 'AI';
+    if (mine) ownerTag = 'KAMU';
+    else if (enemy) ownerTag = (t.owner_email || t.email || 'MUSUH').split('@')[0].slice(0, 10);
+    const t2 = document.createElementNS(NS, 'text');
+    t2.setAttribute('x', cx);
+    t2.setAttribute('y', cy + 12);
+    t2.setAttribute('text-anchor', 'middle');
+    t2.setAttribute('fill', mine ? '#d5f5e3' : (enemy ? '#fadbd8' : '#eee'));
+    t2.setAttribute('font-size', '9');
+    t2.setAttribute('font-weight', '700');
+    t2.style.pointerEvents = 'none';
+    t2.textContent = ownerTag;
+    g.appendChild(t2);
 
-    // star capital if mine first territory
-    if (t && currentUser && t.owner_user_id === currentUser.id && !t.is_ai && list.findIndex(x => x.owner_user_id === currentUser.id) === list.indexOf(t)) {
+    if (mine) {
       const star = document.createElementNS(NS, 'text');
-      star.setAttribute('x', cell.cx);
-      star.setAttribute('y', cell.cy - 12);
+      star.setAttribute('x', cx);
+      star.setAttribute('y', cy - 16);
       star.setAttribute('text-anchor', 'middle');
-      star.setAttribute('font-size', '12');
+      star.setAttribute('font-size', '11');
+      star.style.pointerEvents = 'none';
       star.textContent = '★';
       g.appendChild(star);
     }
+    if (enemy) {
+      const cross = document.createElementNS(NS, 'text');
+      cross.setAttribute('x', cx);
+      cross.setAttribute('y', cy - 16);
+      cross.setAttribute('text-anchor', 'middle');
+      cross.setAttribute('font-size', '10');
+      cross.style.pointerEvents = 'none';
+      cross.textContent = '⚔';
+      g.appendChild(cross);
+    }
 
-    const tid = t && t.id;
-    const handler = (ev) => {
-      ev.preventDefault();
-      ev.stopPropagation();
-      window._warProvSelected = tid || null;
-      if (tid) {
-        warSelectTerritory(tid);
-        warRenderMap(warTerritories || list);
-      }
+    const go = (ev) => {
+      try { ev.preventDefault(); ev.stopPropagation(); } catch (_) {}
+      window._warProvSelected = t.id;
+      warSelectTerritory(t.id);
+      // highlight only (don't full re-render to avoid scroll jump) — update stroke via re-render light
+      warRenderMap(warTerritories || list);
     };
-    g.addEventListener('click', handler);
-    g.addEventListener('touchend', handler, { passive: false });
+    g.addEventListener('click', go);
+    g.addEventListener('touchend', go, { passive: false });
     svg.appendChild(g);
   });
 
-  // bingkai & judul
-  add(svg, 'rect', { x: 8, y: 8, width: 984, height: 784, fill: 'none', stroke: '#3d2b1f', 'stroke-width': 6 });
-  add(svg, 'rect', { x: 14, y: 14, width: 972, height: 772, fill: 'none', stroke: '#6b4f3a', 'stroke-width': 2 });
-  add(svg, 'text', { x: 500, y: 38, fill: '#2c1810', 'font-size': 16, 'font-weight': 900, 'text-anchor': 'middle' }, 'WORLD CONQUEST MAP');
-  add(svg, 'text', { x: 500, y: 785, fill: '#3d2b1f', 'font-size': 11, 'text-anchor': 'middle', opacity: 0.8 }, list.length ? (list.length + ' wilayah · tap provinsi untuk aksi') : 'Refresh Empire untuk memuat wilayah');
+  // frame
+  add('rect', { x: 6, y: 6, width: 988, height: 808, fill: 'none', stroke: '#3d2b1f', 'stroke-width': 7 });
+  add('rect', { x: 12, y: 12, width: 976, height: 796, fill: 'none', stroke: '#6b4f3a', 'stroke-width': 2 });
+  add('text', { x: 500, y: 40, fill: '#2c1810', 'font-size': 17, 'font-weight': 900, 'text-anchor': 'middle' }, 'WORLD CONQUEST — MULTIPLAYER');
+  add('text', { x: 500, y: 800, fill: '#2c1810', 'font-size': 11, 'text-anchor': 'middle', opacity: '0.85' },
+    list.length + ' wilayah · ⚔ = musuh (tap untuk invasi) · ★ = milikmu');
 }
 
-
 function warSelectTerritory(tid) {
-  const t = warTerritories.find(x => x.id === tid);
-  if (!t) return;
+  const t = (warTerritories || []).find(x => x.id === tid);
   const panel = document.getElementById('warTerrDetail');
   if (!panel) return;
+  if (!t) {
+    panel.innerHTML = '<div class="mutasi-empty">Wilayah tidak ditemukan</div>';
+    return;
+  }
   const lv = warPlayer?.troop_level || 1;
-  const mine = t.owner_user_id === currentUser?.id && !t.is_ai;
-  const ai = !!t.is_ai || !t.owner_user_id;
+  const mine = currentUser && t.owner_user_id === currentUser.id && !t.is_ai;
+  const ai = !!(t.is_ai || !t.owner_user_id);
+  const enemy = !mine && !ai && t.owner_user_id;
   const total = (t.troops_sword||0)+(t.troops_horse||0)+(t.troops_shield||0)+(t.troops_spear||0)+(t.troops_archer||0);
-  let ownerLabel = mine ? 'MILIKMU' : (ai ? 'AI / DIGULINGKAN' : 'MUSUH');
+  const ownerMail = t.owner_email || t.email || (mine ? (currentUser?.email || 'Kamu') : (ai ? 'AI / Netral' : 'Player lain'));
+
+  let badge = mine ? '<span style="color:#2ecc71">MILIKMU</span>'
+    : (ai ? '<span style="color:#95a5a6">AI / DIGULINGKAN</span>'
+    : '<span style="color:#e74c3c">MUSUH — bisa diinvasi</span>');
+
   let html = `<div class="war-card war-terr ${mine?'mine':(ai?'ai':'')}">
-    <h4>🗺️ ${escapeHtml(t.name)} <span style="font-size:10px;color:${mine?'#22c55e':(ai?'#94a3b8':'#ff6b9d')}">${ownerLabel}</span></h4>
-    <div style="font-size:11px;color:#b39ddb;line-height:1.55">
-      🛡️ Bunker Lv <b style="color:#fff">${t.bunker_level}</b> · 🎖️ Base Lv <b style="color:#fff">${t.base_level}</b><br>
-      👥 Rakyat: ${t.population||0}<br>
-      <div style="margin-top:6px;padding:8px;background:rgba(0,0,0,0.25);border-radius:8px">
-        <div>⚔️ ${escapeHtml(warTroopName('sword', lv))}: <b style="color:#fff">${t.troops_sword||0}</b></div>
-        <div>🐴 ${escapeHtml(warTroopName('horse', lv))}: <b style="color:#fff">${t.troops_horse||0}</b></div>
-        <div>🛡️ ${escapeHtml(warTroopName('shield', lv))}: <b style="color:#fff">${t.troops_shield||0}</b></div>
-        <div>🗡️ ${escapeHtml(warTroopName('spear', lv))}: <b style="color:#fff">${t.troops_spear||0}</b></div>
-        <div>🏹 ${escapeHtml(warTroopName('archer', lv))}: <b style="color:#fff">${t.troops_archer||0}</b></div>
-        <div style="margin-top:4px;color:#ffd700">Total: ${total.toLocaleString('id-ID')}</div>
-      </div>
+    <h4>🗺️ ${escapeHtml(t.name || '-')} ${badge}</h4>
+    <div style="font-size:11px;color:#b39ddb;line-height:1.55;margin-bottom:8px">
+      👤 Pemilik: <b style="color:#fff">${escapeHtml(ownerMail)}</b><br>
+      🛡️ Bunker Lv <b style="color:#fff">${t.bunker_level||1}</b> · 🎖️ Base Lv <b style="color:#fff">${t.base_level||1}</b><br>
+      👥 Rakyat: ${t.population||0}
+    </div>
+    <div style="padding:8px;background:rgba(0,0,0,0.25);border-radius:8px;font-size:11px;color:#ddd;margin-bottom:8px">
+      <div>⚔️ ${escapeHtml(warTroopName('sword', lv))}: <b>${t.troops_sword||0}</b></div>
+      <div>🐴 ${escapeHtml(warTroopName('horse', lv))}: <b>${t.troops_horse||0}</b></div>
+      <div>🛡️ ${escapeHtml(warTroopName('shield', lv))}: <b>${t.troops_shield||0}</b></div>
+      <div>🗡️ ${escapeHtml(warTroopName('spear', lv))}: <b>${t.troops_spear||0}</b></div>
+      <div>🏹 ${escapeHtml(warTroopName('archer', lv))}: <b>${t.troops_archer||0}</b></div>
+      <div style="margin-top:4px;color:#ffd700">Total pasukan: ${total.toLocaleString('id-ID')}</div>
     </div>`;
+
   if (mine) {
     html += `<button class="war-btn dark" onclick="warUpgradeBunker('${t.id}')">⬆️ Upgrade Bunker (+def)</button>`;
-    html += `<button class="war-btn dark" onclick="warUpgradeBase('${t.id}')">⬆️ Upgrade Base Militer (+atk)</button>`;
+    html += `<button class="war-btn dark" onclick="warUpgradeBase('${t.id}')">⬆️ Upgrade Base (+atk)</button>`;
     html += `<button class="war-btn blue" onclick="warOpenMove('${t.id}')">📦 Pindah Pasukan</button>`;
-  } else {
-    html += `<button class="war-btn primary" onclick="warOpenAttack('${t.id}','${escapeAttr(t.name)}')">⚔️ Serang / Invasi</button>`;
+  } else if (enemy || ai) {
+    html += `<button class="war-btn primary" onclick="warOpenAttack('${t.id}','${escapeAttr(t.name||'Wilayah')}')">⚔️ Invasi / Serang Wilayah Ini</button>`;
     html += `<button class="war-btn green" onclick="warRebel('${t.id}')">🔥 Pemberontakan (25.000 eco)</button>`;
+  }
+  if (t._fallback) {
+    html += `<div style="margin-top:8px;font-size:10px;color:#f59e0b">⚠️ Data fallback (profiles). Jalankan war-empire-schema.sql agar invasi & pasukan penuh aktif.</div>`;
   }
   html += `</div>`;
   panel.innerHTML = html;
-  panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  try { panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); } catch (_) {}
 }
 
 
@@ -6852,30 +6882,44 @@ async function warLoadTerritories() {
       rows = data || [];
     } catch (e1) {
       console.warn('war_territories:', e1.message);
-      // Fallback: tampilkan node dari profiles (gmail) agar peta tetap ada
+      rows = [];
+    }
+
+    // Ambil email pemilik agar tampil di peta multiplayer
+    let emailMap = {};
+    try {
+      const { data: profs } = await supabaseClient.from('profiles').select('id, email').limit(300);
+      (profs || []).forEach(p => { emailMap[p.id] = p.email; });
+    } catch (_) {}
+
+    if (!rows.length) {
+      // fallback node dari profiles
       try {
-        const { data: profs } = await supabaseClient.from('profiles').select('id, email').order('email').limit(80);
+        const { data: profs } = await supabaseClient.from('profiles').select('id, email').order('email').limit(48);
         rows = (profs || []).map(p => ({
           id: p.id,
           name: (p.email || 'user').split('@')[0],
           owner_user_id: p.id,
+          owner_email: p.email,
           is_ai: false,
-          bunker_level: 1,
-          base_level: 1,
+          bunker_level: 1, base_level: 1,
           troops_sword: 0, troops_horse: 0, troops_shield: 0, troops_spear: 0, troops_archer: 0,
-          population: 0,
-          _fallback: true
+          population: 0, _fallback: true
         }));
-      } catch (e2) {
-        rows = [];
-      }
+      } catch (_) { rows = []; }
+    } else {
+      rows = rows.map(t => ({
+        ...t,
+        owner_email: emailMap[t.owner_user_id] || t.owner_email || null
+      }));
     }
+
     warTerritories = rows;
     warRenderMap(warTerritories);
-    if (detail) {
+    if (detail && !detail.querySelector('.war-card')) {
       detail.innerHTML = rows.length
-        ? `<div class="mutasi-empty" style="padding:12px;font-size:11px">Peta aktif · ${rows.length} wilayah · tap titik di peta</div>`
-        : `<div class="mutasi-empty">Peta kosong — jalankan SQL war-empire & klik Refresh Empire</div>`;
+        ? `<div class="mutasi-empty" style="padding:12px;font-size:11px">Peta siap · ${rows.length} wilayah multiplayer · tap provinsi musuh (⚔) untuk invasi</div>`
+        : `<div class="mutasi-empty">Peta kosong — jalankan SQL + Refresh Empire</div>`;
     }
   } catch (e) {
     console.warn('warLoadTerritories', e.message);
