@@ -307,13 +307,34 @@ function saveUrlParams() {
   } catch (e) { console.warn('Gagal simpan URL params:', e); }
 }
 
+function parseOrdersParam(raw) {
+  // URLSearchParams.get() SUDAH decode sekali.
+  // Jangan decodeURIComponent lagi kalau string sudah JSON valid —
+  // karakter "%" di nama layanan (mis. "100%") akan bikin URIError → orders = [].
+  if (!raw) return [];
+  const attempts = [raw];
+  try { attempts.push(decodeURIComponent(raw)); } catch (_) {}
+  try { attempts.push(decodeURIComponent(decodeURIComponent(raw))); } catch (_) {}
+  for (const s of attempts) {
+    try {
+      const data = JSON.parse(s);
+      if (Array.isArray(data)) return data;
+      if (data && typeof data === 'object') return [data];
+    } catch (_) {}
+  }
+  console.warn('parseOrdersParam gagal, raw length=', String(raw).length);
+  return [];
+}
+
 function loadUrlParams() {
   try {
     const ordersParam = p.get("orders");
     if (ordersParam && trx !== "-") {
-      ordersData = JSON.parse(decodeURIComponent(ordersParam));
-      saveUrlParams();
-      return true;
+      ordersData = parseOrdersParam(ordersParam);
+      if (ordersData.length > 0) {
+        saveUrlParams();
+        return true;
+      }
     }
     if (trx === "-" || !p.get("trx")) {
       const storedTrx = localStorage.getItem('last_trx');
@@ -719,7 +740,7 @@ async function saveAllOrdersDetailToDB(method) {
   if ((!ordersData || ordersData.length === 0) && trx && trx !== '-') {
     try {
       const urlOrders = new URLSearchParams(location.search).get('orders');
-      if (urlOrders) ordersData = JSON.parse(decodeURIComponent(urlOrders));
+      if (urlOrders) ordersData = parseOrdersParam(urlOrders);
       else {
         const stored = localStorage.getItem(`url_params_${trx}`);
         if (stored) { const data = JSON.parse(stored); ordersData = data.orders || []; }
