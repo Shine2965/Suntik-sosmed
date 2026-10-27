@@ -5258,15 +5258,26 @@ async function applyMuteUser(targetUserId, targetEmail, reason, untilIso) {
   try {
     await client.from('chat_mutes').delete().eq('user_id', targetUserId);
   } catch (_) {}
-  const { error: insErr } = await client.from('chat_mutes').insert({
+  // insert tanpa muted_by_email (kolom mungkin belum ada)
+  let insErr = null;
+  let res = await client.from('chat_mutes').insert({
     user_id: targetUserId,
     email: targetEmail || null,
     reason: reason || 'Muted by admin',
     muted_until: untilIso,
     muted_by: currentUser?.id || null,
-    muted_by_email: currentUser?.email || null,
     created_at: new Date().toISOString()
   });
+  insErr = res.error;
+  // kalau masih gagal karena kolom, coba set minimal
+  if (insErr && /column|schema cache/i.test(insErr.message || '')) {
+    res = await client.from('chat_mutes').insert({
+      user_id: targetUserId,
+      reason: reason || 'Muted by admin',
+      muted_until: untilIso
+    });
+    insErr = res.error;
+  }
   if (insErr) throw insErr;
   try {
     await supabaseClient.from('profiles').update({
