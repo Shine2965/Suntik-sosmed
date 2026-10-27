@@ -223,6 +223,38 @@
     });
   } catch (e) { console.warn('Supabase init error:', e); }
 
+  // ===== MARKUP dari Supabase settings (key: markup_sosmed2) =====
+  // Diset Owner di HTML utama → dibaca di sini → dikirim ke /api/fayupedia-services?markup=
+  let markupPercentCache = null; // null = belum load
+  let markupLoading = null;
+
+  async function fetchMarkupPercent() {
+    if (markupPercentCache != null) return markupPercentCache;
+    if (markupLoading) return markupLoading;
+    markupLoading = (async () => {
+      let pct = 7.5; // default
+      try {
+        if (supabaseClient) {
+          const { data, error } = await supabaseClient
+            .from('settings')
+            .select('value')
+            .eq('key', 'markup_sosmed2')
+            .maybeSingle();
+          if (!error && data && data.value != null && String(data.value).trim() !== '') {
+            const n = parseFloat(String(data.value).replace(',', '.'));
+            if (!isNaN(n) && n >= 0 && n <= 500) pct = n;
+          }
+        }
+      } catch (e) {
+        console.warn('fetchMarkupPercent:', e.message || e);
+      }
+      markupPercentCache = pct;
+      markupLoading = null;
+      return pct;
+    })();
+    return markupLoading;
+  }
+
   // Cache rata-rata: key = `${type_sosmed}|${service_id}`, value = detik rata-rata
   const averageCache = {};
   // Sedang loading per key
@@ -1321,8 +1353,12 @@
     }
 
     try {
+      // Ambil % markup dari Supabase (Owner set di dashboard)
+      const markupPct = await fetchMarkupPercent();
+      const qs = '?action=services&markup=' + encodeURIComponent(String(markupPct)) + '&ts=' + Date.now();
+
       const [servicesRes, balanceRes] = await Promise.allSettled([
-        fetch(SERVICES_ENDPOINT + '?action=services&ts=' + Date.now(), {
+        fetch(SERVICES_ENDPOINT + qs, {
           method: 'GET',
           headers: { 'Accept': 'application/json' }
         }),
@@ -1384,6 +1420,8 @@
     if (refreshTimer) clearInterval(refreshTimer);
     refreshTimer = setInterval(function () {
       if (document.visibilityState === 'visible') {
+        // refresh markup tiap cycle biar ganti % di dashboard cepat terasa
+        markupPercentCache = null;
         loadData(true);
       }
     }, 60000);
@@ -1391,6 +1429,7 @@
 
   document.addEventListener('visibilitychange', function () {
     if (document.visibilityState === 'visible') {
+      markupPercentCache = null;
       loadData(true);
     }
   });
