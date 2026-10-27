@@ -768,9 +768,9 @@ body.chat-open .cs-bubble-container{display:none !important}
 
 /* WAR EMPIRE */
 
-.war-map-wrap{position:relative;width:100%;aspect-ratio:1.2/1;min-height:280px;max-height:420px;border-radius:16px;overflow:hidden;border:1.5px solid rgba(255,107,157,0.35);background:radial-gradient(ellipse at 30% 20%,#1a3a4a 0%,#0d1b2a 40%,#0a1220 100%);touch-action:manipulation;user-select:none;-webkit-user-select:none}
-.war-map-grid{position:absolute;inset:0;background-image:linear-gradient(rgba(100,255,200,0.04) 1px,transparent 1px),linear-gradient(90deg,rgba(100,255,200,0.04) 1px,transparent 1px);background-size:24px 24px;pointer-events:none}
-.war-map-svg{position:absolute;inset:0;width:100%;height:100%}
+.war-map-wrap{position:relative;width:100%;height:340px;min-height:340px;border-radius:16px;overflow:hidden;border:2px solid rgba(100,255,200,0.45);background:linear-gradient(160deg,#0b7285 0%,#0d1b2a 45%,#1a0e2e 100%);touch-action:manipulation;user-select:none;-webkit-user-select:none;box-shadow:inset 0 0 40px rgba(0,0,0,0.35)}
+.war-map-grid{position:absolute;inset:0;background-image:linear-gradient(rgba(100,255,200,0.06) 1px,transparent 1px),linear-gradient(90deg,rgba(100,255,200,0.06) 1px,transparent 1px);background-size:28px 28px;pointer-events:none;z-index:1}
+.war-map-svg{position:absolute;inset:0;width:100%;height:100%;z-index:2;display:block}
 .war-node{cursor:pointer;touch-action:manipulation}
 .war-node circle{stroke-width:2;transition:all 0.2s}
 .war-node.mine circle{fill:rgba(34,197,94,0.85);stroke:#86efac}
@@ -6519,6 +6519,10 @@ function warSwitchTab(name, el) {
     const box = document.getElementById('warTab-' + n);
     if (box) box.style.display = n === name ? 'block' : 'none';
   });
+  if (name === 'terr') {
+    try { warRenderMap(warTerritories || []); } catch (e) {}
+    try { warLoadTerritories(); } catch (e) {}
+  }
   if (name === 'market') warLoadMarket();
   if (name === 'log') warLoadLogs();
   if (name === 'prod') warLoadFactories();
@@ -6604,32 +6608,88 @@ function warNodePosition(idOrName, index, total) {
 
 function warRenderMap(territories) {
   const svg = document.getElementById('warMapSvg');
-  if (!svg) return;
-  const uid = currentUser?.id;
-  let html = '';
-  // jalur samar antar node
-  const pts = territories.map((t, i) => warNodePosition(t.id || t.name, i, territories.length));
-  for (let i = 0; i < pts.length - 1; i++) {
-    const a = pts[i], b = pts[i + 1];
-    if (i % 3 === 0) {
-      html += `<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="rgba(100,255,200,0.12)" stroke-width="2" stroke-dasharray="6 6"/>`;
-    }
+  const wrap = document.getElementById('warMapWrap');
+  if (!svg) {
+    console.warn('warMapSvg not found');
+    return;
   }
-  territories.forEach((t, i) => {
-    const pos = warNodePosition(t.id || t.name, i, territories.length);
+  if (wrap) {
+    wrap.style.height = '340px';
+    wrap.style.minHeight = '340px';
+    wrap.style.display = 'block';
+  }
+  const list = Array.isArray(territories) ? territories : [];
+  // clear via DOM
+  while (svg.firstChild) svg.removeChild(svg.firstChild);
+
+  const NS = 'http://www.w3.org/2000/svg';
+  const add = (tag, attrs, text) => {
+    const el = document.createElementNS(NS, tag);
+    Object.entries(attrs || {}).forEach(([k, v]) => el.setAttribute(k, String(v)));
+    if (text != null) el.textContent = text;
+    svg.appendChild(el);
+    return el;
+  };
+
+  // laut + pulau dekorasi (selalu kelihatan)
+  add('rect', { x: 0, y: 0, width: 1000, height: 800, fill: '#0a4d68' });
+  add('ellipse', { cx: 220, cy: 200, rx: 160, ry: 90, fill: '#1b6b4a', opacity: 0.85 });
+  add('ellipse', { cx: 720, cy: 280, rx: 200, ry: 110, fill: '#1b6b4a', opacity: 0.8 });
+  add('ellipse', { cx: 480, cy: 520, rx: 240, ry: 130, fill: '#195f42', opacity: 0.85 });
+  add('ellipse', { cx: 160, cy: 560, rx: 120, ry: 70, fill: '#1b6b4a', opacity: 0.75 });
+  add('ellipse', { cx: 850, cy: 600, rx: 140, ry: 80, fill: '#1b6b4a', opacity: 0.75 });
+  add('text', { x: 500, y: 36, fill: '#99f6e4', 'font-size': 18, 'font-weight': 800, 'text-anchor': 'middle' }, 'PETA EMPIRE MULTIPLAYER');
+
+  if (!list.length) {
+    add('text', { x: 500, y: 400, fill: '#fff', 'font-size': 16, 'font-weight': 700, 'text-anchor': 'middle' }, 'Belum ada wilayah — ketuk Refresh Empire');
+    add('text', { x: 500, y: 430, fill: '#94a3b8', 'font-size': 13, 'text-anchor': 'middle' }, 'Atau jalankan war-empire-schema.sql di Supabase');
+    return;
+  }
+
+  const uid = currentUser && currentUser.id;
+  list.forEach((t, i) => {
+    const pos = warNodePosition(t.id || t.name, i, list.length);
     const mine = t.owner_user_id === uid && !t.is_ai;
-    const ai = !!t.is_ai || !t.owner_user_id;
-    const cls = mine ? 'mine' : (ai ? 'ai' : 'enemy');
-    const r = mine ? 22 : 18;
-    const label = (t.name || 'Wilayah').length > 14 ? (t.name || '').slice(0, 12) + '…' : (t.name || 'Wilayah');
-    html += `<g class="war-node ${cls}" data-tid="${t.id}" onclick="warSelectTerritory('${t.id}')">
-      <circle cx="${pos.x}" cy="${pos.y}" r="${r + 6}" fill="rgba(0,0,0,0.25)"/>
-      <circle cx="${pos.x}" cy="${pos.y}" r="${r}"/>
-      <text x="${pos.x}" y="${pos.y + r + 14}">${escapeHtml(label)}</text>
-    </g>`;
+    const ai = !!(t.is_ai || !t.owner_user_id);
+    const fill = mine ? '#22c55e' : (ai ? '#94a3b8' : '#ff4080');
+    const stroke = mine ? '#86efac' : (ai ? '#e2e8f0' : '#fda4c8');
+    const r = mine ? 26 : 22;
+
+    const g = document.createElementNS(NS, 'g');
+    g.style.cursor = 'pointer';
+    g.setAttribute('data-tid', t.id || '');
+    g.addEventListener('click', function (ev) {
+      ev.preventDefault();
+      if (t.id) warSelectTerritory(t.id);
+    });
+    g.addEventListener('touchend', function (ev) {
+      ev.preventDefault();
+      if (t.id) warSelectTerritory(t.id);
+    }, { passive: false });
+
+    const shadow = document.createElementNS(NS, 'circle');
+    shadow.setAttribute('cx', pos.x); shadow.setAttribute('cy', pos.y + 3);
+    shadow.setAttribute('r', r + 4); shadow.setAttribute('fill', 'rgba(0,0,0,0.35)');
+    g.appendChild(shadow);
+
+    const c = document.createElementNS(NS, 'circle');
+    c.setAttribute('cx', pos.x); c.setAttribute('cy', pos.y);
+    c.setAttribute('r', r); c.setAttribute('fill', fill); c.setAttribute('stroke', stroke); c.setAttribute('stroke-width', '3');
+    g.appendChild(c);
+
+    const label = String(t.name || 'Wilayah');
+    const short = label.length > 16 ? label.slice(0, 14) + '…' : label;
+    const tx = document.createElementNS(NS, 'text');
+    tx.setAttribute('x', pos.x); tx.setAttribute('y', pos.y + r + 16);
+    tx.setAttribute('fill', '#fff'); tx.setAttribute('font-size', '11');
+    tx.setAttribute('font-weight', '800'); tx.setAttribute('text-anchor', 'middle');
+    tx.textContent = short;
+    g.appendChild(tx);
+
+    svg.appendChild(g);
   });
-  svg.innerHTML = html;
 }
+
 
 function warSelectTerritory(tid) {
   const t = warTerritories.find(x => x.id === tid);
@@ -6701,22 +6761,44 @@ async function warRefreshAll() {
 }
 
 async function warLoadTerritories() {
-  const list = document.getElementById('warTerrList');
   const detail = document.getElementById('warTerrDetail');
   try {
-    const { data, error } = await supabaseClient.from('war_territories').select('*').order('name');
-    if (error) throw error;
-    warTerritories = data || [];
+    let rows = [];
+    try {
+      const { data, error } = await supabaseClient.from('war_territories').select('*').order('name');
+      if (error) throw error;
+      rows = data || [];
+    } catch (e1) {
+      console.warn('war_territories:', e1.message);
+      // Fallback: tampilkan node dari profiles (gmail) agar peta tetap ada
+      try {
+        const { data: profs } = await supabaseClient.from('profiles').select('id, email').order('email').limit(80);
+        rows = (profs || []).map(p => ({
+          id: p.id,
+          name: (p.email || 'user').split('@')[0],
+          owner_user_id: p.id,
+          is_ai: false,
+          bunker_level: 1,
+          base_level: 1,
+          troops_sword: 0, troops_horse: 0, troops_shield: 0, troops_spear: 0, troops_archer: 0,
+          population: 0,
+          _fallback: true
+        }));
+      } catch (e2) {
+        rows = [];
+      }
+    }
+    warTerritories = rows;
     warRenderMap(warTerritories);
     if (detail) {
-      detail.innerHTML = warTerritories.length
-        ? `<div class="mutasi-empty" style="padding:12px;font-size:11px">Tap wilayah di peta · ${warTerritories.length} wilayah multiplayer</div>`
-        : `<div class="mutasi-empty">Belum ada teritori. Klik Refresh Empire.</div>`;
+      detail.innerHTML = rows.length
+        ? `<div class="mutasi-empty" style="padding:12px;font-size:11px">Peta aktif · ${rows.length} wilayah · tap titik di peta</div>`
+        : `<div class="mutasi-empty">Peta kosong — jalankan SQL war-empire & klik Refresh Empire</div>`;
     }
-    if (list) list.innerHTML = '';
   } catch (e) {
-    if (detail) detail.innerHTML = `<div class="mutasi-empty" style="color:#ff8080">❌ ${escapeHtml(e.message)} — jalankan war-empire-schema.sql</div>`;
     console.warn('warLoadTerritories', e.message);
+    warRenderMap([]);
+    if (detail) detail.innerHTML = `<div class="mutasi-empty" style="color:#ff8080">❌ ${escapeHtml(e.message)}</div>`;
   }
 }
 
