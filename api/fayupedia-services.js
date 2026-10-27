@@ -1,9 +1,15 @@
 // /api/fayupedia-services.js
 // Vercel Serverless Function - Proxy ke Fayupedia API
 // Support:
-//   1. Ambil daftar layanan (default)
+//   1. Ambil daftar layanan (default) — markup dari settings HTML (markup_sosmed2)
 //   2. Cek saldo (?action=balance)
 //   3. Cek status pesanan (?action=status&id=...)
+//
+// Markup sumber (prioritas):
+//   1. Query/body: markup / markup_percent / percent  (contoh ?markup=10)
+//   2. Supabase settings key: markup_sosmed2  (diset di HTML Owner)
+//   3. Env: FAYUPEDIA_MARKUP_PERCENT
+//   4. Default: 7.5
 
 export default async function handler(req, res) {
   // CORS
@@ -15,7 +21,6 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
-  // Allow GET dan POST
   if (req.method !== 'GET' && req.method !== 'POST') {
     return res.status(405).json({
       status: false,
@@ -51,7 +56,7 @@ export default async function handler(req, res) {
     ).toLowerCase().trim();
 
     // ============================================================
-    // 🔥 ACTION: BALANCE (CEK SALDO)
+    // ACTION: BALANCE
     // ============================================================
     if (action === 'balance') {
       const balanceResponse = await fetch('https://fayupedia.id/api/balance', {
@@ -94,15 +99,13 @@ export default async function handler(req, res) {
     }
 
     // ============================================================
-    // 🔥 ACTION: STATUS (CEK STATUS PESANAN)
-    // Support single ID atau multiple ID (dipisah koma, max 50)
+    // ACTION: STATUS
     // ============================================================
     if (action === 'status') {
-      // Ambil ID dari body / query — support berbagai nama parameter
-      const rawId = 
-        body.id || 
-        body.order_id || 
-        body.order || 
+      const rawId =
+        body.id ||
+        body.order_id ||
+        body.order ||
         body.ids ||
         (req.query && (req.query.id || req.query.order_id || req.query.order || req.query.ids));
 
@@ -113,14 +116,11 @@ export default async function handler(req, res) {
         });
       }
 
-      // Normalisasi ID: hapus spasi, trim
       let idStr = String(rawId).trim();
-      
-      // Validasi: pisahkan per koma, filter yang valid
       const idArray = idStr.split(',')
         .map(s => s.trim())
         .filter(s => s.length > 0);
-      
+
       if (idArray.length === 0) {
         return res.status(400).json({
           status: false,
@@ -128,7 +128,6 @@ export default async function handler(req, res) {
         });
       }
 
-      // Batasan max 50 ID sesuai dokumentasi
       if (idArray.length > 50) {
         return res.status(400).json({
           status: false,
@@ -139,7 +138,7 @@ export default async function handler(req, res) {
       idStr = idArray.join(',');
 
       try {
-        console.log(`🔍 [Fayupedia Status] Checking IDs: ${idStr}`);
+        console.log(`[Fayupedia Status] Checking IDs: ${idStr}`);
 
         const statusResponse = await fetch('https://fayupedia.id/api/status', {
           method: 'POST',
@@ -165,9 +164,8 @@ export default async function handler(req, res) {
         }
 
         const statusData = await statusResponse.json();
-        console.log('📥 [Fayupedia Status] Raw response:', JSON.stringify(statusData).substring(0, 800));
+        console.log('[Fayupedia Status] Raw response:', JSON.stringify(statusData).substring(0, 800));
 
-        // Kalau response error dari provider
         if (statusData && statusData.status === false) {
           return res.status(200).json({
             status: false,
@@ -176,31 +174,8 @@ export default async function handler(req, res) {
           });
         }
 
-        // ===== DETEKSI BERBAGAI STRUKTUR RESPONSE =====
-        // 
-        // Struktur 1 (PALING UMUM — sesuai docs Fayupedia single ID):
-        // {
-        //   "status": true,
-        //   "msg": "Pesanan ditemukan.",
-        //   "order_id": 1107,
-        //   "order_status": "processing",
-        //   "charge": 10000,
-        //   "start_count": 10,
-        //   "remains": 90
-        // }
-        //
-        // Struktur 2 (multiple ID — data array):
-        // { "status": true, "msg": "...", "data": [ {id, status, ...}, ... ] }
-        //
-        // Struktur 3 (single di dalam data):
-        // { "status": true, "msg": "...", "data": {id, status, ...} }
-        //
-        // Struktur 4 (data null):
-        // { "status": true, "msg": "...", "data": null }
-
         let itemsToNormalize = [];
 
-        // Cek 1: Ada `data` — array atau object
         if (statusData.data !== undefined && statusData.data !== null) {
           if (Array.isArray(statusData.data)) {
             itemsToNormalize = statusData.data;
@@ -209,9 +184,8 @@ export default async function handler(req, res) {
           }
         }
 
-        // Cek 2: Kalau `data` kosong/null, cek root punya field order (kasus utama Fayupedia)
         if (itemsToNormalize.length === 0) {
-          const rootHasOrderFields = 
+          const rootHasOrderFields =
             statusData.order_status !== undefined ||
             statusData.order_id !== undefined ||
             statusData.remains !== undefined ||
@@ -219,17 +193,14 @@ export default async function handler(req, res) {
             (typeof statusData.status === 'string' && statusData.status !== '');
 
           if (rootHasOrderFields) {
-            // Root object itu sendiri adalah item pesanan
             itemsToNormalize = [statusData];
           }
         }
 
-        // Cek 3: Kalau ada `results` array (dari proxy lain / wrapper)
         if (itemsToNormalize.length === 0 && Array.isArray(statusData.results)) {
           itemsToNormalize = statusData.results;
         }
 
-        // Kalau benar-benar tidak ada data pesanan
         if (itemsToNormalize.length === 0) {
           return res.status(200).json({
             status: true,
@@ -239,7 +210,6 @@ export default async function handler(req, res) {
           });
         }
 
-        // Normalize setiap item
         const normalizedArray = itemsToNormalize.map(item => normalizeStatusItem(item));
 
         return res.status(200).json({
@@ -250,7 +220,7 @@ export default async function handler(req, res) {
         });
 
       } catch (fetchErr) {
-        console.error('❌ Fayupedia status fetch error:', fetchErr);
+        console.error('Fayupedia status fetch error:', fetchErr);
         return res.status(500).json({
           status: false,
           msg: 'Gagal cek status: ' + (fetchErr.message || '')
@@ -259,8 +229,12 @@ export default async function handler(req, res) {
     }
 
     // ============================================================
-    // 🔥 ACTION: SERVICES (DAFTAR LAYANAN) — DEFAULT
+    // ACTION: SERVICES (DEFAULT) — markup dinamis dari HTML settings
     // ============================================================
+    const markupPercent = await resolveMarkupPercent(req, body);
+    const MARKUP = 1 + (markupPercent / 100);
+    console.log(`[Fayupedia Services] markup_percent=${markupPercent} → multiplier=${MARKUP}`);
+
     const servicesResponse = await fetch('https://fayupedia.id/api/services', {
       method: 'POST',
       headers: {
@@ -292,9 +266,7 @@ export default async function handler(req, res) {
       });
     }
 
-    // ===== GROUP BY CATEGORY + MARKUP 7.5% =====
     const grouped = {};
-    const MARKUP = 1.075;
 
     for (const s of data.services) {
       const category = (s.category || 'Lainnya').trim() || 'Lainnya';
@@ -336,7 +308,19 @@ export default async function handler(req, res) {
         );
       });
 
-    res.setHeader('Cache-Control', 's-maxage=30, stale-while-revalidate=60');
+    // cache pendek supaya ganti markup cepat kelihatan
+    res.setHeader('Cache-Control', 's-maxage=15, stale-while-revalidate=30');
+    res.setHeader('X-Markup-Percent', String(markupPercent));
+
+    // meta opsional (frontend boleh ignore)
+    if (req.query && (req.query.meta === '1' || req.query.meta === 'true')) {
+      return res.status(200).json({
+        status: true,
+        markup_percent: markupPercent,
+        markup_multiplier: MARKUP,
+        services: sorted
+      });
+    }
 
     return res.status(200).json(sorted);
 
@@ -350,9 +334,72 @@ export default async function handler(req, res) {
 }
 
 // ============================================================
-// 🔧 HELPER: NORMALIZE STATUS ITEM
-// Fayupedia pakai `order_status` di root, tapi kita normalisasi
-// ke field `status` DAN `order_status` supaya kompatibel dengan frontend
+// MARKUP: resolve dari query/body → Supabase settings → env → default
+// ============================================================
+function parsePercent(v) {
+  if (v === undefined || v === null || v === '') return null;
+  const n = parseFloat(String(v).replace('%', '').replace(',', '.').trim());
+  if (isNaN(n) || n < 0 || n > 500) return null;
+  return n;
+}
+
+async function resolveMarkupPercent(req, body) {
+  // 1) explicit dari request (HTML bisa kirim)
+  const fromReq = parsePercent(
+    (body && (body.markup ?? body.markup_percent ?? body.percent ?? body.markupPercent)) ??
+    (req.query && (req.query.markup ?? req.query.markup_percent ?? req.query.percent))
+  );
+  if (fromReq != null) return fromReq;
+
+  // 2) dari Supabase settings (key sama dengan HTML: markup_sosmed2)
+  try {
+    const fromDb = await fetchMarkupFromSupabase('markup_sosmed2');
+    if (fromDb != null) return fromDb;
+  } catch (e) {
+    console.warn('fetchMarkupFromSupabase:', e.message || e);
+  }
+
+  // 3) env
+  const fromEnv = parsePercent(process.env.FAYUPEDIA_MARKUP_PERCENT);
+  if (fromEnv != null) return fromEnv;
+
+  // 4) default 7.5%
+  return 7.5;
+}
+
+async function fetchMarkupFromSupabase(settingKey) {
+  const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+  // prioritaskan service role; fallback anon (kalau RLS izinkan read settings)
+  const key =
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.SUPABASE_ANON_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!url || !key) return null;
+
+  const endpoint = `${url.replace(/\/$/, '')}/rest/v1/settings?key=eq.${encodeURIComponent(settingKey)}&select=value&limit=1`;
+  const resp = await fetch(endpoint, {
+    method: 'GET',
+    headers: {
+      apikey: key,
+      Authorization: `Bearer ${key}`,
+      Accept: 'application/json'
+    }
+  });
+
+  if (!resp.ok) {
+    const t = await resp.text().catch(() => '');
+    console.warn('Supabase settings HTTP', resp.status, t);
+    return null;
+  }
+
+  const rows = await resp.json();
+  if (!Array.isArray(rows) || !rows.length) return null;
+  return parsePercent(rows[0].value);
+}
+
+// ============================================================
+// NORMALIZE STATUS ITEM
 // ============================================================
 function normalizeStatusItem(item) {
   if (!item || typeof item !== 'object') {
@@ -368,7 +415,6 @@ function normalizeStatusItem(item) {
     };
   }
 
-  // Prioritas: order_status → orderStatus → state → status (skip boolean)
   let statusValue = null;
   const tryFields = ['order_status', 'orderStatus', 'state', 'status'];
   for (const f of tryFields) {
@@ -380,29 +426,28 @@ function normalizeStatusItem(item) {
   }
   if (!statusValue) statusValue = 'Unknown';
 
-  // Ambil ID pesanan
-  const id = 
-    item.id ?? 
-    item.order ?? 
-    item.order_id ?? 
-    item.OrderId ?? 
+  const id =
+    item.id ??
+    item.order ??
+    item.order_id ??
+    item.OrderId ??
     null;
 
-  const startCount = 
+  const startCount =
     parseInt(item.start_count ?? item.startCount ?? item.start ?? 0) || 0;
 
-  const remains = 
+  const remains =
     parseInt(item.remains ?? item.remains_count ?? item.remaining ?? 0) || 0;
 
-  const charge = 
+  const charge =
     parseFloat(item.charge ?? item.price ?? item.cost ?? 0) || 0;
 
   const currency = item.currency ?? 'IDR';
 
   return {
     id: id ? String(id) : null,
-    status: statusValue,        // kompatibel dengan frontend
-    order_status: statusValue,  // juga isi order_status
+    status: statusValue,
+    order_status: statusValue,
     start_count: startCount,
     remains: remains,
     charge: charge,
