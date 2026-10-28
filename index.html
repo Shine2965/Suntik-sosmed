@@ -1561,7 +1561,42 @@ function formatTimeAgo(isoString) {
   return d.toLocaleDateString('id-ID', { day: '2-digit', month: 'short' });
 }
 function escapeHtml(str) { if (!str) return ''; return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
-function formatMessageText(str) { if (!str) return ''; return escapeHtml(str).replace(/\r\n/g, '\n').replace(/\n/g, '<br>').replace(/  /g, '&nbsp;&nbsp;'); }
+function stripLongImageLinks(str) {
+  if (!str) return '';
+  let s = String(str);
+  // hapus baris/blok [IMG]... (termasuk data-url sangat panjang)
+  s = s.replace(/\[IMG\]\s*data:image\/[^\s\n]*/gi, '');
+  s = s.replace(/\[IMG\]\s*https?:\/\/\S+/gi, '');
+  s = s.replace(/\[IMG\]/gi, '');
+  // hapus data-url mentah
+  s = s.replace(/data:image\/[a-zA-Z0-9+.-]+;base64,[A-Za-z0-9+/=\s]+/gi, '');
+  // hapus URL gambar http(s) yang kepanjangan (>80 char)
+  s = s.replace(/https?:\/\/\S+\.(?:jpg|jpeg|png|webp|gif|bmp)(?:\?\S*)?/gi, (url) => {
+    return url.length > 60 ? '📷 Foto' : url;
+  });
+  // hapus URL supabase storage sangat panjang
+  s = s.replace(/https?:\/\/\S*supabase\S*\/storage\/\S+/gi, '📷 Foto');
+  // rapikan baris kosong berlebih
+  s = s.replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+  return s;
+}
+function formatMessageText(str) {
+  if (!str) return '';
+  const clean = stripLongImageLinks(str);
+  if (!clean) return '';
+  return escapeHtml(clean).replace(/\r\n/g, '\n').replace(/\n/g, '<br>').replace(/  /g, '&nbsp;&nbsp;');
+}
+function shortChatPreview(str, maxLen) {
+  const n = maxLen || 50;
+  const clean = stripLongImageLinks(str || '');
+  if (!clean) {
+    // kalau isinya hanya gambar
+    if (str && (/\[IMG\]/i.test(str) || /data:image\//i.test(str) || /\.(jpg|jpeg|png|webp|gif)/i.test(str))) return '📷 Foto';
+    return '';
+  }
+  return clean.length > n ? clean.substring(0, n) + '…' : clean;
+}
+
 function escapeAttr(str) { if (!str) return ''; return String(str).replace(/'/g, "\\'").replace(/"/g, '&quot;'); }
 function scrollChatToBottom(containerId) { const body = document.getElementById(containerId); if (!body) return; setTimeout(() => { body.scrollTop = body.scrollHeight; }, 50); }
 function formatBannedCountdown(bannedUntil) {
@@ -6377,7 +6412,7 @@ function handleGlobalMessageInsert(newMsg) {
   cachedGlobalMessages.push(newMsg);
   updateGlobalSubtitle();
   if (chatHubOpen && currentChatTab === 'global') { renderGlobalMessages(cachedGlobalMessages); renderPinnedMessages(cachedGlobalMessages); setTimeout(() => scrollChatToBottom('globalChatBody'), 100); }
-  const el = document.getElementById('globalChatPreview'); if (el) el.textContent = `${newMsg.email}: ${(newMsg.message || '').substring(0, 50)}`;
+  const el = document.getElementById('globalChatPreview'); if (el) el.textContent = `${newMsg.email}: ${shortChatPreview(newMsg.message || '', 50)}`;
   // badge: pesan dari orang lain
   try {
     const myIds = new Set([currentUser?.id, cachedChatUserId].filter(Boolean));
@@ -6478,27 +6513,44 @@ function subscribeUserSupportChat(userId) {
 }
 function extractSupportImage(msg) {
   if (!msg) return { text: '', imageUrl: null };
-  if (msg.image_url) return { text: msg.message || '', imageUrl: msg.image_url };
-  const raw = String(msg.message || '');
-  // [IMG]url atau [IMG]data:image/...;base64,...  (url bisa sangat panjang)
+  let imageUrl = msg.image_url || null;
+  let raw = String(msg.message || '');
+
   if (raw.startsWith('[IMG]')) {
     const rest = raw.slice(5);
     const nl = rest.indexOf('\n');
-    if (nl >= 0) return { imageUrl: rest.slice(0, nl).trim(), text: rest.slice(nl + 1).trim() };
-    // data URL tidak punya spasi; http URL juga
-    const sp = rest.search(/\s/);
-    if (sp > 0 && !rest.startsWith('data:')) {
-      return { imageUrl: rest.slice(0, sp).trim(), text: rest.slice(sp).trim() };
+    if (nl >= 0) {
+      if (!imageUrl) imageUrl = rest.slice(0, nl).trim();
+      raw = rest.slice(nl + 1).trim();
+    } else if (rest.startsWith('data:')) {
+      // seluruh message = data url
+      if (!imageUrl) imageUrl = rest.trim();
+      raw = '';
+    } else {
+      const sp = rest.search(/\s/);
+      if (sp > 0) {
+        if (!imageUrl) imageUrl = rest.slice(0, sp).trim();
+        raw = rest.slice(sp).trim();
+      } else {
+        if (!imageUrl) imageUrl = rest.trim();
+        raw = '';
+      }
     }
-    return { imageUrl: rest.trim(), text: '' };
+  } else if (!imageUrl) {
+    if (/^https?:\/\/\S+\.(jpg|jpeg|png|webp|gif)(\?\S*)?$/i.test(raw.trim())) {
+      imageUrl = raw.trim();
+      raw = '';
+    } else if (/^data:image\/(png|jpeg|jpg|webp|gif);base64,/i.test(raw.trim())) {
+      imageUrl = raw.trim();
+      raw = '';
+    }
   }
-  if (/^https?:\/\/\S+\.(jpg|jpeg|png|webp|gif)(\?\S*)?$/i.test(raw.trim())) {
-    return { text: '', imageUrl: raw.trim() };
-  }
-  if (/^data:image\/(png|jpeg|jpg|webp|gif);base64,/i.test(raw.trim())) {
-    return { text: '', imageUrl: raw.trim() };
-  }
-  return { text: raw, imageUrl: null };
+
+  // caption: buang sisa link/data-url biar tidak ngeganggu
+  const text = stripLongImageLinks(raw);
+  // jangan tampilkan caption "📷 Foto" generik kalau sudah ada gambar
+  const caption = (text && text !== '📷 Foto') ? text : '';
+  return { text: caption, imageUrl };
 }
 function renderSupportMessages(messages, containerId) {
   const body = document.getElementById(containerId);
@@ -6875,7 +6927,7 @@ async function loadCSFolders() {
       const initial = (f.email || '?').charAt(0).toUpperCase();
       const unreadClass = f.hasUnread ? 'has-unread' : '';
       const deleteBtn = f.manual ? `<button class="cs-folder-delete" onclick="event.stopPropagation(); removeCSFolder('${f.user_id}')" title="Hapus folder">✕</button>` : '';
-      html += `<div class="cs-folder-item ${unreadClass}" data-user-id="${f.user_id}" onclick="openCSFolder('${f.user_id}','${escapeAttr(f.email)}')">${deleteBtn}<div class="cs-folder-icon">${initial}</div><div class="cs-folder-info"><div class="cs-folder-email">${escapeHtml(f.email || 'user')}${f.hasUnread ? '<span class="cs-folder-badge">NEW</span>' : ''}</div><div class="cs-folder-preview">${escapeHtml((f.lastMessage || '').substring(0, 50))}</div></div><div class="cs-folder-time">${formatTimeAgo(f.lastTime)}</div></div>`;
+      html += `<div class="cs-folder-item ${unreadClass}" data-user-id="${f.user_id}" onclick="openCSFolder('${f.user_id}','${escapeAttr(f.email)}')">${deleteBtn}<div class="cs-folder-icon">${initial}</div><div class="cs-folder-info"><div class="cs-folder-email">${escapeHtml(f.email || 'user')}${f.hasUnread ? '<span class="cs-folder-badge">NEW</span>' : ''}</div><div class="cs-folder-preview">${escapeHtml(shortChatPreview(f.lastMessage || '', 50) || '📷')}</div></div><div class="cs-folder-time">${formatTimeAgo(f.lastTime)}</div></div>`;
     });
     listEl.innerHTML = html;
   } catch (err) { listEl.innerHTML = `<div class="chat-empty" style="color:#ff8080;">❌ ${err.message}</div>`; }
@@ -7047,7 +7099,7 @@ function showCSBubble(msg) {
   const bubble = document.createElement('div');
   bubble.className = 'cs-bubble';
   bubble.dataset.msgId = msg.id;
-  const preview = (msg.message || '').substring(0, 150);
+  const preview = shortChatPreview(msg.message || '', 80) || (msg.image_url ? '📷 Foto' : '');
   const timeStr = new Date(msg.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
   bubble.innerHTML = `<div class="cs-bubble-icon">📩</div><div class="cs-bubble-content"><button class="cs-bubble-close" onclick="event.stopPropagation(); dismissCSBubble('${msg.id}')">✕</button><div class="cs-bubble-sender">${roleEmoji} ${escapeHtml(roleLabel)} <span style="background:rgba(255,215,0,0.25);color:#ffd700;padding:1px 6px;border-radius:8px;font-size:8px;">BARU</span></div><div class="cs-bubble-message">${formatMessageText(preview)}</div><div class="cs-bubble-time">🕐 ${timeStr}</div><div class="cs-bubble-actions"><button class="cs-bubble-reply" onclick="event.stopPropagation(); openCSBubbleReply('${msg.id}')">💬 Balas</button></div></div>`;
   bubble.addEventListener('click', (e) => { if (e.target.closest('.cs-bubble-close') || e.target.closest('.cs-bubble-reply')) return; openCSBubbleReply(msg.id); });
