@@ -679,6 +679,8 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
 .nav-item.active .nav-icon{transform:scale(1.1)}
 .nav-item .nav-badge{position:absolute;top:4px;right:calc(50% - 18px);background:#ff4444;color:#fff;min-width:16px;height:16px;padding:0 4px;border-radius:20px;font-size:9px;font-weight:800;display:flex;align-items:center;justify-content:center;border:2px solid #140a28}
 .nav-item .nav-badge:empty{display:none}
+.nav-item .nav-badge.has-count{display:flex !important;animation:badgePulse 1.5s ease-in-out infinite}
+.app-icon-btn .badge.has-count{display:flex !important;animation:badgePulse 1.5s ease-in-out infinite}
 
 /* ============ AUTH ============ */
 .auth-screen{position:absolute;inset:0;background:linear-gradient(180deg,#1a0e2e 0%,#221236 50%,#1a0e2e 100%);z-index:100;display:flex;flex-direction:column;padding:24px 20px;overflow-y:auto}
@@ -6030,6 +6032,161 @@ function startSupportChatAutoCleanup() {
 // ============================================================
 // CHAT SYSTEM
 // ============================================================
+
+// ============================================================
+// CHAT UNREAD BADGE (nav bar + app bar)
+// ============================================================
+let chatUnreadGlobal = 0;
+let chatUnreadSupport = 0;
+let chatBadgeRefreshTimer = null;
+
+function chatUnreadStorageKey(kind) {
+  const uid = currentUser?.id || 'guest';
+  return `shine_chat_seen_${kind}_${uid}`;
+}
+
+function getChatLastSeen(kind) {
+  try {
+    const v = localStorage.getItem(chatUnreadStorageKey(kind));
+    if (v) return v;
+  } catch (_) {}
+  // default: 24 jam terakhir agar tidak banjir badge lama
+  return new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+}
+
+function setChatLastSeen(kind, iso) {
+  try {
+    localStorage.setItem(chatUnreadStorageKey(kind), iso || new Date().toISOString());
+  } catch (_) {}
+}
+
+function updateChatNavBadge(totalOverride) {
+  const total = totalOverride != null
+    ? totalOverride
+    : (Math.max(0, chatUnreadGlobal) + Math.max(0, chatUnreadSupport));
+  const label = total > 99 ? '99+' : (total > 0 ? String(total) : '');
+  ['navChatBadge', 'appBarChatBadge'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = label;
+    if (label) el.classList.add('has-count');
+    else el.classList.remove('has-count');
+  });
+  // preview teks di page-chat
+  try {
+    const prev = document.getElementById('globalChatPreview');
+    // no-op, preview di-update handler lain
+  } catch (_) {}
+}
+
+function markChatTabAsRead(tab) {
+  const now = new Date().toISOString();
+  if (tab === 'global' || tab === 'all') {
+    setChatLastSeen('global', now);
+    chatUnreadGlobal = 0;
+  }
+  if (tab === 'support' || tab === 'all') {
+    setChatLastSeen('support', now);
+    chatUnreadSupport = 0;
+  }
+  updateChatNavBadge();
+}
+
+async function refreshChatUnreadCounts() {
+  if (!chatClient || !currentUser) {
+    chatUnreadGlobal = 0;
+    chatUnreadSupport = 0;
+    updateChatNavBadge(0);
+    return;
+  }
+  try {
+    const chatUid = await getChatUserId();
+    const myIds = new Set([currentUser.id, chatUid, cachedChatUserId].filter(Boolean));
+
+    // --- Global: pesan orang lain setelah last seen ---
+    const globalSeen = getChatLastSeen('global');
+    try {
+      const { data: gRows, error: gErr } = await chatClient
+        .from('global_messages')
+        .select('id, user_id, email, created_at, message')
+        .gt('created_at', globalSeen)
+        .order('created_at', { ascending: false })
+        .limit(100);
+      if (!gErr && gRows) {
+        chatUnreadGlobal = gRows.filter(m => m.user_id && !myIds.has(m.user_id)).length;
+      }
+    } catch (e) { console.warn('badge global', e.message); }
+
+    // --- Support/CS ---
+    const supportSeen = getChatLastSeen('support');
+    try {
+      if (isStaff) {
+        // staff: pesan user belum dibaca
+        const { data: sRows, error: sErr } = await chatClient
+          .from('support_messages')
+          .select('id, sender_role, read_by_admin, created_at')
+          .eq('sender_role', 'user')
+          .eq('read_by_admin', false)
+          .order('created_at', { ascending: false })
+          .limit(100);
+        if (!sErr && sRows) chatUnreadSupport = sRows.length;
+        else {
+          // fallback tanpa kolom read_by_admin
+          const { data: s2 } = await chatClient
+            .from('support_messages')
+            .select('id, sender_role, created_at')
+            .eq('sender_role', 'user')
+            .gt('created_at', supportSeen)
+            .limit(100);
+          chatUnreadSupport = (s2 || []).length;
+        }
+      } else {
+        // user: balasan CS/admin/owner setelah last seen
+        const uid = chatUid || currentUser.id;
+        const { data: sRows, error: sErr } = await chatClient
+          .from('support_messages')
+          .select('id, sender_role, sender_id, created_at')
+          .eq('user_id', uid)
+          .in('sender_role', ['cs', 'admin', 'owner'])
+          .gt('created_at', supportSeen)
+          .order('created_at', { ascending: false })
+          .limit(100);
+        if (!sErr && sRows) {
+          chatUnreadSupport = sRows.filter(m => !myIds.has(m.sender_id)).length;
+        }
+      }
+    } catch (e) { console.warn('badge support', e.message); }
+
+    // jika user sedang buka tab chat, jangan hitung tab itu
+    if (chatHubOpen && currentChatTab === 'global') chatUnreadGlobal = 0;
+    if (chatHubOpen && currentChatTab === 'support') chatUnreadSupport = 0;
+
+    updateChatNavBadge();
+  } catch (e) {
+    console.warn('refreshChatUnreadCounts', e.message || e);
+  }
+}
+
+function bumpChatUnread(kind) {
+  if (kind === 'global') {
+    if (chatHubOpen && currentChatTab === 'global') return;
+    chatUnreadGlobal = Math.min(99, (chatUnreadGlobal || 0) + 1);
+  } else if (kind === 'support') {
+    if (chatHubOpen && currentChatTab === 'support') return;
+    chatUnreadSupport = Math.min(99, (chatUnreadSupport || 0) + 1);
+  }
+  updateChatNavBadge();
+}
+
+function startChatBadgePolling() {
+  if (chatBadgeRefreshTimer) clearInterval(chatBadgeRefreshTimer);
+  refreshChatUnreadCounts();
+  chatBadgeRefreshTimer = setInterval(() => {
+    if (document.visibilityState === 'visible') refreshChatUnreadCounts();
+  }, 20000);
+}
+
+
 async function initChat() {
   if (!chatClient || !currentUser) return;
   const { data: { session } } = await chatClient.auth.getSession();
@@ -6040,6 +6197,7 @@ async function initChat() {
   startCSPolling();
   initPresence();
   startSupportChatAutoCleanup();
+  try { startChatBadgePolling(); } catch (_) {}
 }
 async function getChatUserId() {
   if (chatClient) {
@@ -6065,6 +6223,8 @@ function openChatHub(tab) {
   if (!globalChatChannel) subscribeGlobalChat();
   if (currentChatTab === 'global') switchChatTab('global'); else switchChatTab('support');
   toggleBubbleVisibility();
+  try { markChatTabAsRead(currentChatTab === 'support' ? 'support' : 'global'); } catch (_) {}
+  try { updateChatNavBadge(); } catch (_) {}
 }
 function closeChatHub() { document.getElementById('chatHubModal').classList.remove('show'); document.body.classList.remove('chat-open'); chatHubOpen = false; toggleBubbleVisibility(); }
 function switchChatTab(tab) {
@@ -6084,10 +6244,12 @@ function switchChatTab(tab) {
     titleEl.textContent = 'Global Chat'; subEl.textContent = 'Semua user';
     if (!globalChatChannel) subscribeGlobalChat();
     loadGlobalMessages(); checkGlobalMute();
+    try { markChatTabAsRead('global'); } catch (_) {}
     setTimeout(() => document.getElementById('globalChatInput').focus(), 200);
   } else {
     tabSupport.classList.add('active'); windowEl.classList.add('support');
     viewGlobal.style.display = 'none'; viewSupport.style.display = 'flex';
+    try { markChatTabAsRead('support'); } catch (_) {}
     titleEl.textContent = 'Customer Service'; subEl.textContent = 'Auto-hapus 24 jam';
     openSupportView();
   }
@@ -6159,6 +6321,11 @@ function handleGlobalMessageInsert(newMsg) {
   updateGlobalSubtitle();
   if (chatHubOpen && currentChatTab === 'global') { renderGlobalMessages(cachedGlobalMessages); renderPinnedMessages(cachedGlobalMessages); setTimeout(() => scrollChatToBottom('globalChatBody'), 100); }
   const el = document.getElementById('globalChatPreview'); if (el) el.textContent = `${newMsg.email}: ${(newMsg.message || '').substring(0, 50)}`;
+  // badge: pesan dari orang lain
+  try {
+    const myIds = new Set([currentUser?.id, cachedChatUserId].filter(Boolean));
+    if (newMsg.user_id && !myIds.has(newMsg.user_id)) bumpChatUnread('global');
+  } catch (_) {}
 }
 function handleGlobalMessageUpdate(updatedMsg) { if (!updatedMsg) return; const idx = cachedGlobalMessages.findIndex(m => m.id === updatedMsg.id); if (idx !== -1) cachedGlobalMessages[idx] = updatedMsg; else cachedGlobalMessages.push(updatedMsg); updateGlobalSubtitle(); if (chatHubOpen && currentChatTab === 'global') { renderGlobalMessages(cachedGlobalMessages); renderPinnedMessages(cachedGlobalMessages); } }
 function handleGlobalMessageDelete(oldMsg) { if (!oldMsg || !oldMsg.id) return; cachedGlobalMessages = cachedGlobalMessages.filter(m => m.id !== oldMsg.id); updateGlobalSubtitle(); if (chatHubOpen && currentChatTab === 'global') { renderGlobalMessages(cachedGlobalMessages); renderPinnedMessages(cachedGlobalMessages); } }
@@ -6775,7 +6942,7 @@ async function openSupportChatWith(userId, email) {
   subscribeUserSupportChat(userId);
   await markMessagesAsRead(userId);
 }
-async function markMessagesAsRead(userId) { if (!isStaff || !chatClient) return; try { await chatClient.from('support_messages').update({ read_by_admin: true }).eq('user_id', userId).eq('sender_role', 'user').eq('read_by_admin', false); } catch(e) {} }
+async function markMessagesAsRead(userId) { if (!isStaff || !chatClient) return; try { await chatClient.from('support_messages').update({ read_by_admin: true }).eq('user_id', userId).eq('sender_role', 'user').eq('read_by_admin', false); } catch(e) {} try { await refreshChatUnreadCounts(); } catch(_) {} }
 function backToSupportUsers() { currentSupportTarget = null; document.getElementById('supportChatViewAdmin').style.display = 'none'; document.getElementById('supportUsersView').style.display = 'flex'; loadSupportUsers(); }
 async function loadSupportChatForAdmin(userId) { if (!chatClient) return; const { data, error } = await chatClient.from('support_messages').select('*').eq('user_id', userId).order('created_at', { ascending: true }).limit(200); if (error) return; renderSupportMessages(data || [], 'supportChatBodyAdmin'); }
 
@@ -6791,14 +6958,26 @@ function initCSBubbleChannel() {
 async function handleNewSupportMessage(msg) {
   if (!msg || !currentUser || !msg.sender_role || !msg.created_at) return;
   const msgTime = new Date(msg.created_at).getTime();
-  if (Date.now() - msgTime > 60000) return;
+  if (Date.now() - msgTime > 120000) return;
+
+  // Badge nav: staff ← pesan user; user ← pesan CS/admin/owner
+  try {
+    if (isStaff) {
+      if (msg.sender_role === 'user') bumpChatUnread('support');
+    } else if (['cs', 'admin', 'owner'].includes(msg.sender_role)) {
+      const chatUserId = await getChatUserId();
+      if (chatUserId && msg.user_id === chatUserId) bumpChatUnread('support');
+    }
+  } catch (_) {}
+
+  // Bubble + notif hanya untuk user (bukan staff) dari pesan CS
   if (!['cs', 'admin', 'owner'].includes(msg.sender_role)) return;
   if (isStaff || (chatHubOpen && currentChatTab === 'support')) return;
   const chatUserId = await getChatUserId();
   if (!chatUserId || msg.user_id !== chatUserId) return;
   const roleLabel = msg.sender_role === 'owner' ? 'Owner' : (msg.sender_role === 'admin' ? 'Admin' : 'CS');
-  sendDeviceNotification(`Pesan dari ${roleLabel}`, msg.message || 'Pesan baru', msg.sender_role, 'cs-msg-' + msg.id);
-  if (!(chatHubOpen && currentChatTab === 'support')) showCSBubble(msg);
+  try { sendDeviceNotification(`Pesan dari ${roleLabel}`, msg.message || 'Pesan baru', msg.sender_role, 'cs-msg-' + msg.id); } catch (_) {}
+  showCSBubble(msg);
 }
 function showCSBubble(msg) {
   if (activeBubbles[msg.id]) return;
