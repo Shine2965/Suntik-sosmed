@@ -805,19 +805,25 @@ body.chat-open .cs-bubble-container{display:none !important}
 .mod-board-item .mb-email{font-size:12px;font-weight:800;color:#fff;word-break:break-all}
 .mod-board-item .mb-meta{font-size:10.5px;color:#b39ddb;margin-top:4px;line-height:1.45}
 .mod-board-item .mb-reason{font-size:11px;color:#ffb3b3;margin-top:4px}
-.mod-toast-wrap{position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:99999;width:min(420px,92vw);pointer-events:none}
-.mod-toast{background:linear-gradient(135deg,rgba(26,14,46,0.98),rgba(40,16,50,0.98));border:1.5px solid rgba(255,68,68,0.45);border-radius:16px;padding:14px 16px;box-shadow:0 12px 40px rgba(0,0,0,0.45);animation:modToastIn 0.35s ease both;pointer-events:auto}
-.mod-toast.mute{border-color:rgba(255,170,0,0.5)}
-.mod-toast.unmute{border-color:rgba(100,255,200,0.45)}
-.mod-toast.unban{border-color:rgba(34,197,94,0.45)}
-.mod-toast .mt-title{font-size:13px;font-weight:900;color:#fff;margin-bottom:4px}
-.mod-toast .mt-body{font-size:12px;color:#ddd;line-height:1.5}
-.mod-toast .mt-bar{height:3px;background:rgba(255,255,255,0.12);border-radius:99px;margin-top:10px;overflow:hidden}
-.mod-toast .mt-bar>i{display:block;height:100%;width:100%;background:linear-gradient(90deg,#ff6b9d,#ff4444);animation:modToastBar 10s linear forwards}
+/* Live moderation notif — kanan bawah (semua user online) */
+.mod-toast-wrap{position:fixed;right:14px;bottom:calc(88px + env(safe-area-inset-bottom, 0px));z-index:99998;width:min(340px,calc(100vw - 28px));display:flex;flex-direction:column;gap:10px;pointer-events:none}
+.mod-toast{background:linear-gradient(135deg,rgba(26,14,46,0.97),rgba(40,16,50,0.97));border:1.5px solid rgba(255,68,68,0.5);border-radius:14px;padding:12px 14px;box-shadow:0 10px 32px rgba(0,0,0,0.45),0 0 0 1px rgba(255,255,255,0.04);animation:modToastIn 0.35s ease both;pointer-events:auto;backdrop-filter:blur(12px)}
+.mod-toast.mute{border-color:rgba(255,170,0,0.55)}
+.mod-toast.unmute{border-color:rgba(100,255,200,0.5)}
+.mod-toast.unban{border-color:rgba(34,197,94,0.5)}
+.mod-toast .mt-title{font-size:12.5px;font-weight:900;color:#fff;margin-bottom:4px;display:flex;align-items:center;gap:6px}
+.mod-toast .mt-body{font-size:11.5px;color:#e2e8f0;line-height:1.55}
+.mod-toast .mt-body b{color:#ffd700;word-break:break-all}
+.mod-toast .mt-bar{height:3px;background:rgba(255,255,255,0.1);border-radius:99px;margin-top:10px;overflow:hidden}
+.mod-toast .mt-bar>i{display:block;height:100%;width:100%;background:linear-gradient(90deg,#ff6b9d,#ff4444);animation:modToastBar 8s linear forwards}
 .mod-toast.mute .mt-bar>i{background:linear-gradient(90deg,#ffaa00,#ff6b00)}
 .mod-toast.unmute .mt-bar>i,.mod-toast.unban .mt-bar>i{background:linear-gradient(90deg,#64ffc8,#22c55e)}
-@keyframes modToastIn{from{opacity:0;transform:translateY(-12px)}to{opacity:1;transform:translateY(0)}}
+@keyframes modToastIn{from{opacity:0;transform:translateX(24px)}to{opacity:1;transform:translateX(0)}}
+@keyframes modToastOut{from{opacity:1;transform:translateX(0)}to{opacity:0;transform:translateX(28px)}}
 @keyframes modToastBar{from{width:100%}to{width:0%}}
+@media(max-width:480px){
+  .mod-toast-wrap{right:10px;left:10px;width:auto;bottom:calc(82px + env(safe-area-inset-bottom, 0px))}
+}
 
 
 .chat-input-area{display:flex;align-items:flex-end;gap:8px;padding:10px 12px;border-top:1px solid rgba(255,255,255,0.08);background:rgba(0,0,0,0.2);flex-shrink:0}
@@ -836,6 +842,7 @@ body.chat-open .cs-bubble-container{display:none !important}
 </head>
 <body>
 
+<div id="modToastWrap" class="mod-toast-wrap" aria-live="polite"></div>
 <div class="app">
   <div class="app-bar">
     <div class="app-logo"><img src="/home/logo.png" alt="Shine" onerror="this.style.display='none';this.parentElement.innerHTML='✨'"></div>
@@ -2706,7 +2713,9 @@ async function updateAuthUI(user) {
       document.getElementById('adminIcon').textContent = role === 'owner' ? '👑' : '🛡️';
       loadChatStats();
       loadPendingRefunds();
-      if (isOwner) { loadOwnerWithdrawals(); setTimeout(loadAdminMissions, 1500); setTimeout(loadBannedPublicList, 600); setTimeout(initModerationRealtime, 800); }
+      if (isOwner) { loadOwnerWithdrawals(); setTimeout(loadAdminMissions, 1500); setTimeout(loadBannedPublicList, 600); }
+    // notif ban/mute ke SEMUA user online
+    setTimeout(initModerationRealtime, 700); setTimeout(initChatMuteRealtime, 900);
       startMemberRealtime();
       startAutoUnbanScheduler();
       startBannedCountdownTicker();
@@ -2736,6 +2745,7 @@ async function updateAuthUI(user) {
     if (isAdminOrOwner) setTimeout(() => loadAdminMissions(), 1500);
     await initNotifications();
     await initChat();
+    try { setTimeout(initModerationRealtime, 900); setTimeout(initChatMuteRealtime, 1100); } catch (e) {}
     try { startChatBadgePolling(); } catch (e) {}
     try { setTimeout(refreshChatUnreadCounts, 3000); } catch (e) {}
     await initBroadcastListener();
@@ -5282,7 +5292,6 @@ function showModerationToast(type, email, reason, untilIso) {
   const wrap = document.getElementById('modToastWrap');
   if (!wrap) return;
   const key = type + '|' + (email || '') + '|' + (untilIso || '') + '|' + (reason || '');
-  // avoid spam same event within 12s
   if (modToastSeen.has(key)) return;
   modToastSeen.add(key);
   setTimeout(() => modToastSeen.delete(key), 12000);
@@ -5296,19 +5305,28 @@ function showModerationToast(type, email, reason, untilIso) {
   const cls = type === 'mute' ? 'mute' : (type === 'unmute' ? 'unmute' : (type === 'unban' ? 'unban' : ''));
   const el = document.createElement('div');
   el.className = 'mod-toast ' + cls;
-  el.innerHTML = `
-    <div class="mt-title">${titles[type] || 'Notifikasi Moderasi'}</div>
-    <div class="mt-body">
-      <b style="color:#ffd700;">${escapeHtml(email || '-')}</b><br>
-      ${reason ? ('Alasan: <span style="color:#ffb3b3;">' + escapeHtml(reason) + '</span><br>') : ''}
-      ${untilIso ? ('Sampai: <span style="color:#94a3b8;">' + escapeHtml(formatModUntil(untilIso)) + '</span>') : ''}
-    </div>
-    <div class="mt-bar"><i></i></div>`;
-  wrap.innerHTML = '';
+  const reasonLine = reason ? ('Alasan: <span style="color:#ffb3b3;">' + escapeHtml(String(reason)) + '</span><br>') : '';
+  const untilLine = untilIso ? ('Sampai: <span style="color:#94a3b8;">' + escapeHtml(formatModUntil(untilIso)) + '</span>') : '';
+  el.innerHTML =
+    '<div class="mt-title">' + (titles[type] || 'Notifikasi Moderasi') + '</div>' +
+    '<div class="mt-body"><b>' + escapeHtml(email || '-') + '</b><br>' + reasonLine + untilLine + '</div>' +
+    '<div class="mt-bar"><i></i></div>';
+  // stack: newest di bawah (paling dekat bottom)
   wrap.appendChild(el);
+  // max 4 toast
+  while (wrap.children.length > 4) {
+    try { wrap.removeChild(wrap.firstChild); } catch (_) {}
+  }
+  try { playBubbleSound(); } catch (_) {}
+  if (navigator.vibrate) try { navigator.vibrate([80, 40, 80]); } catch (_) {}
   setTimeout(() => {
-    try { if (el.parentNode) el.parentNode.removeChild(el); } catch (_) {}
-  }, 10000);
+    try {
+      el.style.animation = 'modToastOut 0.3s ease forwards';
+      setTimeout(() => { try { if (el.parentNode) el.parentNode.removeChild(el); } catch (_) {} }, 320);
+    } catch (_) {
+      try { if (el.parentNode) el.parentNode.removeChild(el); } catch (e2) {}
+    }
+  }, 8000);
 }
 
 async function loadBannedPublicList() {
@@ -5357,32 +5375,60 @@ async function loadBannedPublicList() {
   }
 }
 
+
+// Mute table ada di project CHAT — dengarkan juga di chatClient
+function initChatMuteRealtime() {
+  const client = (typeof chatClient !== 'undefined' && chatClient) ? chatClient : null;
+  if (!client || !currentUser) return;
+  try {
+    if (window._chatMuteModChannel) {
+      try { window._chatMuteModChannel.unsubscribe(); } catch (_) {}
+      window._chatMuteModChannel = null;
+    }
+    window._chatMuteModChannel = client
+      .channel('chat_mutes_moderation_' + Date.now())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_mutes' }, (payload) => {
+        try {
+          const ev = payload.eventType || payload.event || '';
+          if (ev === 'INSERT' || ev === 'UPDATE') {
+            const n = payload.new || {};
+            const until = n.muted_until || n.until;
+            showModerationToast('mute', n.email || n.target_email || '-', n.reason || n.mute_reason || '-', until || null);
+          } else if (ev === 'DELETE') {
+            const o = payload.old || {};
+            showModerationToast('unmute', o.email || o.target_email || '-', 'Mute dicabut', null);
+          }
+        } catch (e) { console.warn('chat mute mod', e.message); }
+      })
+      .subscribe();
+  } catch (e) { console.warn('initChatMuteRealtime', e.message); }
+}
+
 function initModerationRealtime() {
-  if (!supabaseClient) return;
+  if (!supabaseClient || !currentUser) return;
   try {
     if (moderationRealtimeChannel) {
       try { moderationRealtimeChannel.unsubscribe(); } catch (_) {}
       moderationRealtimeChannel = null;
     }
+    // Channel publik: semua user yang login menerima event ban/mute
     moderationRealtimeChannel = supabaseClient
-      .channel('moderation_public_' + Date.now())
+      .channel('moderation_public_all_' + Date.now())
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles' }, (payload) => {
         try {
           const n = payload.new || {};
           const o = payload.old || {};
           const email = n.email || o.email || '-';
-          // BAN
           if (n.banned === true && o.banned !== true) {
             showModerationToast('ban', email, n.banned_reason || n.ban_reason || '-', n.banned_until);
-            loadBannedPublicList();
+            try { loadBannedPublicList(); } catch (_) {}
           } else if (n.banned === false && o.banned === true) {
             showModerationToast('unban', email, 'Ban dicabut', null);
-            loadBannedPublicList();
+            try { loadBannedPublicList(); } catch (_) {}
           } else if (n.banned === true && o.banned === true && (n.banned_until !== o.banned_until || n.banned_reason !== o.banned_reason)) {
             showModerationToast('ban', email, n.banned_reason || '-', n.banned_until);
-            loadBannedPublicList();
+            try { loadBannedPublicList(); } catch (_) {}
           }
-          // MUTE via profiles columns (jika ada)
           if ((n.is_muted === true && o.is_muted !== true) ||
               (n.muted_until && n.muted_until !== o.muted_until && new Date(n.muted_until) > new Date())) {
             showModerationToast('mute', email, n.mute_reason || '-', n.muted_until);
@@ -5393,18 +5439,23 @@ function initModerationRealtime() {
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_mutes' }, (payload) => {
         try {
-          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+          const ev = payload.eventType || payload.event || '';
+          if (ev === 'INSERT' || ev === 'UPDATE') {
             const n = payload.new || {};
-            if (n.muted_until && new Date(n.muted_until) > new Date()) {
-              showModerationToast('mute', n.email || '-', n.reason || '-', n.muted_until);
+            const until = n.muted_until || n.until;
+            if (until && new Date(until) > new Date()) {
+              showModerationToast('mute', n.email || n.target_email || '-', n.reason || n.mute_reason || '-', until);
+            } else if (ev === 'INSERT') {
+              showModerationToast('mute', n.email || n.target_email || '-', n.reason || n.mute_reason || '-', until || null);
             }
-          } else if (payload.eventType === 'DELETE') {
+          } else if (ev === 'DELETE') {
             const o = payload.old || {};
-            showModerationToast('unmute', o.email || '-', 'Mute dicabut', null);
+            showModerationToast('unmute', o.email || o.target_email || '-', 'Mute dicabut', null);
           }
         } catch (e) { console.warn('moderation chat_mutes handler', e.message); }
       })
       .subscribe((status) => {
+        if (status === 'SUBSCRIBED') console.log('[moderation] realtime aktif untuk notif publik');
         if (['CHANNEL_ERROR', 'TIMED_OUT', 'CLOSED'].includes(status)) {
           setTimeout(initModerationRealtime, 4000);
         }
