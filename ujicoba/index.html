@@ -6081,19 +6081,76 @@ function previewChatImage(url) {
   });
 }
 
-async function uploadSupportChatImage(file, userId) {
-  if (!file || !supabaseClient) throw new Error('File / client tidak siap');
-  const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
-  const path = `support/${userId || 'guest'}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
-  const { error: upErr } = await supabaseClient.storage.from('chat-images').upload(path, file, {
-    cacheControl: '3600',
-    upsert: false,
-    contentType: file.type || 'image/jpeg'
+async function compressImageForChat(file, maxSide = 1280, quality = 0.82) {
+  return new Promise((resolve, reject) => {
+    try {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        try {
+          let w = img.naturalWidth || img.width;
+          let h = img.naturalHeight || img.height;
+          if (!w || !h) { URL.revokeObjectURL(url); resolve(file); return; }
+          const scale = Math.min(1, maxSide / Math.max(w, h));
+          w = Math.round(w * scale);
+          h = Math.round(h * scale);
+          const canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, w, h);
+          URL.revokeObjectURL(url);
+          canvas.toBlob((blob) => {
+            if (!blob) { resolve(file); return; }
+            resolve(new File([blob], (file.name || 'foto').replace(/\.[^.]+$/, '') + '.jpg', { type: 'image/jpeg' }));
+          }, 'image/jpeg', quality);
+        } catch (e) { URL.revokeObjectURL(url); resolve(file); }
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
+      img.src = url;
+    } catch (e) { resolve(file); }
   });
-  if (upErr) throw upErr;
-  const { data } = supabaseClient.storage.from('chat-images').getPublicUrl(path);
-  if (!data || !data.publicUrl) throw new Error('Gagal mendapatkan URL foto');
-  return data.publicUrl;
+}
+
+async function uploadSupportChatImage(file, userId) {
+  if (!file) throw new Error('File tidak siap');
+  // Chat DB ada di CHAT project → bucket HARUS di project chat (chatClient)
+  const clients = [];
+  if (typeof chatClient !== 'undefined' && chatClient) clients.push({ name: 'chat', client: chatClient });
+  if (typeof supabaseClient !== 'undefined' && supabaseClient) clients.push({ name: 'main', client: supabaseClient });
+  if (!clients.length) throw new Error('Client Supabase tidak siap');
+
+  const compressed = await compressImageForChat(file);
+  const path = `support/${userId || 'guest'}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.jpg`;
+  let lastErr = null;
+
+  for (const { name, client } of clients) {
+    try {
+      const { error: upErr } = await client.storage.from('chat-images').upload(path, compressed, {
+        cacheControl: '3600',
+        upsert: false,
+        contentType: 'image/jpeg'
+      });
+      if (upErr) throw upErr;
+      const { data } = client.storage.from('chat-images').getPublicUrl(path);
+      if (!data || !data.publicUrl) throw new Error('Gagal mendapatkan URL foto');
+      console.log('[chat-image] uploaded via', name, data.publicUrl);
+      return data.publicUrl;
+    } catch (e) {
+      lastErr = e;
+      console.warn('[chat-image] upload via', name, 'failed:', e.message || e);
+    }
+  }
+
+  const msg = (lastErr && (lastErr.message || String(lastErr))) || 'Upload gagal';
+  if (/bucket not found/i.test(msg)) {
+    throw new Error(
+      'Bucket "chat-images" belum ada di project CHAT.\n\n' +
+      'Buat di Supabase project chat:\n' +
+      'Storage → New bucket → nama: chat-images → Public: ON\n\n' +
+      'Project chat: klsmpfojsohcdzdbivxj'
+    );
+  }
+  throw lastErr || new Error(msg);
 }
 
 async function insertSupportMessageRow(row) {
