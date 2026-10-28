@@ -677,10 +677,14 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
 .nav-item .nav-label{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.5px;line-height:1}
 .nav-item.active{color:#ff6b9d;background:rgba(255,107,157,0.1)}
 .nav-item.active .nav-icon{transform:scale(1.1)}
-.nav-item .nav-badge{position:absolute;top:4px;right:calc(50% - 18px);background:#ff4444;color:#fff;min-width:16px;height:16px;padding:0 4px;border-radius:20px;font-size:9px;font-weight:800;display:flex;align-items:center;justify-content:center;border:2px solid #140a28}
-.nav-item .nav-badge:empty{display:none}
+.nav-item .nav-badge{position:absolute;top:2px;right:8px;background:#ff4444;color:#fff;min-width:18px;height:18px;padding:0 5px;border-radius:20px;font-size:10px;font-weight:900;display:none;align-items:center;justify-content:center;border:2px solid #140a28;z-index:5;box-shadow:0 0 8px rgba(255,68,68,0.6);line-height:1}
+.nav-item .nav-badge:empty{display:none !important}
 .nav-item .nav-badge.has-count{display:flex !important;animation:badgePulse 1.5s ease-in-out infinite}
+.app-icon-btn .badge{position:absolute;top:-2px;right:-2px;background:#ff4444;color:#fff;min-width:18px;height:18px;padding:0 5px;border-radius:20px;font-size:10px;font-weight:900;display:none;align-items:center;justify-content:center;border:2px solid #1a0e2e;z-index:5;box-shadow:0 0 8px rgba(255,68,68,0.6);line-height:1}
+.app-icon-btn .badge:empty{display:none !important}
 .app-icon-btn .badge.has-count{display:flex !important;animation:badgePulse 1.5s ease-in-out infinite}
+.chat-list-badge{display:none;min-width:18px;height:18px;padding:0 6px;border-radius:20px;background:#ff4444;color:#fff;font-size:10px;font-weight:900;align-items:center;justify-content:center;margin-left:6px}
+.chat-list-badge.has-count{display:inline-flex !important}
 
 /* ============ AUTH ============ */
 .auth-screen{position:absolute;inset:0;background:linear-gradient(180deg,#1a0e2e 0%,#221236 50%,#1a0e2e 100%);z-index:100;display:flex;flex-direction:column;padding:24px 20px;overflow-y:auto}
@@ -952,8 +956,8 @@ body.chat-open .cs-bubble-container{display:none !important}
       </div>
       <div class="section">
         <div class="section-title">💬 Pilih Chat<div class="line"></div></div>
-        <div class="chat-list-item" onclick="openChatHub('global')"><div class="chat-avatar global">💬<span class="live-dot"></span></div><div class="chat-info"><div class="chat-name">Global Chat<span class="live-badge"><span class="dot"></span>LIVE</span></div><div class="chat-preview" id="globalChatPreview">Ngobrol dengan semua user</div></div><div class="chat-arrow">→</div></div>
-        <div class="chat-list-item" onclick="openChatHub('support')"><div class="chat-avatar support">📩</div><div class="chat-info"><div class="chat-name">Customer Service</div><div class="chat-preview" id="supportChatPreview">Hubungi CS untuk bantuan</div></div><div class="chat-arrow">→</div></div>
+        <div class="chat-list-item" onclick="openChatHub('global')"><div class="chat-avatar global">💬<span class="live-dot"></span></div><div class="chat-info"><div class="chat-name">Global Chat<span class="live-badge"><span class="dot"></span>LIVE</span><span class="chat-list-badge" id="globalListBadge"></span></div><div class="chat-preview" id="globalChatPreview">Ngobrol dengan semua user</div></div><div class="chat-arrow">→</div></div>
+        <div class="chat-list-item" onclick="openChatHub('support')"><div class="chat-avatar support">📩</div><div class="chat-info"><div class="chat-name">Customer Service<span class="chat-list-badge" id="supportListBadge"></span></div><div class="chat-preview" id="supportChatPreview">Hubungi CS untuk bantuan</div></div><div class="chat-arrow">→</div></div>
       </div>
       <div class="section"><div class="section-title">ℹ️ Info<div class="line"></div></div><div class="info-banner"><span class="icon">💡</span><div><b>Global Chat</b> auto-hapus 12 jam · <b>Support Chat</b> auto-hapus 24 jam. <b>Ctrl+Enter</b> untuk kirim.</div></div></div>
     </div>
@@ -2697,6 +2701,8 @@ async function updateAuthUI(user) {
     if (isAdminOrOwner) setTimeout(() => loadAdminMissions(), 1500);
     await initNotifications();
     await initChat();
+    try { startChatBadgePolling(); } catch (e) {}
+    try { setTimeout(refreshChatUnreadCounts, 3000); } catch (e) {}
     await initBroadcastListener();
     if (profile?.banned) startUserBanCheckTimer();
     updateNotifStatusDisplay();
@@ -6033,16 +6039,17 @@ function startSupportChatAutoCleanup() {
 // CHAT SYSTEM
 // ============================================================
 
+
 // ============================================================
-// CHAT UNREAD BADGE (nav bar + app bar)
+// CHAT UNREAD BADGE (nav bar + app bar) — robust
 // ============================================================
 let chatUnreadGlobal = 0;
 let chatUnreadSupport = 0;
 let chatBadgeRefreshTimer = null;
 
 function chatUnreadStorageKey(kind) {
-  const uid = currentUser?.id || 'guest';
-  return `shine_chat_seen_${kind}_${uid}`;
+  const uid = (currentUser && currentUser.id) ? currentUser.id : 'guest';
+  return 'shine_chat_seen_' + kind + '_' + uid;
 }
 
 function getChatLastSeen(kind) {
@@ -6050,33 +6057,40 @@ function getChatLastSeen(kind) {
     const v = localStorage.getItem(chatUnreadStorageKey(kind));
     if (v) return v;
   } catch (_) {}
-  // default: 24 jam terakhir agar tidak banjir badge lama
-  return new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  return new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString();
 }
 
 function setChatLastSeen(kind, iso) {
-  try {
-    localStorage.setItem(chatUnreadStorageKey(kind), iso || new Date().toISOString());
-  } catch (_) {}
+  try { localStorage.setItem(chatUnreadStorageKey(kind), iso || new Date().toISOString()); } catch (_) {}
 }
 
 function updateChatNavBadge(totalOverride) {
-  const total = totalOverride != null
-    ? totalOverride
-    : (Math.max(0, chatUnreadGlobal) + Math.max(0, chatUnreadSupport));
+  const g = Math.max(0, Number(chatUnreadGlobal) || 0);
+  const s = Math.max(0, Number(chatUnreadSupport) || 0);
+  const total = totalOverride != null ? totalOverride : (g + s);
   const label = total > 99 ? '99+' : (total > 0 ? String(total) : '');
-  ['navChatBadge', 'appBarChatBadge'].forEach(id => {
-    const el = document.getElementById(id);
+
+  function setBadge(el, value) {
     if (!el) return;
-    el.textContent = label;
-    if (label) el.classList.add('has-count');
-    else el.classList.remove('has-count');
-  });
-  // preview teks di page-chat
-  try {
-    const prev = document.getElementById('globalChatPreview');
-    // no-op, preview di-update handler lain
-  } catch (_) {}
+    el.textContent = value || '';
+    if (value) {
+      el.classList.add('has-count');
+      el.style.display = 'flex';
+    } else {
+      el.classList.remove('has-count');
+      el.style.display = 'none';
+      el.textContent = '';
+    }
+  }
+
+  setBadge(document.getElementById('navChatBadge'), label);
+  setBadge(document.getElementById('appBarChatBadge'), label);
+
+  // badge di list page-chat
+  const gLabel = g > 99 ? '99+' : (g > 0 ? String(g) : '');
+  const sLabel = s > 99 ? '99+' : (s > 0 ? String(s) : '');
+  setBadge(document.getElementById('globalListBadge'), gLabel);
+  setBadge(document.getElementById('supportListBadge'), sLabel);
 }
 
 function markChatTabAsRead(tab) {
@@ -6093,78 +6107,105 @@ function markChatTabAsRead(tab) {
 }
 
 async function refreshChatUnreadCounts() {
-  if (!chatClient || !currentUser) {
+  if (!currentUser) {
     chatUnreadGlobal = 0;
     chatUnreadSupport = 0;
     updateChatNavBadge(0);
     return;
   }
-  try {
-    const chatUid = await getChatUserId();
-    const myIds = new Set([currentUser.id, chatUid, cachedChatUserId].filter(Boolean));
 
-    // --- Global: pesan orang lain setelah last seen ---
-    const globalSeen = getChatLastSeen('global');
-    try {
-      const { data: gRows, error: gErr } = await chatClient
-        .from('global_messages')
-        .select('id, user_id, email, created_at, message')
+  let chatUid = null;
+  try {
+    if (typeof getChatUserId === 'function') chatUid = await getChatUserId();
+  } catch (_) {}
+  if (!chatUid) chatUid = cachedChatUserId || currentUser.id;
+  const myIds = new Set([currentUser.id, chatUid, cachedChatUserId].filter(Boolean));
+
+  // GLOBAL
+  try {
+    if (chatHubOpen && currentChatTab === 'global') {
+      chatUnreadGlobal = 0;
+    } else if (chatClient) {
+      const globalSeen = getChatLastSeen('global');
+      // coba beberapa bentuk kolom pengirim
+      let rows = null;
+      let err = null;
+      let r1 = await chatClient.from('global_messages')
+        .select('id, user_id, email, created_at')
         .gt('created_at', globalSeen)
         .order('created_at', { ascending: false })
-        .limit(100);
-      if (!gErr && gRows) {
-        chatUnreadGlobal = gRows.filter(m => m.user_id && !myIds.has(m.user_id)).length;
+        .limit(80);
+      err = r1.error; rows = r1.data;
+      if (err) {
+        const r2 = await chatClient.from('global_messages')
+          .select('id, email, created_at')
+          .gt('created_at', globalSeen)
+          .limit(80);
+        rows = r2.data;
       }
-    } catch (e) { console.warn('badge global', e.message); }
+      if (rows && rows.length) {
+        chatUnreadGlobal = rows.filter(m => {
+          if (m.user_id && myIds.has(m.user_id)) return false;
+          // kalau cuma email: anggap unread jika email bukan milik kita
+          if (!m.user_id && m.email && currentUser.email && m.email.toLowerCase() === currentUser.email.toLowerCase()) return false;
+          return true;
+        }).length;
+      } else {
+        chatUnreadGlobal = 0;
+      }
+    }
+  } catch (e) {
+    console.warn('[badge] global', e.message || e);
+  }
 
-    // --- Support/CS ---
-    const supportSeen = getChatLastSeen('support');
-    try {
+  // SUPPORT / CS
+  try {
+    if (chatHubOpen && currentChatTab === 'support') {
+      chatUnreadSupport = 0;
+    } else if (chatClient) {
+      const supportSeen = getChatLastSeen('support');
       if (isStaff) {
-        // staff: pesan user belum dibaca
-        const { data: sRows, error: sErr } = await chatClient
-          .from('support_messages')
+        let sRows = null;
+        const q1 = await chatClient.from('support_messages')
           .select('id, sender_role, read_by_admin, created_at')
           .eq('sender_role', 'user')
-          .eq('read_by_admin', false)
           .order('created_at', { ascending: false })
-          .limit(100);
-        if (!sErr && sRows) chatUnreadSupport = sRows.length;
-        else {
-          // fallback tanpa kolom read_by_admin
-          const { data: s2 } = await chatClient
-            .from('support_messages')
+          .limit(80);
+        if (!q1.error && q1.data) {
+          sRows = q1.data.filter(m => m.read_by_admin === false || m.read_by_admin == null);
+          // jika semua null read_by_admin, fallback by time
+          if (sRows.length === 0 && q1.data.every(m => m.read_by_admin == null)) {
+            sRows = q1.data.filter(m => m.created_at && m.created_at > supportSeen);
+          }
+        } else {
+          const q2 = await chatClient.from('support_messages')
             .select('id, sender_role, created_at')
             .eq('sender_role', 'user')
             .gt('created_at', supportSeen)
-            .limit(100);
-          chatUnreadSupport = (s2 || []).length;
+            .limit(80);
+          sRows = q2.data || [];
         }
+        chatUnreadSupport = (sRows || []).length;
       } else {
-        // user: balasan CS/admin/owner setelah last seen
         const uid = chatUid || currentUser.id;
-        const { data: sRows, error: sErr } = await chatClient
-          .from('support_messages')
+        const q1 = await chatClient.from('support_messages')
           .select('id, sender_role, sender_id, created_at')
           .eq('user_id', uid)
           .in('sender_role', ['cs', 'admin', 'owner'])
           .gt('created_at', supportSeen)
-          .order('created_at', { ascending: false })
-          .limit(100);
-        if (!sErr && sRows) {
-          chatUnreadSupport = sRows.filter(m => !myIds.has(m.sender_id)).length;
+          .limit(80);
+        if (!q1.error && q1.data) {
+          chatUnreadSupport = q1.data.filter(m => !m.sender_id || !myIds.has(m.sender_id)).length;
+        } else {
+          chatUnreadSupport = 0;
         }
       }
-    } catch (e) { console.warn('badge support', e.message); }
-
-    // jika user sedang buka tab chat, jangan hitung tab itu
-    if (chatHubOpen && currentChatTab === 'global') chatUnreadGlobal = 0;
-    if (chatHubOpen && currentChatTab === 'support') chatUnreadSupport = 0;
-
-    updateChatNavBadge();
+    }
   } catch (e) {
-    console.warn('refreshChatUnreadCounts', e.message || e);
+    console.warn('[badge] support', e.message || e);
   }
+
+  updateChatNavBadge();
 }
 
 function bumpChatUnread(kind) {
@@ -6179,18 +6220,34 @@ function bumpChatUnread(kind) {
 }
 
 function startChatBadgePolling() {
-  if (chatBadgeRefreshTimer) clearInterval(chatBadgeRefreshTimer);
-  refreshChatUnreadCounts();
-  chatBadgeRefreshTimer = setInterval(() => {
-    if (document.visibilityState === 'visible') refreshChatUnreadCounts();
-  }, 20000);
+  try {
+    if (chatBadgeRefreshTimer) clearInterval(chatBadgeRefreshTimer);
+    // jalankan segera + delay (nunggu chat auth)
+    refreshChatUnreadCounts();
+    setTimeout(() => refreshChatUnreadCounts(), 2500);
+    setTimeout(() => refreshChatUnreadCounts(), 8000);
+    chatBadgeRefreshTimer = setInterval(() => {
+      if (document.visibilityState === 'visible') refreshChatUnreadCounts();
+    }, 15000);
+  } catch (e) {
+    console.warn('startChatBadgePolling', e.message || e);
+  }
 }
 
 
 async function initChat() {
-  if (!chatClient || !currentUser) return;
-  const { data: { session } } = await chatClient.auth.getSession();
-  if (!session || !session.user) return;
+  if (!currentUser) return;
+  try { startChatBadgePolling(); } catch (_) {}
+  if (!chatClient) return;
+  try {
+    const { data: { session } } = await chatClient.auth.getSession();
+    if (!session || !session.user) {
+      // coba login chat dulu, tetap refresh badge
+      try { await getChatUserId(); } catch (_) {}
+      try { startChatBadgePolling(); } catch (_) {}
+      return;
+    }
+  } catch (_) {}
   subscribeGlobalChat();
   subscribeUserSupportChat();
   initCSBubbleChannel();
