@@ -813,6 +813,19 @@ body.chat-open .cs-bubble-container{display:none !important}
 @keyframes modToastIn{from{opacity:0;transform:translateY(-12px)}to{opacity:1;transform:translateY(0)}}
 @keyframes modToastBar{from{width:100%}to{width:0%}}
 
+
+.chat-input-area{display:flex;align-items:flex-end;gap:8px;padding:10px 12px;border-top:1px solid rgba(255,255,255,0.08);background:rgba(0,0,0,0.2);flex-shrink:0}
+.chat-attach-btn{width:40px;height:40px;border-radius:12px;border:1px solid rgba(255,107,157,0.35);background:rgba(255,107,157,0.12);color:#ff6b9d;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all 0.2s}
+.chat-attach-btn:hover{background:rgba(255,107,157,0.25);transform:scale(1.05)}
+.chat-attach-btn:disabled{opacity:0.4;cursor:not-allowed}
+.msg-image{display:block;max-width:min(240px,70vw);max-height:280px;border-radius:12px;margin-top:6px;cursor:pointer;border:1px solid rgba(255,255,255,0.12);object-fit:cover}
+.msg-image-caption{font-size:12px;margin-top:4px;color:inherit;opacity:0.95}
+.chat-img-preview{display:none;padding:8px 12px;background:rgba(0,0,0,0.25);border-top:1px solid rgba(255,255,255,0.06);align-items:center;gap:10px}
+.chat-img-preview.show{display:flex}
+.chat-img-preview img{width:56px;height:56px;object-fit:cover;border-radius:10px;border:1px solid rgba(255,255,255,0.15)}
+.chat-img-preview .cip-name{flex:1;font-size:11px;color:#b39ddb;word-break:break-all}
+.chat-img-preview .cip-clear{background:rgba(255,68,68,0.2);border:none;color:#ff8080;width:28px;height:28px;border-radius:8px;cursor:pointer;font-weight:800}
+
 </style>
 </head>
 <body>
@@ -933,7 +946,7 @@ body.chat-open .cs-bubble-container{display:none !important}
       <div class="section" id="csFolderSection" style="display:none;">
         <div class="section-title">📁 Folder Chat Customer Service<div class="line"></div></div>
         <div id="csFolderList"><div class="chat-empty" style="padding:20px 10px;"><span class="icon">📭</span>Belum ada folder chat</div></div>
-        <div style="font-size:10px;color:#6b4a7a;text-align:center;margin-top:8px;font-style:italic;">Folder chat bisa dihapus manual lewat tombol ✕ pada tiap folder</div>
+        <div style="font-size:10px;color:#6b4a7a;text-align:center;margin-top:8px;font-style:italic;">Folder & chat CS auto-hapus setelah 36 jam tidak aktif · bisa dihapus manual lewat ✕</div>
       </div>
       <div class="section">
         <div class="section-title">💬 Pilih Chat<div class="line"></div></div>
@@ -1065,7 +1078,10 @@ body.chat-open .cs-bubble-container{display:none !important}
               <div class="bf-label">👥 Target</div><select id="bfTargetRole" class="bf-select"><option value="all">🌐 Semua User</option><option value="user">👤 User</option><option value="cs">💼 CS</option><option value="admin">🛡️ Admin</option><option value="owner">👑 Owner</option></select>
               <div class="bf-label">⚡ Prioritas</div>
               <div class="bf-priority-grid"><button type="button" class="bf-priority-btn active" data-priority="normal" onclick="selectPriority('normal', this)"><span>💬</span><span style="font-size:10px;">Normal</span></button><button type="button" class="bf-priority-btn high" data-priority="high" onclick="selectPriority('high', this)"><span>⚡</span><span style="font-size:10px;">High</span></button><button type="button" class="bf-priority-btn urgent" data-priority="urgent" onclick="selectPriority('urgent', this)"><span>🚨</span><span style="font-size:10px;">Urgent</span></button></div>
-              <div class="bf-label">⏰ Durasi (jam)</div><input type="number" id="bfExpiresHours" class="bf-input" value="24" min="1" max="720">
+              <div class="bf-label">⏰ Durasi aktif broadcast (jam)</div><input type="number" id="bfExpiresHours" class="bf-input" value="24" min="1" max="720">
+              <div class="bf-label">⏱️ Timer pop-up (detik)</div>
+              <input type="number" id="bfPopupSeconds" class="bf-input" value="8" min="3" max="120" step="1" placeholder="Detik pop-up tampil">
+              <div style="font-size:10px;color:#94a3b8;margin:-4px 0 10px;">Pop-up otomatis tutup setelah detik ini. Jika ada beberapa broadcast, muncul bergiliran.</div>
               <button class="bf-submit" id="bfSubmitBtn" onclick="sendBroadcast()">📢 Kirim Broadcast</button>
             </div>
             <div class="broadcast-history"><div class="bh-title"><span>📜 Riwayat Broadcast</span><button onclick="loadBroadcastHistory()" style="background:rgba(255,107,157,0.2);color:#ff6b9d;border:none;padding:3px 8px;border-radius:6px;font-size:10px;cursor:pointer;font-weight:800;">🔄</button></div><div id="broadcastHistoryList"><div class="broadcast-empty"><span style="font-size:28px;display:block;margin-bottom:6px;opacity:0.5;">📭</span>Belum ada</div></div></div>
@@ -1211,13 +1227,25 @@ body.chat-open .cs-bubble-container{display:none !important}
     <div id="chatSupportView" style="flex:1;display:none;flex-direction:column;overflow:hidden;">
       <div class="support-chat-view show" id="supportChatViewUser" style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
         <div class="chat-msgs" id="supportChatBodyUser"><div class="chat-empty"><span class="icon">📩</span>Hubungi CS untuk bantuan</div></div>
-        <div class="chat-input-area"><textarea class="chat-input" id="supportChatInput" placeholder="Tulis pesan ke CS... (Ctrl+Enter kirim)" rows="1" maxlength="2000"></textarea><button class="chat-send" id="supportChatSend" onclick="sendSupportMessage()">➤</button></div>
+        <div class="chat-img-preview" id="supportImgPreviewUser"><img id="supportImgThumbUser" alt="preview"><span class="cip-name" id="supportImgNameUser"></span><button type="button" class="cip-clear" onclick="clearSupportImage('user')" title="Hapus">✕</button></div>
+        <div class="chat-input-area">
+          <input type="file" id="supportImageInputUser" accept="image/jpeg,image/png,image/webp,image/gif" style="display:none" onchange="onSupportImagePicked(event,'user')">
+          <button type="button" class="chat-attach-btn" id="supportAttachUser" onclick="document.getElementById('supportImageInputUser').click()" title="Kirim foto">🖼️</button>
+          <textarea class="chat-input" id="supportChatInput" placeholder="Tulis pesan ke CS... (Ctrl+Enter kirim)" rows="1" maxlength="2000"></textarea>
+          <button class="chat-send" id="supportChatSend" onclick="sendSupportMessage()">➤</button>
+        </div>
       </div>
       <div class="support-users-view" id="supportUsersView" style="flex:1;display:none;flex-direction:column;overflow:hidden;"><div class="support-users-list" id="supportUsersList"><div class="chat-empty"><span class="icon">📭</span>Belum ada chat dari user</div></div></div>
       <div class="support-chat-view" id="supportChatViewAdmin" style="flex:1;display:none;flex-direction:column;overflow:hidden;">
         <div class="admin-chat-bar"><button class="back-btn" onclick="backToSupportUsers()">← Kembali</button><div class="target-email" id="supportAdminTargetEmail">-</div></div>
         <div class="chat-msgs" id="supportChatBodyAdmin"></div>
-        <div class="chat-input-area"><textarea class="chat-input" id="supportChatInputAdmin" placeholder="Balas sebagai CS... (Ctrl+Enter kirim)" rows="1" maxlength="2000"></textarea><button class="chat-send" id="supportChatSendAdmin" onclick="sendSupportReply()">➤</button></div>
+        <div class="chat-img-preview" id="supportImgPreviewAdmin"><img id="supportImgThumbAdmin" alt="preview"><span class="cip-name" id="supportImgNameAdmin"></span><button type="button" class="cip-clear" onclick="clearSupportImage('admin')" title="Hapus">✕</button></div>
+        <div class="chat-input-area">
+          <input type="file" id="supportImageInputAdmin" accept="image/jpeg,image/png,image/webp,image/gif" style="display:none" onchange="onSupportImagePicked(event,'admin')">
+          <button type="button" class="chat-attach-btn" id="supportAttachAdmin" onclick="document.getElementById('supportImageInputAdmin').click()" title="Kirim foto">🖼️</button>
+          <textarea class="chat-input" id="supportChatInputAdmin" placeholder="Balas sebagai CS... (Ctrl+Enter kirim)" rows="1" maxlength="2000"></textarea>
+          <button class="chat-send" id="supportChatSendAdmin" onclick="sendSupportReply()">➤</button>
+        </div>
       </div>
     </div>
   </div>
@@ -1288,6 +1316,8 @@ let activeBubbles = {};
 let csPollingInterval = null;
 let lastPolledTime = null;
 const CS_BUBBLE_DURATION = 10000;
+const SUPPORT_CHAT_TTL_HOURS = 36; // auto-hapus chat CS + folder setelah 36 jam
+let supportChatCleanupInterval = null;
 const CS_BUBBLE_MAX = 3;
 let presenceChannelRealtime = null;
 let balanceRealtimeChannel = null;
@@ -1323,6 +1353,10 @@ let allMutasiAdminCache = [];
 let mutasiAdminTypeFilter = 'all';
 let broadcastPopupTimer = null;
 let seenBroadcastIds = new Set();
+let broadcastQueue = [];
+let broadcastShowing = false;
+let broadcastPopupCallback = null;
+const DEFAULT_BROADCAST_POPUP_SECONDS = 8;
 let broadcastListenerChannel = null;
 let withdrawHistoryData = [];
 let memberPageSearchQuery = '';
@@ -4304,11 +4338,15 @@ async function sendBroadcast() {
   const messageInput = document.getElementById('bfMessage');
   const targetSelect = document.getElementById('bfTargetRole');
   const expiresInput = document.getElementById('bfExpiresHours');
+  const popupSecInput = document.getElementById('bfPopupSeconds');
   const submitBtn = document.getElementById('bfSubmitBtn');
   const title = titleInput.value.trim();
   const message = messageInput.value.trim();
   const targetRole = targetSelect.value;
   const expiresHours = parseInt(expiresInput.value) || 24;
+  let popupSeconds = parseInt(popupSecInput && popupSecInput.value, 10);
+  if (isNaN(popupSeconds)) popupSeconds = DEFAULT_BROADCAST_POPUP_SECONDS;
+  popupSeconds = Math.min(120, Math.max(3, popupSeconds));
   if (!title) { Swal.fire({ title: '⚠️ Judul Kosong', icon: 'warning', confirmButtonColor: '#ff6b9d', background: '#1a0e2e', color: '#fff' }); titleInput.focus(); return; }
   if (!message) { Swal.fire({ title: '⚠️ Pesan Kosong', icon: 'warning', confirmButtonColor: '#ff6b9d', background: '#1a0e2e', color: '#fff' }); messageInput.focus(); return; }
   submitBtn.disabled = true; submitBtn.innerHTML = '⏳ Mengirim...';
@@ -4316,7 +4354,21 @@ async function sendBroadcast() {
     const { data, error } = await supabaseClient.rpc('send_broadcast', { p_title: title, p_message: message, p_target_role: targetRole, p_priority: selectedBroadcastPriority, p_expires_hours: expiresHours });
     if (error) throw error;
     if (!data.success) throw new Error(data.message);
+    // simpan timer pop-up ke row (kolom popup_seconds opsional)
+    try {
+      const bid = data.id || data.broadcast_id || data.notification_id || (data.data && data.data.id);
+      if (bid) {
+        await supabaseClient.from('broadcast_notifications').update({ popup_seconds: popupSeconds }).eq('id', bid);
+      } else {
+        // fallback: update broadcast terakhir milik owner dengan judul sama
+        const { data: latest } = await supabaseClient.from('broadcast_notifications').select('id').eq('title', title).order('sent_at', { ascending: false }).limit(1);
+        if (latest && latest[0]) {
+          await supabaseClient.from('broadcast_notifications').update({ popup_seconds: popupSeconds }).eq('id', latest[0].id);
+        }
+      }
+    } catch (e) { console.warn('simpan popup_seconds:', e.message); }
     titleInput.value = ''; messageInput.value = ''; expiresInput.value = '24';
+    if (popupSecInput) popupSecInput.value = String(popupSeconds);
     updateBroadcastCharCount();
     selectPriority('normal', document.querySelector('.bf-priority-btn[data-priority="normal"]'));
     Swal.fire({ title: '🎉 Terkirim!', html: `<p style="color:#22c55e;font-weight:800;">${data.recipient_count} user akan menerima</p>`, icon: 'success', confirmButtonColor: '#22c55e', background: '#0a0e1a', color: '#fff', timer: 3000, timerProgressBar: true });
@@ -4351,6 +4403,39 @@ async function deleteBroadcast(id) {
     await loadBroadcastHistory();
   } catch (err) { Swal.fire({ title: '❌ Gagal', text: err.message, icon: 'error', confirmButtonColor: '#ff4444', background: '#1a0e2e', color: '#fff' }); }
 }
+function getBroadcastPopupSeconds(b) {
+  if (b && b.popup_seconds != null) {
+    const n = parseInt(b.popup_seconds, 10);
+    if (!isNaN(n) && n >= 3) return Math.min(120, n);
+  }
+  if (b && b.priority === 'urgent') return 15;
+  if (b && b.priority === 'high') return 10;
+  return DEFAULT_BROADCAST_POPUP_SECONDS;
+}
+
+function enqueueBroadcastPopup(b) {
+  if (!b || !b.id) return;
+  if (seenBroadcastIds.has(b.id)) return;
+  // jangan antri duplikat di queue
+  if (broadcastQueue.some(x => x && x.id === b.id)) return;
+  seenBroadcastIds.add(b.id);
+  try { localStorage.setItem('seen_broadcast_' + b.id, '1'); } catch (e) {}
+  broadcastQueue.push(b);
+  processBroadcastQueue();
+}
+
+function processBroadcastQueue() {
+  if (broadcastShowing) return;
+  if (!broadcastQueue.length) return;
+  broadcastShowing = true;
+  const next = broadcastQueue.shift();
+  showBroadcastPopup(next, () => {
+    broadcastShowing = false;
+    // jeda singkat biar tidak kedip
+    setTimeout(() => processBroadcastQueue(), 350);
+  });
+}
+
 async function initBroadcastListener() {
   if (!supabaseClient || !currentUser) return;
   if (broadcastListenerChannel) { try { broadcastListenerChannel.unsubscribe(); } catch(e) {} broadcastListenerChannel = null; }
@@ -4360,37 +4445,36 @@ async function initBroadcastListener() {
       const b = payload.new;
       if (!b || !b.is_active) return;
       if (b.target_role !== 'all' && b.target_role !== myRole) return;
-      if (seenBroadcastIds.has(b.id)) return;
       if (b.created_by === currentUser.id) return;
       const sentAt = new Date(b.sent_at || b.created_at).getTime();
-      if (Date.now() - sentAt > 60000) return;
-      seenBroadcastIds.add(b.id);
-      showBroadcastPopup(b);
+      if (Date.now() - sentAt > 5 * 60 * 1000) return;
+      enqueueBroadcastPopup(b);
     })
     .subscribe((status) => { if (['CHANNEL_ERROR','TIMED_OUT','CLOSED'].includes(status)) setTimeout(initBroadcastListener, 3000); });
   setTimeout(() => checkNewBroadcastsOnLoad(), 2000);
 }
+
 async function checkNewBroadcastsOnLoad() {
   if (!supabaseClient || !currentUser) return;
   try {
     const myRole = currentProfile?.role || 'user';
     const since = new Date(Date.now() - 5 * 60 * 1000).toISOString();
-    const { data } = await supabaseClient.from('broadcast_notifications').select('*').eq('is_active', true).gte('sent_at', since).order('sent_at', { ascending: false }).limit(10);
+    const { data } = await supabaseClient.from('broadcast_notifications').select('*').eq('is_active', true).gte('sent_at', since).order('sent_at', { ascending: true }).limit(20);
     if (!data || data.length === 0) return;
     for (const b of data) {
       if (b.target_role !== 'all' && b.target_role !== myRole) continue;
       if (b.created_by === currentUser.id) continue;
-      if (seenBroadcastIds.has(b.id)) continue;
       const seenKey = 'seen_broadcast_' + b.id;
       if (localStorage.getItem(seenKey) === '1') { seenBroadcastIds.add(b.id); continue; }
-      seenBroadcastIds.add(b.id);
-      showBroadcastPopup(b);
-      break;
+      if (seenBroadcastIds.has(b.id)) continue;
+      enqueueBroadcastPopup(b);
     }
   } catch (e) {}
 }
-function showBroadcastPopup(b) {
-  if (!b) return;
+
+function showBroadcastPopup(b, onDone) {
+  if (!b) { if (typeof onDone === 'function') onDone(); return; }
+  broadcastPopupCallback = typeof onDone === 'function' ? onDone : null;
   try { localStorage.setItem('seen_broadcast_' + b.id, '1'); } catch(e) {}
   const overlay = document.getElementById('broadcastPopupOverlay');
   const popup = document.getElementById('broadcastPopup');
@@ -4400,39 +4484,47 @@ function showBroadcastPopup(b) {
   const metaEl = document.getElementById('broadcastPopupMeta');
   const barEl = document.getElementById('broadcastPopupBar');
   const secondsEl = document.getElementById('broadcastPopupSeconds');
-  if (!overlay || !popup) return;
+  if (!overlay || !popup) { if (broadcastPopupCallback) broadcastPopupCallback(); return; }
   if (b.priority === 'urgent') iconEl.textContent = '🚨';
   else if (b.priority === 'high') iconEl.textContent = '⚡';
   else iconEl.textContent = '📢';
   titleEl.textContent = b.title || 'Pengumuman';
   messageEl.textContent = b.message || '';
-  const timeStr = new Date(b.sent_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+  const timeStr = new Date(b.sent_at || b.created_at || Date.now()).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
   const priorityLabel = b.priority === 'urgent' ? '🚨 Urgent' : (b.priority === 'high' ? '⚡ High' : '💬 Normal');
-  metaEl.innerHTML = `<span class="bp-tag">${priorityLabel}</span><span class="bp-tag">🕐 ${timeStr} WIB</span>`;
+  const totalSec = getBroadcastPopupSeconds(b);
+  metaEl.innerHTML = `<span class="bp-tag">${priorityLabel}</span><span class="bp-tag">🕐 ${timeStr} WIB</span><span class="bp-tag">⏱️ ${totalSec}s</span>`;
   overlay.classList.add('show');
-  let secondsLeft = 5;
-  barEl.style.width = '100%';
-  secondsEl.textContent = secondsLeft + 's';
+  let secondsLeft = totalSec;
+  if (barEl) barEl.style.width = '100%';
+  if (secondsEl) secondsEl.textContent = secondsLeft + 's';
   if (broadcastPopupTimer) clearInterval(broadcastPopupTimer);
   broadcastPopupTimer = setInterval(() => {
     secondsLeft--;
-    const percent = (secondsLeft / 5) * 100;
-    barEl.style.width = Math.max(0, percent) + '%';
-    secondsEl.textContent = Math.max(0, secondsLeft) + 's';
-    if (secondsLeft <= 0) { clearInterval(broadcastPopupTimer); broadcastPopupTimer = null; closeBroadcastPopup(); }
+    const percent = (secondsLeft / totalSec) * 100;
+    if (barEl) barEl.style.width = Math.max(0, percent) + '%';
+    if (secondsEl) secondsEl.textContent = Math.max(0, secondsLeft) + 's';
+    if (secondsLeft <= 0) {
+      clearInterval(broadcastPopupTimer);
+      broadcastPopupTimer = null;
+      closeBroadcastPopup();
+    }
   }, 1000);
-  playBubbleSound();
-  if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 200]);
+  try { playBubbleSound(); } catch (_) {}
+  if (navigator.vibrate) try { navigator.vibrate([200, 100, 200, 100, 200]); } catch (_) {}
 }
+
 function closeBroadcastPopup() {
   const overlay = document.getElementById('broadcastPopupOverlay');
   if (overlay) overlay.classList.remove('show');
   if (broadcastPopupTimer) { clearInterval(broadcastPopupTimer); broadcastPopupTimer = null; }
+  const cb = broadcastPopupCallback;
+  broadcastPopupCallback = null;
+  if (typeof cb === 'function') {
+    try { cb(); } catch (_) {}
+  }
 }
 
-// ============================================================
-// PASSWORD MANAGER
-// ============================================================
 function togglePasswordManager() {
   const manager = document.querySelector('.password-manager');
   if (!manager) return;
@@ -5777,6 +5869,164 @@ async function deleteUserAccount(userId, email) {
   } catch (err) { Swal.fire({ title: '❌ Gagal', text: err.message, icon: 'error', confirmButtonColor: '#ff4444', background: '#1a0e2e', color: '#fff' }); }
 }
 
+
+// ============================================================
+// AUTO-DELETE chat CS + folder setelah 36 jam
+// ============================================================
+function getSupportChatCutoffIso() {
+  return new Date(Date.now() - SUPPORT_CHAT_TTL_HOURS * 60 * 60 * 1000).toISOString();
+}
+
+async function cleanupExpiredSupportChats(silent = true) {
+  const cutoff = getSupportChatCutoffIso();
+  let deletedMsgs = 0;
+  let deletedFolders = 0;
+
+  // 1) Coba RPC server-side (paling aman / bypass RLS)
+  if (chatClient) {
+    try {
+      const { data, error } = await chatClient.rpc('cleanup_old_support_messages', {
+        p_hours: SUPPORT_CHAT_TTL_HOURS
+      });
+      if (error) {
+        // RPC lama tanpa parameter
+        try { await chatClient.rpc('cleanup_old_support_messages'); } catch (_) {}
+      } else if (data != null) {
+        if (typeof data === 'number') deletedMsgs = data;
+        else if (data && typeof data === 'object') {
+          deletedMsgs = data.deleted_messages || data.deleted || 0;
+          deletedFolders = data.deleted_folders || 0;
+        }
+      }
+    } catch (_) {
+      try { await chatClient.rpc('cleanup_old_support_messages'); } catch (_) {}
+    }
+
+    // 2) Hapus thread CS yang last activity > 36 jam (+ folder)
+    try {
+      const { data: recent, error: rErr } = await chatClient
+        .from('support_messages')
+        .select('user_id, created_at')
+        .order('created_at', { ascending: false })
+        .limit(2000);
+      if (!rErr && recent) {
+        const lastByUser = {};
+        recent.forEach(r => {
+          if (!r.user_id) return;
+          if (!lastByUser[r.user_id] || new Date(r.created_at) > new Date(lastByUser[r.user_id])) {
+            lastByUser[r.user_id] = r.created_at;
+          }
+        });
+        const staleUsers = Object.keys(lastByUser).filter(uid => new Date(lastByUser[uid]) < new Date(cutoff));
+        for (const uid of staleUsers) {
+          try {
+            const { error: delU } = await chatClient.from('support_messages').delete().eq('user_id', uid);
+            if (!delU) deletedMsgs++;
+          } catch (_) {}
+          try {
+            if (supabaseClient) {
+              await supabaseClient.from('cs_manual_folders').delete().eq('user_id', uid);
+              deletedFolders++;
+            }
+          } catch (_) {}
+        }
+      }
+    } catch (eThread) { console.warn('cleanup stale threads', eThread.message); }
+
+    // 2b) Hapus pesan support yang lebih tua dari 36 jam (client)
+    try {
+      // Hapus per batch berdasarkan created_at
+      const { data: oldRows, error: selErr } = await chatClient
+        .from('support_messages')
+        .select('id')
+        .lt('created_at', cutoff)
+        .limit(500);
+      if (!selErr && oldRows && oldRows.length) {
+        const ids = oldRows.map(r => r.id).filter(Boolean);
+        // delete by ids in chunks
+        for (let i = 0; i < ids.length; i += 100) {
+          const chunk = ids.slice(i, i + 100);
+          const { error: delErr, count } = await chatClient
+            .from('support_messages')
+            .delete({ count: 'exact' })
+            .in('id', chunk);
+          if (!delErr) deletedMsgs += (count != null ? count : chunk.length);
+        }
+      } else if (!selErr) {
+        // fallback: delete langsung by timestamp
+        const { error: delErr2, count } = await chatClient
+          .from('support_messages')
+          .delete({ count: 'exact' })
+          .lt('created_at', cutoff);
+        if (!delErr2 && count) deletedMsgs += count;
+      }
+    } catch (e) {
+      console.warn('cleanup support_messages:', e.message || e);
+    }
+  }
+
+  // 3) Hapus folder manual yang sudah > 36 jam (project utama)
+  if (supabaseClient) {
+    try {
+      // updated_at atau created_at
+      let folderIds = [];
+      const { data: folders, error: fErr } = await supabaseClient
+        .from('cs_manual_folders')
+        .select('user_id, created_at, updated_at')
+        .limit(500);
+      if (!fErr && folders) {
+        folderIds = folders
+          .filter(f => {
+            const t = f.updated_at || f.created_at;
+            return t && new Date(t) < new Date(cutoff);
+          })
+          .map(f => f.user_id)
+          .filter(Boolean);
+      }
+      // juga coba delete by timestamp langsung
+      try {
+        await supabaseClient.from('cs_manual_folders').delete().lt('updated_at', cutoff);
+      } catch (_) {}
+      try {
+        await supabaseClient.from('cs_manual_folders').delete().lt('created_at', cutoff);
+      } catch (_) {}
+
+      for (const uid of folderIds) {
+        try {
+          const ok = await removeManualFolder(uid);
+          if (ok) deletedFolders++;
+        } catch (_) {}
+      }
+      // refresh cache
+      try {
+        const { data: fd, error: fe } = await supabaseClient.rpc('cleanup_old_cs_folders', { p_hours: SUPPORT_CHAT_TTL_HOURS });
+        if (!fe && fd && fd.deleted_folders) deletedFolders += fd.deleted_folders;
+      } catch (_) {}
+      try { await fetchManualFolders(true); } catch (_) {}
+    } catch (e) {
+      console.warn('cleanup cs_manual_folders:', e.message || e);
+    }
+  }
+
+  if (!silent && (deletedMsgs || deletedFolders)) {
+    console.log(`[cleanup] ${SUPPORT_CHAT_TTL_HOURS}h: messages≈${deletedMsgs}, folders≈${deletedFolders}`);
+  }
+  return { deletedMsgs, deletedFolders, cutoff };
+}
+
+function startSupportChatAutoCleanup() {
+  if (supportChatCleanupInterval) {
+    try { clearInterval(supportChatCleanupInterval); } catch (_) {}
+    supportChatCleanupInterval = null;
+  }
+  // jalan segera, lalu tiap 15 menit
+  cleanupExpiredSupportChats(true);
+  supportChatCleanupInterval = setInterval(() => {
+    cleanupExpiredSupportChats(true);
+  }, 15 * 60 * 1000);
+}
+
+
 // ============================================================
 // CHAT SYSTEM
 // ============================================================
@@ -5789,12 +6039,21 @@ async function initChat() {
   initCSBubbleChannel();
   startCSPolling();
   initPresence();
+  startSupportChatAutoCleanup();
 }
 async function getChatUserId() {
-  if (chatClient) { const { data: { session } } = await chatClient.auth.getSession(); if (session?.user?.id) return session.user.id; }
+  if (chatClient) {
+    const { data: { session } } = await chatClient.auth.getSession();
+    if (session?.user?.id) { cachedChatUserId = session.user.id; return session.user.id; }
+  }
   const savedEmail = localStorage.getItem('chat_auth_email');
   const savedPass = localStorage.getItem('chat_auth_password');
-  if (savedEmail && savedPass && chatClient) { try { const { data, error } = await chatClient.auth.signInWithPassword({ email: savedEmail, password: savedPass }); if (!error && data.session?.user?.id) return data.session.user.id; } catch(e) {} }
+  if (savedEmail && savedPass && chatClient) {
+    try {
+      const { data, error } = await chatClient.auth.signInWithPassword({ email: savedEmail, password: savedPass });
+      if (!error && data.session?.user?.id) { cachedChatUserId = data.session.user.id; return data.session.user.id; }
+    } catch(e) {}
+  }
   return currentUser?.id || null;
 }
 function openChatHub(tab) {
@@ -5949,15 +6208,34 @@ async function deleteGlobalMessageHard(msgId) {
 }
 function openSupportView() {
   if (isStaff) { document.getElementById('supportUsersView').style.display = 'flex'; document.getElementById('supportChatViewUser').style.display = 'none'; document.getElementById('supportChatViewAdmin').style.display = 'none'; loadSupportUsers(); }
-  else { document.getElementById('supportUsersView').style.display = 'none'; document.getElementById('supportChatViewUser').style.display = 'flex'; document.getElementById('supportChatViewAdmin').style.display = 'none'; loadSupportChatForUser(currentUser.id); }
+  else { document.getElementById('supportUsersView').style.display = 'none'; document.getElementById('supportChatViewUser').style.display = 'flex'; document.getElementById('supportChatViewAdmin').style.display = 'none'; loadSupportChatForUser(null); }
 }
+let cachedChatUserId = null;
 async function loadSupportChatForUser(userId) {
   if (!chatClient) return;
-  try { await chatClient.rpc('cleanup_old_support_messages'); } catch(e) {}
-  const { data, error } = await chatClient.from('support_messages').select('*').eq('user_id', userId).order('created_at', { ascending: true }).limit(200);
-  if (error) return;
-  renderSupportMessages(data || [], 'supportChatBodyUser');
-  subscribeUserSupportChat(userId);
+  try {
+    // PENTING: pesan CS disimpan dengan user_id = chat auth id, BUKAN selalu currentUser.id (project utama)
+    let uid = userId;
+    try {
+      const chatUid = await getChatUserId();
+      if (chatUid) {
+        cachedChatUserId = chatUid;
+        // jika argumen kosong / sama dengan main user id, pakai chat id
+        if (!uid || uid === currentUser?.id) uid = chatUid;
+      }
+    } catch (_) {}
+    if (!uid) return;
+    try { await cleanupExpiredSupportChats(true); } catch(e) {}
+    const { data, error } = await chatClient.from('support_messages').select('*').eq('user_id', uid).order('created_at', { ascending: true }).limit(200);
+    if (error) {
+      console.warn('loadSupportChatForUser', error.message);
+      return;
+    }
+    renderSupportMessages(data || [], 'supportChatBodyUser');
+    subscribeUserSupportChat(uid);
+  } catch (e) {
+    console.warn('loadSupportChatForUser', e.message || e);
+  }
 }
 function subscribeUserSupportChat(userId) {
   if (supportChatChannel) { try { supportChatChannel.unsubscribe(); } catch(e) {} supportChatChannel = null; }
@@ -5966,44 +6244,355 @@ function subscribeUserSupportChat(userId) {
   if (!targetUserId) return;
   supportChatChannel = chatClient.channel('support_' + targetUserId + '_' + Date.now())
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'support_messages', filter: `user_id=eq.${targetUserId}` }, (payload) => {
-      if (chatHubOpen && currentChatTab === 'support') { if (isStaff && currentSupportTarget) loadSupportChatForAdmin(currentSupportTarget.user_id); else if (!isStaff) loadSupportChatForUser(targetUserId); }
+      if (chatHubOpen && currentChatTab === 'support') {
+        if (isStaff && currentSupportTarget) loadSupportChatForAdmin(currentSupportTarget.user_id);
+        else if (!isStaff) loadSupportChatForUser(targetUserId || cachedChatUserId || null);
+      }
       if (isStaff) setTimeout(() => loadCSFolders(), 500);
     })
     .subscribe((status) => { if (['CHANNEL_ERROR','TIMED_OUT','CLOSED'].includes(status)) setTimeout(() => subscribeUserSupportChat(targetUserId), 3000); });
+}
+function extractSupportImage(msg) {
+  if (!msg) return { text: '', imageUrl: null };
+  if (msg.image_url) return { text: msg.message || '', imageUrl: msg.image_url };
+  const raw = String(msg.message || '');
+  // [IMG]url atau [IMG]data:image/...;base64,...  (url bisa sangat panjang)
+  if (raw.startsWith('[IMG]')) {
+    const rest = raw.slice(5);
+    const nl = rest.indexOf('\n');
+    if (nl >= 0) return { imageUrl: rest.slice(0, nl).trim(), text: rest.slice(nl + 1).trim() };
+    // data URL tidak punya spasi; http URL juga
+    const sp = rest.search(/\s/);
+    if (sp > 0 && !rest.startsWith('data:')) {
+      return { imageUrl: rest.slice(0, sp).trim(), text: rest.slice(sp).trim() };
+    }
+    return { imageUrl: rest.trim(), text: '' };
+  }
+  if (/^https?:\/\/\S+\.(jpg|jpeg|png|webp|gif)(\?\S*)?$/i.test(raw.trim())) {
+    return { text: '', imageUrl: raw.trim() };
+  }
+  if (/^data:image\/(png|jpeg|jpg|webp|gif);base64,/i.test(raw.trim())) {
+    return { text: '', imageUrl: raw.trim() };
+  }
+  return { text: raw, imageUrl: null };
 }
 function renderSupportMessages(messages, containerId) {
   const body = document.getElementById(containerId);
   if (!body) return;
   if (!messages || messages.length === 0) { body.innerHTML = `<div class="chat-empty"><span class="icon">📩</span>Belum ada pesan</div>`; return; }
   let html = '';
-  const myId = currentUser?.id;
+  const myMainId = currentUser?.id;
+  const myChatId = cachedChatUserId || null;
+  const staffRoles = ['owner', 'admin', 'cs'];
   messages.forEach(msg => {
-    const isMine = msg.sender_id === myId;
+    // isMine: sender adalah kita (main id ATAU chat id)
+    let isMine = false;
+    if (msg.sender_id && (msg.sender_id === myMainId || msg.sender_id === myChatId)) isMine = true;
+    // di view user: pesan role user = kita; di view admin: pesan staff = kita
+    if (containerId === 'supportChatBodyUser' && msg.sender_role === 'user') isMine = true;
+    if (containerId === 'supportChatBodyAdmin' && staffRoles.includes(msg.sender_role)) isMine = true;
+
     const roleClass = msg.sender_role === 'owner' ? 'owner' : (msg.sender_role === 'admin' ? 'admin' : (msg.sender_role === 'cs' ? 'cs' : ''));
     const roleTag = msg.sender_role === 'owner' ? '<span class="msg-role-tag owner">Owner</span>' : (msg.sender_role === 'admin' ? '<span class="msg-role-tag admin">Admin</span>' : (msg.sender_role === 'cs' ? '<span class="msg-role-tag cs">CS</span>' : ''));
-    html += `<div class="chat-msg ${isMine ? 'mine' : 'other'} ${roleClass}"><div class="msg-meta">${roleTag}<span class="msg-email">${isMine ? 'Anda' : escapeHtml(msg.email || 'user')}</span><span class="msg-time">${formatTimeAgo(msg.created_at)}</span></div><div class="msg-bubble">${formatMessageText(msg.message || '')}</div></div>`;
+    const parsed = extractSupportImage(msg);
+    let content = '';
+    if (parsed.imageUrl) {
+      // jangan taruh data-URL panjang di atribut onclick (bisa putus di HTML)
+      const safeSrc = String(parsed.imageUrl).replace(/"/g, '&quot;');
+      content += `<img class="msg-image" src="${safeSrc}" alt="foto" loading="lazy" style="cursor:pointer" onclick="previewChatImage(this.src)">`;
+    }
+    if (parsed.text && parsed.text !== '📷 Foto' && parsed.text !== '📷 foto') {
+      content += `<div class="msg-image-caption">${formatMessageText(parsed.text)}</div>`;
+    }
+    if (!content) content = formatMessageText(msg.message || '');
+    const who = isMine ? 'Anda' : escapeHtml(msg.email || msg.sender_role || 'user');
+    html += `<div class="chat-msg ${isMine ? 'mine' : 'other'} ${roleClass}"><div class="msg-meta">${roleTag}<span class="msg-email">${who}</span><span class="msg-time">${formatTimeAgo(msg.created_at)}</span></div><div class="msg-bubble">${content}</div></div>`;
   });
   body.innerHTML = html;
+  // bind broken-image fallback
+  body.querySelectorAll('img.msg-image').forEach(img => {
+    img.onerror = function() {
+      this.style.display = 'none';
+      const note = document.createElement('div');
+      note.className = 'msg-image-caption';
+      note.style.color = '#ff8080';
+      note.textContent = '⚠️ Foto gagal dimuat';
+      this.parentNode && this.parentNode.insertBefore(note, this.nextSibling);
+    };
+  });
   scrollChatToBottom(containerId);
 }
+
+// ===== Support chat: kirim foto =====
+const supportPendingImage = { user: null, admin: null };
+
+function onSupportImagePicked(ev, who) {
+  const file = ev.target.files && ev.target.files[0];
+  if (!file) return;
+  if (!file.type.startsWith('image/')) {
+    Swal.fire({ title: '❌ Bukan gambar', text: 'Pilih file JPG/PNG/WEBP/GIF.', icon: 'error', confirmButtonColor: '#ff4444', background: '#1a0e2e', color: '#fff' });
+    ev.target.value = '';
+    return;
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    Swal.fire({ title: '❌ Terlalu besar', text: 'Maksimal 5 MB.', icon: 'error', confirmButtonColor: '#ff4444', background: '#1a0e2e', color: '#fff' });
+    ev.target.value = '';
+    return;
+  }
+  supportPendingImage[who] = file;
+  const url = URL.createObjectURL(file);
+  const prev = document.getElementById(who === 'admin' ? 'supportImgPreviewAdmin' : 'supportImgPreviewUser');
+  const thumb = document.getElementById(who === 'admin' ? 'supportImgThumbAdmin' : 'supportImgThumbUser');
+  const name = document.getElementById(who === 'admin' ? 'supportImgNameAdmin' : 'supportImgNameUser');
+  if (thumb) thumb.src = url;
+  if (name) name.textContent = file.name + ' (' + (file.size / 1024).toFixed(0) + ' KB)';
+  if (prev) prev.classList.add('show');
+}
+
+function clearSupportImage(who) {
+  supportPendingImage[who] = null;
+  const input = document.getElementById(who === 'admin' ? 'supportImageInputAdmin' : 'supportImageInputUser');
+  if (input) input.value = '';
+  const prev = document.getElementById(who === 'admin' ? 'supportImgPreviewAdmin' : 'supportImgPreviewUser');
+  if (prev) prev.classList.remove('show');
+}
+
+function previewChatImage(url) {
+  if (!url) return;
+  Swal.fire({
+    imageUrl: url,
+    imageAlt: 'Foto chat',
+    showConfirmButton: true,
+    confirmButtonText: 'Tutup',
+    confirmButtonColor: '#ff6b9d',
+    background: '#1a0e2e',
+    color: '#fff',
+    width: Math.min(480, window.innerWidth - 24)
+  });
+}
+
+function canvasToBlob(canvas, type, quality) {
+  return new Promise((resolve) => {
+    canvas.toBlob((blob) => resolve(blob), type, quality);
+  });
+}
+
+async function compressImageForChat(file, maxSide = 1280, quality = 0.8) {
+  return new Promise((resolve) => {
+    try {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = async () => {
+        try {
+          let w = img.naturalWidth || img.width;
+          let h = img.naturalHeight || img.height;
+          if (!w || !h) { URL.revokeObjectURL(url); resolve(file); return; }
+          const scale = Math.min(1, maxSide / Math.max(w, h));
+          w = Math.max(1, Math.round(w * scale));
+          h = Math.max(1, Math.round(h * scale));
+          const canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, w, h);
+          URL.revokeObjectURL(url);
+          let q = quality;
+          let blob = await canvasToBlob(canvas, 'image/jpeg', q);
+          // target < ~350KB biar aman disimpan di message bila storage gagal
+          while (blob && blob.size > 350 * 1024 && q > 0.45) {
+            q -= 0.1;
+            blob = await canvasToBlob(canvas, 'image/jpeg', q);
+          }
+          if (!blob) { resolve(file); return; }
+          resolve(new File([blob], (file.name || 'foto').replace(/\.[^.]+$/, '') + '.jpg', { type: 'image/jpeg' }));
+        } catch (e) { try { URL.revokeObjectURL(url); } catch(_){} resolve(file); }
+      };
+      img.onerror = () => { try { URL.revokeObjectURL(url); } catch(_){} resolve(file); };
+      img.src = url;
+    } catch (e) { resolve(file); }
+  });
+}
+
+function blobToDataURL(blob) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);
+    r.onerror = () => reject(new Error('Gagal baca foto'));
+    r.readAsDataURL(blob);
+  });
+}
+
+async function uploadSupportChatImage(file, userId) {
+  if (!file) throw new Error('File tidak siap');
+
+  // pastikan session chat (storage + support_messages di project CHAT)
+  try {
+    if (typeof getChatUserId === 'function') await getChatUserId();
+  } catch (_) {}
+
+  const compressed = await compressImageForChat(file);
+  const path = `support/${userId || 'guest'}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.jpg`;
+
+  const clients = [];
+  if (typeof chatClient !== 'undefined' && chatClient) clients.push({ name: 'chat', client: chatClient });
+  if (typeof supabaseClient !== 'undefined' && supabaseClient) clients.push({ name: 'main', client: supabaseClient });
+
+  let lastErr = null;
+  for (const { name, client } of clients) {
+    try {
+      const { error: upErr } = await client.storage.from('chat-images').upload(path, compressed, {
+        cacheControl: '3600',
+        upsert: true,
+        contentType: 'image/jpeg'
+      });
+      if (upErr) throw upErr;
+      const { data } = client.storage.from('chat-images').getPublicUrl(path);
+      if (!data || !data.publicUrl) throw new Error('Gagal mendapatkan URL foto');
+      console.log('[chat-image] storage OK via', name);
+      return data.publicUrl;
+    } catch (e) {
+      lastErr = e;
+      console.warn('[chat-image] storage', name, 'fail:', e.message || e);
+    }
+  }
+
+  // FALLBACK TANPA BUCKET: kirim sebagai data-URL (foto sudah dikompres)
+  try {
+    console.warn('[chat-image] fallback data-URL, last storage error:', lastErr && lastErr.message);
+    const dataUrl = await blobToDataURL(compressed);
+    if (!dataUrl || dataUrl.length < 32) throw new Error('Kompresi foto gagal');
+    if (dataUrl.length > 900000) {
+      // coba lebih kecil lagi
+      const smaller = await compressImageForChat(file, 900, 0.55);
+      const dataUrl2 = await blobToDataURL(smaller);
+      if (dataUrl2.length > 900000) throw new Error('Foto terlalu besar meski sudah dikompres. Coba foto lebih kecil.');
+      return dataUrl2;
+    }
+    return dataUrl;
+  } catch (e2) {
+    throw new Error(
+      'Gagal kirim foto. ' +
+      ((lastErr && lastErr.message) ? ('Storage: ' + lastErr.message + '. ') : '') +
+      (e2.message || '')
+    );
+  }
+}
+
+async function insertSupportMessageRow(row) {
+  // Selalu tanam [IMG] di message agar SEMUA client (user & CS) bisa baca foto
+  // meski kolom image_url belum ada / tidak ikut di-select.
+  const base = {
+    user_id: row.user_id,
+    email: row.email,
+    sender_id: row.sender_id,
+    sender_role: row.sender_role,
+    message: row.message || ''
+  };
+  if (row.image_url) {
+    const caption = (row.message && row.message !== '📷 Foto') ? row.message : '';
+    base.message = '[IMG]' + row.image_url + (caption ? ('\n' + caption) : '');
+  }
+
+  // Coba insert + image_url (jika kolom ada)
+  if (row.image_url) {
+    try {
+      const { error } = await chatClient.from('support_messages').insert({ ...base, image_url: row.image_url });
+      if (!error) return;
+      console.warn('insert with image_url failed, fallback message-only:', error.message);
+    } catch (e) {
+      console.warn('insert with image_url exception:', e.message || e);
+    }
+  }
+
+  const { error: e2 } = await chatClient.from('support_messages').insert(base);
+  if (e2) throw e2;
+}
+
 async function sendSupportMessage() {
   const input = document.getElementById('supportChatInput');
-  const msg = input.value.trim();
-  if (!msg || !chatClient || !currentUser) return;
-  input.disabled = true;
+  const msg = (input?.value || '').trim();
+  const file = supportPendingImage.user;
+  if ((!msg && !file) || !chatClient || !currentUser) return;
+  const sendBtn = document.getElementById('supportChatSend');
+  const attachBtn = document.getElementById('supportAttachUser');
+  if (input) input.disabled = true;
+  if (sendBtn) sendBtn.disabled = true;
+  if (attachBtn) attachBtn.disabled = true;
   try {
     const chatUserId = await getChatUserId();
-    const { error } = await chatClient.from('support_messages').insert({ user_id: chatUserId, email: currentUser.email, sender_id: chatUserId, sender_role: currentProfile?.role || 'user', message: msg });
-    if (error) throw error;
-    input.value = ''; window.autoResizeTextarea(input);
+    let imageUrl = null;
+    if (file) {
+      Swal.fire({ title: '⏳ Mengunggah foto...', allowOutsideClick: false, showConfirmButton: false, background: '#1a0e2e', color: '#fff', didOpen: () => Swal.showLoading() });
+      imageUrl = await uploadSupportChatImage(file, chatUserId);
+      try { Swal.close(); } catch (_) {}
+    }
+    const row = {
+      user_id: chatUserId,
+      email: currentUser.email,
+      sender_id: chatUserId,
+      sender_role: currentProfile?.role || 'user',
+      message: msg || (imageUrl ? '📷 Foto' : ''),
+      image_url: imageUrl || null
+    };
+    if (!imageUrl) delete row.image_url;
+    await insertSupportMessageRow(row);
+    if (input) { input.value = ''; window.autoResizeTextarea(input); }
+    clearSupportImage('user');
     loadSupportChatForUser(chatUserId);
-  } catch (err) { Swal.fire({ title: '❌ Gagal', text: err.message, icon: 'error', confirmButtonColor: '#ff4444', background: '#1a0e2e', color: '#fff' }); }
-  finally { input.disabled = false; input.focus(); }
+  } catch (err) {
+    try { Swal.close(); } catch (_) {}
+    Swal.fire({ title: '❌ Gagal', text: err.message || String(err), icon: 'error', confirmButtonColor: '#ff4444', background: '#1a0e2e', color: '#fff' });
+  } finally {
+    if (input) { input.disabled = false; input.focus(); }
+    if (sendBtn) sendBtn.disabled = false;
+    if (attachBtn) attachBtn.disabled = false;
+  }
 }
+
+async function sendSupportReply() {
+  const input = document.getElementById('supportChatInputAdmin');
+  const msg = (input?.value || '').trim();
+  const file = supportPendingImage.admin;
+  if ((!msg && !file) || !chatClient || !currentUser || !currentSupportTarget) return;
+  const sendBtn = document.getElementById('supportChatSendAdmin');
+  const attachBtn = document.getElementById('supportAttachAdmin');
+  if (input) input.disabled = true;
+  if (sendBtn) sendBtn.disabled = true;
+  if (attachBtn) attachBtn.disabled = true;
+  try {
+    const chatUserId = await getChatUserId();
+    let imageUrl = null;
+    if (file) {
+      Swal.fire({ title: '⏳ Mengunggah foto...', allowOutsideClick: false, showConfirmButton: false, background: '#1a0e2e', color: '#fff', didOpen: () => Swal.showLoading() });
+      imageUrl = await uploadSupportChatImage(file, currentSupportTarget.user_id);
+      try { Swal.close(); } catch (_) {}
+    }
+    const row = {
+      user_id: currentSupportTarget.user_id,
+      email: currentSupportTarget.email,
+      sender_id: chatUserId,
+      sender_role: currentProfile?.role || 'admin',
+      message: msg || (imageUrl ? '📷 Foto' : ''),
+      image_url: imageUrl || null
+    };
+    if (!imageUrl) delete row.image_url;
+    await insertSupportMessageRow(row);
+    if (input) { input.value = ''; window.autoResizeTextarea(input); }
+    clearSupportImage('admin');
+    loadSupportChatForAdmin(currentSupportTarget.user_id);
+  } catch (err) {
+    try { Swal.close(); } catch (_) {}
+    Swal.fire({ title: '❌ Gagal', text: err.message || String(err), icon: 'error', confirmButtonColor: '#ff4444', background: '#1a0e2e', color: '#fff' });
+  } finally {
+    if (input) { input.disabled = false; input.focus(); }
+    if (sendBtn) sendBtn.disabled = false;
+    if (attachBtn) attachBtn.disabled = false;
+  }
+}
+
 async function loadSupportUsers() {
   if (!chatClient) return;
   const listEl = document.getElementById('supportUsersList');
-  try { await chatClient.rpc('cleanup_old_support_messages'); } catch(e) {}
+  try { await cleanupExpiredSupportChats(true); } catch(e) {}
   const { data, error } = await chatClient.from('support_messages').select('user_id, email, message, created_at, sender_role, read_by_admin').order('created_at', { ascending: false }).limit(1000);
   if (error) return;
   const userMap = {};
@@ -6189,20 +6778,7 @@ async function openSupportChatWith(userId, email) {
 async function markMessagesAsRead(userId) { if (!isStaff || !chatClient) return; try { await chatClient.from('support_messages').update({ read_by_admin: true }).eq('user_id', userId).eq('sender_role', 'user').eq('read_by_admin', false); } catch(e) {} }
 function backToSupportUsers() { currentSupportTarget = null; document.getElementById('supportChatViewAdmin').style.display = 'none'; document.getElementById('supportUsersView').style.display = 'flex'; loadSupportUsers(); }
 async function loadSupportChatForAdmin(userId) { if (!chatClient) return; const { data, error } = await chatClient.from('support_messages').select('*').eq('user_id', userId).order('created_at', { ascending: true }).limit(200); if (error) return; renderSupportMessages(data || [], 'supportChatBodyAdmin'); }
-async function sendSupportReply() {
-  const input = document.getElementById('supportChatInputAdmin');
-  const msg = input.value.trim();
-  if (!msg || !chatClient || !currentUser || !currentSupportTarget) return;
-  input.disabled = true;
-  try {
-    const chatUserId = await getChatUserId();
-    const { error } = await chatClient.from('support_messages').insert({ user_id: currentSupportTarget.user_id, email: currentSupportTarget.email, sender_id: chatUserId, sender_role: currentProfile?.role || 'admin', message: msg });
-    if (error) throw error;
-    input.value = ''; window.autoResizeTextarea(input);
-    loadSupportChatForAdmin(currentSupportTarget.user_id);
-  } catch (err) { Swal.fire({ title: '❌ Gagal', text: err.message, icon: 'error', confirmButtonColor: '#ff4444', background: '#1a0e2e', color: '#fff' }); }
-  finally { input.disabled = false; input.focus(); }
-}
+
 
 function initCSBubbleChannel() {
   if (!chatClient || !currentUser) return;
