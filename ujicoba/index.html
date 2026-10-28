@@ -6000,10 +6000,22 @@ function extractSupportImage(msg) {
   if (!msg) return { text: '', imageUrl: null };
   if (msg.image_url) return { text: msg.message || '', imageUrl: msg.image_url };
   const raw = String(msg.message || '');
-  const m = raw.match(/^\[IMG\](\S+)(?:\n([\s\S]*))?$/);
-  if (m) return { text: (m[2] || '').trim(), imageUrl: m[1] };
-  // fallback: pure image url as message
+  // [IMG]url atau [IMG]data:image/...;base64,...  (url bisa sangat panjang)
+  if (raw.startsWith('[IMG]')) {
+    const rest = raw.slice(5);
+    const nl = rest.indexOf('\n');
+    if (nl >= 0) return { imageUrl: rest.slice(0, nl).trim(), text: rest.slice(nl + 1).trim() };
+    // data URL tidak punya spasi; http URL juga
+    const sp = rest.search(/\s/);
+    if (sp > 0 && !rest.startsWith('data:')) {
+      return { imageUrl: rest.slice(0, sp).trim(), text: rest.slice(sp).trim() };
+    }
+    return { imageUrl: rest.trim(), text: '' };
+  }
   if (/^https?:\/\/\S+\.(jpg|jpeg|png|webp|gif)(\?\S*)?$/i.test(raw.trim())) {
+    return { text: '', imageUrl: raw.trim() };
+  }
+  if (/^data:image\/(png|jpeg|jpg|webp|gif);base64,/i.test(raw.trim())) {
     return { text: '', imageUrl: raw.trim() };
   }
   return { text: raw, imageUrl: null };
@@ -6081,76 +6093,110 @@ function previewChatImage(url) {
   });
 }
 
-async function compressImageForChat(file, maxSide = 1280, quality = 0.82) {
-  return new Promise((resolve, reject) => {
+function canvasToBlob(canvas, type, quality) {
+  return new Promise((resolve) => {
+    canvas.toBlob((blob) => resolve(blob), type, quality);
+  });
+}
+
+async function compressImageForChat(file, maxSide = 1280, quality = 0.8) {
+  return new Promise((resolve) => {
     try {
       const url = URL.createObjectURL(file);
       const img = new Image();
-      img.onload = () => {
+      img.onload = async () => {
         try {
           let w = img.naturalWidth || img.width;
           let h = img.naturalHeight || img.height;
           if (!w || !h) { URL.revokeObjectURL(url); resolve(file); return; }
           const scale = Math.min(1, maxSide / Math.max(w, h));
-          w = Math.round(w * scale);
-          h = Math.round(h * scale);
+          w = Math.max(1, Math.round(w * scale));
+          h = Math.max(1, Math.round(h * scale));
           const canvas = document.createElement('canvas');
           canvas.width = w; canvas.height = h;
           const ctx = canvas.getContext('2d');
           ctx.drawImage(img, 0, 0, w, h);
           URL.revokeObjectURL(url);
-          canvas.toBlob((blob) => {
-            if (!blob) { resolve(file); return; }
-            resolve(new File([blob], (file.name || 'foto').replace(/\.[^.]+$/, '') + '.jpg', { type: 'image/jpeg' }));
-          }, 'image/jpeg', quality);
-        } catch (e) { URL.revokeObjectURL(url); resolve(file); }
+          let q = quality;
+          let blob = await canvasToBlob(canvas, 'image/jpeg', q);
+          // target < ~350KB biar aman disimpan di message bila storage gagal
+          while (blob && blob.size > 350 * 1024 && q > 0.45) {
+            q -= 0.1;
+            blob = await canvasToBlob(canvas, 'image/jpeg', q);
+          }
+          if (!blob) { resolve(file); return; }
+          resolve(new File([blob], (file.name || 'foto').replace(/\.[^.]+$/, '') + '.jpg', { type: 'image/jpeg' }));
+        } catch (e) { try { URL.revokeObjectURL(url); } catch(_){} resolve(file); }
       };
-      img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
+      img.onerror = () => { try { URL.revokeObjectURL(url); } catch(_){} resolve(file); };
       img.src = url;
     } catch (e) { resolve(file); }
   });
 }
 
+function blobToDataURL(blob) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);
+    r.onerror = () => reject(new Error('Gagal baca foto'));
+    r.readAsDataURL(blob);
+  });
+}
+
 async function uploadSupportChatImage(file, userId) {
   if (!file) throw new Error('File tidak siap');
-  // Chat DB ada di CHAT project → bucket HARUS di project chat (chatClient)
-  const clients = [];
-  if (typeof chatClient !== 'undefined' && chatClient) clients.push({ name: 'chat', client: chatClient });
-  if (typeof supabaseClient !== 'undefined' && supabaseClient) clients.push({ name: 'main', client: supabaseClient });
-  if (!clients.length) throw new Error('Client Supabase tidak siap');
+
+  // pastikan session chat (storage + support_messages di project CHAT)
+  try {
+    if (typeof getChatUserId === 'function') await getChatUserId();
+  } catch (_) {}
 
   const compressed = await compressImageForChat(file);
   const path = `support/${userId || 'guest'}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.jpg`;
-  let lastErr = null;
 
+  const clients = [];
+  if (typeof chatClient !== 'undefined' && chatClient) clients.push({ name: 'chat', client: chatClient });
+  if (typeof supabaseClient !== 'undefined' && supabaseClient) clients.push({ name: 'main', client: supabaseClient });
+
+  let lastErr = null;
   for (const { name, client } of clients) {
     try {
       const { error: upErr } = await client.storage.from('chat-images').upload(path, compressed, {
         cacheControl: '3600',
-        upsert: false,
+        upsert: true,
         contentType: 'image/jpeg'
       });
       if (upErr) throw upErr;
       const { data } = client.storage.from('chat-images').getPublicUrl(path);
       if (!data || !data.publicUrl) throw new Error('Gagal mendapatkan URL foto');
-      console.log('[chat-image] uploaded via', name, data.publicUrl);
+      console.log('[chat-image] storage OK via', name);
       return data.publicUrl;
     } catch (e) {
       lastErr = e;
-      console.warn('[chat-image] upload via', name, 'failed:', e.message || e);
+      console.warn('[chat-image] storage', name, 'fail:', e.message || e);
     }
   }
 
-  const msg = (lastErr && (lastErr.message || String(lastErr))) || 'Upload gagal';
-  if (/bucket not found/i.test(msg)) {
+  // FALLBACK TANPA BUCKET: kirim sebagai data-URL (foto sudah dikompres)
+  try {
+    console.warn('[chat-image] fallback data-URL, last storage error:', lastErr && lastErr.message);
+    const dataUrl = await blobToDataURL(compressed);
+    if (!dataUrl || dataUrl.length < 32) throw new Error('Kompresi foto gagal');
+    if (dataUrl.length > 900000) {
+      // coba lebih kecil lagi
+      const smaller = await compressImageForChat(file, 900, 0.55);
+      const dataUrl2 = await blobToDataURL(smaller);
+      if (dataUrl2.length > 900000) throw new Error('Foto terlalu besar meski sudah dikompres. Coba foto lebih kecil.');
+      return dataUrl2;
+    }
+    return dataUrl;
+  } catch (e2) {
     throw new Error(
-      'Bucket "chat-images" belum ada di project CHAT.\n\n' +
-      'Buat di Supabase project chat:\n' +
-      'Storage → New bucket → nama: chat-images → Public: ON\n\n' +
-      'Project chat: klsmpfojsohcdzdbivxj'
+      'Gagal kirim foto. ' +
+      ((lastErr && lastErr.message) ? ('Storage: ' + lastErr.message + '. ') : '') +
+      (e2.message || '')
     );
   }
-  throw lastErr || new Error(msg);
 }
 
 async function insertSupportMessageRow(row) {
