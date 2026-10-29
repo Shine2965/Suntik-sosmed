@@ -848,7 +848,7 @@ body.chat-open .cs-bubble-container{display:none !important}
 @keyframes authTermsShake{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
 
 
-.auth-stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:16px 0 4px;width:100%}
+.auth-stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin:16px 0 4px;width:100%}
 .auth-stat-card{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:14px;padding:12px 10px;text-align:center;position:relative;overflow:hidden}
 .auth-stat-card::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,107,157,0.08),rgba(0,198,255,0.06));pointer-events:none}
 .auth-stat-card .as-icon{font-size:18px;margin-bottom:4px;line-height:1}
@@ -856,6 +856,9 @@ body.chat-open .cs-bubble-container{display:none !important}
 .auth-stat-card .as-label{font-size:9.5px;color:#b39ddb;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;margin-top:4px}
 .auth-stat-card.users .as-value{color:#38bdf8}
 .auth-stat-card.tx .as-value{color:#ffd700}
+.auth-stat-card.count .as-value{color:#a78bfa}
+.auth-stat-card .as-value{font-size:14px}
+@media(max-width:360px){.auth-stats{grid-template-columns:1fr;}.auth-stat-card .as-value{font-size:16px}}
 .auth-stats-note{font-size:10px;color:#6b4a7a;text-align:center;margin-top:6px;font-style:italic}
 
 </style>
@@ -1233,10 +1236,15 @@ body.chat-open .cs-bubble-container{display:none !important}
         <div class="as-value" id="authStatUsers">—</div>
         <div class="as-label">Total User</div>
       </div>
+      <div class="auth-stat-card count">
+        <div class="as-icon">📦</div>
+        <div class="as-value" id="authStatTxCount">—</div>
+        <div class="as-label">Jml Trx</div>
+      </div>
       <div class="auth-stat-card tx">
         <div class="as-icon">💳</div>
         <div class="as-value" id="authStatTx">—</div>
-        <div class="as-label">Trx Bulan Ini</div>
+        <div class="as-label">Nominal</div>
       </div>
     </div>
     <div class="auth-stats-note" id="authStatsNote">Memuat statistik…</div>
@@ -2441,6 +2449,7 @@ function getMonthRangeWIB() {
 
 async function loadAuthPublicStats() {
   const usersEl = document.getElementById('authStatUsers');
+  const txCountEl = document.getElementById('authStatTxCount');
   const txEl = document.getElementById('authStatTx');
   const noteEl = document.getElementById('authStatsNote');
   if (!usersEl || !txEl) return;
@@ -2448,7 +2457,14 @@ async function loadAuthPublicStats() {
   const { startIso, endIso, monthName } = getMonthRangeWIB();
   if (noteEl) noteEl.textContent = 'Statistik ' + monthName + ' · live';
 
-  // 1) Coba RPC publik (paling aman)
+  function applyStats(users, count, total) {
+    if (users != null && usersEl) usersEl.textContent = formatAuthStatNumber(users);
+    if (count != null && txCountEl) txCountEl.textContent = formatAuthStatNumber(count);
+    if (total != null && txEl) txEl.textContent = 'Rp ' + formatAuthStatNumber(Math.round(Number(total) || 0));
+    if (noteEl) noteEl.textContent = 'Statistik ' + monthName;
+  }
+
+  // 1) RPC publik
   try {
     if (supabaseClient) {
       const { data, error } = await supabaseClient.rpc('get_public_auth_stats');
@@ -2456,72 +2472,67 @@ async function loadAuthPublicStats() {
         const row = Array.isArray(data) ? data[0] : data;
         if (row) {
           const users = row.total_users ?? row.users ?? row.user_count;
+          const count = row.month_tx_count ?? row.tx_count ?? row.order_count ?? row.count;
           const total = row.month_tx_total ?? row.total_tx ?? row.tx_total ?? row.month_total;
-          if (users != null) usersEl.textContent = formatAuthStatNumber(users);
-          if (total != null) txEl.textContent = 'Rp ' + formatAuthStatNumber(total);
-          if (noteEl) noteEl.textContent = 'Statistik ' + monthName;
-          return;
+          if (users != null || count != null || total != null) {
+            applyStats(users, count, total);
+            return;
+          }
         }
       }
     }
   } catch (e) { console.warn('auth stats rpc', e.message); }
 
-  // 2) Fallback query langsung (butuh policy SELECT publik / anon)
+  // 2) Fallback query
   try {
     if (!supabaseClient) throw new Error('no client');
+    let users = null, count = null, total = 0;
 
-    // total user
     try {
-      const { count, error } = await supabaseClient
+      const { count: c, error } = await supabaseClient
         .from('profiles')
         .select('id', { count: 'exact', head: true });
-      if (!error && count != null) usersEl.textContent = formatAuthStatNumber(count);
-      else usersEl.textContent = '—';
-    } catch (_) {
-      usersEl.textContent = '—';
-    }
+      if (!error && c != null) users = c;
+    } catch (_) {}
 
-    // total transaksi bulan ini (sum total_payment)
     try {
-      const { data, error } = await supabaseClient
+      // count + sum via select
+      const { data, error, count: c2 } = await supabaseClient
         .from('orders_detail')
-        .select('total_payment')
+        .select('total_payment', { count: 'exact' })
         .gte('created_at', startIso)
         .lt('created_at', endIso)
         .limit(10000);
-      if (!error && data) {
-        let sum = 0;
-        data.forEach(r => {
+      if (!error) {
+        if (c2 != null) count = c2;
+        else if (data) count = data.length;
+        (data || []).forEach(r => {
           const v = parseFloat(r.total_payment);
-          if (!isNaN(v) && v > 0) sum += v;
+          if (!isNaN(v) && v > 0) total += v;
         });
-        txEl.textContent = 'Rp ' + formatAuthStatNumber(Math.round(sum));
       } else {
-        // coba kolom alternatif
-        const { data: d2 } = await supabaseClient
+        const { data: d2, count: c3 } = await supabaseClient
           .from('orders_detail')
-          .select('price, amount, total')
+          .select('price, amount, total', { count: 'exact' })
           .gte('created_at', startIso)
           .lt('created_at', endIso)
           .limit(5000);
-        if (d2) {
-          let sum = 0;
-          d2.forEach(r => {
-            const v = parseFloat(r.total_payment ?? r.price ?? r.amount ?? r.total);
-            if (!isNaN(v) && v > 0) sum += v;
-          });
-          txEl.textContent = 'Rp ' + formatAuthStatNumber(Math.round(sum));
-        } else {
-          txEl.textContent = '—';
-        }
+        if (c3 != null) count = c3;
+        else if (d2) count = d2.length;
+        (d2 || []).forEach(r => {
+          const v = parseFloat(r.total_payment ?? r.price ?? r.amount ?? r.total);
+          if (!isNaN(v) && v > 0) total += v;
+        });
       }
     } catch (e2) {
       console.warn('auth stats tx', e2.message);
-      txEl.textContent = '—';
     }
+
+    applyStats(users, count, total);
   } catch (e) {
     console.warn('loadAuthPublicStats', e.message);
     if (usersEl) usersEl.textContent = '—';
+    if (txCountEl) txCountEl.textContent = '—';
     if (txEl) txEl.textContent = '—';
   }
   if (noteEl) noteEl.textContent = 'Statistik ' + monthName;
