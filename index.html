@@ -838,6 +838,26 @@ body.chat-open .cs-bubble-container{display:none !important}
 .chat-img-preview .cip-name{flex:1;font-size:11px;color:#b39ddb;word-break:break-all}
 .chat-img-preview .cip-clear{background:rgba(255,68,68,0.2);border:none;color:#ff8080;width:28px;height:28px;border-radius:8px;cursor:pointer;font-weight:800}
 
+
+.auth-terms{display:flex;align-items:flex-start;gap:10px;margin-top:4px;padding:10px 12px;background:rgba(0,198,255,0.06);border:1px solid rgba(0,198,255,0.2);border-radius:12px;cursor:pointer;user-select:none}
+.auth-terms input[type="checkbox"]{width:18px;height:18px;margin-top:2px;flex-shrink:0;accent-color:#00c6ff;cursor:pointer}
+.auth-terms .auth-terms-text{font-size:12px;color:#e2e8f0;line-height:1.5;font-weight:600}
+.auth-terms .auth-terms-text a{color:#38bdf8;font-weight:800;text-decoration:underline;text-underline-offset:2px}
+.auth-terms .auth-terms-text a:hover{color:#7dd3fc}
+.auth-terms.error{border-color:rgba(255,68,68,0.55);background:rgba(255,68,68,0.08);animation:authTermsShake 0.4s ease}
+@keyframes authTermsShake{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
+
+
+.auth-stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:16px 0 4px;width:100%}
+.auth-stat-card{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:14px;padding:12px 10px;text-align:center;position:relative;overflow:hidden}
+.auth-stat-card::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,107,157,0.08),rgba(0,198,255,0.06));pointer-events:none}
+.auth-stat-card .as-icon{font-size:18px;margin-bottom:4px;line-height:1}
+.auth-stat-card .as-value{font-size:16px;font-weight:900;font-family:'Poppins',sans-serif;color:#fff;line-height:1.2;word-break:break-all}
+.auth-stat-card .as-label{font-size:9.5px;color:#b39ddb;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;margin-top:4px}
+.auth-stat-card.users .as-value{color:#38bdf8}
+.auth-stat-card.tx .as-value{color:#ffd700}
+.auth-stats-note{font-size:10px;color:#6b4a7a;text-align:center;margin-top:6px;font-style:italic}
+
 </style>
 </head>
 <body>
@@ -1207,6 +1227,19 @@ body.chat-open .cs-bubble-container{display:none !important}
 
   <div class="auth-screen" id="authScreen">
     <div class="auth-brand"><div class="auth-logo"><img src="/home/logo.png" alt="Shine" onerror="this.style.display='none';this.parentElement.innerHTML='✨'"></div><h1>Shine Shop</h1><div class="subtitle">✦ Suntik Sosmed Terpercaya se-Indonesia ✦</div></div>
+    <div class="auth-stats" id="authPublicStats">
+      <div class="auth-stat-card users">
+        <div class="as-icon">👥</div>
+        <div class="as-value" id="authStatUsers">—</div>
+        <div class="as-label">Total User</div>
+      </div>
+      <div class="auth-stat-card tx">
+        <div class="as-icon">💳</div>
+        <div class="as-value" id="authStatTx">—</div>
+        <div class="as-label">Trx Bulan Ini</div>
+      </div>
+    </div>
+    <div class="auth-stats-note" id="authStatsNote">Memuat statistik…</div>
     <div class="auth-tabs"><button class="auth-tab active" id="tabLogin" onclick="switchAuthTab('login')">🔑 Masuk</button><button class="auth-tab" id="tabSignup" onclick="switchAuthTab('signup')">✨ Daftar</button></div>
     <form class="auth-form active" id="formLogin" onsubmit="handleLogin(event)"><div class="auth-field"><label>Email</label><input type="email" id="loginEmail" placeholder="email@gmail.com" required></div><div class="auth-field"><label>Password</label><input type="password" id="loginPassword" placeholder="••••••••" required minlength="6"></div><button type="submit" class="auth-submit" id="btnLoginSubmit">🔑 Masuk Sekarang</button><div class="auth-footer">Belum punya akun? <a onclick="switchAuthTab('signup')">Daftar</a></div></form>
     <form class="auth-form" id="formSignup" onsubmit="handleSignup(event)">
@@ -1218,6 +1251,10 @@ body.chat-open .cs-bubble-container{display:none !important}
         <input type="text" id="signupReferralCode" placeholder="Kode referral (opsional)" autocomplete="off" autocapitalize="none" spellcheck="false">
         <div id="signupReferralHint" style="font-size:10px;color:#6b4a7a;margin-top:4px;font-style:italic;padding-left:4px;display:none;"></div>
       </div>
+      <label class="auth-terms" id="signupTermsBox" for="signupAgreeTerms">
+        <input type="checkbox" id="signupAgreeTerms" name="agree_terms">
+        <span class="auth-terms-text">Saya menyetujui semua <a href="https://shinedomain.my.id/rules" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()">Syarat &amp; Ketentuan</a> yang berlaku.</span>
+      </label>
       <button type="submit" class="auth-submit" id="btnSignupSubmit">✨ Buat Akun</button>
       <div class="auth-footer">Sudah punya akun? <a onclick="switchAuthTab('login')">Masuk</a></div>
     </form>
@@ -2369,6 +2406,127 @@ function stopAutoCleanupOrders() {
 // ============================================================
 // AUTH
 // ============================================================
+
+function formatAuthStatNumber(n) {
+  const x = Number(n) || 0;
+  if (x >= 1e9) return (x / 1e9).toFixed(1).replace(/\.0$/, '') + 'M'.replace('M', 'B');
+  if (x >= 1e6) return (x / 1e6).toFixed(1).replace(/\.0$/, '') + 'Jt';
+  if (x >= 1e3) return x.toLocaleString('id-ID');
+  return String(x);
+}
+function getMonthRangeWIB() {
+  // bulan berjalan (WIB / UTC+7)
+  const now = new Date();
+  // approximate WIB by offset
+  const wibMs = now.getTime() + (7 * 60 * 60 * 1000 - now.getTimezoneOffset() * 60000);
+  // simpler: use local calendar if browser already WIB; else construct from parts
+  const y = now.getFullYear();
+  const m = now.getMonth(); // 0-11 local
+  // Prefer Asia/Jakarta parts
+  let year = y, month = m;
+  try {
+    const fmt = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit' });
+    const parts = fmt.formatToParts(now);
+    year = parseInt(parts.find(p => p.type === 'year').value, 10);
+    month = parseInt(parts.find(p => p.type === 'month').value, 10) - 1;
+  } catch (_) {}
+  const start = new Date(Date.UTC(year, month, 1, -7, 0, 0)); // WIB midnight ≈ UTC-7h display trick
+  // Better: ISO strings for filter
+  const startIso = new Date(year, month, 1, 0, 0, 0, 0).toISOString();
+  const end = new Date(year, month + 1, 1, 0, 0, 0, 0);
+  const endIso = end.toISOString();
+  const monthName = new Date(year, month, 1).toLocaleString('id-ID', { month: 'long', year: 'numeric' });
+  return { startIso, endIso, monthName, year, month };
+}
+
+async function loadAuthPublicStats() {
+  const usersEl = document.getElementById('authStatUsers');
+  const txEl = document.getElementById('authStatTx');
+  const noteEl = document.getElementById('authStatsNote');
+  if (!usersEl || !txEl) return;
+
+  const { startIso, endIso, monthName } = getMonthRangeWIB();
+  if (noteEl) noteEl.textContent = 'Statistik ' + monthName + ' · live';
+
+  // 1) Coba RPC publik (paling aman)
+  try {
+    if (supabaseClient) {
+      const { data, error } = await supabaseClient.rpc('get_public_auth_stats');
+      if (!error && data) {
+        const row = Array.isArray(data) ? data[0] : data;
+        if (row) {
+          const users = row.total_users ?? row.users ?? row.user_count;
+          const total = row.month_tx_total ?? row.total_tx ?? row.tx_total ?? row.month_total;
+          if (users != null) usersEl.textContent = formatAuthStatNumber(users);
+          if (total != null) txEl.textContent = 'Rp ' + formatAuthStatNumber(total);
+          if (noteEl) noteEl.textContent = 'Statistik ' + monthName;
+          return;
+        }
+      }
+    }
+  } catch (e) { console.warn('auth stats rpc', e.message); }
+
+  // 2) Fallback query langsung (butuh policy SELECT publik / anon)
+  try {
+    if (!supabaseClient) throw new Error('no client');
+
+    // total user
+    try {
+      const { count, error } = await supabaseClient
+        .from('profiles')
+        .select('id', { count: 'exact', head: true });
+      if (!error && count != null) usersEl.textContent = formatAuthStatNumber(count);
+      else usersEl.textContent = '—';
+    } catch (_) {
+      usersEl.textContent = '—';
+    }
+
+    // total transaksi bulan ini (sum total_payment)
+    try {
+      const { data, error } = await supabaseClient
+        .from('orders_detail')
+        .select('total_payment')
+        .gte('created_at', startIso)
+        .lt('created_at', endIso)
+        .limit(10000);
+      if (!error && data) {
+        let sum = 0;
+        data.forEach(r => {
+          const v = parseFloat(r.total_payment);
+          if (!isNaN(v) && v > 0) sum += v;
+        });
+        txEl.textContent = 'Rp ' + formatAuthStatNumber(Math.round(sum));
+      } else {
+        // coba kolom alternatif
+        const { data: d2 } = await supabaseClient
+          .from('orders_detail')
+          .select('price, amount, total')
+          .gte('created_at', startIso)
+          .lt('created_at', endIso)
+          .limit(5000);
+        if (d2) {
+          let sum = 0;
+          d2.forEach(r => {
+            const v = parseFloat(r.total_payment ?? r.price ?? r.amount ?? r.total);
+            if (!isNaN(v) && v > 0) sum += v;
+          });
+          txEl.textContent = 'Rp ' + formatAuthStatNumber(Math.round(sum));
+        } else {
+          txEl.textContent = '—';
+        }
+      }
+    } catch (e2) {
+      console.warn('auth stats tx', e2.message);
+      txEl.textContent = '—';
+    }
+  } catch (e) {
+    console.warn('loadAuthPublicStats', e.message);
+    if (usersEl) usersEl.textContent = '—';
+    if (txEl) txEl.textContent = '—';
+  }
+  if (noteEl) noteEl.textContent = 'Statistik ' + monthName;
+}
+
 function switchAuthTab(tab) {
   const tabLogin = document.getElementById('tabLogin');
   const tabSignup = document.getElementById('tabSignup');
@@ -2443,6 +2601,23 @@ async function handleSignup(event) {
   if (!email || !password) return;
   if (password !== passwordConfirm) { Swal.fire({ title: '⚠️ Password Tidak Cocok', icon: 'warning', confirmButtonColor: '#ff6b9d', background: '#1a0e2e', color: '#fff' }); return; }
   if (password.length < 6) { Swal.fire({ title: '⚠️ Password Pendek', text: 'Minimal 6 karakter', icon: 'warning', confirmButtonColor: '#ff6b9d', background: '#1a0e2e', color: '#fff' }); return; }
+  const agreeTerms = document.getElementById('signupAgreeTerms');
+  const termsBox = document.getElementById('signupTermsBox');
+  if (!agreeTerms || !agreeTerms.checked) {
+    if (termsBox) {
+      termsBox.classList.add('error');
+      setTimeout(() => termsBox.classList.remove('error'), 1200);
+    }
+    Swal.fire({
+      title: '⚠️ Setujui Syarat & Ketentuan',
+      html: 'Centang persetujuan Syarat &amp; Ketentuan terlebih dahulu.<br><a href="https://shinedomain.my.id/rules" target="_blank" rel="noopener noreferrer" style="color:#38bdf8;font-weight:800;">Baca di sini</a>',
+      icon: 'warning',
+      confirmButtonColor: '#00c6ff',
+      background: '#1a0e2e',
+      color: '#fff'
+    });
+    return;
+  }
 
   btn.disabled = true; btn.innerHTML = '⏳ Membuat akun...';
 
@@ -7443,6 +7618,7 @@ async function handleButtonClick(dest) {
 window.addEventListener('load', async () => {
   updateGmailDisplay();
   initSignupReferralField();
+  try { loadAuthPublicStats(); } catch (e) {}
   await initAuth();
   ['globalChatInput', 'supportChatInput', 'supportChatInputAdmin'].forEach(id => {
     const el = document.getElementById(id);
