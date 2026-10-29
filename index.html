@@ -1395,6 +1395,7 @@ let revealedPasswords = {};
 let selectedBroadcastPriority = 'normal';
 let autoUnbanInterval = null;
 let bannedCountdownTicker = null;
+let selfBanRealtimeChannel = null;
 let userBanCheckInterval = null;
 let memberRefreshTimeout = null;
 let memberListChannel = null;
@@ -2707,6 +2708,7 @@ async function handleLogout() {
     stopAutoUnbanScheduler();
     stopBannedCountdownTicker();
     stopUserBanCheckTimer();
+    try { if (selfBanRealtimeChannel) { selfBanRealtimeChannel.unsubscribe(); selfBanRealtimeChannel = null; } } catch (e) {}
     stopOrderAutoRefresh();
     stopOrderSyncRealtime();
     stopAutoCleanupOrders();
@@ -2777,34 +2779,158 @@ function startBannedCountdownTicker() {
 }
 function stopBannedCountdownTicker() { if (bannedCountdownTicker) { clearInterval(bannedCountdownTicker); bannedCountdownTicker = null; } }
 
+function isProfileCurrentlyBanned(profile) {
+  if (!profile || !profile.banned) return false;
+  if (profile.banned_until) {
+    const until = new Date(profile.banned_until);
+    if (!isNaN(until.getTime()) && until <= new Date()) return false; // sudah lewat
+  }
+  return true;
+}
+
+async function applyRealtimeBanState(profile, source) {
+  if (!profile || !currentUser) return;
+  // merge ke currentProfile
+  try {
+    currentProfile = Object.assign({}, currentProfile || {}, profile, {
+      email: profile.email || currentProfile?.email || currentUser.email
+    });
+  } catch (_) {
+    currentProfile = profile;
+  }
+
+  if (isProfileCurrentlyBanned(profile)) {
+    showBanOverlay(currentProfile);
+    try {
+      // tutup chat/modal biar tidak bisa dipakai
+      document.body.classList.remove('chat-open');
+      const hub = document.getElementById('chatHubModal');
+      if (hub) hub.classList.remove('show');
+    } catch (_) {}
+    if (source === 'realtime') {
+      try {
+        Swal.fire({
+          title: '🚫 Akun Anda Di-BAN',
+          html: '<div style="text-align:left;color:#ddd;font-size:13px;line-height:1.5;">Akun Anda baru saja di-ban oleh admin/owner.<br><b style="color:#ff8080;">Alasan:</b> ' +
+            escapeHtml(profile.banned_reason || profile.ban_reason || 'Tidak ada alasan') + '</div>',
+          icon: 'error',
+          confirmButtonColor: '#ff4444',
+          background: '#1a0e2e',
+          color: '#fff'
+        });
+      } catch (_) {}
+    }
+    startUserBanCheckTimer();
+    return;
+  }
+
+  // unban / ban expired
+  const overlay = document.getElementById('banOverlay');
+  if (overlay) overlay.classList.remove('show');
+  if (banCountdownInterval) { clearInterval(banCountdownInterval); banCountdownInterval = null; }
+  if (source === 'realtime' || source === 'poll') {
+    try {
+      const Toast = Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 3500, timerProgressBar: true, background: '#1a0e2e', color: '#fff' });
+      Toast.fire({ icon: 'success', title: '🎉 Akun aktif kembali' });
+    } catch (_) {}
+  }
+  try {
+    const fresh = await fetchProfile(currentUser.id);
+    if (fresh) currentProfile = fresh;
+    await updateAuthUI(currentUser);
+    document.getElementById('authScreen')?.classList.add('hidden');
+  } catch (_) {}
+}
+
+function initSelfBanRealtime() {
+  if (!supabaseClient || !currentUser) return;
+  try {
+    if (selfBanRealtimeChannel) {
+      try { selfBanRealtimeChannel.unsubscribe(); } catch (_) {}
+      selfBanRealtimeChannel = null;
+    }
+    const uid = currentUser.id;
+    selfBanRealtimeChannel = supabaseClient
+      .channel('self_ban_' + uid + '_' + Date.now())
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'profiles', filter: 'id=eq.' + uid },
+        (payload) => {
+          try {
+            const n = payload.new || {};
+            applyRealtimeBanState(n, 'realtime');
+          } catch (e) {
+            console.warn('self ban realtime', e.message);
+          }
+        }
+      )
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') console.log('[ban] realtime aktif untuk akun sendiri');
+        if (['CHANNEL_ERROR', 'TIMED_OUT', 'CLOSED'].includes(status)) {
+          setTimeout(initSelfBanRealtime, 3000);
+        }
+      });
+  } catch (e) {
+    console.warn('initSelfBanRealtime', e.message);
+  }
+}
+
 function startUserBanCheckTimer() {
   if (userBanCheckInterval) clearInterval(userBanCheckInterval);
+  // poll cepat sebagai backup realtime
   userBanCheckInterval = setInterval(async () => {
     if (!currentUser || !supabaseClient) return;
     try {
-      const { data: profile } = await supabaseClient.from('profiles').select('banned, banned_until').eq('id', currentUser.id).single();
+      const { data: profile } = await supabaseClient
+        .from('profiles')
+        .select('id, email, banned, banned_reason, ban_reason, banned_until, banned_at, banned_by')
+        .eq('id', currentUser.id)
+        .maybeSingle();
       if (!profile) return;
-      if (profile.banned && profile.banned_until && new Date(profile.banned_until) < new Date()) {
-        const { data: unbanResult } = await supabaseClient.rpc('auto_unban_user_by_id', { p_user_id: currentUser.id });
-        if (unbanResult && unbanResult.success) {
-          const overlay = document.getElementById('banOverlay');
-          if (overlay) overlay.classList.remove('show');
-          const Toast = Swal.mixin({ toast: true, position: 'top', showConfirmButton: false, timer: 3000, timerProgressBar: true, background: '#1a0e2e', color: '#fff' });
-          Toast.fire({ icon: 'success', title: '🎉 Banned berakhir! Akun aktif kembali' });
-          const freshProfile = await fetchProfile(currentUser.id);
-          if (freshProfile && !freshProfile.banned) {
-            currentProfile = freshProfile;
-            await updateAuthUI(currentUser);
-            document.getElementById('authScreen').classList.add('hidden');
-            switchPage('home');
-            stopUserBanCheckTimer();
-          }
+
+      // ban aktif → tampilkan overlay (realtime / admin baru ban)
+      if (isProfileCurrentlyBanned(profile)) {
+        const overlay = document.getElementById('banOverlay');
+        const already = overlay && overlay.classList.contains('show');
+        if (!already) applyRealtimeBanState(profile, 'poll');
+        else {
+          // update countdown reason
+          try {
+            currentProfile = Object.assign({}, currentProfile || {}, profile);
+            const reasonEl = document.getElementById('banReason');
+            if (reasonEl) reasonEl.innerHTML = (profile.banned_reason || profile.ban_reason || 'Tidak ada alasan').replace(/\n/g, '<br>');
+          } catch (_) {}
         }
+        return;
+      }
+
+      // ban sudah lewat → auto unban
+      if (profile.banned && profile.banned_until && new Date(profile.banned_until) <= new Date()) {
+        try {
+          const { data: unbanResult } = await supabaseClient.rpc('auto_unban_user_by_id', { p_user_id: currentUser.id });
+          if (unbanResult && unbanResult.success) {
+            const freshProfile = await fetchProfile(currentUser.id);
+            await applyRealtimeBanState(freshProfile || { banned: false, email: currentUser.email }, 'poll');
+            stopUserBanCheckTimer();
+            return;
+          }
+        } catch (_) {}
+      }
+
+      // tidak banned tapi overlay masih terbuka
+      const overlay = document.getElementById('banOverlay');
+      if (overlay && overlay.classList.contains('show') && !profile.banned) {
+        await applyRealtimeBanState(profile, 'poll');
+        stopUserBanCheckTimer();
       }
     } catch (e) {}
-  }, 10000);
+  }, 4000);
 }
-function stopUserBanCheckTimer() { if (userBanCheckInterval) { clearInterval(userBanCheckInterval); userBanCheckInterval = null; } }
+
+function stopUserBanCheckTimer() {
+  if (userBanCheckInterval) { clearInterval(userBanCheckInterval); userBanCheckInterval = null; }
+}
+
 
 function showBanOverlay(profile) {
   const overlay = document.getElementById('banOverlay');
@@ -2871,7 +2997,7 @@ async function updateAuthUI(user) {
     if (profile && profile.banned) {
       const until = profile.banned_until ? new Date(profile.banned_until) : null;
       if (until && until < new Date()) { await autoUnbanUser(user.id); currentProfile = await fetchProfile(user.id); }
-      else { authScreen.classList.add('hidden'); showBanOverlay(profile); return; }
+      else { authScreen.classList.add('hidden'); showBanOverlay(profile); try { initSelfBanRealtime(); startUserBanCheckTimer(); } catch(e) {} return; }
     }
     document.getElementById('banOverlay').classList.remove('show');
     if (banCountdownInterval) clearInterval(banCountdownInterval);
@@ -2935,6 +3061,8 @@ async function updateAuthUI(user) {
     try { startChatBadgePolling(); } catch (e) {}
     try { setTimeout(refreshChatUnreadCounts, 3000); } catch (e) {}
     await initBroadcastListener();
+    try { initSelfBanRealtime(); } catch (e) {}
+    try { startUserBanCheckTimer(); } catch (e) {}
     if (profile?.banned) startUserBanCheckTimer();
     updateNotifStatusDisplay();
     setTimeout(() => cleanupOldMutations(), 3000);
@@ -5608,12 +5736,15 @@ function initModerationRealtime() {
           if (n.banned === true && o.banned !== true) {
             showModerationToast('ban', email, n.banned_reason || n.ban_reason || '-', n.banned_until);
             try { loadBannedPublicList(); } catch (_) {}
+            if (currentUser && n.id === currentUser.id) applyRealtimeBanState(n, 'realtime');
           } else if (n.banned === false && o.banned === true) {
             showModerationToast('unban', email, 'Ban dicabut', null);
             try { loadBannedPublicList(); } catch (_) {}
+            if (currentUser && n.id === currentUser.id) applyRealtimeBanState(n, 'realtime');
           } else if (n.banned === true && o.banned === true && (n.banned_until !== o.banned_until || n.banned_reason !== o.banned_reason)) {
             showModerationToast('ban', email, n.banned_reason || '-', n.banned_until);
             try { loadBannedPublicList(); } catch (_) {}
+            if (currentUser && n.id === currentUser.id) applyRealtimeBanState(n, 'realtime');
           }
           if ((n.is_muted === true && o.is_muted !== true) ||
               (n.muted_until && n.muted_until !== o.muted_until && new Date(n.muted_until) > new Date())) {
