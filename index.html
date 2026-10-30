@@ -5739,6 +5739,22 @@ async function loadBannedPublicList() {
 
 
 // Mute table ada di project CHAT — dengarkan juga di chatClient
+function isChatMuteRowActive(row) {
+  if (!row) return false;
+  if (row.is_muted === false) return false;
+  const until = row.muted_until || row.until || null;
+  if (until) {
+    const t = new Date(until).getTime();
+    if (!isNaN(t) && t <= Date.now()) return false; // sudah expired = auto unmute
+  }
+  // INSERT mute tanpa until = aktif; UPDATE yang mengosongkan until + is_muted false sudah di atas
+  if (row.is_muted === true) return true;
+  // row chat_mutes yang masih ada biasanya berarti masih mute (kecuali expired)
+  if (until && new Date(until).getTime() > Date.now()) return true;
+  if (!until && (row.user_id || row.email)) return true;
+  return false;
+}
+
 function initChatMuteRealtime() {
   const client = (typeof chatClient !== 'undefined' && chatClient) ? chatClient : null;
   if (!client || !currentUser) return;
@@ -5752,13 +5768,31 @@ function initChatMuteRealtime() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_mutes' }, (payload) => {
         try {
           const ev = payload.eventType || payload.event || '';
-          if (ev === 'INSERT' || ev === 'UPDATE') {
-            const n = payload.new || {};
-            const until = n.muted_until || n.until;
-            showModerationToast('mute', n.email || n.target_email || '-', n.reason || n.mute_reason || '-', until || null);
-          } else if (ev === 'DELETE') {
-            const o = payload.old || {};
-            showModerationToast('unmute', o.email || o.target_email || '-', 'Mute dicabut', null);
+          const n = payload.new || {};
+          const o = payload.old || {};
+          const email = n.email || n.target_email || o.email || o.target_email || '-';
+          if (ev === 'DELETE') {
+            showModerationToast('unmute', email, 'Mute dicabut / kedaluwarsa', null);
+            return;
+          }
+          if (ev === 'INSERT') {
+            if (isChatMuteRowActive(n)) {
+              showModerationToast('mute', email, n.reason || n.mute_reason || '-', n.muted_until || n.until || null);
+            }
+            return;
+          }
+          if (ev === 'UPDATE') {
+            const wasActive = isChatMuteRowActive(o) || o.is_muted === true || (o.muted_until && new Date(o.muted_until) > new Date());
+            const nowActive = isChatMuteRowActive(n);
+            if (nowActive && !wasActive) {
+              showModerationToast('mute', email, n.reason || n.mute_reason || '-', n.muted_until || n.until || null);
+            } else if (!nowActive && wasActive) {
+              // auto-unmute / admin unmute via UPDATE
+              showModerationToast('unmute', email, 'Mute dicabut / kedaluwarsa', null);
+            } else if (nowActive && wasActive) {
+              // perpanjang mute saja — toast mute opsional, skip biar tidak spam
+            }
+            // jika !nowActive && !wasActive → ignore
           }
         } catch (e) { console.warn('chat mute mod', e.message); }
       })
@@ -5794,31 +5828,20 @@ function initModerationRealtime() {
             try { loadBannedPublicList(); } catch (_) {}
             if (currentUser && n.id === currentUser.id) applyRealtimeBanState(n, 'realtime');
           }
-          if ((n.is_muted === true && o.is_muted !== true) ||
-              (n.muted_until && n.muted_until !== o.muted_until && new Date(n.muted_until) > new Date())) {
-            showModerationToast('mute', email, n.mute_reason || '-', n.muted_until);
-          } else if (n.is_muted === false && o.is_muted === true) {
+          // Mute di profiles
+          const wasMuted = (o.is_muted === true) || (o.muted_until && new Date(o.muted_until) > new Date());
+          const nowMuted = (n.is_muted === true) || (n.muted_until && new Date(n.muted_until) > new Date());
+          // expired update (auto unmute)
+          if (n.muted_until && new Date(n.muted_until) <= new Date() && wasMuted) {
+            showModerationToast('unmute', email, 'Mute kedaluwarsa', null);
+          } else if (nowMuted && !wasMuted) {
+            showModerationToast('mute', email, n.mute_reason || '-', n.muted_until || null);
+          } else if (!nowMuted && wasMuted) {
             showModerationToast('unmute', email, 'Mute dicabut', null);
           }
         } catch (e) { console.warn('moderation profiles handler', e.message); }
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_mutes' }, (payload) => {
-        try {
-          const ev = payload.eventType || payload.event || '';
-          if (ev === 'INSERT' || ev === 'UPDATE') {
-            const n = payload.new || {};
-            const until = n.muted_until || n.until;
-            if (until && new Date(until) > new Date()) {
-              showModerationToast('mute', n.email || n.target_email || '-', n.reason || n.mute_reason || '-', until);
-            } else if (ev === 'INSERT') {
-              showModerationToast('mute', n.email || n.target_email || '-', n.reason || n.mute_reason || '-', until || null);
-            }
-          } else if (ev === 'DELETE') {
-            const o = payload.old || {};
-            showModerationToast('unmute', o.email || o.target_email || '-', 'Mute dicabut', null);
-          }
-        } catch (e) { console.warn('moderation chat_mutes handler', e.message); }
-      })
+      // chat_mutes toast → hanya via initChatMuteRealtime (hindari double + false mute toast)
       .subscribe((status) => {
         if (status === 'SUBSCRIBED') console.log('[moderation] realtime aktif untuk notif publik');
         if (['CHANNEL_ERROR', 'TIMED_OUT', 'CLOSED'].includes(status)) {
