@@ -220,6 +220,22 @@ let sellPhotos = []; // {file, preview}
 let stockRowsCount = 0;
 
 function $(id){ return document.getElementById(id); }
+
+const _emailCache = {};
+async function resolveEmails(ids) {
+  const uniq = [...new Set((ids || []).filter(Boolean))];
+  const missing = uniq.filter(id => !_emailCache[id]);
+  if (missing.length && sb) {
+    try {
+      const { data } = await sb.from('profiles').select('id, email').in('id', missing);
+      (data || []).forEach(p => { _emailCache[p.id] = p.email || p.id; });
+    } catch (_) {}
+    missing.forEach(id => { if (!_emailCache[id]) _emailCache[id] = String(id).slice(0, 8) + '…'; });
+  }
+  return _emailCache;
+}
+function emailOf(id){ return _emailCache[id] || (id ? String(id).slice(0,8)+'…' : '-'); }
+
 function escapeHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function formatRp(n){ return 'Rp ' + (Number(n)||0).toLocaleString('id-ID'); }
 function starsHtml(avg){
@@ -407,12 +423,13 @@ async function loadMarket(){
   const box = $('marketList');
   box.innerHTML = '<div class="loading">Memuat produk...</div>';
   const { data, error } = await sb.from('marketplace_products')
-    .select('*, profiles:seller_id(email, role)')
+    .select('id, seller_id, title, description, price, images, stock_remaining, avg_rating, review_count, status, created_at')
     .eq('status', 'active')
     .order('created_at', { ascending: false })
     .limit(100);
   if(error){ box.innerHTML = `<div class="empty"><span class="big">⚠️</span>${escapeHtml(error.message)}<br><small>Jalankan SQL marketplace dulu</small></div>`; return; }
   marketCache = data || [];
+  await resolveEmails(marketCache.map(p => p.seller_id));
   renderMarket();
 }
 
@@ -453,14 +470,20 @@ function renderMarket(){
 
 /* ========== DETAIL + BUY ========== */
 async function openDetail(id){
-  const { data: p, error } = await sb.from('marketplace_products').select('*, profiles:seller_id(email)').eq('id', id).maybeSingle();
+  const { data: p, error } = await sb.from('marketplace_products')
+    .select('id, seller_id, title, description, price, images, stock_remaining, avg_rating, review_count, status, created_at')
+    .eq('id', id).maybeSingle();
   if(error||!p) return Swal.fire({title:'Error',text:error?.message||'Tidak ditemukan',icon:'error',background:'#1a0e2e',color:'#fff'});
+  await resolveEmails([p.seller_id]);
   const imgs = (p.images||[]).map(u=>`<img src="${escapeHtml(u)}" alt="">`).join('') || '<div style="color:#666;padding:20px">Tanpa foto</div>';
   const stock = p.stock_remaining||0;
-  const { data: reviews } = await sb.from('marketplace_reviews').select('*, profiles:buyer_id(email)').eq('product_id', id).order('created_at',{ascending:false}).limit(20);
+  const { data: reviews } = await sb.from('marketplace_reviews')
+    .select('id, buyer_id, rating, comment, created_at')
+    .eq('product_id', id).order('created_at',{ascending:false}).limit(20);
+  await resolveEmails((reviews||[]).map(r => r.buyer_id));
   const revHtml = (reviews||[]).length ? reviews.map(r => `
     <div style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.06);font-size:12px">
-      <div class="stars">${starsHtml(r.rating)} · <span style="color:#94a3b8">${escapeHtml(r.profiles?.email||'user')}</span></div>
+      <div class="stars">${starsHtml(r.rating)} · <span style="color:#94a3b8">${escapeHtml(emailOf(r.buyer_id))}</span></div>
       <div style="margin-top:4px;color:#e2e8f0">${escapeHtml(r.comment||'')}</div>
     </div>`).join('') : '<div class="empty" style="padding:12px">Belum ada ulasan</div>';
 
@@ -472,7 +495,7 @@ async function openDetail(id){
       <span class="stars">${starsHtml(p.avg_rating)} ${Number(p.avg_rating||0).toFixed(1)} (${p.review_count||0} ulasan)</span>
       <span class="badge ${stock>0?'stock':'soldout'}">${stock>0?stock+' stok':'Habis'}</span>
     </div>
-    <div style="font-size:11px;color:#94a3b8;margin-bottom:8px">Seller: ${escapeHtml(p.profiles?.email||'-')}</div>
+    <div style="font-size:11px;color:#94a3b8;margin-bottom:8px">Seller: ${escapeHtml(emailOf(p.seller_id))}</div>
     <div style="font-size:13px;line-height:1.55;white-space:pre-wrap;margin-bottom:12px">${escapeHtml(p.description||'')}</div>
     <button class="btn btn-primary" ${stock<1||p.seller_id===currentUser?.id?'disabled':''} onclick="buyProduct('${p.id}')">
       ${p.seller_id===currentUser?.id?'Produk Anda':(stock<1?'Stok Habis':'🛒 Beli Sekarang')}
@@ -775,14 +798,15 @@ async function loadAdminPending(){
   if(!isStaff) return;
   const box = $('adminPendingList');
   const { data, error } = await sb.from('marketplace_pending_balance')
-    .select('*, profiles:seller_id(email)')
+    .select('id, seller_id, buyer_id, order_id, amount, available_at, status, created_at')
     .eq('status','pending')
     .order('created_at',{ascending:false}).limit(100);
   if(error){ box.innerHTML = `<div class="empty">${escapeHtml(error.message)}</div>`; return; }
   if(!data?.length){ box.innerHTML = '<div class="empty">Tidak ada pending</div>'; return; }
+  await resolveEmails(data.map(p => p.seller_id));
   box.innerHTML = data.map(p => `
     <div class="card pending-card">
-      <div style="font-size:12px">${escapeHtml(p.profiles?.email||p.seller_id)}</div>
+      <div style="font-size:12px">${escapeHtml(emailOf(p.seller_id))}</div>
       <div style="font-weight:900;color:#facc15">${formatRp(p.amount)}</div>
       <button class="btn btn-danger" style="margin-top:8px;padding:8px;font-size:11px" onclick="cancelPending('${p.id}')">Cancel & Refund Pembeli</button>
     </div>`).join('');
@@ -809,30 +833,37 @@ function setOrderTab(t, btn){
 async function loadOrders(){
   const box = $('ordersList');
   box.innerHTML = '<div class="loading">Memuat...</div>';
-  let q = sb.from('marketplace_orders').select('*, product:product_id(title, images), stock:stock_id(username, password)').order('created_at',{ascending:false}).limit(50);
+  let q = sb.from('marketplace_orders').select('id, buyer_id, seller_id, product_id, stock_id, price, delivered_username, delivered_password, status, created_at').order('created_at',{ascending:false}).limit(50);
   if(orderTab==='buy') q = q.eq('buyer_id', currentUser.id);
   else q = q.eq('seller_id', currentUser.id);
   const { data, error } = await q;
   if(error){ box.innerHTML = `<div class="empty">${escapeHtml(error.message)}</div>`; return; }
   if(!data?.length){ box.innerHTML = '<div class="empty"><span class="big">📋</span>Belum ada riwayat</div>'; return; }
 
-  // which orders already reviewed
+  const productIds = [...new Set(data.map(o => o.product_id).filter(Boolean))];
+  const productMap = {};
+  if (productIds.length) {
+    const { data: prods } = await sb.from('marketplace_products').select('id, title, images').in('id', productIds);
+    (prods || []).forEach(p => { productMap[p.id] = p; });
+  }
+
   const orderIds = data.map(o=>o.id);
   const { data: revs } = await sb.from('marketplace_reviews').select('order_id').in('order_id', orderIds);
   const reviewed = new Set((revs||[]).map(r=>r.order_id));
 
   box.innerHTML = data.map(o => {
-    const img = o.product?.images?.[0];
+    const prod = productMap[o.product_id] || {};
+    const img = (prod.images && prod.images[0]) ? prod.images[0] : '';
     const isBuy = orderTab==='buy';
-    const cred = isBuy ? `<div class="cred-box"><div>Username/Gmail</div><code>${escapeHtml(o.stock?.username||o.delivered_username||'-')}</code>
-      <div style="margin-top:6px">Password</div><code>${escapeHtml(o.stock?.password||o.delivered_password||'-')}</code></div>
+    const cred = isBuy ? `<div class="cred-box"><div>Username/Gmail</div><code>${escapeHtml(o.delivered_username||'-')}</code>
+      <div style="margin-top:6px">Password</div><code>${escapeHtml(o.delivered_password||'-')}</code></div>
       <div class="note-box">Anda memiliki waktu <b>7 hari</b> untuk mengamankan akun. Jika ada kendala (akun tidak bisa masuk), laporkan ke WhatsApp Shine Shop <a href="https://wa.me/${WA_REPORT}" target="_blank" style="color:#38bdf8">+${WA_REPORT}</a>.</div>` : '';
     const reviewBtn = isBuy && !reviewed.has(o.id) ? `<button class="btn btn-gold" style="margin-top:8px;padding:8px;font-size:12px" onclick="openReview('${o.id}','${o.product_id}','${o.seller_id}')">⭐ Beri Ulasan</button>` : (isBuy && reviewed.has(o.id)?`<div style="font-size:11px;color:#22c55e;margin-top:6px">✓ Sudah diulas</div>`:'');
     return `<div class="card">
       <div style="display:flex;gap:10px">
         ${img?`<img class="product-thumb" src="${escapeHtml(img)}">`:`<div class="product-thumb" style="display:flex;align-items:center;justify-content:center">🎮</div>`}
         <div style="flex:1">
-          <div style="font-weight:800;font-size:13px">${escapeHtml(o.product?.title||'Produk')}</div>
+          <div style="font-weight:800;font-size:13px">${escapeHtml(prod.title||'Produk')}</div>
           <div class="product-price" style="font-size:13px;margin-top:4px">${formatRp(o.price)}</div>
           <div style="font-size:10px;color:#94a3b8;margin-top:4px">${new Date(o.created_at).toLocaleString('id-ID',{timeZone:'Asia/Jakarta'})} WIB</div>
         </div>
