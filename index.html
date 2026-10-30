@@ -3507,14 +3507,16 @@ function stopDepositPolling() { if (depositPollingInterval) { clearInterval(depo
 async function processReferralBonusOnDeposit({ userId, userEmail, depositId, depositAmount, uniqueCode }) {
   const uniqueNum = parseFloat(uniqueCode) || 0;
   if (!userId || !depositId || uniqueNum <= 0) {
+    console.warn('[referral] skip: no unique', { userId, depositId, uniqueCode });
     return { reward: 0, message: 'no_unique_code' };
   }
 
-  // 0) RPC server-side paling andal (trigger-compatible)
+  // 0) RPC server-side SECURITY DEFINER (WAJIB — client tidak bisa update saldo orang lain)
   try {
     const { data: payData, error: payErr } = await supabaseClient.rpc('pay_referral_bonus_for_deposit', {
       p_deposit_id: depositId
     });
+    console.log('[referral] pay_referral_bonus_for_deposit =>', payData, payErr);
     if (!payErr && payData) {
       if (payData.success && parseFloat(payData.reward_amount) > 0) {
         return {
@@ -3525,6 +3527,10 @@ async function processReferralBonusOnDeposit({ userId, userEmail, depositId, dep
         };
       }
       if (payData.message === 'already_claimed') return { reward: 0, message: 'already_claimed' };
+      if (payData.message === 'no_upline') {
+        console.warn('[referral] no_upline — pastikan referred_by_user_id terisi di profiles downline', payData);
+        return { reward: 0, message: 'no_upline', detail: payData };
+      }
       if (payData.message && payData.message !== 'no_upline') {
         console.warn('pay_referral_bonus_for_deposit:', payData);
       }
