@@ -79,7 +79,7 @@ body{font-family:'Quicksand',sans-serif;background:#0f0818;color:#f1e6f5;min-hei
 .search-box{width:100%;padding:11px 14px;border-radius:12px;border:1.5px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04);color:#fff;font-family:inherit;font-size:13px;margin-bottom:10px;outline:none}
 .modal-back{position:fixed;inset:0;background:rgba(0,0,0,0.65);z-index:80;display:none;align-items:flex-end;justify-content:center}
 .modal-back.show{display:flex}
-.modal-sheet{background:#1a0e2e;border-radius:20px 20px 0 0;width:100%;max-width:480px;max-height:88vh;overflow-y:auto;padding:16px 14px calc(20px + env(safe-area-inset-bottom));border:1px solid rgba(255,255,255,0.1);border-bottom:none}
+.modal-sheet{background:#1a0e2e;border-radius:20px 20px 0 0;width:100%;max-width:480px;max-height:88vh;overflow-y:auto;padding:16px 14px calc(20px + env(safe-area-inset-bottom));border:1px solid rgba(255,255,255,0.1);border-bottom:none;pointer-events:auto;position:relative;z-index:2}
 .modal-sheet h3{font-size:15px;font-weight:900;margin-bottom:12px}
 .loading{text-align:center;padding:20px;color:#94a3b8;font-size:12px}
 .admin-tag{font-size:9px;background:rgba(255,215,0,0.2);color:#ffd700;padding:2px 6px;border-radius:6px;font-weight:800}
@@ -104,7 +104,7 @@ body{font-family:'Quicksand',sans-serif;background:#0f0818;color:#f1e6f5;min-hei
 .terms-box span{font-size:12px;color:#e2e8f0;line-height:1.5;font-weight:600}
 .terms-box a{color:#38bdf8;font-weight:800;text-decoration:underline;text-underline-offset:2px}
 .terms-box.error{border-color:rgba(255,68,68,0.55);background:rgba(255,68,68,0.08)}
-.chat-panel{position:fixed;inset:0;z-index:90;background:rgba(0,0,0,0.55);display:none;align-items:flex-end;justify-content:center}
+.chat-panel{position:fixed;inset:0;z-index:120;background:rgba(0,0,0,0.55);display:none;align-items:flex-end;justify-content:center}
 .chat-panel.show{display:flex}
 .chat-sheet{width:100%;max-width:480px;height:min(88vh,720px);background:#140a22;border-radius:18px 18px 0 0;display:flex;flex-direction:column;border:1px solid rgba(255,255,255,0.1);border-bottom:none}
 .chat-sheet-head{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid rgba(255,255,255,0.08);background:rgba(26,14,46,0.95)}
@@ -622,8 +622,8 @@ async function openDetail(id){
     <button class="btn btn-primary" ${stock<1||p.seller_id===currentUser?.id?'disabled':''} onclick="buyProduct('${p.id}')">
       ${p.seller_id===currentUser?.id?'Produk Anda':(stock<1?'Stok Habis':'🛒 Beli Sekarang')}
     </button>
-    ${p.seller_id!==currentUser?.id ? `<button class="btn btn-secondary" style="margin-top:8px" onclick="startChatWithSeller('${p.seller_id}','${p.id}', ${JSON.stringify(p.title||'')})">💬 Chat Penjual</button>` : ''}
-    ${p.seller_id===currentUser?.id ? `<button class="btn btn-gold" style="margin-top:8px" onclick="closeDetail();openAddStock('${p.id}', ${JSON.stringify(p.title||'')})">➕ Tambah Stok</button>` : ''}
+    ${p.seller_id!==currentUser?.id ? `<button type="button" class="btn btn-secondary" style="margin-top:8px;position:relative;z-index:5" onclick="event.preventDefault();event.stopPropagation();startChatWithSeller('${p.seller_id}','${p.id}')">💬 Chat Penjual</button>` : ''}
+    ${p.seller_id===currentUser?.id ? `<button type="button" class="btn btn-gold" style="margin-top:8px;position:relative;z-index:5" onclick="event.preventDefault();event.stopPropagation();closeDetail();openAddStock('${p.id}')">➕ Tambah Stok</button>` : ''}
     ${(isStaff || p.seller_id===currentUser?.id) ? `<button class="btn btn-danger" style="margin-top:8px" onclick="deleteProduct('${p.id}')">${isStaff && p.seller_id!==currentUser?.id ? '🛡️ Hapus (Admin)' : 'Hapus Produk'}</button>` : ''}
     <div class="section-title">⭐ Ulasan <div class="line"></div></div>
     ${revHtml}
@@ -921,6 +921,12 @@ async function loadMyProducts(){
 }
 
 async function openAddStock(productId, title){
+  if (!title && productId) {
+    try {
+      const { data: prod } = await sb.from('marketplace_products').select('title').eq('id', productId).maybeSingle();
+      if (prod) title = prod.title;
+    } catch (_) {}
+  }
   const { value: formValues } = await Swal.fire({
     title: 'Tambah Stok',
     html: `<div style="text-align:left;font-size:12px;color:#94a3b8;margin-bottom:8px">${escapeHtml(title || '')}</div>
@@ -1353,22 +1359,57 @@ function shortPreview(s){
 }
 
 async function startChatWithSeller(sellerId, productId, productTitle){
-  if(!currentUser) return;
-  if(sellerId === currentUser.id){
-    return Swal.fire({title:'Info',text:'Tidak bisa chat ke diri sendiri',icon:'info',background:'#1a0e2e',color:'#fff'});
+  // exposed for inline onclick
+
+  try {
+    if(!currentUser) {
+      return Swal.fire({title:'Login dulu',icon:'info',background:'#1a0e2e',color:'#fff'});
+    }
+    if(!sellerId) {
+      return Swal.fire({title:'Seller tidak ditemukan',icon:'error',background:'#1a0e2e',color:'#fff'});
+    }
+    if(sellerId === currentUser.id){
+      return Swal.fire({title:'Info',text:'Tidak bisa chat ke diri sendiri',icon:'info',background:'#1a0e2e',color:'#fff'});
+    }
+
+    // ambil judul produk jika belum ada
+    let title = productTitle || null;
+    if(!title && productId){
+      try {
+        const { data: prod } = await sb.from('marketplace_products').select('title, seller_id').eq('id', productId).maybeSingle();
+        if(prod){ title = prod.title; if(!sellerId) sellerId = prod.seller_id; }
+      } catch(_){}
+    }
+
+    // tutup detail dulu biar chat panel tidak ketutup
+    try { closeDetail(); } catch(_){}
+
+    Swal.fire({title:'Membuka chat...',allowOutsideClick:false,didOpen:()=>Swal.showLoading(),background:'#1a0e2e',color:'#fff'});
+    const { data, error } = await sb.rpc('marketplace_open_chat', {
+      p_seller_id: sellerId,
+      p_product_id: productId || null,
+      p_product_title: title || null
+    });
+    try { Swal.close(); } catch(_){}
+
+    if(error) {
+      console.error('open chat', error);
+      return Swal.fire({title:'Gagal',text:error.message,icon:'error',background:'#1a0e2e',color:'#fff'});
+    }
+    if(data && data.success === false) {
+      return Swal.fire({title:'Gagal',text:data.message||'Gagal buka chat',icon:'error',background:'#1a0e2e',color:'#fff'});
+    }
+    const threadId = data?.thread_id || data?.id;
+    if(!threadId) {
+      return Swal.fire({title:'Gagal',text:'Thread tidak dibuat. Jalankan SQL marketplace-chat.sql',icon:'error',background:'#1a0e2e',color:'#fff'});
+    }
+    openChatPanel();
+    await openChatThread(threadId);
+  } catch (err) {
+    console.error(err);
+    try { Swal.close(); } catch(_){}
+    Swal.fire({title:'Gagal',text:err.message||String(err),icon:'error',background:'#1a0e2e',color:'#fff'});
   }
-  Swal.fire({title:'Membuka chat...',allowOutsideClick:false,didOpen:()=>Swal.showLoading(),background:'#1a0e2e',color:'#fff'});
-  const { data, error } = await sb.rpc('marketplace_open_chat', {
-    p_seller_id: sellerId,
-    p_product_id: productId || null,
-    p_product_title: productTitle || null
-  });
-  Swal.close();
-  if(error) return Swal.fire({title:'Gagal',text:error.message,icon:'error',background:'#1a0e2e',color:'#fff'});
-  if(data && data.success === false) return Swal.fire({title:'Gagal',text:data.message||'Gagal',icon:'error',background:'#1a0e2e',color:'#fff'});
-  const threadId = data.thread_id || data.id;
-  openChatPanel();
-  if(threadId) openChatThread(threadId);
 }
 
 async function openChatThread(threadId){
@@ -1501,6 +1542,9 @@ async function sendChatMessage(){
 }
 
 
+window.startChatWithSeller = startChatWithSeller;
+window.openChatPanel = openChatPanel;
+window.openAddStock = openAddStock;
 window.addEventListener('load', async () => {
   initSb();
   await initAuth();
