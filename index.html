@@ -2725,17 +2725,11 @@ async function handleLogout() {
 async function forceLogout() { try { if (chatClient) await chatClient.auth.signOut(); await supabaseClient.auth.signOut(); } catch(e) {} location.reload(); }
 
 async function handleAccountDeletedLogout(reason) {
+  // Hanya dipanggil saat yakin akun benar-benar dihapus (bukan error jaringan)
+  if (window._accountDeleteLogoutDone) return;
+  window._accountDeleteLogoutDone = true;
   try {
-    // bersihkan storage session
-    try { localStorage.removeItem('user_gmail'); } catch (_) {}
-    try {
-      const keys = Object.keys(localStorage);
-      keys.forEach(k => {
-        if (/supabase|sb-|auth|shine-shop/i.test(k)) {
-          try { localStorage.removeItem(k); } catch (_) {}
-        }
-      });
-    } catch (_) {}
+    try { if (window._deletedAccountPoll) clearInterval(window._deletedAccountPoll); } catch (_) {}
     try { if (chatClient) await chatClient.auth.signOut(); } catch (_) {}
     try { if (supabaseClient) await supabaseClient.auth.signOut(); } catch (_) {}
   } catch (_) {}
@@ -2755,7 +2749,10 @@ async function handleAccountDeletedLogout(reason) {
 
 function startDeletedAccountWatcher() {
   if (!supabaseClient || !currentUser) return;
-  // Realtime: profile baris sendiri terhapus
+  window._accountDeleteMissCount = 0;
+  window._accountDeleteLogoutDone = false;
+
+  // Realtime saja: baris profile sendiri dihapus → logout
   try {
     if (window._deletedAccountChannel) {
       try { window._deletedAccountChannel.unsubscribe(); } catch (_) {}
@@ -2775,32 +2772,65 @@ function startDeletedAccountWatcher() {
     console.warn('deleted account channel', e.message);
   }
 
-  // Poll: profile hilang / getUser gagal
+  // Poll longgar: hanya logout setelah BEBERAPA kali berturut-turut
+  // profile benar-benar tidak ada + auth user juga tidak ada (bukan error jaringan)
   if (window._deletedAccountPoll) clearInterval(window._deletedAccountPoll);
   window._deletedAccountPoll = setInterval(async () => {
-    if (!currentUser || !supabaseClient) return;
+    if (!currentUser || !supabaseClient || document.visibilityState === 'hidden') return;
     try {
-      const { data: { user }, error } = await supabaseClient.auth.getUser();
-      if (error || !user) {
-        await handleAccountDeletedLogout('Sesi tidak valid / akun dihapus.');
+      const uid = currentUser.id;
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      // Session masih ada → jangan logout (token refresh / jaringan goyah)
+      if (session && session.user && session.user.id === uid) {
+        const { data: prof, error: pErr } = await supabaseClient
+          .from('profiles')
+          .select('id')
+          .eq('id', uid)
+          .maybeSingle();
+        // Error jaringan / RLS sementara → abaikan
+        if (pErr) {
+          window._accountDeleteMissCount = 0;
+          return;
+        }
+        if (prof && prof.id) {
+          window._accountDeleteMissCount = 0;
+          return;
+        }
+        // Profile kosong tapi session masih ada → bisa jadi delay replica; hitung miss
+        window._accountDeleteMissCount = (window._accountDeleteMissCount || 0) + 1;
+        if (window._accountDeleteMissCount >= 5) {
+          // Konfirmasi lagi dengan getUser
+          const { data: { user }, error: uErr } = await supabaseClient.auth.getUser();
+          if (uErr && /user not found|User from sub claim in JWT does not exist/i.test(uErr.message || '')) {
+            await handleAccountDeletedLogout('Akun tidak ditemukan di auth.');
+            return;
+          }
+          if (user && user.id === uid) {
+            // Auth masih ada, profile belum → jangan logout (mungkin trigger profile belum)
+            window._accountDeleteMissCount = 0;
+            return;
+          }
+          await handleAccountDeletedLogout('Profile tidak ditemukan (akun dihapus).');
+        }
         return;
       }
-      const { data: prof, error: pErr } = await supabaseClient
-        .from('profiles')
-        .select('id')
-        .eq('id', currentUser.id)
-        .maybeSingle();
-      if (pErr && /JWT|invalid|user not found|not found/i.test(pErr.message || '')) {
-        await handleAccountDeletedLogout(pErr.message);
+
+      // Tidak ada session: coba getUser sekali
+      const { data: { user }, error: uErr } = await supabaseClient.auth.getUser();
+      if (uErr && /user not found|User from sub claim in JWT does not exist/i.test(uErr.message || '')) {
+        window._accountDeleteMissCount = (window._accountDeleteMissCount || 0) + 1;
+        if (window._accountDeleteMissCount >= 3) {
+          await handleAccountDeletedLogout('Sesi tidak valid / akun dihapus.');
+        }
         return;
       }
-      if (!prof) {
-        await handleAccountDeletedLogout('Profile tidak ditemukan (akun dihapus).');
-      }
+      // Session kosong sementara (refresh) → jangan logout
+      window._accountDeleteMissCount = 0;
     } catch (e) {
-      // diam
+      // Error jaringan: jangan logout
+      window._accountDeleteMissCount = 0;
     }
-  }, 12000);
+  }, 45000);
 }
 
 // ============================================================
