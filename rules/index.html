@@ -1,416 +1,1510 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-  
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SOP & Peraturan Resmi | Shine Shop</title>
-
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#1a0e2e">
+<title>Shine Account Market</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700;800;900&family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600&family=Inter:wght@300;400;500&display=swap');
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:'Quicksand',sans-serif;background:#0f0818;color:#f1e6f5;min-height:100dvh;overflow-x:hidden}
+.app{max-width:480px;margin:0 auto;min-height:100dvh;display:flex;flex-direction:column;background:linear-gradient(180deg,#1a0e2e 0%,#140a22 40%,#0f0818 100%);position:relative}
+.app-bar{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:rgba(20,10,40,0.95);border-bottom:1px solid rgba(255,255,255,0.08);position:sticky;top:0;z-index:50;backdrop-filter:blur(12px)}
+.app-bar h1{font-size:15px;font-weight:900;font-family:'Poppins',sans-serif;background:linear-gradient(90deg,#ff6b9d,#ffd700);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.balance-pill{background:rgba(255,215,0,0.12);border:1px solid rgba(255,215,0,0.35);color:#ffd700;font-weight:800;font-size:12px;padding:6px 10px;border-radius:20px}
+.pages{flex:1;overflow-y:auto;padding:12px 12px 90px}
+.page{display:none}.page.active{display:block}
+.bottom-nav{position:fixed;left:50%;transform:translateX(-50%);bottom:0;width:100%;max-width:480px;display:flex;background:rgba(20,10,40,0.98);border-top:1px solid rgba(255,255,255,0.08);padding:8px 6px calc(8px + env(safe-area-inset-bottom));z-index:60}
+.nav-item{flex:1;background:transparent;border:none;color:#6b4a7a;font-family:inherit;font-size:10px;font-weight:800;display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 4px;border-radius:12px;cursor:pointer}
+.nav-item.active{color:#ff6b9d;background:rgba(255,107,157,0.12)}
+.nav-item .ico{font-size:18px}
+.section-title{font-size:13px;font-weight:900;margin:14px 0 10px;display:flex;align-items:center;gap:8px}
+.section-title .line{flex:1;height:1px;background:linear-gradient(90deg,rgba(255,107,157,0.4),transparent)}
+.card{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:16px;padding:12px;margin-bottom:10px}
+.product-card{display:flex;gap:10px;cursor:pointer;transition:0.2s}
+.product-card:hover{border-color:rgba(255,107,157,0.35);background:rgba(255,107,157,0.06)}
+.product-thumb{width:72px;height:72px;border-radius:12px;object-fit:cover;background:#221236;flex-shrink:0}
+.product-info{flex:1;min-width:0}
+.product-title{font-size:13px;font-weight:800;color:#fff;margin-bottom:4px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.product-meta{font-size:10px;color:#94a3b8;display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}
+.product-price{font-size:14px;font-weight:900;color:#ffd700;font-family:'Poppins',sans-serif}
+.stars{color:#ffd700;font-size:11px;letter-spacing:1px}
+.badge{display:inline-flex;padding:2px 7px;border-radius:8px;font-size:9px;font-weight:800}
+.badge.stock{background:rgba(34,197,94,0.15);color:#22c55e;border:1px solid rgba(34,197,94,0.3)}
+.badge.soldout{background:rgba(255,68,68,0.15);color:#ff8080;border:1px solid rgba(255,68,68,0.3)}
+.btn{border:none;border-radius:12px;padding:12px 14px;font-family:inherit;font-weight:800;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;width:100%}
+.btn-primary{background:linear-gradient(135deg,#ff6b9d,#ff4080);color:#fff;box-shadow:0 6px 20px rgba(255,107,157,0.35)}
+.btn-secondary{background:rgba(255,255,255,0.06);color:#fff;border:1px solid rgba(255,255,255,0.12)}
+.btn-gold{background:linear-gradient(135deg,#ffd700,#f59e0b);color:#1a0e2e}
+.btn-danger{background:linear-gradient(135deg,#ef4444,#b91c1c);color:#fff}
+.btn:disabled{opacity:0.55;cursor:not-allowed}
+.field{margin-bottom:10px}
+.field label{display:block;font-size:11px;font-weight:700;color:#b39ddb;margin-bottom:5px}
+.field input,.field textarea,.field select{width:100%;padding:12px 14px;border-radius:12px;border:1.5px solid rgba(255,107,157,0.2);background:rgba(255,255,255,0.04);color:#fff;font-family:inherit;font-size:13px;outline:none}
+.field textarea{min-height:90px;resize:vertical}
+.field input:focus,.field textarea:focus{border-color:#ff6b9d}
+.photo-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-top:6px}
+.photo-slot{aspect-ratio:1;border-radius:10px;background:rgba(255,255,255,0.04);border:1.5px dashed rgba(255,255,255,0.15);display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative;cursor:pointer}
+.photo-slot img{width:100%;height:100%;object-fit:cover}
+.photo-slot .rm{position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:rgba(255,68,68,0.9);color:#fff;font-size:10px;border:none;cursor:pointer}
+.stock-row{display:grid;grid-template-columns:1fr 1fr auto;gap:6px;margin-bottom:6px;align-items:center}
+.stock-row input{padding:10px;font-size:12px}
+.stock-row button{width:34px;height:34px;border-radius:8px;border:none;background:rgba(255,68,68,0.2);color:#ff8080;cursor:pointer;font-weight:900}
+.auth-screen{position:fixed;inset:0;z-index:100;background:linear-gradient(180deg,#1a0e2e,#140a22);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;max-width:480px;left:50%;transform:translateX(-50%)}
+.auth-screen.hidden{display:none}
+.auth-box{width:100%;max-width:360px}
+.auth-box h2{font-family:'Poppins',sans-serif;font-size:22px;font-weight:900;text-align:center;margin-bottom:6px;background:linear-gradient(90deg,#ff6b9d,#ffd700);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.auth-box p{text-align:center;font-size:12px;color:#94a3b8;margin-bottom:18px}
+.tabs{display:flex;gap:6px;margin-bottom:14px}
+.tabs button{flex:1;padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.1);background:transparent;color:#94a3b8;font-family:inherit;font-weight:800;cursor:pointer}
+.tabs button.active{background:rgba(255,107,157,0.15);color:#ff6b9d;border-color:rgba(255,107,157,0.4)}
+.empty{text-align:center;padding:30px 12px;color:#6b4a7a;font-size:12px}
+.empty .big{font-size:36px;display:block;margin-bottom:8px;opacity:0.5}
+.detail-gallery{display:flex;gap:8px;overflow-x:auto;padding-bottom:8px;margin-bottom:12px}
+.detail-gallery img{width:120px;height:120px;border-radius:12px;object-fit:cover;flex-shrink:0;background:#221236}
+.cred-box{background:rgba(0,0,0,0.3);border:1px solid rgba(255,215,0,0.3);border-radius:12px;padding:12px;margin:10px 0;font-size:12px}
+.cred-box code{display:block;background:rgba(255,255,255,0.05);padding:8px;border-radius:8px;margin-top:4px;word-break:break-all;color:#ffd700}
+.note-box{background:rgba(255,107,157,0.1);border-left:3px solid #ff6b9d;padding:10px 12px;border-radius:0 10px 10px 0;font-size:11.5px;line-height:1.55;color:#e2e8f0;margin-top:10px}
+.slot-info{font-size:11px;color:#94a3b8;margin-bottom:10px;padding:8px 10px;background:rgba(0,198,255,0.08);border:1px solid rgba(0,198,255,0.2);border-radius:10px}
+.pending-card{border-left:3px solid #facc15}
+.star-pick{display:flex;gap:6px;justify-content:center;margin:10px 0}
+.star-pick button{background:transparent;border:none;font-size:28px;cursor:pointer;opacity:0.35;filter:grayscale(1)}
+.star-pick button.on{opacity:1;filter:none}
+.filter-row{display:flex;gap:6px;margin-bottom:12px;overflow-x:auto}
+.chip{flex-shrink:0;padding:7px 12px;border-radius:20px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04);color:#94a3b8;font-size:11px;font-weight:800;cursor:pointer;font-family:inherit}
+.chip.active{background:rgba(255,107,157,0.15);border-color:rgba(255,107,157,0.4);color:#ff6b9d}
+.search-box{width:100%;padding:11px 14px;border-radius:12px;border:1.5px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04);color:#fff;font-family:inherit;font-size:13px;margin-bottom:10px;outline:none}
+.modal-back{position:fixed;inset:0;background:rgba(0,0,0,0.65);z-index:80;display:none;align-items:flex-end;justify-content:center}
+.modal-back.show{display:flex}
+.modal-sheet{background:#1a0e2e;border-radius:20px 20px 0 0;width:100%;max-width:480px;max-height:88vh;overflow-y:auto;padding:16px 14px calc(20px + env(safe-area-inset-bottom));border:1px solid rgba(255,255,255,0.1);border-bottom:none}
+.modal-sheet h3{font-size:15px;font-weight:900;margin-bottom:12px}
+.loading{text-align:center;padding:20px;color:#94a3b8;font-size:12px}
+.admin-tag{font-size:9px;background:rgba(255,215,0,0.2);color:#ffd700;padding:2px 6px;border-radius:6px;font-weight:800}
 
-:root {
-    --gold: #d4af37;
-    --gold-soft: rgba(212,175,55,0.15);
-    --bg: #0b0b0b;
-    --card: #151515;
-    --border: rgba(212,175,55,.25);
-    --text: #f5f5f5;
-    --muted: #b5b5b5;
-    --danger: #ff5c5c;
-}
+.img-lightbox{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,0.92);display:none;align-items:center;justify-content:center;padding:16px;flex-direction:column;gap:12px}
+.img-lightbox.show{display:flex}
+.img-lightbox img{max-width:100%;max-height:78vh;border-radius:12px;object-fit:contain;box-shadow:0 12px 40px rgba(0,0,0,0.5);cursor:zoom-out}
+.img-lightbox .lb-close{position:absolute;top:12px;right:12px;width:40px;height:40px;border-radius:50%;border:none;background:rgba(255,255,255,0.15);color:#fff;font-size:18px;cursor:pointer;font-weight:900;z-index:2}
+.img-lightbox .lb-nav{display:flex;gap:10px}
+.img-lightbox .lb-nav button{padding:10px 16px;border-radius:12px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.1);color:#fff;font-family:inherit;font-weight:800;cursor:pointer}
+.detail-gallery img,.product-thumb[src],.product-thumb img{cursor:zoom-in}
 
-* { box-sizing: border-box; }
 
-body {
-    margin: 0;
-    background: radial-gradient(circle at top, #1c1c1c, #000);
-    color: var(--text);
-    font-family: 'Inter', sans-serif;
-    line-height: 1.7;
-}
+.chat-fab{position:fixed;right:14px;bottom:calc(72px + env(safe-area-inset-bottom));z-index:55;width:52px;height:52px;border-radius:50%;border:none;background:linear-gradient(135deg,#ff6b9d,#ff4080);color:#fff;font-size:22px;cursor:pointer;box-shadow:0 8px 24px rgba(255,107,157,0.45)}
+.chat-fab-badge{position:absolute;top:-4px;right:-4px;min-width:20px;height:20px;padding:0 6px;border-radius:20px;background:#ff4444;color:#fff;font-size:11px;font-weight:900;display:none;align-items:center;justify-content:center;border:2px solid #140a22;box-shadow:0 0 10px rgba(255,68,68,0.55);line-height:1}
+.chat-fab-badge.has-count{display:flex !important;animation:badgePulse 1.4s ease-in-out infinite}
+@keyframes badgePulse{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
+.chat-folder.has-unread{border-color:rgba(255,68,68,0.45);background:rgba(255,68,68,0.08)}
+.chat-folder .cf-badge{display:inline-flex;min-width:18px;height:18px;padding:0 5px;border-radius:20px;background:#ff4444;color:#fff;font-size:10px;font-weight:900;align-items:center;justify-content:center;margin-left:6px}
+.terms-box{display:flex;align-items:flex-start;gap:10px;margin:10px 0 12px;padding:10px 12px;background:rgba(0,198,255,0.06);border:1px solid rgba(0,198,255,0.22);border-radius:12px;cursor:pointer;user-select:none}
+.terms-box input{width:18px;height:18px;margin-top:2px;flex-shrink:0;accent-color:#00c6ff;cursor:pointer}
+.terms-box span{font-size:12px;color:#e2e8f0;line-height:1.5;font-weight:600}
+.terms-box a{color:#38bdf8;font-weight:800;text-decoration:underline;text-underline-offset:2px}
+.terms-box.error{border-color:rgba(255,68,68,0.55);background:rgba(255,68,68,0.08)}
+.chat-panel{position:fixed;inset:0;z-index:90;background:rgba(0,0,0,0.55);display:none;align-items:flex-end;justify-content:center}
+.chat-panel.show{display:flex}
+.chat-sheet{width:100%;max-width:480px;height:min(88vh,720px);background:#140a22;border-radius:18px 18px 0 0;display:flex;flex-direction:column;border:1px solid rgba(255,255,255,0.1);border-bottom:none}
+.chat-sheet-head{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid rgba(255,255,255,0.08);background:rgba(26,14,46,0.95)}
+.chat-sheet-head h3{flex:1;font-size:14px;font-weight:900;margin:0}
+.chat-sheet-head button{background:rgba(255,255,255,0.08);border:none;color:#fff;width:34px;height:34px;border-radius:10px;cursor:pointer;font-weight:800}
+.chat-list{flex:1;overflow-y:auto;padding:10px}
+.chat-folder{display:flex;gap:10px;padding:12px;border-radius:14px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);margin-bottom:8px;cursor:pointer}
+.chat-folder:hover{border-color:rgba(255,107,157,0.35)}
+.chat-folder .cf-av{width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,#ff6b9d,#00c6ff);display:flex;align-items:center;justify-content:center;font-weight:900;flex-shrink:0}
+.chat-folder .cf-info{flex:1;min-width:0}
+.chat-folder .cf-title{font-size:12.5px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chat-folder .cf-prev{font-size:11px;color:#94a3b8;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chat-folder .cf-time{font-size:10px;color:#6b4a7a;flex-shrink:0}
+.chat-msgs{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px}
+.chat-bubble{max-width:82%;padding:10px 12px;border-radius:14px;font-size:13px;line-height:1.45;word-break:break-word}
+.chat-bubble.mine{align-self:flex-end;background:linear-gradient(135deg,#ff6b9d,#ff4080);color:#fff;border-bottom-right-radius:4px}
+.chat-bubble.other{align-self:flex-start;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.1);border-bottom-left-radius:4px}
+.chat-bubble img.chat-img{display:block;max-width:min(220px,70vw);max-height:240px;border-radius:10px;margin-top:6px;cursor:zoom-in}
+.chat-bubble .t{font-size:10px;opacity:0.75;margin-top:4px}
+.chat-input-row{display:flex;gap:8px;padding:10px 12px calc(10px + env(safe-area-inset-bottom));border-top:1px solid rgba(255,255,255,0.08);align-items:flex-end}
+.chat-input-row textarea{flex:1;min-height:40px;max-height:100px;padding:10px 12px;border-radius:12px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.05);color:#fff;font-family:inherit;font-size:13px;resize:none;outline:none}
+.chat-input-row button{width:42px;height:42px;border-radius:12px;border:none;cursor:pointer;font-size:16px;flex-shrink:0}
+.chat-input-row .send{background:linear-gradient(135deg,#ff6b9d,#ff4080);color:#fff}
+.chat-input-row .attach{background:rgba(255,255,255,0.08);color:#fff}
+.chat-note{font-size:10px;color:#6b4a7a;text-align:center;padding:6px 10px}
 
-/* ===== WATERMARK ===== */
-body::before {
-    content: "SHINE SHOP • OFFICIAL";
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%) rotate(-25deg);
-    font-family: 'Playfair Display', serif;
-    font-size: 90px;
-    letter-spacing: 10px;
-    color: rgba(212,175,55,0.05);
-    pointer-events: none;
-    z-index: 0;
-}
-
-.container {
-    max-width: 920px;
-    margin: auto;
-    padding: 60px 20px;
-    position: relative;
-    z-index: 1;
-}
-
-/* ===== HEADER ===== */
-.header {
-    text-align: center;
-    margin-bottom: 70px;
-}
-
-.header h1 {
-    font-family: 'Playfair Display', serif;
-    font-size: 40px;
-    color: var(--gold);
-    letter-spacing: 1px;
-    margin-bottom: 8px;
-}
-
-.header p {
-    color: var(--muted);
-    font-size: 14px;
-    letter-spacing: 2px;
-}
-
-.trust-badge {
-    display: inline-block;
-    margin-top: 16px;
-    padding: 8px 20px;
-    border-radius: 999px;
-    border: 1px solid var(--border);
-    background: linear-gradient(135deg, var(--gold-soft), transparent);
-    color: var(--gold);
-    font-size: 13px;
-    letter-spacing: 1px;
-}
-
-/* ===== SECTION ===== */
-.section {
-    background: linear-gradient(180deg, var(--card), #0f0f0f);
-    border: 1px solid var(--border);
-    border-radius: 18px;
-    padding: 30px;
-    margin-bottom: 28px;
-    box-shadow: 0 20px 45px rgba(0,0,0,.65);
-    position: relative;
-    overflow: hidden;
-}
-
-.section::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(120deg, transparent, var(--gold-soft), transparent);
-    opacity: .45;
-}
-
-.section h2 {
-    position: relative;
-    font-family: 'Playfair Display', serif;
-    font-size: 22px;
-    color: var(--gold);
-    margin-top: 0;
-    margin-bottom: 16px;
-}
-    
-
-.section p,
-.section li {
-    position: relative;
-    font-size: 15px;
-}
-
-ul { padding-left: 20px; }
-li { margin-bottom: 8px; }
-
-.highlight { color: var(--gold); font-weight: 500; }
-.danger { color: var(--danger); font-weight: 500; }
-
-.footer {
-    margin-top: 90px;
-    text-align: center;
-    font-size: 13px;
-    color: var(--muted);
-}
-
-/* ===== MOBILE ===== */
-@media (max-width: 600px) {
-    body::before { font-size: 46px; }
-    .header h1 { font-size: 30px; }
-}
 </style>
- </head>
-
+</head>
 <body>
-    
-<audio id="bgm" autoplay loop muted>
-  <source src="https://files.catbox.moe/1120of.mp3" type="audio/mpeg">
-</audio>
-
-<div class="container">
-
-    <div class="header">
-        <h1>SOP & PERATURAN RESMI</h1>
-        <p>SHINE SHOP</p>
-        <div class="trust-badge">✔ TRUSTED DIGITAL SELLER</div>
-    </div>
-<div class="section">
-        <h2>💝 INFORMASI</h2>
-        <ul>
-            <li>HATI HATI TERHADAP CLONE SHINE SHOP! <span class="highlight">Berikut sosial media Shine Shop</span>.</li>
-            <li>Instagram: @onivla_</li>
-          <li>Tiktok: @onivla1</li>
-            <li>Channel WhatsApp: https://whatsapp.com/channel/0029Vb8pYHd0G0XjnloL680y</li>
-            <li> WhatsApp: +62 895-1810-3883
-            <li>Discord: https://discord.gg/yRr2YHbzvN</li>
-            <li>Pemilik: Alvino Jeremy</li>
-        </ul>
-</div>
-    <div class="section">
-        <h2>💝 INFORMASI DAN SEJARAH SHINE SHOP</h2>
-        <ul>
-          <p>Shine Shop adalah salah satu toko online yang menyediakan berbagai produk dan jasa digital <br>
-              Shime Shop dibangun pada tahun 2022 dan pada saat tersebut Shine Shop belum berupa website <br>
-          Pada Tahun 2023 Shine Shop dibangun dan sudah berdiri berseta website nya yang pada saat itu belum serba otomatis seperti saat ini <br>
-          Saya Alvino Jeremy selaku pemilik Shine Shop mengucapkan terima kasih atas kepercayaan anda yang telah menggunakan jasa layanan Shine Shop sejak 2022 </p>  
-        </ul>
-    </div>
-    
-<div class="section">
-        <h2>💝 WEB SHINE SHOP</h2>
-        <ul>
-           <li>WEB SUNTIK SOSMED DAN GIFT STARS TELEGRAM <span class="highlight">shinedomain.my.id</span>.</li>
-           </ul>
-</div>
-<div class="section">
-        <h2>💠 FEE REKBER / MC</h2>
-        <ul>
-<li>Transaksi 1-30K → Rp 1.000
-<li>Transaksi 31K-50K → Rp 3.000 </li>
-<li>Transaksi 51K-300K → Rp 5.000</li>
-<li>Transaksi 301K-1jt → Rp 10.000 </li>
-<li>Transaksi diatas 1 juta → Rp 15.000</li>
-﻿
-           </ul>
-</div>
-    
-    <div class="section">
-        <h2>1. Ketentuan Umum</h2>
-        <ul>
-            <li>Shine Shop adalah penyedia <span class="highlight">script dan layanan digital</span>.</li>
-            <li>Dengan melakukan transaksi, pembeli dianggap telah membaca, memahami, dan menyetujui seluruh SOP dan peraturan ini.</li>
-            <li>Seluruh transaksi bersifat <span class="highlight">digital dan final</span>.</li>
-        </ul>
-    </div>
-
-    <div class="section">
-        <h2>2. Jual beli akun </h2>
-        <ul>
-          <li>2.1 Seller diwajibkan me-non aktifkan fitur verifikasi 2 langkah pada akun yang ingin dijual</li>
-          <li>2.2 Pembeli memiliki waktu 7 hari untuk mengamankan akun yang sudah dibeli sebelum dicairkan ke penjual </li>
-          <li>2.3 Pembeli berhak melaporkan seller yang melakukan hackback(HB) dan berhak mendapatkan reffund 100% selama 7 hari setelah pembelian</li>
-          <li>2.4 Seller yang melakukan tindakan illegal seperti: hackback/penipuan/mengajak pembeli transaksi diluar website akan mendapatkan sanksi tegas<br> Saldo minus hingga pembekuan akun</li>
-          <li>2.5 Saldo hasil penjualan dapat dicairkan ke rekening e wallet</li>
-          
-        </ul>
-    </div>
-
-    <div class="section">
-        <h2>3. Bug/Error </h2>
-        <ul>
-          <li>3.1 Pemanfaatan Error/Bug untuk keuntungan pribadi </li>
-          <li>3.2 Menyebarkan secara massal bug/error pada web kepada pihak lain agar disalah gunakan </li>
-          <li>Sanksi: Saldo dikurangi hingga Banned sementara bahkan Banned permanen</li>
-          <li>Hadiah untuk bug hunter: penambahan saldo akun </li>
-        </ul>
-    </div>
-
-    <div class="section">
-        <h2>4. Pencairan saldo Shine Shop</h2>
-      <ul>
-        <li>4.1 Saldo yang berada di Shine Shop dapat dicairkan dengan minimal pencairan sebesar Rp10.000</li>
-        <li>4.2 Biaya admin pencairan sebesar Rp2.000 untuk semua jenis e wallet</li>
-        <li>4.3 Pencairan dapat dilakukan pada website </li>
-      </ul>
-          </div>
-
-    <div class="section">
-        <h2>5. Refund & Komplain</h2>
-        <p class="danger">refund untuk seluruh produk digital.</p>
-        <p class="danger"> reffund 100% bila itu adalah kesalahan kami. <br> Contoh: Error pada pesanan, Pesanan tidak masuk, pesanan dibatalkan otomatis dari pusat, website error dan sebagainya<br><br></p>
- <p class="danger">reffund 70% jika kesalahan dilakukan pembeli <br>Contoh: 1. Pembeli private akun/postingan yang ingin disuntik <br>2. Kesalahan input data contoh: memesan suntik like namun memberikan username akun
-  </p>
-        <ul>
-            <li>Komplain hanya dilayani jika terjadi kesalahan atau gangguan dari pihak Shine Shop.</li>
-            <li>Komplain dengan unsur ancaman, spam, atau kata kasar akan diblokir permanen dan reffund tidak akan dilakukan.</li>
-        </ul>
-    </div>
-
-    <div class="section">
-        <h2>6. Etika Pembeli</h2>
-        <ul>
-            <li>Gunakan bahasa yang sopan dan profesional.</li>
-            <li>Dilarang menuduh scam tanpa bukti.</li>
-            <li>Keputusan Shine Shop bersifat <span class="highlight">final</span>.</li>
-        </ul>
-    </div>
-
-    <div class="section">
-        <h2>7. Disclaimer & Ketentuan Hukum</h2>
-        <ul>
-            <li>Shine Shop berhak mengubah SOP sewaktu-waktu tanpa pemberitahuan.</li>
-            <li>Versi SOP terbaru adalah yang sah dan mengikat.</li>
-            <li>Ketidaktahuan pembeli terhadap SOP bukan alasan komplain atau refund.</li>
-         </ul>
-    </div>
-    <div class="section">
-        <h2>8. PERATURAN SUNTIK SOSMED</h2>
-        <ul>
-            <li> 1. ⁠Pastikan target yang dimasukkan sudah benar sebelum melakukan pemesanan.</li>
-            <li> 2.⁠ Dilarang menggunakan layanan untuk konten yang mengandung unsur SARA, pornografi, perjudian , penipuan, ujaran kebencian, atau aktivitas ilegal lainnya</li>
-            <li> 3. ⁠Kecepatan proses dapat berubah sewaktu-waktu tergantung kondisi server dan jumlah antrean yang sedang berjalan.</li>
-            <li> 4. ⁠Jangan membuat pesanan baru pada target yang sama , jika pesanan sebelumnya ke target tersebut belum selesai / complated.</li>
-            <li> 5.⁠ Bukti transfer tidak valid/palsu/tidak sesuai akses anda akan kami blockir</li>
-            <li> 6. Jangan spam konfirmasi pembayaran serta sanksi tegas dapat kami berikan</li>
-          <li>7. garansi berlaku yaitu berupa refill gratis 1× selama masa garansi</li>
-          <li>8. Layanan Buzzer bersifat permanen dan 100% natural dikerjakan langsung oleh manusia yang dibayar</li>
-          <li>9. JPM (JASA PUSH MEMBER) 100% DIKERJAKAN OLEH MANUSIA MURNI DAN TELAH BEKERJA SAMA DENGAN SHINE SHOP</li>
-          <li>10. Shine Shop berhak melakukan blacklist/banned terhadap pengguna dianggap tidak menghargai, menghina, memfitnah, hingga memanfaatkan error yang terjadi pada website </li>
-        
-          <br><br>
-          <p>- Penolakan: Panel SHINE SHOP tidak akan bertanggung jawab jika Anda mengalami kerugian dalam bisnis Anda.<br>
-- Kewajiban: Panel SHINE SHOP tidak bertanggung jawab jika Anda mengalami suspensi atau penghapusan akun yang dilakukan oleh Instagram, Twitter, Facebook, Youtube, dan lain-lain.<br>
-          - SHINE SHOP tidak menjamin bahwa pesanan Anda tidak mengalami drop atau penurunan, karena pada dasarnya seluruh layanan kami dapat mengalami drop dan drop pada pesanan itu murni atau pure dari sistem platform sosial media itu sendiri. Anda dapat menggunakan layanan refill untuk mendapat jaminan isi ulang jika sewaktu-waktu pesanan Anda mengalami drop.
-          <br>
-          - Untuk layanan No Refill atau tanpa garansi, tidak ada pengembalian dana atau refund saldo bahkan jika drop dalam 5 menit sejak pesanan selesai. Order dengan resiko Anda sendiri!
-          </p>
-          
-            <p class="danger"> KAMI BERHAK MEMBLOCKIR AKSES PEMBELIAN ANDA SERTA TIDAK MELAKUKAN REFFUND JIKA MELANGGAR PASAL 8 AYAT 2
-            </p>
-          <br> <br>
-        </ul>
-    </div>
-
-     <div class="section">
-        <h2>9. Syarat ketentuan Untuk Sewa web</h2>
-        <p>
-       9.1 Anda dapat mengatur keuntungan anda sendiri pada website suntik sosmed <br><br>
-          9.2 apa yang dimaksud 500 pesanan/bulan? <br>
-          • Itu adalah limit Pesanan yang dapat dilakukan pada website anda, sehingga jika pesanan sudah 500 dalam bulan ini maka website anda tidak dapat melakukan transaksi. <br><br>
-          9.3 Bisakah saya melakukan upgrade limit? <br>
-          • Bisa, 1. anda dapat upgrade paket bulanan anda <br> 2. Anda dapat membeli limit seharga Rp10.000/500 pesanan
-          <br><br>
-          9.4 Apakah bisa saya custom nama domain ? <br> 
-          • Bisa, namun dengan syarat anda wajib sewa dengan waktu 1 tahun (12 bulan) <br><br>
-          9.5 Apakah ada biaya lagi? Jika ada biaya apakah itu? <br>
-          • Ada, deposit saldo untuk pusat (agar pesanan otomatis di proses ketika ada transaksi) (dan terdapat biaya admin deposit tergantung kebijakan admin) 
-          • Untuk penyewa web dengan harga 50K ke atas akan mendapatkan free saldo pusat sebesar Rp10.000
-          <br> <br>
-        9.6 bisakah saya request nama toko dan logo? 
-          <br> • Bisa
-        </p>
-    </div>
-   <div class="section">
-        <h2>10. Peraturan Untuk akun buzzer yang akan di daftarkan</h2>
-    <ul>
-      <li>10.1 silahkan hubungi admin untuk pendaftaran akun buzzer yang akan digunakan pastikan sudah sesuai dengan syarat ketentuan yang dibutuhkan sesuai pernyataan dibawah</li>
-        <li>10.2 Pengguna dilarang keras melakukan unfollow jika ketahuan komisi akan dipotong 90% serta peringatan pertama</li>
-      <li>10.3 Jika pengguna telah melanggar hingga sp3 maka akun akan di musnahkan serta saldo di website akan di hanguskan</li>
-    </ul>
-     
-   </div>
-  <div class="section">
-        <h2>11. Peraturan Untuk akun buzzer Instagram</h2>
-    <ul>
-      <li> 11.1 Akun Wajib menggunakan nama dan foto profil ala orang Indonesia</li>
-      <li>11.2 akun wajib memiliki setidak nya 5 followers dan 5 mengikuti orang lain (bebas)</li>
-      <li>11.3 akun setidaknya memiliki 2 postingan dengan minimal 3 likes pada setiap postingan</li>
-      <li>11.4 Akun yang memiliki centang biru akan mendapatkan bounty tambahan dari admin (wajib mengirimkan bukti melalui WhatsApp admin)</li>
-    </ul>
-        </div>
-  <div class="section">
-        <h2>12. Peraturan Untuk akun buzzer Tiktok</h2>
-    <ul>
-      <li> 12.1 Akun Wajib menggunakan nama dan foto profil ala orang Indonesia</li>
-      <li>12.2 akun wajib memiliki setidak nya 5 followers dan 5 mengikuti orang lain (bebas)</li>
-      <li>12.3 akun setidaknya memiliki 2 postingan dengan minimal 5 likes dan minimal 50 views pada setiap postingan</li>
-      <li>12.4 Akun yang memiliki centang biru akan mendapatkan bounty tambahan dari admin (wajib mengirimkan bukti melalui WhatsApp admin)</li>
-    </ul>
+<div class="app">
+  <div class="app-bar">
+    <h1>🛒 Account Market</h1>
+    <div class="balance-pill" id="balancePill">Rp 0</div>
   </div>
-   <div class="section">
-        <h2>13. Peraturan Untuk akun buzzer X (Twitter)</h2>
-    <ul>
-      <li> 13.1 Akun Wajib menggunakan nama dan foto profil ala orang Indonesia</li>
-      <li>13.2 akun wajib memiliki setidak nya 5 followers dan 5 mengikuti orang lain (bebas)</li>
-      <li>13.3 akun setidaknya memiliki 2 postingan dengan minimal 5 likes dan minimal 50 views pada setiap postingan</li>
-      <li>13.4 Akun yang memiliki centang biru akan mendapatkan bounty tambahan dari admin (wajib mengirimkan bukti melalui WhatsApp admin)</li>
-    </ul>
+  <div class="pages">
+    <!-- MARKET -->
+    <div class="page active" id="page-market">
+      <input class="search-box" id="searchInput" placeholder="🔍 Cari judul produk..." oninput="filterMarket()">
+      <div class="filter-row">
+        <button class="chip active" data-f="all" onclick="setFilter('all',this)">Semua</button>
+        <button class="chip" data-f="available" onclick="setFilter('available',this)">Ada Stok</button>
+        <button class="chip" data-f="cheap" onclick="setFilter('cheap',this)">Termurah</button>
+        <button class="chip" data-f="top" onclick="setFilter('top',this)">Rating Tinggi</button>
+      </div>
+      <div id="marketList" class="loading">Memuat produk...</div>
+    </div>
+
+    <!-- SELL -->
+    <div class="page" id="page-sell">
+      <div class="section-title">📦 Produk Saya <div class="line"></div></div>
+      <div class="slot-info" id="slotInfo">Slot upload: — / —</div>
+      <button class="btn btn-primary" style="margin-bottom:10px" onclick="openSellForm()">➕ Upload Produk Baru</button>
+      <button class="btn btn-gold" style="margin-bottom:14px" onclick="buyExtraSlots()">🔓 Beli +2 Slot (Rp 5.000)</button>
+      <div id="myProducts" class="loading">Memuat...</div>
+      <div class="section-title">⏳ Saldo Pending <div class="line"></div></div>
+      <div id="pendingList" class="loading">Memuat...</div>
+    </div>
+
+    <!-- ORDERS -->
+    <div class="page" id="page-orders">
+      <div class="filter-row">
+        <button class="chip active" data-o="buy" onclick="setOrderTab('buy',this)">🛒 Pembelian</button>
+        <button class="chip" data-o="sell" onclick="setOrderTab('sell',this)">💰 Penjualan</button>
+      </div>
+      <div id="ordersList" class="loading">Memuat riwayat...</div>
+    </div>
+
+    <!-- PROFILE / ADMIN -->
+    <div class="page" id="page-profile">
+      <div class="card">
+        <div style="font-size:12px;color:#94a3b8">Email</div>
+        <div style="font-weight:800;word-break:break-all" id="profileEmail">—</div>
+        <div style="margin-top:8px;font-size:12px;color:#94a3b8">Role <span id="profileRole" class="admin-tag" style="display:none">ADMIN</span></div>
+        <div style="font-weight:800" id="profileRoleText">user</div>
+        <div style="margin-top:10px;font-size:12px;color:#94a3b8">Saldo</div>
+        <div style="font-size:20px;font-weight:900;color:#ffd700;font-family:Poppins,sans-serif" id="profileBalance">Rp 0</div>
+      </div>
+      <div class="section-title" id="adminProductsTitle" style="display:none">🛡️ Semua Produk (Admin) <div class="line"></div></div>
+      <div id="adminProductsList" style="display:none"></div>
+      <div class="section-title" id="adminPendingTitle" style="display:none">🛡️ Pending (Admin) <div class="line"></div></div>
+      <div id="adminPendingList" style="display:none"></div>
+      <button class="btn btn-secondary" style="margin-top:12px" onclick="refreshBalance()">🔄 Refresh Saldo</button>
+      <button class="btn btn-danger" style="margin-top:8px" onclick="handleLogout()">🚪 Keluar</button>
+      <div class="note-box" style="margin-top:14px">Saldo sama dengan Shine Shop. Deposit di aplikasi utama, pakai di market ini.</div>
+    </div>
   </div>
-<div class="section">
-        <h2>14. Peraturan Untuk akun buzzer Threads</h2>
-    <ul>
-      <li> 14.1 Akun Wajib menggunakan nama dan foto profil ala orang Indonesia</li>
-      <li>14.2 akun wajib memiliki setidak nya 5 followers dan 5 mengikuti orang lain (bebas)</li>
-      <li>14.3 akun setidaknya memiliki 2 postingan dengan minimal 5 likes dan minimal 50 views pada setiap postingan</li>
-      <li>14.4 Akun yang memiliki centang biru akan mendapatkan bounty tambahan dari admin (wajib mengirimkan bukti melalui WhatsApp admin)</li>
-    </ul>
-</div>
-  
-  
-  <div class="section">
-        <h2>15. Penutup</h2>
-        <p>
-            Shine Shop berkomitmen memberikan layanan profesional, transparan, dan terpercaya.  
-            Dengan melanjutkan transaksi, pembeli dianggap telah menyetujui seluruh ketentuan di atas.
-        </p>
-    </div>
 
-    <div class="footer">
-        © 2026 Shine Shop — Official & Verified Digital Service
-    </div>
-
+  <div class="bottom-nav">
+    <button class="nav-item active" onclick="switchPage('market')"><span class="ico">🏪</span>Market</button>
+    <button class="nav-item" onclick="switchPage('sell')"><span class="ico">📤</span>Jual</button>
+    <button class="nav-item" onclick="switchPage('orders')"><span class="ico">📋</span>Riwayat</button>
+    <button class="nav-item" onclick="switchPage('profile')"><span class="ico">👤</span>Akun</button>
+  </div>
 </div>
-    
+
+<!-- AUTH -->
+<div class="auth-screen" id="authScreen">
+  <div class="auth-box">
+    <h2>Account Market</h2>
+    <p>Jual beli akun · saldo Shine Shop</p>
+    <form id="formLogin" onsubmit="handleLogin(event)">
+      <div class="field"><label>Email</label><input type="email" id="loginEmail" required placeholder="email@gmail.com"></div>
+      <div class="field"><label>Password</label><input type="password" id="loginPassword" required minlength="6"></div>
+      <button class="btn btn-primary" type="submit">🔑 Masuk</button>
+    </form>
+    <p style="text-align:center;font-size:12px;color:#94a3b8;margin-top:14px;line-height:1.5">
+      Belum punya akun?<br>
+      Daftar di halaman utama<br>
+      <a href="/" style="color:#38bdf8;font-weight:800;text-decoration:underline">shinedomain.my.id</a>
+    </p>
+  </div>
+</div>
+
+<!-- DETAIL MODAL -->
+<div class="modal-back" id="detailModal">
+  <div class="modal-sheet" id="detailSheet"></div>
+</div>
+
+<!-- SELL FORM MODAL -->
+<div class="modal-back" id="sellModal">
+  <div class="modal-sheet">
+    <h3>📤 Upload Produk Akun</h3>
+    <div class="field"><label>Judul *</label><input id="sellTitle" maxlength="100" placeholder="Contoh: Netflix Premium 1 Bulan"></div>
+    <div class="field"><label>Deskripsi *</label><textarea id="sellDesc" maxlength="2000" placeholder="Detail produk, garansi, dll"></textarea></div>
+    <div class="field"><label>Harga (Rp) *</label><input id="sellPrice" type="number" min="1000" step="100" placeholder="Minimal 1000"></div>
+    <div class="field">
+      <label>Foto (max 5)</label>
+      <input type="file" id="sellPhotos" accept="image/*" multiple hidden onchange="onPhotosPicked(event)">
+      <div class="photo-grid" id="photoGrid">
+        <div class="photo-slot" onclick="document.getElementById('sellPhotos').click()">➕</div>
+      </div>
+    </div>
+    <div class="field">
+      <label>Stok akun * (username/Gmail + password)</label>
+      <div id="stockRows"></div>
+      <button type="button" class="btn btn-secondary" style="margin-top:6px" onclick="addStockRow()">➕ Tambah baris stok</button>
+    </div>
+    <label class="terms-box" id="sellTermsBox" for="sellAgreeTerms">
+      <input type="checkbox" id="sellAgreeTerms">
+      <span>Saya menyetujui semua <a href="/rules/" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()">Syarat &amp; Ketentuan</a> yang berlaku.</span>
+    </label>
+    <button class="btn btn-primary" onclick="submitProduct()">🚀 Publikasikan</button>
+    <button class="btn btn-secondary" style="margin-top:8px" onclick="closeSellForm()">Batal</button>
+  </div>
+</div>
+
+
+<button type="button" class="chat-fab" id="chatFab" onclick="openChatPanel()" title="Chat jual-beli" style="display:none">💬<span class="chat-fab-badge" id="chatFabBadge"></span></button>
+<div class="chat-panel" id="chatPanel">
+  <div class="chat-sheet">
+    <div class="chat-sheet-head">
+      <button type="button" id="chatBackBtn" onclick="chatGoBack()" style="display:none">‹</button>
+      <h3 id="chatPanelTitle">Chat Jual-Beli</h3>
+      <button type="button" onclick="closeChatPanel()">✕</button>
+    </div>
+    <div class="chat-note">Chat & folder otomatis hapus setelah 36 jam tidak aktif</div>
+    <div id="chatFolderView" class="chat-list"></div>
+    <div id="chatThreadView" style="display:none;flex:1;flex-direction:column;min-height:0">
+      <div class="chat-msgs" id="chatMsgs"></div>
+      <div class="chat-input-row">
+        <input type="file" id="chatImageInput" accept="image/*" style="display:none" onchange="onChatImagePicked(event)">
+        <button type="button" class="attach" onclick="document.getElementById('chatImageInput').click()">🖼️</button>
+        <textarea id="chatInput" rows="1" placeholder="Tulis pesan..." maxlength="2000"></textarea>
+        <button type="button" class="send" onclick="sendChatMessage()">➤</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="img-lightbox" id="imgLightbox" onclick="if(event.target===this)closeImagePreview()">
+  <button type="button" class="lb-close" onclick="closeImagePreview()" title="Tutup">✕</button>
+  <img id="imgLightboxImg" src="" alt="Preview">
+  <div class="lb-nav" id="imgLightboxNav" style="display:none">
+    <button type="button" onclick="event.stopPropagation();lightboxPrev()">‹ Prev</button>
+    <button type="button" onclick="event.stopPropagation();lightboxNext()">Next ›</button>
+  </div>
+</div>
 <script>
-const audio = document.getElementById("bgm");
+const SUPABASE_URL = 'https://vvzgpbiesvupuhqqoxrg.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ2emdwYmllc3Z1cHVocXFveHJnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIwNzE3MTUsImV4cCI6MjEwNzY0NzcxNX0.W3_Ck8B5Q-nEfNlsyeufJsLsTqbM8xPcAeHoAHfGRwY';
+const WA_REPORT = '6289518103883';
+const SLOT_PACK_PRICE = 5000;
+const SLOT_PACK_EXTRA = 2;
+const FREE_SLOTS = 3;
 
-// setelah audio mulai, unmute otomatis
-audio.addEventListener("canplay", () => {
-  audio.muted = false;
-  audio.volume = 0.8; // atur volume (0.0 - 1.0)
+let sb = null;
+let currentUser = null;
+let currentProfile = null;
+let isStaff = false;
+let marketCache = [];
+let marketFilter = 'all';
+let orderTab = 'buy';
+let sellPhotos = []; // {file, preview}
+let stockRowsCount = 0;
+let chatThreads = [];
+let currentThread = null;
+let chatPollTimer = null;
+let chatPendingImage = null;
+const CHAT_TTL_HOURS = 36;
+
+
+function $(id){ return document.getElementById(id); }
+
+const _emailCache = {};
+async function resolveEmails(ids) {
+  const uniq = [...new Set((ids || []).filter(Boolean))];
+  const missing = uniq.filter(id => !_emailCache[id]);
+  if (missing.length && sb) {
+    try {
+      const { data } = await sb.from('profiles').select('id, email').in('id', missing);
+      (data || []).forEach(p => { _emailCache[p.id] = p.email || p.id; });
+    } catch (_) {}
+    missing.forEach(id => { if (!_emailCache[id]) _emailCache[id] = String(id).slice(0, 8) + '…'; });
+  }
+  return _emailCache;
+}
+function emailOf(id){ return _emailCache[id] || (id ? String(id).slice(0,8)+'…' : '-'); }
+
+function escapeHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+let lightboxList = [];
+let lightboxIndex = 0;
+
+function openImagePreview(src, list) {
+  if (!src) return;
+  lightboxList = Array.isArray(list) && list.length ? list.filter(Boolean) : [src];
+  lightboxIndex = Math.max(0, lightboxList.indexOf(src));
+  if (lightboxIndex < 0) lightboxIndex = 0;
+  const box = document.getElementById('imgLightbox');
+  const img = document.getElementById('imgLightboxImg');
+  const nav = document.getElementById('imgLightboxNav');
+  if (!box || !img) return;
+  img.src = lightboxList[lightboxIndex];
+  if (nav) nav.style.display = lightboxList.length > 1 ? 'flex' : 'none';
+  box.classList.add('show');
+  document.body.style.overflow = 'hidden';
+}
+function closeImagePreview() {
+  const box = document.getElementById('imgLightbox');
+  if (box) box.classList.remove('show');
+  document.body.style.overflow = '';
+  const img = document.getElementById('imgLightboxImg');
+  if (img) img.src = '';
+}
+function lightboxPrev() {
+  if (!lightboxList.length) return;
+  lightboxIndex = (lightboxIndex - 1 + lightboxList.length) % lightboxList.length;
+  document.getElementById('imgLightboxImg').src = lightboxList[lightboxIndex];
+}
+function lightboxNext() {
+  if (!lightboxList.length) return;
+  lightboxIndex = (lightboxIndex + 1) % lightboxList.length;
+  document.getElementById('imgLightboxImg').src = lightboxList[lightboxIndex];
+}
+document.addEventListener('keydown', (e) => {
+  const box = document.getElementById('imgLightbox');
+  if (!box || !box.classList.contains('show')) return;
+  if (e.key === 'Escape') closeImagePreview();
+  if (e.key === 'ArrowLeft') lightboxPrev();
+  if (e.key === 'ArrowRight') lightboxNext();
 });
 
-// fallback jika browser nahan autoplay
-setTimeout(() => {
-  audio.muted = false;
-  audio.play().catch(()=>{});
-}, 1000);
-    
-/* 🚫 ANTI INSPECT */
- // 1. Blokir klik kanan
-document.addEventListener("contextmenu", e => e.preventDefault());
+function formatRp(n){ return 'Rp ' + (Number(n)||0).toLocaleString('id-ID'); }
+function starsHtml(avg){
+  const a = Math.round(Number(avg)||0);
+  let h = '';
+  for(let i=1;i<=5;i++) h += i<=a ? '★' : '☆';
+  return h;
+}
 
-// 2. Blokir tombol kombinasi (F12, Ctrl+Shift+I/C/J, Ctrl+U)
-document.addEventListener("keydown", function(e) {
-    const key = e.key.toLowerCase();
-    
-    if (e.key === "F12") e.preventDefault();
-    if (e.ctrlKey && e.shiftKey && ["i", "c", "j"].includes(key)) e.preventDefault();
-    if (e.ctrlKey && key === "u") e.preventDefault();
-});
+function initSb(){
+  // storageKey SAMA dengan shine-shop-fixed.html agar session login berbagi
+  sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+      storage: window.localStorage,
+      storageKey: 'shine-shop-auth'
+    }
+  });
+}
 
-// 3. Anti-debugging (Membuat DevTools lag/berhenti saat dibuka)
-setInterval(() => {
-    (function() {
+async function initAuth(){
+  // Ambil session yang sama dengan Shine Shop (storageKey: shine-shop-auth)
+  let session = null;
+  try {
+    const { data } = await sb.auth.getSession();
+    session = data?.session || null;
+  } catch (e) { console.warn('getSession', e.message); }
+
+  // Fallback: baca langsung localStorage jika getSession kosong (race)
+  if (!session) {
+    try {
+      const raw = localStorage.getItem('shine-shop-auth');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed?.access_token && parsed?.user) {
+          const { data, error } = await sb.auth.setSession({
+            access_token: parsed.access_token,
+            refresh_token: parsed.refresh_token
+          });
+          if (!error) session = data.session;
+        } else if (parsed?.currentSession?.access_token) {
+          const cs = parsed.currentSession;
+          const { data, error } = await sb.auth.setSession({
+            access_token: cs.access_token,
+            refresh_token: cs.refresh_token
+          });
+          if (!error) session = data.session;
+        }
+      }
+    } catch (e) { console.warn('session recover', e.message); }
+  }
+
+  if (session?.user) await onLogin(session.user);
+  else $('authScreen').classList.remove('hidden');
+
+  sb.auth.onAuthStateChange(async (ev, session) => {
+    if (ev === 'SIGNED_IN' && session?.user) await onLogin(session.user);
+    if (ev === 'TOKEN_REFRESHED' && session?.user) currentUser = session.user;
+    if (ev === 'SIGNED_OUT') {
+      currentUser = null; currentProfile = null;
+      $('authScreen').classList.remove('hidden');
+    }
+  });
+}
+
+async function onLogin(user){
+  currentUser = user;
+  const { data: prof } = await sb.from('profiles').select('*').eq('id', user.id).maybeSingle();
+  currentProfile = prof || { id: user.id, email: user.email, balance: 0, role: 'user' };
+  isStaff = ['admin','owner'].includes(currentProfile.role);
+  $('authScreen').classList.add('hidden');
+  const fab=$('chatFab'); if(fab) fab.style.display='block';
+  updateBalanceUI();
+  try { cleanupMarketChats(); } catch(_){}
+  try { startChatBadgePolling(); } catch(_){}
+  $('profileEmail').textContent = currentProfile.email || user.email;
+  $('profileRoleText').textContent = currentProfile.role || 'user';
+  $('profileRole').style.display = isStaff ? 'inline' : 'none';
+  if(isStaff){ $('adminPendingTitle').style.display='flex'; $('adminPendingList').style.display='block'; $('adminProductsTitle').style.display='flex'; $('adminProductsList').style.display='block'; loadAdminPending(); loadAdminProducts(); }
+  ensureSlots();
+  loadMarket();
+  startBalanceRealtime();
+}
+
+function updateBalanceUI(){
+  const b = Number(currentProfile?.balance)||0;
+  $('balancePill').textContent = formatRp(b);
+  $('profileBalance').textContent = formatRp(b);
+}
+
+async function refreshBalance(){
+  if(!currentUser) return;
+  const { data } = await sb.from('profiles').select('*').eq('id', currentUser.id).maybeSingle();
+  if(data){ currentProfile = data; updateBalanceUI(); }
+}
+
+function startBalanceRealtime(){
+  if(!currentUser) return;
+  sb.channel('bal_'+currentUser.id)
+    .on('postgres_changes',{event:'UPDATE',schema:'public',table:'profiles',filter:'id=eq.'+currentUser.id}, (p)=>{
+      if(p.new){ currentProfile = Object.assign({}, currentProfile, p.new); updateBalanceUI(); }
+    }).subscribe();
+}
+
+
+async function handleLogin(e){
+  e.preventDefault();
+  const email = $('loginEmail').value.trim().toLowerCase();
+  const password = $('loginPassword').value;
+  const { data, error } = await sb.auth.signInWithPassword({ email, password });
+  if(error) return Swal.fire({title:'Gagal',text:error.message,icon:'error',background:'#1a0e2e',color:'#fff'});
+  await onLogin(data.user);
+}
+
+
+async function handleLogout(){
+  await sb.auth.signOut();
+  location.reload();
+}
+
+function switchPage(name){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  $('page-'+name).classList.add('active');
+  const map = {market:0,sell:1,orders:2,profile:3};
+  document.querySelectorAll('.nav-item')[map[name]]?.classList.add('active');
+  if(name==='market') loadMarket();
+  if(name==='sell'){ loadMyProducts(); loadPending(); loadSlotInfo(); }
+  if(name==='orders') loadOrders();
+  if(name==='profile'){ refreshBalance(); if(isStaff){ loadAdminPending(); loadAdminProducts(); } }
+}
+
+/* ========== SLOTS ========== */
+async function ensureSlots(){
+  if(!currentUser) return;
+  await sb.from('marketplace_slots').upsert({ user_id: currentUser.id, free_slots: FREE_SLOTS }, { onConflict: 'user_id', ignoreDuplicates: true });
+}
+
+async function getSlotInfo(){
+  const { data } = await sb.from('marketplace_slots').select('*').eq('user_id', currentUser.id).maybeSingle();
+  const free = data?.free_slots ?? FREE_SLOTS;
+  const bonus = data?.bonus_slots ?? 0;
+  const { count } = await sb.from('marketplace_products').select('id',{count:'exact',head:true}).eq('seller_id', currentUser.id).neq('status','deleted');
+  const used = count || 0;
+  return { free, bonus, total: free + bonus, used, remain: (free + bonus) - used };
+}
+
+async function loadSlotInfo(){
+  const s = await getSlotInfo();
+  $('slotInfo').innerHTML = `Slot produk: <b style="color:#fff">${s.used}</b> / <b style="color:#38bdf8">${s.total}</b> terpakai · sisa <b style="color:#22c55e">${Math.max(0,s.remain)}</b><br><span style="font-size:10px">Gratis ${FREE_SLOTS} slot. Beli paket +${SLOT_PACK_EXTRA} slot = ${formatRp(SLOT_PACK_PRICE)} (potong saldo).</span>`;
+}
+
+async function buyExtraSlots(){
+  const conf = await Swal.fire({
+    title: 'Beli Slot Tambahan?',
+    html: `Bayar <b style="color:#ffd700">${formatRp(SLOT_PACK_PRICE)}</b> dari saldo untuk mendapatkan <b>+${SLOT_PACK_EXTRA} slot</b> upload produk.`,
+    icon: 'question', showCancelButton: true, confirmButtonText: 'Bayar & Tambah Slot',
+    cancelButtonText: 'Batal', confirmButtonColor: '#ff6b9d', background: '#1a0e2e', color: '#fff'
+  });
+  if(!conf.isConfirmed) return;
+  const { data, error } = await sb.rpc('marketplace_buy_slots');
+  if(error) return Swal.fire({title:'Gagal',text:error.message,icon:'error',background:'#1a0e2e',color:'#fff'});
+  if(data && data.success === false) return Swal.fire({title:'Gagal',text:data.message||'Gagal',icon:'error',background:'#1a0e2e',color:'#fff'});
+  await refreshBalance();
+  await loadSlotInfo();
+  Swal.fire({title:'Berhasil',text:`+${SLOT_PACK_EXTRA} slot ditambahkan`,icon:'success',background:'#1a0e2e',color:'#fff',timer:2000});
+}
+
+/* ========== MARKET LIST ========== */
+async function loadMarket(){
+  const box = $('marketList');
+  box.innerHTML = '<div class="loading">Memuat produk...</div>';
+  const { data, error } = await sb.from('marketplace_products')
+    .select('id, seller_id, title, description, price, images, stock_remaining, avg_rating, review_count, status, created_at')
+    .eq('status', 'active')
+    .order('created_at', { ascending: false })
+    .limit(100);
+  if(error){ box.innerHTML = `<div class="empty"><span class="big">⚠️</span>${escapeHtml(error.message)}<br><small>Jalankan SQL marketplace dulu</small></div>`; return; }
+  marketCache = data || [];
+  await resolveEmails(marketCache.map(p => p.seller_id));
+  renderMarket();
+}
+
+function setFilter(f, btn){
+  marketFilter = f;
+  document.querySelectorAll('.filter-row .chip').forEach(c=>c.classList.remove('active'));
+  btn.classList.add('active');
+  renderMarket();
+}
+
+function filterMarket(){ renderMarket(); }
+
+function renderMarket(){
+  let list = [...marketCache];
+  const q = ($('searchInput').value||'').trim().toLowerCase();
+  if(q) list = list.filter(p => (p.title||'').toLowerCase().includes(q) || (p.description||'').toLowerCase().includes(q));
+  if(marketFilter==='available') list = list.filter(p => (p.stock_remaining||0) > 0);
+  if(marketFilter==='cheap') list.sort((a,b)=> (a.price||0)-(b.price||0));
+  if(marketFilter==='top') list.sort((a,b)=> (b.avg_rating||0)-(a.avg_rating||0));
+  const box = $('marketList');
+  if(!list.length){ box.innerHTML = '<div class="empty"><span class="big">📭</span>Belum ada produk</div>'; return; }
+  box.innerHTML = list.map(p => {
+    const img = (p.images && p.images[0]) ? p.images[0] : '';
+    const stock = p.stock_remaining||0;
+    return `<div class="card product-card" onclick="openDetail('${p.id}')">
+      ${img?`<img class="product-thumb" src="${escapeHtml(img)}" alt="" onclick="event.stopPropagation();openImagePreview(this.src)">`:`<div class="product-thumb" style="display:flex;align-items:center;justify-content:center;font-size:28px">🎮</div>`}
+      <div class="product-info">
+        <div class="product-title">${escapeHtml(p.title)}</div>
+        <div class="product-meta">
+          <span class="stars">${starsHtml(p.avg_rating)} (${Number(p.avg_rating||0).toFixed(1)})</span>
+          <span class="badge ${stock>0?'stock':'soldout'}">${stock>0?stock+' stok':'Habis'}</span>
+        </div>
+        <div class="product-price">${formatRp(p.price)}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+/* ========== DETAIL + BUY ========== */
+async function openDetail(id){
+  const { data: p, error } = await sb.from('marketplace_products')
+    .select('id, seller_id, title, description, price, images, stock_remaining, avg_rating, review_count, status, created_at')
+    .eq('id', id).maybeSingle();
+  if(error||!p) return Swal.fire({title:'Error',text:error?.message||'Tidak ditemukan',icon:'error',background:'#1a0e2e',color:'#fff'});
+  await resolveEmails([p.seller_id]);
+  const imgList = (p.images || []).filter(Boolean);
+  window._detailImages = imgList;
+  const imgs = imgList.map((u, i) =>
+    `<img src="${escapeHtml(u)}" alt="foto" style="cursor:zoom-in" onclick="event.stopPropagation();openImagePreview(window._detailImages[${i}], window._detailImages)">`
+  ).join('') || '<div style="color:#666;padding:20px">Tanpa foto</div>';
+  const stock = p.stock_remaining||0;
+  const { data: reviews } = await sb.from('marketplace_reviews')
+    .select('id, buyer_id, rating, comment, created_at')
+    .eq('product_id', id).order('created_at',{ascending:false}).limit(20);
+  await resolveEmails((reviews||[]).map(r => r.buyer_id));
+  const revHtml = (reviews||[]).length ? reviews.map(r => `
+    <div style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.06);font-size:12px">
+      <div class="stars">${starsHtml(r.rating)} · <span style="color:#94a3b8">${escapeHtml(emailOf(r.buyer_id))}</span></div>
+      <div style="margin-top:4px;color:#e2e8f0">${escapeHtml(r.comment||'')}</div>
+    </div>`).join('') : '<div class="empty" style="padding:12px">Belum ada ulasan</div>';
+
+  $('detailSheet').innerHTML = `
+    <h3>${escapeHtml(p.title)}</h3>
+    <div class="detail-gallery">${imgs}</div>
+    <div class="product-price" style="margin-bottom:6px">${formatRp(p.price)}</div>
+    <div class="product-meta" style="margin-bottom:10px">
+      <span class="stars">${starsHtml(p.avg_rating)} ${Number(p.avg_rating||0).toFixed(1)} (${p.review_count||0} ulasan)</span>
+      <span class="badge ${stock>0?'stock':'soldout'}">${stock>0?stock+' stok':'Habis'}</span>
+    </div>
+    <div style="font-size:11px;color:#94a3b8;margin-bottom:8px">Seller: ${escapeHtml(emailOf(p.seller_id))}</div>
+    <div style="font-size:13px;line-height:1.55;white-space:pre-wrap;margin-bottom:12px">${escapeHtml(p.description||'')}</div>
+    <button class="btn btn-primary" ${stock<1||p.seller_id===currentUser?.id?'disabled':''} onclick="buyProduct('${p.id}')">
+      ${p.seller_id===currentUser?.id?'Produk Anda':(stock<1?'Stok Habis':'🛒 Beli Sekarang')}
+    </button>
+    ${p.seller_id!==currentUser?.id ? `<button class="btn btn-secondary" style="margin-top:8px" onclick="startChatWithSeller('${p.seller_id}','${p.id}', ${JSON.stringify(p.title||'')})">💬 Chat Penjual</button>` : ''}
+    ${p.seller_id===currentUser?.id ? `<button class="btn btn-gold" style="margin-top:8px" onclick="closeDetail();openAddStock('${p.id}', ${JSON.stringify(p.title||'')})">➕ Tambah Stok</button>` : ''}
+    ${(isStaff || p.seller_id===currentUser?.id) ? `<button class="btn btn-danger" style="margin-top:8px" onclick="deleteProduct('${p.id}')">${isStaff && p.seller_id!==currentUser?.id ? '🛡️ Hapus (Admin)' : 'Hapus Produk'}</button>` : ''}
+    <div class="section-title">⭐ Ulasan <div class="line"></div></div>
+    ${revHtml}
+    <button class="btn btn-secondary" style="margin-top:12px" onclick="closeDetail()">Tutup</button>`;
+  $('detailModal').classList.add('show');
+}
+function closeDetail(){ $('detailModal').classList.remove('show'); }
+
+async function buyProduct(productId){
+  const conf = await Swal.fire({
+    title: 'Konfirmasi Beli?',
+    html: `<div style="text-align:left;font-size:13px;color:#ddd;line-height:1.5">
+      Saldo akan dipotong sesuai harga.<br>
+      Data akun (username &amp; password) langsung diberikan setelah bayar.
+      <label class="terms-box" id="buyTermsBox" for="buyAgreeTerms" style="margin-top:12px;display:flex">
+        <input type="checkbox" id="buyAgreeTerms">
+        <span>Saya menyetujui semua <a href="/rules/" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" style="color:#38bdf8;font-weight:800">Syarat &amp; Ketentuan</a> yang berlaku.</span>
+      </label>
+    </div>`,
+    icon: 'question', showCancelButton: true, confirmButtonText: 'Bayar & Ambil Akun',
+    cancelButtonText: 'Batal', confirmButtonColor: '#ff6b9d', background: '#1a0e2e', color: '#fff',
+    preConfirm: () => {
+      const cb = document.getElementById('buyAgreeTerms');
+      const box = document.getElementById('buyTermsBox');
+      if (!cb || !cb.checked) {
+        if (box) box.classList.add('error');
+        Swal.showValidationMessage('Centang persetujuan Syarat & Ketentuan terlebih dahulu');
         return false;
-    }['constructor']('debugger')());
-}, 300);
+      }
+      return true;
+    }
+  });
+  if(!conf.isConfirmed) return;
+  Swal.fire({title:'Memproses...',allowOutsideClick:false,didOpen:()=>Swal.showLoading(),background:'#1a0e2e',color:'#fff'});
+  const { data, error } = await sb.rpc('marketplace_purchase', { p_product_id: productId });
+  Swal.close();
+  if(error) return Swal.fire({title:'Gagal',text:error.message,icon:'error',background:'#1a0e2e',color:'#fff'});
+  if(data && data.success === false) return Swal.fire({title:'Gagal',text:data.message||'Gagal beli',icon:'error',background:'#1a0e2e',color:'#fff'});
+  await refreshBalance();
+  await loadMarket();
+  const user = data.username || data.account_user || '-';
+  const pass = data.password || data.account_pass || '-';
+  Swal.fire({
+    title: '✅ Pembelian Berhasil',
+    html: `<div class="cred-box" style="text-align:left">
+      <div>Username / Gmail</div><code>${escapeHtml(user)}</code>
+      <div style="margin-top:8px">Password</div><code>${escapeHtml(pass)}</code>
+    </div>
+    <div class="note-box" style="text-align:left">Anda memiliki waktu <b>7 hari</b> untuk mengamankan akun. Jika terdapat kendala seperti akun tidak bisa dimasukkan, laporkan ke WhatsApp Shine Shop <b><a href="https://wa.me/${WA_REPORT}" target="_blank" style="color:#38bdf8">+${WA_REPORT}</a></b>.</div>`,
+    icon: 'success', confirmButtonColor: '#22c55e', background: '#1a0e2e', color: '#fff', width: 420
+  });
+  closeDetail();
+  switchPage('orders');
+}
 
-// 4. Bersihkan konsol secara berkala
-setInterval(() => { console.clear(); }, 50);
+/* ========== SELL FORM ========== */
+async function openSellForm(){
+  const s = await getSlotInfo();
+  if(s.remain <= 0){
+    return Swal.fire({
+      title: 'Slot Penuh',
+      html: `Anda sudah memakai ${s.used}/${s.total} slot.<br>Beli +${SLOT_PACK_EXTRA} slot seharga ${formatRp(SLOT_PACK_PRICE)}?`,
+      icon: 'warning', showCancelButton: true, confirmButtonText: 'Beli Slot',
+      cancelButtonText: 'Nanti', confirmButtonColor: '#ffd700', background: '#1a0e2e', color: '#fff'
+    }).then(r => { if(r.isConfirmed) buyExtraSlots(); });
+  }
+  const warn = await Swal.fire({
+    title: '⚠️ Wajib Nonaktifkan 2FA',
+    html: 'Sebelum menjual, pastikan <b>2FA / verifikasi dua langkah dinonaktifkan</b> pada setiap akun stok.<br><br>Jika pembeli tidak bisa login karena 2FA, Anda bertanggung jawab dan bisa kena cancel + refund.',
+    icon: 'warning', confirmButtonText: 'Saya Mengerti & Lanjut', confirmButtonColor: '#ff6b9d', background: '#1a0e2e', color: '#fff'
+  });
+  if(!warn.isConfirmed) return;
+  sellPhotos = [];
+  $('sellTitle').value = '';
+  $('sellDesc').value = '';
+  $('sellPrice').value = '';
+  const ta=$('sellAgreeTerms'); if(ta) ta.checked=false; const tb=$('sellTermsBox'); if(tb) tb.classList.remove('error');
+  $('stockRows').innerHTML = '';
+  stockRowsCount = 0;
+  addStockRow();
+  renderPhotoGrid();
+  $('sellModal').classList.add('show');
+}
+function closeSellForm(){ $('sellModal').classList.remove('show'); }
+
+function addStockRow(){
+  if(stockRowsCount >= 50) return Swal.fire({title:'Maks 50 stok/produk',icon:'info',background:'#1a0e2e',color:'#fff'});
+  const id = 'sr_'+(++stockRowsCount);
+  const div = document.createElement('div');
+  div.className = 'stock-row';
+  div.id = id;
+  div.innerHTML = `<input placeholder="Username / Gmail" data-u>
+    <input placeholder="Password" data-p>
+    <button type="button" onclick="this.parentElement.remove()">✕</button>`;
+  $('stockRows').appendChild(div);
+}
+
+function onPhotosPicked(e){
+  const files = Array.from(e.target.files||[]);
+  e.target.value = '';
+  for(const f of files){
+    if(sellPhotos.length >= 5) break;
+    if(!f.type.startsWith('image/')) continue;
+    const preview = URL.createObjectURL(f);
+    sellPhotos.push({ file: f, preview });
+  }
+  renderPhotoGrid();
+}
+function renderPhotoGrid(){
+  const g = $('photoGrid');
+  let h = sellPhotos.map((p,i)=>`<div class="photo-slot"><img src="${p.preview}"><button class="rm" type="button" onclick="removePhoto(${i})">✕</button></div>`).join('');
+  if(sellPhotos.length < 5) h += `<div class="photo-slot" onclick="document.getElementById('sellPhotos').click()">➕</div>`;
+  g.innerHTML = h;
+}
+function removePhoto(i){
+  try{ URL.revokeObjectURL(sellPhotos[i].preview); }catch(_){}
+  sellPhotos.splice(i,1);
+  renderPhotoGrid();
+}
+
+async function compressImage(file, maxSide=1000, quality=0.75){
+  return new Promise(resolve=>{
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = ()=>{
+      let w=img.width,h=img.height;
+      const scale=Math.min(1,maxSide/Math.max(w,h));
+      w=Math.round(w*scale); h=Math.round(h*scale);
+      const c=document.createElement('canvas'); c.width=w; c.height=h;
+      c.getContext('2d').drawImage(img,0,0,w,h);
+      URL.revokeObjectURL(url);
+      c.toBlob(b=>resolve(b||file),'image/jpeg',quality);
+    };
+    img.onerror=()=>{URL.revokeObjectURL(url);resolve(file);};
+    img.src=url;
+  });
+}
+
+function blobToDataURL(blob){
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);
+    r.onerror = () => reject(new Error('Gagal baca foto'));
+    r.readAsDataURL(blob);
+  });
+}
+
+async function compressImageSmall(file, maxSide = 900, quality = 0.7){
+  // kompres lebih agresif agar aman disimpan sebagai data-URL di DB
+  return new Promise(resolve => {
+    try {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = async () => {
+        try {
+          let w = img.width, h = img.height;
+          const scale = Math.min(1, maxSide / Math.max(w, h));
+          w = Math.max(1, Math.round(w * scale));
+          h = Math.max(1, Math.round(h * scale));
+          const c = document.createElement('canvas');
+          c.width = w; c.height = h;
+          c.getContext('2d').drawImage(img, 0, 0, w, h);
+          URL.revokeObjectURL(url);
+          let q = quality;
+          let blob = await new Promise(res => c.toBlob(res, 'image/jpeg', q));
+          while (blob && blob.size > 220 * 1024 && q > 0.4) {
+            q -= 0.1;
+            blob = await new Promise(res => c.toBlob(res, 'image/jpeg', q));
+          }
+          resolve(blob || file);
+        } catch (_) { try { URL.revokeObjectURL(url); } catch(e){} resolve(file); }
+      };
+      img.onerror = () => { try { URL.revokeObjectURL(url); } catch(e){} resolve(file); };
+      img.src = url;
+    } catch (_) { resolve(file); }
+  });
+}
+
+async function uploadProductImages(){
+  const urls = [];
+  for (let i = 0; i < sellPhotos.length; i++) {
+    const blob = await compressImageSmall(sellPhotos[i].file);
+    const path = `market/${currentUser.id}/${Date.now()}_${i}.jpg`;
+    let uploaded = false;
+
+    // Coba Storage dulu (jika bucket ada)
+    try {
+      const { error } = await sb.storage.from('marketplace-images').upload(path, blob, {
+        contentType: 'image/jpeg',
+        upsert: true
+      });
+      if (!error) {
+        const { data } = sb.storage.from('marketplace-images').getPublicUrl(path);
+        if (data?.publicUrl) {
+          urls.push(data.publicUrl);
+          uploaded = true;
+        }
+      } else {
+        console.warn('storage upload fail:', error.message);
+      }
+    } catch (e) {
+      console.warn('storage exception:', e.message || e);
+    }
+
+    // Fallback TANPA bucket: simpan data-URL (foto sudah dikompres)
+    if (!uploaded) {
+      const dataUrl = await blobToDataURL(blob);
+      if (!dataUrl || dataUrl.length < 32) throw new Error('Gagal memproses foto');
+      // batasi ukuran per foto di DB
+      if (dataUrl.length > 350000) {
+        const smaller = await compressImageSmall(sellPhotos[i].file, 640, 0.5);
+        const dataUrl2 = await blobToDataURL(smaller);
+        if (dataUrl2.length > 350000) throw new Error('Foto terlalu besar meski dikompres. Pilih foto lebih kecil.');
+        urls.push(dataUrl2);
+      } else {
+        urls.push(dataUrl);
+      }
+    }
+  }
+  return urls;
+}
+
+async function submitProduct(){
+  const title = $('sellTitle').value.trim();
+  const description = $('sellDesc').value.trim();
+  const price = parseInt($('sellPrice').value,10);
+  if(!title) return Swal.fire({title:'Judul wajib',icon:'warning',background:'#1a0e2e',color:'#fff'});
+  if(!description) return Swal.fire({title:'Deskripsi wajib',icon:'warning',background:'#1a0e2e',color:'#fff'});
+  if(!price || price < 1000) return Swal.fire({title:'Harga minimal Rp 1.000',icon:'warning',background:'#1a0e2e',color:'#fff'});
+  const agree = $('sellAgreeTerms');
+  const termsBox = $('sellTermsBox');
+  if (!agree || !agree.checked) {
+    if (termsBox) { termsBox.classList.add('error'); setTimeout(() => termsBox.classList.remove('error'), 1200); }
+    return Swal.fire({
+      title: '⚠️ Setujui Syarat & Ketentuan',
+      html: 'Centang persetujuan terlebih dahulu.<br><a href="/rules/" target="_blank" style="color:#38bdf8;font-weight:800">Baca di /rules/</a>',
+      icon: 'warning', confirmButtonColor: '#00c6ff', background: '#1a0e2e', color: '#fff'
+    });
+  }
+  const rows = [...document.querySelectorAll('#stockRows .stock-row')];
+  const stock = [];
+  for(const r of rows){
+    const u = r.querySelector('[data-u]').value.trim();
+    const p = r.querySelector('[data-p]').value.trim();
+    if(u && p) stock.push({ username: u, password: p });
+  }
+  if(!stock.length) return Swal.fire({title:'Minimal 1 stok (user + pass)',icon:'warning',background:'#1a0e2e',color:'#fff'});
+
+  const s = await getSlotInfo();
+  if(s.remain <= 0) return Swal.fire({title:'Slot penuh',text:'Beli slot tambahan dulu',icon:'warning',background:'#1a0e2e',color:'#fff'});
+
+  Swal.fire({title:'Mengunggah...',allowOutsideClick:false,didOpen:()=>Swal.showLoading(),background:'#1a0e2e',color:'#fff'});
+  try{
+    let images = [];
+    if(sellPhotos.length) images = await uploadProductImages();
+    const { data, error } = await sb.rpc('marketplace_create_product', {
+      p_title: title,
+      p_description: description,
+      p_price: price,
+      p_images: images,
+      p_stock: stock
+    });
+    Swal.close();
+    if(error) throw error;
+    if(data && data.success === false) throw new Error(data.message||'Gagal');
+    closeSellForm();
+    Swal.fire({title:'Produk tayang!',icon:'success',background:'#1a0e2e',color:'#fff',timer:2000});
+    loadMyProducts(); loadSlotInfo(); loadMarket();
+  }catch(err){
+    Swal.close();
+    Swal.fire({title:'Gagal',text:err.message,icon:'error',background:'#1a0e2e',color:'#fff'});
+  }
+}
+
+async function loadMyProducts(){
+  const box = $('myProducts');
+  const { data, error } = await sb.from('marketplace_products').select('*').eq('seller_id', currentUser.id).neq('status','deleted').order('created_at',{ascending:false});
+  if(error){ box.innerHTML = `<div class="empty">${escapeHtml(error.message)}</div>`; return; }
+  if(!data?.length){ box.innerHTML = '<div class="empty"><span class="big">📦</span>Belum ada produk</div>'; return; }
+  box.innerHTML = data.map(p => `
+    <div class="card">
+      <div style="font-weight:800;margin-bottom:4px">${escapeHtml(p.title)}</div>
+      <div class="product-meta">
+        <span class="product-price" style="font-size:13px">${formatRp(p.price)}</span>
+        <span class="badge stock">Stok ${p.stock_remaining||0}</span>
+        <span class="stars">${starsHtml(p.avg_rating)}</span>
+        <span class="badge">${escapeHtml(p.status)}</span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">
+        <button class="btn btn-secondary" style="padding:8px;font-size:11px;width:auto;flex:1" onclick="openDetail('${p.id}')">Lihat</button>
+        <button class="btn btn-gold" style="padding:8px;font-size:11px;width:auto;flex:1" onclick="openAddStock('${p.id}','${escapeHtml(p.title).replace(/'/g,"&#39;")}')">➕ Stok</button>
+        <button class="btn btn-danger" style="padding:8px;font-size:11px;width:auto;flex:1" onclick="deleteProduct('${p.id}')">Hapus</button>
+      </div>
+    </div>`).join('');
+}
+
+async function openAddStock(productId, title){
+  const { value: formValues } = await Swal.fire({
+    title: 'Tambah Stok',
+    html: `<div style="text-align:left;font-size:12px;color:#94a3b8;margin-bottom:8px">${escapeHtml(title || '')}</div>
+      <div id="addStockRows"></div>
+      <button type="button" id="btnAddStockRow" class="swal2-confirm swal2-styled" style="background:#333;margin-top:8px;width:100%">➕ Baris stok</button>
+      <p style="font-size:11px;color:#facc15;margin-top:10px;text-align:left">⚠️ Nonaktifkan 2FA pada akun yang ditambahkan.</p>`,
+    background: '#1a0e2e', color: '#fff', showCancelButton: true,
+    confirmButtonText: 'Simpan Stok', cancelButtonText: 'Batal', confirmButtonColor: '#ff6b9d',
+    width: 420,
+    didOpen: () => {
+      const box = document.getElementById('addStockRows');
+      function addRow(){
+        const div = document.createElement('div');
+        div.style.cssText = 'display:grid;grid-template-columns:1fr 1fr auto;gap:6px;margin-bottom:6px';
+        div.innerHTML = `<input class="swal2-input" placeholder="Username/Gmail" style="margin:0;width:100%">
+          <input class="swal2-input" placeholder="Password" style="margin:0;width:100%">
+          <button type="button" style="border:none;background:rgba(255,68,68,0.3);color:#ff8080;border-radius:8px;cursor:pointer">✕</button>`;
+        div.querySelector('button').onclick = () => div.remove();
+        box.appendChild(div);
+      }
+      addRow();
+      document.getElementById('btnAddStockRow').onclick = addRow;
+    },
+    preConfirm: () => {
+      const rows = [...document.querySelectorAll('#addStockRows > div')];
+      const stock = [];
+      rows.forEach(r => {
+        const inputs = r.querySelectorAll('input');
+        const u = (inputs[0]?.value || '').trim();
+        const p = (inputs[1]?.value || '').trim();
+        if (u && p) stock.push({ username: u, password: p });
+      });
+      if (!stock.length) {
+        Swal.showValidationMessage('Isi minimal 1 stok (user + password)');
+        return false;
+      }
+      return stock;
+    }
+  });
+  if (!formValues) return;
+  Swal.fire({ title: 'Menyimpan...', allowOutsideClick: false, didOpen: () => Swal.showLoading(), background: '#1a0e2e', color: '#fff' });
+  const { data, error } = await sb.rpc('marketplace_add_stock', {
+    p_product_id: productId,
+    p_stock: formValues
+  });
+  Swal.close();
+  if (error) return Swal.fire({ title: 'Gagal', text: error.message, icon: 'error', background: '#1a0e2e', color: '#fff' });
+  if (data && data.success === false) return Swal.fire({ title: 'Gagal', text: data.message || 'Gagal', icon: 'error', background: '#1a0e2e', color: '#fff' });
+  Swal.fire({ title: 'Stok ditambah!', text: `+${data?.added || formValues.length} stok`, icon: 'success', background: '#1a0e2e', color: '#fff', timer: 2000 });
+  loadMyProducts(); loadMarket();
+}
+
+async function deleteProduct(id){
+  const c = await Swal.fire({
+    title: 'Hapus produk?',
+    text: isStaff ? 'Admin/Owner dapat menghapus produk seller.' : 'Produk akan disembunyikan dari market.',
+    showCancelButton: true, confirmButtonColor: '#ef4444', background: '#1a0e2e', color: '#fff',
+    confirmButtonText: 'Hapus', cancelButtonText: 'Batal'
+  });
+  if (!c.isConfirmed) return;
+  // Seller: update sendiri; Admin: RPC (bisa hapus produk orang lain)
+  if (isStaff) {
+    const { data, error } = await sb.rpc('marketplace_admin_delete_product', { p_product_id: id });
+    if (error) return Swal.fire({ title: 'Gagal', text: error.message, icon: 'error', background: '#1a0e2e', color: '#fff' });
+    if (data && data.success === false) return Swal.fire({ title: 'Gagal', text: data.message, icon: 'error', background: '#1a0e2e', color: '#fff' });
+  } else {
+    const { error } = await sb.from('marketplace_products').update({ status: 'deleted' }).eq('id', id).eq('seller_id', currentUser.id);
+    if (error) return Swal.fire({ title: 'Gagal', text: error.message, icon: 'error', background: '#1a0e2e', color: '#fff' });
+  }
+  Swal.fire({ title: 'Dihapus', icon: 'success', background: '#1a0e2e', color: '#fff', timer: 1500 });
+  loadMyProducts(); loadSlotInfo(); loadMarket();
+  try { closeDetail(); } catch (_) {}
+}
+
+/* ========== PENDING ========== */
+async function loadPending(){
+  const box = $('pendingList');
+  const { data, error } = await sb.from('marketplace_pending_balance')
+    .select('*')
+    .eq('seller_id', currentUser.id)
+    .order('created_at',{ascending:false}).limit(50);
+  if(error){ box.innerHTML = `<div class="empty">${escapeHtml(error.message)}</div>`; return; }
+  if(!data?.length){ box.innerHTML = '<div class="empty">Tidak ada saldo pending</div>'; return; }
+  box.innerHTML = data.map(p => {
+    const avail = p.available_at ? new Date(p.available_at).toLocaleString('id-ID',{timeZone:'Asia/Jakarta'}) : '-';
+    return `<div class="card pending-card">
+      <div style="display:flex;justify-content:space-between">
+        <span style="font-weight:900;color:#facc15">${formatRp(p.amount)}</span>
+        <span class="badge">${escapeHtml(p.status)}</span>
+      </div>
+      <div style="font-size:11px;color:#94a3b8;margin-top:4px">Cair: ${avail} WIB</div>
+    </div>`;
+  }).join('');
+}
 
 
+async function loadAdminProducts(){
+  if(!isStaff) return;
+  const box = $('adminProductsList');
+  if(!box) return;
+  box.innerHTML = '<div class="loading">Memuat produk...</div>';
+  const { data, error } = await sb.from('marketplace_products')
+    .select('id, seller_id, title, price, stock_remaining, status, created_at')
+    .neq('status', 'deleted')
+    .order('created_at', { ascending: false })
+    .limit(100);
+  if(error){ box.innerHTML = `<div class="empty">${escapeHtml(error.message)}</div>`; return; }
+  if(!data?.length){ box.innerHTML = '<div class="empty">Tidak ada produk</div>'; return; }
+  await resolveEmails(data.map(p => p.seller_id));
+  box.innerHTML = data.map(p => `
+    <div class="card">
+      <div style="font-weight:800;font-size:13px">${escapeHtml(p.title)}</div>
+      <div style="font-size:11px;color:#94a3b8;margin:4px 0">Seller: ${escapeHtml(emailOf(p.seller_id))}</div>
+      <div class="product-meta">
+        <span class="product-price" style="font-size:12px">${formatRp(p.price)}</span>
+        <span class="badge stock">Stok ${p.stock_remaining||0}</span>
+      </div>
+      <div style="display:flex;gap:6px;margin-top:8px">
+        <button class="btn btn-secondary" style="padding:8px;font-size:11px" onclick="openDetail('${p.id}')">Lihat</button>
+        <button class="btn btn-danger" style="padding:8px;font-size:11px" onclick="deleteProduct('${p.id}')">Hapus</button>
+      </div>
+    </div>`).join('');
+}
+
+async function loadAdminPending(){
+  if(!isStaff) return;
+  const box = $('adminPendingList');
+  const { data, error } = await sb.from('marketplace_pending_balance')
+    .select('id, seller_id, buyer_id, order_id, amount, available_at, status, created_at')
+    .eq('status','pending')
+    .order('created_at',{ascending:false}).limit(100);
+  if(error){ box.innerHTML = `<div class="empty">${escapeHtml(error.message)}</div>`; return; }
+  if(!data?.length){ box.innerHTML = '<div class="empty">Tidak ada pending</div>'; return; }
+  await resolveEmails(data.map(p => p.seller_id));
+  box.innerHTML = data.map(p => `
+    <div class="card pending-card">
+      <div style="font-size:12px">${escapeHtml(emailOf(p.seller_id))}</div>
+      <div style="font-weight:900;color:#facc15">${formatRp(p.amount)}</div>
+      <button class="btn btn-danger" style="margin-top:8px;padding:8px;font-size:11px" onclick="cancelPending('${p.id}')">Cancel & Refund Pembeli</button>
+    </div>`).join('');
+}
+
+async function cancelPending(pendingId){
+  const c = await Swal.fire({title:'Cancel pending & refund pembeli?',showCancelButton:true,confirmButtonColor:'#ef4444',background:'#1a0e2e',color:'#fff'});
+  if(!c.isConfirmed) return;
+  const { data, error } = await sb.rpc('marketplace_cancel_pending', { p_pending_id: pendingId });
+  if(error) return Swal.fire({title:'Gagal',text:error.message,icon:'error',background:'#1a0e2e',color:'#fff'});
+  if(data && data.success===false) return Swal.fire({title:'Gagal',text:data.message,icon:'error',background:'#1a0e2e',color:'#fff'});
+  Swal.fire({title:'Refund sukses',icon:'success',background:'#1a0e2e',color:'#fff',timer:2000});
+  loadAdminPending(); loadPending();
+}
+
+/* ========== ORDERS + REVIEW ========== */
+function setOrderTab(t, btn){
+  orderTab = t;
+  document.querySelectorAll('#page-orders .chip').forEach(c=>c.classList.remove('active'));
+  btn.classList.add('active');
+  loadOrders();
+}
+
+async function loadOrders(){
+  const box = $('ordersList');
+  box.innerHTML = '<div class="loading">Memuat...</div>';
+  let q = sb.from('marketplace_orders').select('id, buyer_id, seller_id, product_id, stock_id, price, delivered_username, delivered_password, status, created_at').order('created_at',{ascending:false}).limit(50);
+  if(orderTab==='buy') q = q.eq('buyer_id', currentUser.id);
+  else q = q.eq('seller_id', currentUser.id);
+  const { data, error } = await q;
+  if(error){ box.innerHTML = `<div class="empty">${escapeHtml(error.message)}</div>`; return; }
+  if(!data?.length){ box.innerHTML = '<div class="empty"><span class="big">📋</span>Belum ada riwayat</div>'; return; }
+
+  const productIds = [...new Set(data.map(o => o.product_id).filter(Boolean))];
+  const productMap = {};
+  if (productIds.length) {
+    const { data: prods } = await sb.from('marketplace_products').select('id, title, images').in('id', productIds);
+    (prods || []).forEach(p => { productMap[p.id] = p; });
+  }
+
+  const orderIds = data.map(o=>o.id);
+  const { data: revs } = await sb.from('marketplace_reviews').select('order_id').in('order_id', orderIds);
+  const reviewed = new Set((revs||[]).map(r=>r.order_id));
+
+  box.innerHTML = data.map(o => {
+    const prod = productMap[o.product_id] || {};
+    const img = (prod.images && prod.images[0]) ? prod.images[0] : '';
+    const isBuy = orderTab==='buy';
+    const cred = isBuy ? `<div class="cred-box"><div>Username/Gmail</div><code>${escapeHtml(o.delivered_username||'-')}</code>
+      <div style="margin-top:6px">Password</div><code>${escapeHtml(o.delivered_password||'-')}</code></div>
+      <div class="note-box">Anda memiliki waktu <b>7 hari</b> untuk mengamankan akun. Jika ada kendala (akun tidak bisa masuk), laporkan ke WhatsApp Shine Shop <a href="https://wa.me/${WA_REPORT}" target="_blank" style="color:#38bdf8">+${WA_REPORT}</a>.</div>` : '';
+    const reviewBtn = isBuy && !reviewed.has(o.id) ? `<button class="btn btn-gold" style="margin-top:8px;padding:8px;font-size:12px" onclick="openReview('${o.id}','${o.product_id}','${o.seller_id}')">⭐ Beri Ulasan</button>` : (isBuy && reviewed.has(o.id)?`<div style="font-size:11px;color:#22c55e;margin-top:6px">✓ Sudah diulas</div>`:'');
+    return `<div class="card">
+      <div style="display:flex;gap:10px">
+        ${img?`<img class="product-thumb" src="${escapeHtml(img)}" onclick="event.stopPropagation();openImagePreview(this.src)" style="cursor:zoom-in">`:`<div class="product-thumb" style="display:flex;align-items:center;justify-content:center">🎮</div>`}
+        <div style="flex:1">
+          <div style="font-weight:800;font-size:13px">${escapeHtml(prod.title||'Produk')}</div>
+          <div class="product-price" style="font-size:13px;margin-top:4px">${formatRp(o.price)}</div>
+          <div style="font-size:10px;color:#94a3b8;margin-top:4px">${new Date(o.created_at).toLocaleString('id-ID',{timeZone:'Asia/Jakarta'})} WIB</div>
+        </div>
+      </div>
+      ${cred}
+      ${reviewBtn}
+    </div>`;
+  }).join('');
+}
+
+function openReview(orderId, productId, sellerId){
+  let rating = 5;
+  Swal.fire({
+    title: 'Ulasan Produk',
+    html: `<div class="star-pick" id="swalStars">
+      ${[1,2,3,4,5].map(i=>`<button type="button" class="on" data-s="${i}">⭐</button>`).join('')}
+    </div>
+    <textarea id="swalReview" class="swal2-textarea" placeholder="Tulis ulasan (opsional)" style="background:rgba(255,255,255,0.05);color:#fff"></textarea>`,
+    background: '#1a0e2e', color: '#fff', confirmButtonColor: '#ffd700', confirmButtonText: 'Kirim',
+    showCancelButton: true, cancelButtonText: 'Batal',
+    didOpen: () => {
+      const box = document.getElementById('swalStars');
+      box.querySelectorAll('button').forEach(btn => {
+        btn.onclick = () => {
+          rating = parseInt(btn.dataset.s,10);
+          box.querySelectorAll('button').forEach(b => {
+            const v = parseInt(b.dataset.s,10);
+            b.classList.toggle('on', v <= rating);
+            b.style.opacity = v <= rating ? '1' : '0.3';
+            b.style.filter = v <= rating ? 'none' : 'grayscale(1)';
+          });
+        };
+      });
+    },
+    preConfirm: () => ({ rating, comment: document.getElementById('swalReview').value.trim() })
+  }).then(async res => {
+    if(!res.isConfirmed) return;
+    const { data, error } = await sb.rpc('marketplace_submit_review', {
+      p_order_id: orderId,
+      p_product_id: productId,
+      p_seller_id: sellerId,
+      p_rating: res.value.rating,
+      p_comment: res.value.comment||''
+    });
+    if(error) return Swal.fire({title:'Gagal',text:error.message,icon:'error',background:'#1a0e2e',color:'#fff'});
+    if(data && data.success===false) return Swal.fire({title:'Gagal',text:data.message,icon:'error',background:'#1a0e2e',color:'#fff'});
+    Swal.fire({title:'Terima kasih!',icon:'success',background:'#1a0e2e',color:'#fff',timer:1800});
+    loadOrders(); loadMarket();
+  });
+}
+
+// close modals on backdrop
+$('detailModal').addEventListener('click', e => { if(e.target===$('detailModal')) closeDetail(); });
+$('sellModal').addEventListener('click', e => { if(e.target===$('sellModal')) closeSellForm(); });
+
+
+
+/* Chat unread badge */
+let chatUnreadTotal = 0;
+let chatBadgeTimer = null;
+
+function chatSeenKey(threadId){
+  const uid = currentUser?.id || 'guest';
+  return 'mp_chat_seen_' + uid + '_' + threadId;
+}
+function getChatSeen(threadId){
+  try { return localStorage.getItem(chatSeenKey(threadId)) || ''; } catch(_) { return ''; }
+}
+function setChatSeen(threadId, iso){
+  try { localStorage.setItem(chatSeenKey(threadId), iso || new Date().toISOString()); } catch(_){}
+}
+function updateChatFabBadge(n){
+  chatUnreadTotal = Math.max(0, Number(n) || 0);
+  const el = $('chatFabBadge');
+  if(!el) return;
+  if(chatUnreadTotal > 0){
+    el.textContent = chatUnreadTotal > 99 ? '99+' : String(chatUnreadTotal);
+    el.classList.add('has-count');
+    el.style.display = 'flex';
+  } else {
+    el.textContent = '';
+    el.classList.remove('has-count');
+    el.style.display = 'none';
+  }
+}
+
+async function refreshChatUnreadBadge(){
+  if(!sb || !currentUser){ updateChatFabBadge(0); return; }
+  try {
+    const { data: threads } = await sb.from('marketplace_chat_threads')
+      .select('id, last_message_at, last_message')
+      .or(`buyer_id.eq.${currentUser.id},seller_id.eq.${currentUser.id}`)
+      .order('last_message_at', { ascending: false })
+      .limit(50);
+    if(!threads || !threads.length){ updateChatFabBadge(0); return; }
+
+    let total = 0;
+    for(const t of threads){
+      // skip if currently open
+      if(currentThread && currentThread.id === t.id) continue;
+      const seen = getChatSeen(t.id);
+      if(!t.last_message_at) continue;
+      if(!seen || new Date(t.last_message_at) > new Date(seen)){
+        // count messages after seen
+        let q = sb.from('marketplace_chat_messages')
+          .select('id, sender_id, created_at')
+          .eq('thread_id', t.id)
+          .neq('sender_id', currentUser.id)
+          .order('created_at', { ascending: false })
+          .limit(30);
+        if(seen) q = q.gt('created_at', seen);
+        const { data: msgs } = await q;
+        total += (msgs || []).length;
+      }
+    }
+    updateChatFabBadge(total);
+  } catch(e){
+    console.warn('chat badge', e.message || e);
+  }
+}
+
+function startChatBadgePolling(){
+  if(chatBadgeTimer) clearInterval(chatBadgeTimer);
+  refreshChatUnreadBadge();
+  chatBadgeTimer = setInterval(() => {
+    if(document.visibilityState === 'visible') refreshChatUnreadBadge();
+  }, 12000);
+}
+
+
+/* ========== BUYER ↔ SELLER CHAT (36 jam auto-hapus) ========== */
+function openChatPanel(){
+  if(!currentUser) return;
+  $('chatPanel').classList.add('show');
+  showChatFolders();
+  loadChatFolders();
+  try { cleanupMarketChats(); } catch(_){}
+}
+function closeChatPanel(){
+  $('chatPanel').classList.remove('show');
+  currentThread = null;
+  if(chatPollTimer){ clearInterval(chatPollTimer); chatPollTimer = null; }
+}
+function chatGoBack(){
+  currentThread = null;
+  if(chatPollTimer){ clearInterval(chatPollTimer); chatPollTimer = null; }
+  showChatFolders();
+  loadChatFolders();
+}
+function showChatFolders(){
+  $('chatFolderView').style.display = 'block';
+  $('chatThreadView').style.display = 'none';
+  $('chatBackBtn').style.display = 'none';
+  $('chatPanelTitle').textContent = 'Chat Jual-Beli';
+}
+function showChatThread(){
+  $('chatFolderView').style.display = 'none';
+  $('chatThreadView').style.display = 'flex';
+  $('chatBackBtn').style.display = 'block';
+}
+
+async function cleanupMarketChats(){
+  if(!sb || !currentUser) return;
+  try {
+    await sb.rpc('marketplace_cleanup_chats', { p_hours: CHAT_TTL_HOURS });
+  } catch(e) {
+    // fallback client: hapus thread lama milik user
+    try {
+      const cutoff = new Date(Date.now() - CHAT_TTL_HOURS * 3600 * 1000).toISOString();
+      const { data: olds } = await sb.from('marketplace_chat_threads')
+        .select('id')
+        .or(`buyer_id.eq.${currentUser.id},seller_id.eq.${currentUser.id}`)
+        .lt('last_message_at', cutoff)
+        .limit(50);
+      for(const t of (olds||[])){
+        try { await sb.from('marketplace_chat_messages').delete().eq('thread_id', t.id); } catch(_){}
+        try { await sb.from('marketplace_chat_threads').delete().eq('id', t.id); } catch(_){}
+      }
+    } catch(_){}
+  }
+}
+
+async function loadChatFolders(){
+  const box = $('chatFolderView');
+  if(!box || !currentUser) return;
+  box.innerHTML = '<div class="loading">Memuat chat...</div>';
+  await cleanupMarketChats();
+  const { data, error } = await sb.from('marketplace_chat_threads')
+    .select('id, buyer_id, seller_id, product_id, product_title, last_message, last_message_at, created_at')
+    .or(`buyer_id.eq.${currentUser.id},seller_id.eq.${currentUser.id}`)
+    .order('last_message_at', { ascending: false })
+    .limit(50);
+  if(error){
+    box.innerHTML = `<div class="empty">${escapeHtml(error.message)}<br><small>Jalankan SQL chat market</small></div>`;
+    return;
+  }
+  chatThreads = data || [];
+  const otherIds = chatThreads.map(t => t.buyer_id === currentUser.id ? t.seller_id : t.buyer_id);
+  await resolveEmails(otherIds);
+  if(!chatThreads.length){
+    box.innerHTML = '<div class="empty"><span class="big">💬</span>Belum ada chat<br><small>Buka produk → Chat Penjual</small></div>';
+    return;
+  }
+  // hitung unread per folder
+  const unreadMap = {};
+  for (const t of chatThreads) {
+    const seen = getChatSeen(t.id);
+    if (t.last_message_at && (!seen || new Date(t.last_message_at) > new Date(seen))) {
+      unreadMap[t.id] = true;
+    }
+  }
+  try { refreshChatUnreadBadge(); } catch(_){}
+
+  box.innerHTML = chatThreads.map(t => {
+    const other = t.buyer_id === currentUser.id ? t.seller_id : t.buyer_id;
+    const role = t.buyer_id === currentUser.id ? 'Seller' : 'Pembeli';
+    const initial = (emailOf(other)||'?').charAt(0).toUpperCase();
+    const time = t.last_message_at ? new Date(t.last_message_at).toLocaleString('id-ID',{timeZone:'Asia/Jakarta',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : '';
+    const prev = shortPreview(t.last_message||'');
+    const unread = !!unreadMap[t.id];
+    return `<div class="chat-folder ${unread?'has-unread':''}" onclick="openChatThread('${t.id}')">
+      <div class="cf-av">${escapeHtml(initial)}</div>
+      <div class="cf-info">
+        <div class="cf-title">${escapeHtml(emailOf(other))} · ${role}${unread?'<span class="cf-badge">•</span>':''}</div>
+        <div class="cf-prev">${escapeHtml(t.product_title ? t.product_title+' · ' : '')}${escapeHtml(prev)}</div>
+      </div>
+      <div class="cf-time">${escapeHtml(time)}</div>
+    </div>`;
+  }).join('');
+}
+
+function shortPreview(s){
+  s = String(s||'');
+  if(s.startsWith('[IMG]') || s.startsWith('data:image') || /📷/.test(s)) return '📷 Foto';
+  return s.length > 40 ? s.slice(0,40)+'…' : s;
+}
+
+async function startChatWithSeller(sellerId, productId, productTitle){
+  if(!currentUser) return;
+  if(sellerId === currentUser.id){
+    return Swal.fire({title:'Info',text:'Tidak bisa chat ke diri sendiri',icon:'info',background:'#1a0e2e',color:'#fff'});
+  }
+  Swal.fire({title:'Membuka chat...',allowOutsideClick:false,didOpen:()=>Swal.showLoading(),background:'#1a0e2e',color:'#fff'});
+  const { data, error } = await sb.rpc('marketplace_open_chat', {
+    p_seller_id: sellerId,
+    p_product_id: productId || null,
+    p_product_title: productTitle || null
+  });
+  Swal.close();
+  if(error) return Swal.fire({title:'Gagal',text:error.message,icon:'error',background:'#1a0e2e',color:'#fff'});
+  if(data && data.success === false) return Swal.fire({title:'Gagal',text:data.message||'Gagal',icon:'error',background:'#1a0e2e',color:'#fff'});
+  const threadId = data.thread_id || data.id;
+  openChatPanel();
+  if(threadId) openChatThread(threadId);
+}
+
+async function openChatThread(threadId){
+  const t = chatThreads.find(x => x.id === threadId) || { id: threadId };
+  // refresh thread meta
+  const { data: meta } = await sb.from('marketplace_chat_threads').select('*').eq('id', threadId).maybeSingle();
+  currentThread = meta || t;
+  setChatSeen(threadId, new Date().toISOString());
+  try { refreshChatUnreadBadge(); } catch(_){}
+  const other = currentThread.buyer_id === currentUser.id ? currentThread.seller_id : currentThread.seller_id === currentUser.id ? currentThread.buyer_id : null;
+  await resolveEmails([other, currentThread.buyer_id, currentThread.seller_id]);
+  $('chatPanelTitle').textContent = emailOf(other) || 'Chat';
+  showChatThread();
+  await loadChatMessages();
+  if(chatPollTimer) clearInterval(chatPollTimer);
+  chatPollTimer = setInterval(() => { if(currentThread) loadChatMessages(true); }, 4000);
+}
+
+async function loadChatMessages(silent){
+  if(!currentThread?.id) return;
+  const box = $('chatMsgs');
+  if(!silent) box.innerHTML = '<div class="loading">Memuat pesan...</div>';
+  const { data, error } = await sb.from('marketplace_chat_messages')
+    .select('id, sender_id, message, image_url, created_at')
+    .eq('thread_id', currentThread.id)
+    .order('created_at', { ascending: true })
+    .limit(200);
+  if(error){
+    if(!silent) box.innerHTML = `<div class="empty">${escapeHtml(error.message)}</div>`;
+    return;
+  }
+  const msgs = data || [];
+  box.innerHTML = msgs.map(m => {
+    const mine = m.sender_id === currentUser.id;
+    let body = '';
+    const raw = m.message || '';
+    let img = m.image_url || null;
+    let text = raw;
+    if(raw.startsWith('[IMG]')){
+      const rest = raw.slice(5);
+      const nl = rest.indexOf('\n');
+      if(nl>=0){ img = img || rest.slice(0,nl).trim(); text = rest.slice(nl+1).trim(); }
+      else { img = img || rest.trim(); text = ''; }
+    }
+    if(img) body += `<img class="chat-img" src="${escapeHtml(img)}" alt="foto" onclick="openImagePreview(this.src)">`;
+    if(text && text !== '📷 Foto') body += `<div>${escapeHtml(text)}</div>`;
+    if(!body) body = escapeHtml(raw||'');
+    const time = new Date(m.created_at).toLocaleTimeString('id-ID',{timeZone:'Asia/Jakarta',hour:'2-digit',minute:'2-digit'});
+    return `<div class="chat-bubble ${mine?'mine':'other'}">${body}<div class="t">${time}</div></div>`;
+  }).join('') || '<div class="empty">Belum ada pesan</div>';
+  box.scrollTop = box.scrollHeight;
+}
+
+async function onChatImagePicked(e){
+  const f = e.target.files && e.target.files[0];
+  e.target.value = '';
+  if(!f) return;
+  chatPendingImage = f;
+  Swal.fire({title:'Foto siap',text:f.name+' — ketik pesan (opsional) lalu kirim',icon:'info',background:'#1a0e2e',color:'#fff',timer:1800});
+}
+
+async function sendChatMessage(){
+  if(!currentThread?.id || !currentUser) return;
+  const input = $('chatInput');
+  const textMsg = (input?.value || '').trim();
+  const file = chatPendingImage;
+  if(!textMsg && !file) return;
+
+  let imagePayload = null;
+  if(file){
+    try {
+      const blob = await compressImageSmall(file, 900, 0.7);
+      // try storage then data url
+      const path = `market-chat/${currentUser.id}/${Date.now()}.jpg`;
+      let url = null;
+      try {
+        const { error } = await sb.storage.from('marketplace-images').upload(path, blob, { contentType:'image/jpeg', upsert:true });
+        if(!error){
+          const { data } = sb.storage.from('marketplace-images').getPublicUrl(path);
+          url = data?.publicUrl;
+        }
+      } catch(_){}
+      if(!url){
+        url = await blobToDataURL(blob);
+        if(url.length > 350000){
+          const smaller = await compressImageSmall(file, 640, 0.5);
+          url = await blobToDataURL(smaller);
+        }
+      }
+      imagePayload = url;
+    } catch(err){
+      return Swal.fire({title:'Gagal foto',text:err.message,icon:'error',background:'#1a0e2e',color:'#fff'});
+    }
+  }
+
+  const message = imagePayload
+    ? ('[IMG]' + imagePayload + (textMsg ? '\n' + textMsg : ''))
+    : textMsg;
+
+  const row = {
+    thread_id: currentThread.id,
+    sender_id: currentUser.id,
+    message: message,
+    image_url: imagePayload || null
+  };
+  // try with image_url column
+  let { error } = await sb.from('marketplace_chat_messages').insert(row);
+  if(error && imagePayload){
+    const { error: e2 } = await sb.from('marketplace_chat_messages').insert({
+      thread_id: currentThread.id,
+      sender_id: currentUser.id,
+      message: message
+    });
+    if(e2) return Swal.fire({title:'Gagal',text:e2.message,icon:'error',background:'#1a0e2e',color:'#fff'});
+  } else if(error){
+    return Swal.fire({title:'Gagal',text:error.message,icon:'error',background:'#1a0e2e',color:'#fff'});
+  }
+
+  // update thread preview
+  try {
+    await sb.from('marketplace_chat_threads').update({
+      last_message: imagePayload ? (textMsg || '📷 Foto') : textMsg,
+      last_message_at: new Date().toISOString()
+    }).eq('id', currentThread.id);
+  } catch(_){}
+
+  if(input) input.value = '';
+  chatPendingImage = null;
+  await loadChatMessages();
+}
+
+
+window.addEventListener('load', async () => {
+  initSb();
+  await initAuth();
+});
 </script>
 </body>
-                                                </html>
+</html>
