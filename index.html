@@ -2723,6 +2723,85 @@ async function handleLogout() {
 }
 async function forceLogout() { try { if (chatClient) await chatClient.auth.signOut(); await supabaseClient.auth.signOut(); } catch(e) {} location.reload(); }
 
+async function handleAccountDeletedLogout(reason) {
+  try {
+    // bersihkan storage session
+    try { localStorage.removeItem('user_gmail'); } catch (_) {}
+    try {
+      const keys = Object.keys(localStorage);
+      keys.forEach(k => {
+        if (/supabase|sb-|auth|shine-shop/i.test(k)) {
+          try { localStorage.removeItem(k); } catch (_) {}
+        }
+      });
+    } catch (_) {}
+    try { if (chatClient) await chatClient.auth.signOut(); } catch (_) {}
+    try { if (supabaseClient) await supabaseClient.auth.signOut(); } catch (_) {}
+  } catch (_) {}
+  try {
+    await Swal.fire({
+      title: 'Akun Dihapus',
+      html: '<div style="text-align:left;color:#ddd;font-size:13px;line-height:1.6;">Akun Anda telah dihapus oleh admin/owner.<br><span style="color:#94a3b8;">' + (reason ? String(reason) : 'Silakan daftar ulang jika diperlukan.') + '</span></div>',
+      icon: 'warning',
+      confirmButtonColor: '#ff6b9d',
+      background: '#1a0e2e',
+      color: '#fff',
+      allowOutsideClick: false
+    });
+  } catch (_) {}
+  location.reload();
+}
+
+function startDeletedAccountWatcher() {
+  if (!supabaseClient || !currentUser) return;
+  // Realtime: profile baris sendiri terhapus
+  try {
+    if (window._deletedAccountChannel) {
+      try { window._deletedAccountChannel.unsubscribe(); } catch (_) {}
+    }
+    window._deletedAccountChannel = supabaseClient
+      .channel('account_deleted_' + currentUser.id)
+      .on('postgres_changes', {
+        event: 'DELETE',
+        schema: 'public',
+        table: 'profiles',
+        filter: 'id=eq.' + currentUser.id
+      }, () => {
+        handleAccountDeletedLogout('Akun dihapus dari sistem.');
+      })
+      .subscribe();
+  } catch (e) {
+    console.warn('deleted account channel', e.message);
+  }
+
+  // Poll: profile hilang / getUser gagal
+  if (window._deletedAccountPoll) clearInterval(window._deletedAccountPoll);
+  window._deletedAccountPoll = setInterval(async () => {
+    if (!currentUser || !supabaseClient) return;
+    try {
+      const { data: { user }, error } = await supabaseClient.auth.getUser();
+      if (error || !user) {
+        await handleAccountDeletedLogout('Sesi tidak valid / akun dihapus.');
+        return;
+      }
+      const { data: prof, error: pErr } = await supabaseClient
+        .from('profiles')
+        .select('id')
+        .eq('id', currentUser.id)
+        .maybeSingle();
+      if (pErr && /JWT|invalid|user not found|not found/i.test(pErr.message || '')) {
+        await handleAccountDeletedLogout(pErr.message);
+        return;
+      }
+      if (!prof) {
+        await handleAccountDeletedLogout('Profile tidak ditemukan (akun dihapus).');
+      }
+    } catch (e) {
+      // diam
+    }
+  }, 12000);
+}
+
 // ============================================================
 // AUTO-UNBAN
 // ============================================================
@@ -3027,7 +3106,7 @@ async function updateAuthUI(user) {
       loadPendingRefunds();
       if (isOwner) { loadOwnerWithdrawals(); setTimeout(loadAdminMissions, 1500); setTimeout(loadBannedPublicList, 600); }
     // notif ban/mute ke SEMUA user online
-    setTimeout(initModerationRealtime, 700); setTimeout(initChatMuteRealtime, 900);
+    setTimeout(initModerationRealtime, 700); setTimeout(initChatMuteRealtime, 900); try { startDeletedAccountWatcher(); } catch (e) {}
       startMemberRealtime();
       startAutoUnbanScheduler();
       startBannedCountdownTicker();
@@ -3057,7 +3136,7 @@ async function updateAuthUI(user) {
     if (isAdminOrOwner) setTimeout(() => loadAdminMissions(), 1500);
     await initNotifications();
     await initChat();
-    try { setTimeout(initModerationRealtime, 900); setTimeout(initChatMuteRealtime, 1100); } catch (e) {}
+    try { setTimeout(initModerationRealtime, 900); setTimeout(initChatMuteRealtime, 1100); try { startDeletedAccountWatcher(); } catch (e2) {} } catch (e) {}
     try { startChatBadgePolling(); } catch (e) {}
     try { setTimeout(refreshChatUnreadCounts, 3000); } catch (e) {}
     await initBroadcastListener();
@@ -7799,9 +7878,19 @@ async function initAuth() {
     else updateAuthUI(null);
   } catch (err) { updateAuthUI(null); }
   supabaseClient.auth.onAuthStateChange((event, session) => {
-    if (event === 'SIGNED_IN' && session?.user) updateAuthUI(session.user);
-    else if (event === 'SIGNED_OUT') { updateAuthUI(null); try { localStorage.removeItem('user_gmail'); } catch(e) {} updateGmailDisplay(); }
-    else if (event === 'TOKEN_REFRESHED' && session?.user) currentUser = session.user;
+    if (event === 'SIGNED_IN' && session?.user) {
+      updateAuthUI(session.user);
+      try { startDeletedAccountWatcher(); } catch (e) {}
+    } else if (event === 'SIGNED_OUT') {
+      updateAuthUI(null);
+      try { localStorage.removeItem('user_gmail'); } catch(e) {}
+      try { updateGmailDisplay(); } catch(e) {}
+      try { if (window._deletedAccountPoll) clearInterval(window._deletedAccountPoll); } catch(e) {}
+    } else if (event === 'TOKEN_REFRESHED' && session?.user) {
+      currentUser = session.user;
+    } else if (event === 'USER_DELETED') {
+      try { handleAccountDeletedLogout('Akun dihapus.'); } catch (e) {}
+    }
   });
 }
 const GMAIL_KEY = 'user_gmail';
