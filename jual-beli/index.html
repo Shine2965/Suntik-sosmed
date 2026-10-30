@@ -230,18 +230,60 @@ function starsHtml(avg){
 }
 
 function initSb(){
+  // storageKey SAMA dengan shine-shop-fixed.html agar session login berbagi
   sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+      storage: window.localStorage,
+      storageKey: 'shine-shop-auth'
+    }
   });
 }
 
 async function initAuth(){
-  const { data: { session } } = await sb.auth.getSession();
-  if(session?.user) await onLogin(session.user);
+  // Ambil session yang sama dengan Shine Shop (storageKey: shine-shop-auth)
+  let session = null;
+  try {
+    const { data } = await sb.auth.getSession();
+    session = data?.session || null;
+  } catch (e) { console.warn('getSession', e.message); }
+
+  // Fallback: baca langsung localStorage jika getSession kosong (race)
+  if (!session) {
+    try {
+      const raw = localStorage.getItem('shine-shop-auth');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed?.access_token && parsed?.user) {
+          const { data, error } = await sb.auth.setSession({
+            access_token: parsed.access_token,
+            refresh_token: parsed.refresh_token
+          });
+          if (!error) session = data.session;
+        } else if (parsed?.currentSession?.access_token) {
+          const cs = parsed.currentSession;
+          const { data, error } = await sb.auth.setSession({
+            access_token: cs.access_token,
+            refresh_token: cs.refresh_token
+          });
+          if (!error) session = data.session;
+        }
+      }
+    } catch (e) { console.warn('session recover', e.message); }
+  }
+
+  if (session?.user) await onLogin(session.user);
   else $('authScreen').classList.remove('hidden');
+
   sb.auth.onAuthStateChange(async (ev, session) => {
-    if(ev==='SIGNED_IN' && session?.user) await onLogin(session.user);
-    if(ev==='SIGNED_OUT'){ currentUser=null; currentProfile=null; $('authScreen').classList.remove('hidden'); }
+    if (ev === 'SIGNED_IN' && session?.user) await onLogin(session.user);
+    if (ev === 'TOKEN_REFRESHED' && session?.user) currentUser = session.user;
+    if (ev === 'SIGNED_OUT') {
+      currentUser = null; currentProfile = null;
+      $('authScreen').classList.remove('hidden');
+    }
   });
 }
 
@@ -554,15 +596,86 @@ async function compressImage(file, maxSide=1000, quality=0.75){
   });
 }
 
+function blobToDataURL(blob){
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);
+    r.onerror = () => reject(new Error('Gagal baca foto'));
+    r.readAsDataURL(blob);
+  });
+}
+
+async function compressImageSmall(file, maxSide = 900, quality = 0.7){
+  // kompres lebih agresif agar aman disimpan sebagai data-URL di DB
+  return new Promise(resolve => {
+    try {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = async () => {
+        try {
+          let w = img.width, h = img.height;
+          const scale = Math.min(1, maxSide / Math.max(w, h));
+          w = Math.max(1, Math.round(w * scale));
+          h = Math.max(1, Math.round(h * scale));
+          const c = document.createElement('canvas');
+          c.width = w; c.height = h;
+          c.getContext('2d').drawImage(img, 0, 0, w, h);
+          URL.revokeObjectURL(url);
+          let q = quality;
+          let blob = await new Promise(res => c.toBlob(res, 'image/jpeg', q));
+          while (blob && blob.size > 220 * 1024 && q > 0.4) {
+            q -= 0.1;
+            blob = await new Promise(res => c.toBlob(res, 'image/jpeg', q));
+          }
+          resolve(blob || file);
+        } catch (_) { try { URL.revokeObjectURL(url); } catch(e){} resolve(file); }
+      };
+      img.onerror = () => { try { URL.revokeObjectURL(url); } catch(e){} resolve(file); };
+      img.src = url;
+    } catch (_) { resolve(file); }
+  });
+}
+
 async function uploadProductImages(){
   const urls = [];
-  for(let i=0;i<sellPhotos.length;i++){
-    const blob = await compressImage(sellPhotos[i].file);
+  for (let i = 0; i < sellPhotos.length; i++) {
+    const blob = await compressImageSmall(sellPhotos[i].file);
     const path = `market/${currentUser.id}/${Date.now()}_${i}.jpg`;
-    const { error } = await sb.storage.from('marketplace-images').upload(path, blob, { contentType: 'image/jpeg', upsert: true });
-    if(error) throw new Error('Upload foto gagal: '+error.message+' (buat bucket marketplace-images public)');
-    const { data } = sb.storage.from('marketplace-images').getPublicUrl(path);
-    urls.push(data.publicUrl);
+    let uploaded = false;
+
+    // Coba Storage dulu (jika bucket ada)
+    try {
+      const { error } = await sb.storage.from('marketplace-images').upload(path, blob, {
+        contentType: 'image/jpeg',
+        upsert: true
+      });
+      if (!error) {
+        const { data } = sb.storage.from('marketplace-images').getPublicUrl(path);
+        if (data?.publicUrl) {
+          urls.push(data.publicUrl);
+          uploaded = true;
+        }
+      } else {
+        console.warn('storage upload fail:', error.message);
+      }
+    } catch (e) {
+      console.warn('storage exception:', e.message || e);
+    }
+
+    // Fallback TANPA bucket: simpan data-URL (foto sudah dikompres)
+    if (!uploaded) {
+      const dataUrl = await blobToDataURL(blob);
+      if (!dataUrl || dataUrl.length < 32) throw new Error('Gagal memproses foto');
+      // batasi ukuran per foto di DB
+      if (dataUrl.length > 350000) {
+        const smaller = await compressImageSmall(sellPhotos[i].file, 640, 0.5);
+        const dataUrl2 = await blobToDataURL(smaller);
+        if (dataUrl2.length > 350000) throw new Error('Foto terlalu besar meski dikompres. Pilih foto lebih kecil.');
+        urls.push(dataUrl2);
+      } else {
+        urls.push(dataUrl);
+      }
+    }
   }
   return urls;
 }
