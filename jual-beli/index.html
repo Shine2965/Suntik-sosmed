@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#1a0e2e">
+<title>Shine Account Market</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700;800;900&family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:'Quicksand',sans-serif;background:#0f0818;color:#f1e6f5;min-height:100dvh;overflow-x:hidden}
+.app{max-width:480px;margin:0 auto;min-height:100dvh;display:flex;flex-direction:column;background:linear-gradient(180deg,#1a0e2e 0%,#140a22 40%,#0f0818 100%);position:relative}
+.app-bar{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:rgba(20,10,40,0.95);border-bottom:1px solid rgba(255,255,255,0.08);position:sticky;top:0;z-index:50;backdrop-filter:blur(12px)}
+.app-bar h1{font-size:15px;font-weight:900;font-family:'Poppins',sans-serif;background:linear-gradient(90deg,#ff6b9d,#ffd700);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.balance-pill{background:rgba(255,215,0,0.12);border:1px solid rgba(255,215,0,0.35);color:#ffd700;font-weight:800;font-size:12px;padding:6px 10px;border-radius:20px}
+.pages{flex:1;overflow-y:auto;padding:12px 12px 90px}
+.page{display:none}.page.active{display:block}
+.bottom-nav{position:fixed;left:50%;transform:translateX(-50%);bottom:0;width:100%;max-width:480px;display:flex;background:rgba(20,10,40,0.98);border-top:1px solid rgba(255,255,255,0.08);padding:8px 6px calc(8px + env(safe-area-inset-bottom));z-index:60}
+.nav-item{flex:1;background:transparent;border:none;color:#6b4a7a;font-family:inherit;font-size:10px;font-weight:800;display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 4px;border-radius:12px;cursor:pointer}
+.nav-item.active{color:#ff6b9d;background:rgba(255,107,157,0.12)}
+.nav-item .ico{font-size:18px}
+.section-title{font-size:13px;font-weight:900;margin:14px 0 10px;display:flex;align-items:center;gap:8px}
+.section-title .line{flex:1;height:1px;background:linear-gradient(90deg,rgba(255,107,157,0.4),transparent)}
+.card{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:16px;padding:12px;margin-bottom:10px}
+.product-card{display:flex;gap:10px;cursor:pointer;transition:0.2s}
+.product-card:hover{border-color:rgba(255,107,157,0.35);background:rgba(255,107,157,0.06)}
+.product-thumb{width:72px;height:72px;border-radius:12px;object-fit:cover;background:#221236;flex-shrink:0}
+.product-info{flex:1;min-width:0}
+.product-title{font-size:13px;font-weight:800;color:#fff;margin-bottom:4px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.product-meta{font-size:10px;color:#94a3b8;display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}
+.product-price{font-size:14px;font-weight:900;color:#ffd700;font-family:'Poppins',sans-serif}
+.stars{color:#ffd700;font-size:11px;letter-spacing:1px}
+.badge{display:inline-flex;padding:2px 7px;border-radius:8px;font-size:9px;font-weight:800}
+.badge.stock{background:rgba(34,197,94,0.15);color:#22c55e;border:1px solid rgba(34,197,94,0.3)}
+.badge.soldout{background:rgba(255,68,68,0.15);color:#ff8080;border:1px solid rgba(255,68,68,0.3)}
+.btn{border:none;border-radius:12px;padding:12px 14px;font-family:inherit;font-weight:800;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;width:100%}
+.btn-primary{background:linear-gradient(135deg,#ff6b9d,#ff4080);color:#fff;box-shadow:0 6px 20px rgba(255,107,157,0.35)}
+.btn-secondary{background:rgba(255,255,255,0.06);color:#fff;border:1px solid rgba(255,255,255,0.12)}
+.btn-gold{background:linear-gradient(135deg,#ffd700,#f59e0b);color:#1a0e2e}
+.btn-danger{background:linear-gradient(135deg,#ef4444,#b91c1c);color:#fff}
+.btn:disabled{opacity:0.55;cursor:not-allowed}
+.field{margin-bottom:10px}
+.field label{display:block;font-size:11px;font-weight:700;color:#b39ddb;margin-bottom:5px}
+.field input,.field textarea,.field select{width:100%;padding:12px 14px;border-radius:12px;border:1.5px solid rgba(255,107,157,0.2);background:rgba(255,255,255,0.04);color:#fff;font-family:inherit;font-size:13px;outline:none}
+.field textarea{min-height:90px;resize:vertical}
+.field input:focus,.field textarea:focus{border-color:#ff6b9d}
+.photo-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-top:6px}
+.photo-slot{aspect-ratio:1;border-radius:10px;background:rgba(255,255,255,0.04);border:1.5px dashed rgba(255,255,255,0.15);display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative;cursor:pointer}
+.photo-slot img{width:100%;height:100%;object-fit:cover}
+.photo-slot .rm{position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:rgba(255,68,68,0.9);color:#fff;font-size:10px;border:none;cursor:pointer}
+.stock-row{display:grid;grid-template-columns:1fr 1fr auto;gap:6px;margin-bottom:6px;align-items:center}
+.stock-row input{padding:10px;font-size:12px}
+.stock-row button{width:34px;height:34px;border-radius:8px;border:none;background:rgba(255,68,68,0.2);color:#ff8080;cursor:pointer;font-weight:900}
+.auth-screen{position:fixed;inset:0;z-index:100;background:linear-gradient(180deg,#1a0e2e,#140a22);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;max-width:480px;left:50%;transform:translateX(-50%)}
+.auth-screen.hidden{display:none}
+.auth-box{width:100%;max-width:360px}
+.auth-box h2{font-family:'Poppins',sans-serif;font-size:22px;font-weight:900;text-align:center;margin-bottom:6px;background:linear-gradient(90deg,#ff6b9d,#ffd700);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.auth-box p{text-align:center;font-size:12px;color:#94a3b8;margin-bottom:18px}
+.tabs{display:flex;gap:6px;margin-bottom:14px}
+.tabs button{flex:1;padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.1);background:transparent;color:#94a3b8;font-family:inherit;font-weight:800;cursor:pointer}
+.tabs button.active{background:rgba(255,107,157,0.15);color:#ff6b9d;border-color:rgba(255,107,157,0.4)}
+.empty{text-align:center;padding:30px 12px;color:#6b4a7a;font-size:12px}
+.empty .big{font-size:36px;display:block;margin-bottom:8px;opacity:0.5}
+.detail-gallery{display:flex;gap:8px;overflow-x:auto;padding-bottom:8px;margin-bottom:12px}
+.detail-gallery img{width:120px;height:120px;border-radius:12px;object-fit:cover;flex-shrink:0;background:#221236}
+.cred-box{background:rgba(0,0,0,0.3);border:1px solid rgba(255,215,0,0.3);border-radius:12px;padding:12px;margin:10px 0;font-size:12px}
+.cred-box code{display:block;background:rgba(255,255,255,0.05);padding:8px;border-radius:8px;margin-top:4px;word-break:break-all;color:#ffd700}
+.note-box{background:rgba(255,107,157,0.1);border-left:3px solid #ff6b9d;padding:10px 12px;border-radius:0 10px 10px 0;font-size:11.5px;line-height:1.55;color:#e2e8f0;margin-top:10px}
+.slot-info{font-size:11px;color:#94a3b8;margin-bottom:10px;padding:8px 10px;background:rgba(0,198,255,0.08);border:1px solid rgba(0,198,255,0.2);border-radius:10px}
+.pending-card{border-left:3px solid #facc15}
+.star-pick{display:flex;gap:6px;justify-content:center;margin:10px 0}
+.star-pick button{background:transparent;border:none;font-size:28px;cursor:pointer;opacity:0.35;filter:grayscale(1)}
+.star-pick button.on{opacity:1;filter:none}
+.filter-row{display:flex;gap:6px;margin-bottom:12px;overflow-x:auto}
+.chip{flex-shrink:0;padding:7px 12px;border-radius:20px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04);color:#94a3b8;font-size:11px;font-weight:800;cursor:pointer;font-family:inherit}
+.chip.active{background:rgba(255,107,157,0.15);border-color:rgba(255,107,157,0.4);color:#ff6b9d}
+.search-box{width:100%;padding:11px 14px;border-radius:12px;border:1.5px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04);color:#fff;font-family:inherit;font-size:13px;margin-bottom:10px;outline:none}
+.modal-back{position:fixed;inset:0;background:rgba(0,0,0,0.65);z-index:80;display:none;align-items:flex-end;justify-content:center}
+.modal-back.show{display:flex}
+.modal-sheet{background:#1a0e2e;border-radius:20px 20px 0 0;width:100%;max-width:480px;max-height:88vh;overflow-y:auto;padding:16px 14px calc(20px + env(safe-area-inset-bottom));border:1px solid rgba(255,255,255,0.1);border-bottom:none}
+.modal-sheet h3{font-size:15px;font-weight:900;margin-bottom:12px}
+.loading{text-align:center;padding:20px;color:#94a3b8;font-size:12px}
+.admin-tag{font-size:9px;background:rgba(255,215,0,0.2);color:#ffd700;padding:2px 6px;border-radius:6px;font-weight:800}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="app-bar">
+    <h1>🛒 Account Market</h1>
+    <div class="balance-pill" id="balancePill">Rp 0</div>
+  </div>
+  <div class="pages">
+    <!-- MARKET -->
+    <div class="page active" id="page-market">
+      <input class="search-box" id="searchInput" placeholder="🔍 Cari judul produk..." oninput="filterMarket()">
+      <div class="filter-row">
+        <button class="chip active" data-f="all" onclick="setFilter('all',this)">Semua</button>
+        <button class="chip" data-f="available" onclick="setFilter('available',this)">Ada Stok</button>
+        <button class="chip" data-f="cheap" onclick="setFilter('cheap',this)">Termurah</button>
+        <button class="chip" data-f="top" onclick="setFilter('top',this)">Rating Tinggi</button>
+      </div>
+      <div id="marketList" class="loading">Memuat produk...</div>
+    </div>
+
+    <!-- SELL -->
+    <div class="page" id="page-sell">
+      <div class="section-title">📦 Produk Saya <div class="line"></div></div>
+      <div class="slot-info" id="slotInfo">Slot upload: — / —</div>
+      <button class="btn btn-primary" style="margin-bottom:10px" onclick="openSellForm()">➕ Upload Produk Baru</button>
+      <button class="btn btn-gold" style="margin-bottom:14px" onclick="buyExtraSlots()">🔓 Beli +2 Slot (Rp 5.000)</button>
+      <div id="myProducts" class="loading">Memuat...</div>
+      <div class="section-title">⏳ Saldo Pending <div class="line"></div></div>
+      <div id="pendingList" class="loading">Memuat...</div>
+    </div>
+
+    <!-- ORDERS -->
+    <div class="page" id="page-orders">
+      <div class="filter-row">
+        <button class="chip active" data-o="buy" onclick="setOrderTab('buy',this)">🛒 Pembelian</button>
+        <button class="chip" data-o="sell" onclick="setOrderTab('sell',this)">💰 Penjualan</button>
+      </div>
+      <div id="ordersList" class="loading">Memuat riwayat...</div>
+    </div>
+
+    <!-- PROFILE / ADMIN -->
+    <div class="page" id="page-profile">
+      <div class="card">
+        <div style="font-size:12px;color:#94a3b8">Email</div>
+        <div style="font-weight:800;word-break:break-all" id="profileEmail">—</div>
+        <div style="margin-top:8px;font-size:12px;color:#94a3b8">Role <span id="profileRole" class="admin-tag" style="display:none">ADMIN</span></div>
+        <div style="font-weight:800" id="profileRoleText">user</div>
+        <div style="margin-top:10px;font-size:12px;color:#94a3b8">Saldo</div>
+        <div style="font-size:20px;font-weight:900;color:#ffd700;font-family:Poppins,sans-serif" id="profileBalance">Rp 0</div>
+      </div>
+      <div class="section-title" id="adminPendingTitle" style="display:none">🛡️ Pending (Admin) <div class="line"></div></div>
+      <div id="adminPendingList" style="display:none"></div>
+      <button class="btn btn-secondary" style="margin-top:12px" onclick="refreshBalance()">🔄 Refresh Saldo</button>
+      <button class="btn btn-danger" style="margin-top:8px" onclick="handleLogout()">🚪 Keluar</button>
+      <div class="note-box" style="margin-top:14px">Saldo sama dengan Shine Shop. Deposit di aplikasi utama, pakai di market ini.</div>
+    </div>
+  </div>
+
+  <div class="bottom-nav">
+    <button class="nav-item active" onclick="switchPage('market')"><span class="ico">🏪</span>Market</button>
+    <button class="nav-item" onclick="switchPage('sell')"><span class="ico">📤</span>Jual</button>
+    <button class="nav-item" onclick="switchPage('orders')"><span class="ico">📋</span>Riwayat</button>
+    <button class="nav-item" onclick="switchPage('profile')"><span class="ico">👤</span>Akun</button>
+  </div>
+</div>
+
+<!-- AUTH -->
+<div class="auth-screen" id="authScreen">
+  <div class="auth-box">
+    <h2>Account Market</h2>
+    <p>Jual beli akun · saldo Shine Shop</p>
+    <div class="tabs">
+      <button type="button" class="active" id="tabLogin" onclick="switchAuth('login')">Masuk</button>
+      <button type="button" id="tabSignup" onclick="switchAuth('signup')">Daftar</button>
+    </div>
+    <form id="formLogin" onsubmit="handleLogin(event)">
+      <div class="field"><label>Email</label><input type="email" id="loginEmail" required placeholder="email@gmail.com"></div>
+      <div class="field"><label>Password</label><input type="password" id="loginPassword" required minlength="6"></div>
+      <button class="btn btn-primary" type="submit">🔑 Masuk</button>
+    </form>
+    <form id="formSignup" style="display:none" onsubmit="handleSignup(event)">
+      <div class="field"><label>Email</label><input type="email" id="signupEmail" required></div>
+      <div class="field"><label>Password</label><input type="password" id="signupPassword" required minlength="6"></div>
+      <button class="btn btn-primary" type="submit">✨ Daftar</button>
+    </form>
+  </div>
+</div>
+
+<!-- DETAIL MODAL -->
+<div class="modal-back" id="detailModal">
+  <div class="modal-sheet" id="detailSheet"></div>
+</div>
+
+<!-- SELL FORM MODAL -->
+<div class="modal-back" id="sellModal">
+  <div class="modal-sheet">
+    <h3>📤 Upload Produk Akun</h3>
+    <div class="field"><label>Judul *</label><input id="sellTitle" maxlength="100" placeholder="Contoh: Netflix Premium 1 Bulan"></div>
+    <div class="field"><label>Deskripsi *</label><textarea id="sellDesc" maxlength="2000" placeholder="Detail produk, garansi, dll"></textarea></div>
+    <div class="field"><label>Harga (Rp) *</label><input id="sellPrice" type="number" min="1000" step="100" placeholder="Minimal 1000"></div>
+    <div class="field">
+      <label>Foto (max 5)</label>
+      <input type="file" id="sellPhotos" accept="image/*" multiple hidden onchange="onPhotosPicked(event)">
+      <div class="photo-grid" id="photoGrid">
+        <div class="photo-slot" onclick="document.getElementById('sellPhotos').click()">➕</div>
+      </div>
+    </div>
+    <div class="field">
+      <label>Stok akun * (username/Gmail + password)</label>
+      <div id="stockRows"></div>
+      <button type="button" class="btn btn-secondary" style="margin-top:6px" onclick="addStockRow()">➕ Tambah baris stok</button>
+    </div>
+    <button class="btn btn-primary" onclick="submitProduct()">🚀 Publikasikan</button>
+    <button class="btn btn-secondary" style="margin-top:8px" onclick="closeSellForm()">Batal</button>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://vvzgpbiesvupuhqqoxrg.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ2emdwYmllc3Z1cHVocXFveHJnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIwNzE3MTUsImV4cCI6MjEwNzY0NzcxNX0.W3_Ck8B5Q-nEfNlsyeufJsLsTqbM8xPcAeHoAHfGRwY';
+const WA_REPORT = '6289518103883';
+const SLOT_PACK_PRICE = 5000;
+const SLOT_PACK_EXTRA = 2;
+const FREE_SLOTS = 3;
+
+let sb = null;
+let currentUser = null;
+let currentProfile = null;
+let isStaff = false;
+let marketCache = [];
+let marketFilter = 'all';
+let orderTab = 'buy';
+let sellPhotos = []; // {file, preview}
+let stockRowsCount = 0;
+
+function $(id){ return document.getElementById(id); }
+function escapeHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function formatRp(n){ return 'Rp ' + (Number(n)||0).toLocaleString('id-ID'); }
+function starsHtml(avg){
+  const a = Math.round(Number(avg)||0);
+  let h = '';
+  for(let i=1;i<=5;i++) h += i<=a ? '★' : '☆';
+  return h;
+}
+
+function initSb(){
+  sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
+  });
+}
+
+async function initAuth(){
+  const { data: { session } } = await sb.auth.getSession();
+  if(session?.user) await onLogin(session.user);
+  else $('authScreen').classList.remove('hidden');
+  sb.auth.onAuthStateChange(async (ev, session) => {
+    if(ev==='SIGNED_IN' && session?.user) await onLogin(session.user);
+    if(ev==='SIGNED_OUT'){ currentUser=null; currentProfile=null; $('authScreen').classList.remove('hidden'); }
+  });
+}
+
+async function onLogin(user){
+  currentUser = user;
+  const { data: prof } = await sb.from('profiles').select('*').eq('id', user.id).maybeSingle();
+  currentProfile = prof || { id: user.id, email: user.email, balance: 0, role: 'user' };
+  isStaff = ['admin','owner'].includes(currentProfile.role);
+  $('authScreen').classList.add('hidden');
+  updateBalanceUI();
+  $('profileEmail').textContent = currentProfile.email || user.email;
+  $('profileRoleText').textContent = currentProfile.role || 'user';
+  $('profileRole').style.display = isStaff ? 'inline' : 'none';
+  if(isStaff){ $('adminPendingTitle').style.display='flex'; $('adminPendingList').style.display='block'; loadAdminPending(); }
+  ensureSlots();
+  loadMarket();
+  startBalanceRealtime();
+}
+
+function updateBalanceUI(){
+  const b = Number(currentProfile?.balance)||0;
+  $('balancePill').textContent = formatRp(b);
+  $('profileBalance').textContent = formatRp(b);
+}
+
+async function refreshBalance(){
+  if(!currentUser) return;
+  const { data } = await sb.from('profiles').select('*').eq('id', currentUser.id).maybeSingle();
+  if(data){ currentProfile = data; updateBalanceUI(); }
+}
+
+function startBalanceRealtime(){
+  if(!currentUser) return;
+  sb.channel('bal_'+currentUser.id)
+    .on('postgres_changes',{event:'UPDATE',schema:'public',table:'profiles',filter:'id=eq.'+currentUser.id}, (p)=>{
+      if(p.new){ currentProfile = Object.assign({}, currentProfile, p.new); updateBalanceUI(); }
+    }).subscribe();
+}
+
+function switchAuth(tab){
+  $('tabLogin').classList.toggle('active', tab==='login');
+  $('tabSignup').classList.toggle('active', tab==='signup');
+  $('formLogin').style.display = tab==='login'?'block':'none';
+  $('formSignup').style.display = tab==='signup'?'block':'none';
+}
+
+async function handleLogin(e){
+  e.preventDefault();
+  const email = $('loginEmail').value.trim().toLowerCase();
+  const password = $('loginPassword').value;
+  const { data, error } = await sb.auth.signInWithPassword({ email, password });
+  if(error) return Swal.fire({title:'Gagal',text:error.message,icon:'error',background:'#1a0e2e',color:'#fff'});
+  await onLogin(data.user);
+}
+
+async function handleSignup(e){
+  e.preventDefault();
+  const email = $('signupEmail').value.trim().toLowerCase();
+  const password = $('signupPassword').value;
+  const { data, error } = await sb.auth.signUp({ email, password });
+  if(error) return Swal.fire({title:'Gagal',text:error.message,icon:'error',background:'#1a0e2e',color:'#fff'});
+  if(data.user) await onLogin(data.user);
+  else Swal.fire({title:'Cek email',text:'Konfirmasi email jika diminta.',icon:'info',background:'#1a0e2e',color:'#fff'});
+}
+
+async function handleLogout(){
+  await sb.auth.signOut();
+  location.reload();
+}
+
+function switchPage(name){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  $('page-'+name).classList.add('active');
+  const map = {market:0,sell:1,orders:2,profile:3};
+  document.querySelectorAll('.nav-item')[map[name]]?.classList.add('active');
+  if(name==='market') loadMarket();
+  if(name==='sell'){ loadMyProducts(); loadPending(); loadSlotInfo(); }
+  if(name==='orders') loadOrders();
+  if(name==='profile'){ refreshBalance(); if(isStaff) loadAdminPending(); }
+}
+
+/* ========== SLOTS ========== */
+async function ensureSlots(){
+  if(!currentUser) return;
+  await sb.from('marketplace_slots').upsert({ user_id: currentUser.id, free_slots: FREE_SLOTS }, { onConflict: 'user_id', ignoreDuplicates: true });
+}
+
+async function getSlotInfo(){
+  const { data } = await sb.from('marketplace_slots').select('*').eq('user_id', currentUser.id).maybeSingle();
+  const free = data?.free_slots ?? FREE_SLOTS;
+  const bonus = data?.bonus_slots ?? 0;
+  const { count } = await sb.from('marketplace_products').select('id',{count:'exact',head:true}).eq('seller_id', currentUser.id).neq('status','deleted');
+  const used = count || 0;
+  return { free, bonus, total: free + bonus, used, remain: (free + bonus) - used };
+}
+
+async function loadSlotInfo(){
+  const s = await getSlotInfo();
+  $('slotInfo').innerHTML = `Slot produk: <b style="color:#fff">${s.used}</b> / <b style="color:#38bdf8">${s.total}</b> terpakai · sisa <b style="color:#22c55e">${Math.max(0,s.remain)}</b><br><span style="font-size:10px">Gratis ${FREE_SLOTS} slot. Beli paket +${SLOT_PACK_EXTRA} slot = ${formatRp(SLOT_PACK_PRICE)} (potong saldo).</span>`;
+}
+
+async function buyExtraSlots(){
+  const conf = await Swal.fire({
+    title: 'Beli Slot Tambahan?',
+    html: `Bayar <b style="color:#ffd700">${formatRp(SLOT_PACK_PRICE)}</b> dari saldo untuk mendapatkan <b>+${SLOT_PACK_EXTRA} slot</b> upload produk.`,
+    icon: 'question', showCancelButton: true, confirmButtonText: 'Bayar & Tambah Slot',
+    cancelButtonText: 'Batal', confirmButtonColor: '#ff6b9d', background: '#1a0e2e', color: '#fff'
+  });
+  if(!conf.isConfirmed) return;
+  const { data, error } = await sb.rpc('marketplace_buy_slots');
+  if(error) return Swal.fire({title:'Gagal',text:error.message,icon:'error',background:'#1a0e2e',color:'#fff'});
+  if(data && data.success === false) return Swal.fire({title:'Gagal',text:data.message||'Gagal',icon:'error',background:'#1a0e2e',color:'#fff'});
+  await refreshBalance();
+  await loadSlotInfo();
+  Swal.fire({title:'Berhasil',text:`+${SLOT_PACK_EXTRA} slot ditambahkan`,icon:'success',background:'#1a0e2e',color:'#fff',timer:2000});
+}
+
+/* ========== MARKET LIST ========== */
+async function loadMarket(){
+  const box = $('marketList');
+  box.innerHTML = '<div class="loading">Memuat produk...</div>';
+  const { data, error } = await sb.from('marketplace_products')
+    .select('*, profiles:seller_id(email, role)')
+    .eq('status', 'active')
+    .order('created_at', { ascending: false })
+    .limit(100);
+  if(error){ box.innerHTML = `<div class="empty"><span class="big">⚠️</span>${escapeHtml(error.message)}<br><small>Jalankan SQL marketplace dulu</small></div>`; return; }
+  marketCache = data || [];
+  renderMarket();
+}
+
+function setFilter(f, btn){
+  marketFilter = f;
+  document.querySelectorAll('.filter-row .chip').forEach(c=>c.classList.remove('active'));
+  btn.classList.add('active');
+  renderMarket();
+}
+
+function filterMarket(){ renderMarket(); }
+
+function renderMarket(){
+  let list = [...marketCache];
+  const q = ($('searchInput').value||'').trim().toLowerCase();
+  if(q) list = list.filter(p => (p.title||'').toLowerCase().includes(q) || (p.description||'').toLowerCase().includes(q));
+  if(marketFilter==='available') list = list.filter(p => (p.stock_remaining||0) > 0);
+  if(marketFilter==='cheap') list.sort((a,b)=> (a.price||0)-(b.price||0));
+  if(marketFilter==='top') list.sort((a,b)=> (b.avg_rating||0)-(a.avg_rating||0));
+  const box = $('marketList');
+  if(!list.length){ box.innerHTML = '<div class="empty"><span class="big">📭</span>Belum ada produk</div>'; return; }
+  box.innerHTML = list.map(p => {
+    const img = (p.images && p.images[0]) ? p.images[0] : '';
+    const stock = p.stock_remaining||0;
+    return `<div class="card product-card" onclick="openDetail('${p.id}')">
+      ${img?`<img class="product-thumb" src="${escapeHtml(img)}" alt="">`:`<div class="product-thumb" style="display:flex;align-items:center;justify-content:center;font-size:28px">🎮</div>`}
+      <div class="product-info">
+        <div class="product-title">${escapeHtml(p.title)}</div>
+        <div class="product-meta">
+          <span class="stars">${starsHtml(p.avg_rating)} (${Number(p.avg_rating||0).toFixed(1)})</span>
+          <span class="badge ${stock>0?'stock':'soldout'}">${stock>0?stock+' stok':'Habis'}</span>
+        </div>
+        <div class="product-price">${formatRp(p.price)}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+/* ========== DETAIL + BUY ========== */
+async function openDetail(id){
+  const { data: p, error } = await sb.from('marketplace_products').select('*, profiles:seller_id(email)').eq('id', id).maybeSingle();
+  if(error||!p) return Swal.fire({title:'Error',text:error?.message||'Tidak ditemukan',icon:'error',background:'#1a0e2e',color:'#fff'});
+  const imgs = (p.images||[]).map(u=>`<img src="${escapeHtml(u)}" alt="">`).join('') || '<div style="color:#666;padding:20px">Tanpa foto</div>';
+  const stock = p.stock_remaining||0;
+  const { data: reviews } = await sb.from('marketplace_reviews').select('*, profiles:buyer_id(email)').eq('product_id', id).order('created_at',{ascending:false}).limit(20);
+  const revHtml = (reviews||[]).length ? reviews.map(r => `
+    <div style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.06);font-size:12px">
+      <div class="stars">${starsHtml(r.rating)} · <span style="color:#94a3b8">${escapeHtml(r.profiles?.email||'user')}</span></div>
+      <div style="margin-top:4px;color:#e2e8f0">${escapeHtml(r.comment||'')}</div>
+    </div>`).join('') : '<div class="empty" style="padding:12px">Belum ada ulasan</div>';
+
+  $('detailSheet').innerHTML = `
+    <h3>${escapeHtml(p.title)}</h3>
+    <div class="detail-gallery">${imgs}</div>
+    <div class="product-price" style="margin-bottom:6px">${formatRp(p.price)}</div>
+    <div class="product-meta" style="margin-bottom:10px">
+      <span class="stars">${starsHtml(p.avg_rating)} ${Number(p.avg_rating||0).toFixed(1)} (${p.review_count||0} ulasan)</span>
+      <span class="badge ${stock>0?'stock':'soldout'}">${stock>0?stock+' stok':'Habis'}</span>
+    </div>
+    <div style="font-size:11px;color:#94a3b8;margin-bottom:8px">Seller: ${escapeHtml(p.profiles?.email||'-')}</div>
+    <div style="font-size:13px;line-height:1.55;white-space:pre-wrap;margin-bottom:12px">${escapeHtml(p.description||'')}</div>
+    <button class="btn btn-primary" ${stock<1||p.seller_id===currentUser?.id?'disabled':''} onclick="buyProduct('${p.id}')">
+      ${p.seller_id===currentUser?.id?'Produk Anda':(stock<1?'Stok Habis':'🛒 Beli Sekarang')}
+    </button>
+    <div class="section-title">⭐ Ulasan <div class="line"></div></div>
+    ${revHtml}
+    <button class="btn btn-secondary" style="margin-top:12px" onclick="closeDetail()">Tutup</button>`;
+  $('detailModal').classList.add('show');
+}
+function closeDetail(){ $('detailModal').classList.remove('show'); }
+
+async function buyProduct(productId){
+  const conf = await Swal.fire({
+    title: 'Konfirmasi Beli?',
+    html: 'Saldo akan dipotong sesuai harga.<br>Data akun (username & password) langsung diberikan setelah bayar.',
+    icon: 'question', showCancelButton: true, confirmButtonText: 'Bayar & Ambil Akun',
+    cancelButtonText: 'Batal', confirmButtonColor: '#ff6b9d', background: '#1a0e2e', color: '#fff'
+  });
+  if(!conf.isConfirmed) return;
+  Swal.fire({title:'Memproses...',allowOutsideClick:false,didOpen:()=>Swal.showLoading(),background:'#1a0e2e',color:'#fff'});
+  const { data, error } = await sb.rpc('marketplace_purchase', { p_product_id: productId });
+  Swal.close();
+  if(error) return Swal.fire({title:'Gagal',text:error.message,icon:'error',background:'#1a0e2e',color:'#fff'});
+  if(data && data.success === false) return Swal.fire({title:'Gagal',text:data.message||'Gagal beli',icon:'error',background:'#1a0e2e',color:'#fff'});
+  await refreshBalance();
+  await loadMarket();
+  const user = data.username || data.account_user || '-';
+  const pass = data.password || data.account_pass || '-';
+  Swal.fire({
+    title: '✅ Pembelian Berhasil',
+    html: `<div class="cred-box" style="text-align:left">
+      <div>Username / Gmail</div><code>${escapeHtml(user)}</code>
+      <div style="margin-top:8px">Password</div><code>${escapeHtml(pass)}</code>
+    </div>
+    <div class="note-box" style="text-align:left">Anda memiliki waktu <b>7 hari</b> untuk mengamankan akun. Jika terdapat kendala seperti akun tidak bisa dimasukkan, laporkan ke WhatsApp Shine Shop <b><a href="https://wa.me/${WA_REPORT}" target="_blank" style="color:#38bdf8">+${WA_REPORT}</a></b>.</div>`,
+    icon: 'success', confirmButtonColor: '#22c55e', background: '#1a0e2e', color: '#fff', width: 420
+  });
+  closeDetail();
+  switchPage('orders');
+}
+
+/* ========== SELL FORM ========== */
+async function openSellForm(){
+  const s = await getSlotInfo();
+  if(s.remain <= 0){
+    return Swal.fire({
+      title: 'Slot Penuh',
+      html: `Anda sudah memakai ${s.used}/${s.total} slot.<br>Beli +${SLOT_PACK_EXTRA} slot seharga ${formatRp(SLOT_PACK_PRICE)}?`,
+      icon: 'warning', showCancelButton: true, confirmButtonText: 'Beli Slot',
+      cancelButtonText: 'Nanti', confirmButtonColor: '#ffd700', background: '#1a0e2e', color: '#fff'
+    }).then(r => { if(r.isConfirmed) buyExtraSlots(); });
+  }
+  const warn = await Swal.fire({
+    title: '⚠️ Wajib Nonaktifkan 2FA',
+    html: 'Sebelum menjual, pastikan <b>2FA / verifikasi dua langkah dinonaktifkan</b> pada setiap akun stok.<br><br>Jika pembeli tidak bisa login karena 2FA, Anda bertanggung jawab dan bisa kena cancel + refund.',
+    icon: 'warning', confirmButtonText: 'Saya Mengerti & Lanjut', confirmButtonColor: '#ff6b9d', background: '#1a0e2e', color: '#fff'
+  });
+  if(!warn.isConfirmed) return;
+  sellPhotos = [];
+  $('sellTitle').value = '';
+  $('sellDesc').value = '';
+  $('sellPrice').value = '';
+  $('stockRows').innerHTML = '';
+  stockRowsCount = 0;
+  addStockRow();
+  renderPhotoGrid();
+  $('sellModal').classList.add('show');
+}
+function closeSellForm(){ $('sellModal').classList.remove('show'); }
+
+function addStockRow(){
+  if(stockRowsCount >= 50) return Swal.fire({title:'Maks 50 stok/produk',icon:'info',background:'#1a0e2e',color:'#fff'});
+  const id = 'sr_'+(++stockRowsCount);
+  const div = document.createElement('div');
+  div.className = 'stock-row';
+  div.id = id;
+  div.innerHTML = `<input placeholder="Username / Gmail" data-u>
+    <input placeholder="Password" data-p>
+    <button type="button" onclick="this.parentElement.remove()">✕</button>`;
+  $('stockRows').appendChild(div);
+}
+
+function onPhotosPicked(e){
+  const files = Array.from(e.target.files||[]);
+  e.target.value = '';
+  for(const f of files){
+    if(sellPhotos.length >= 5) break;
+    if(!f.type.startsWith('image/')) continue;
+    const preview = URL.createObjectURL(f);
+    sellPhotos.push({ file: f, preview });
+  }
+  renderPhotoGrid();
+}
+function renderPhotoGrid(){
+  const g = $('photoGrid');
+  let h = sellPhotos.map((p,i)=>`<div class="photo-slot"><img src="${p.preview}"><button class="rm" type="button" onclick="removePhoto(${i})">✕</button></div>`).join('');
+  if(sellPhotos.length < 5) h += `<div class="photo-slot" onclick="document.getElementById('sellPhotos').click()">➕</div>`;
+  g.innerHTML = h;
+}
+function removePhoto(i){
+  try{ URL.revokeObjectURL(sellPhotos[i].preview); }catch(_){}
+  sellPhotos.splice(i,1);
+  renderPhotoGrid();
+}
+
+async function compressImage(file, maxSide=1000, quality=0.75){
+  return new Promise(resolve=>{
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = ()=>{
+      let w=img.width,h=img.height;
+      const scale=Math.min(1,maxSide/Math.max(w,h));
+      w=Math.round(w*scale); h=Math.round(h*scale);
+      const c=document.createElement('canvas'); c.width=w; c.height=h;
+      c.getContext('2d').drawImage(img,0,0,w,h);
+      URL.revokeObjectURL(url);
+      c.toBlob(b=>resolve(b||file),'image/jpeg',quality);
+    };
+    img.onerror=()=>{URL.revokeObjectURL(url);resolve(file);};
+    img.src=url;
+  });
+}
+
+async function uploadProductImages(){
+  const urls = [];
+  for(let i=0;i<sellPhotos.length;i++){
+    const blob = await compressImage(sellPhotos[i].file);
+    const path = `market/${currentUser.id}/${Date.now()}_${i}.jpg`;
+    const { error } = await sb.storage.from('marketplace-images').upload(path, blob, { contentType: 'image/jpeg', upsert: true });
+    if(error) throw new Error('Upload foto gagal: '+error.message+' (buat bucket marketplace-images public)');
+    const { data } = sb.storage.from('marketplace-images').getPublicUrl(path);
+    urls.push(data.publicUrl);
+  }
+  return urls;
+}
+
+async function submitProduct(){
+  const title = $('sellTitle').value.trim();
+  const description = $('sellDesc').value.trim();
+  const price = parseInt($('sellPrice').value,10);
+  if(!title) return Swal.fire({title:'Judul wajib',icon:'warning',background:'#1a0e2e',color:'#fff'});
+  if(!description) return Swal.fire({title:'Deskripsi wajib',icon:'warning',background:'#1a0e2e',color:'#fff'});
+  if(!price || price < 1000) return Swal.fire({title:'Harga minimal Rp 1.000',icon:'warning',background:'#1a0e2e',color:'#fff'});
+  const rows = [...document.querySelectorAll('#stockRows .stock-row')];
+  const stock = [];
+  for(const r of rows){
+    const u = r.querySelector('[data-u]').value.trim();
+    const p = r.querySelector('[data-p]').value.trim();
+    if(u && p) stock.push({ username: u, password: p });
+  }
+  if(!stock.length) return Swal.fire({title:'Minimal 1 stok (user + pass)',icon:'warning',background:'#1a0e2e',color:'#fff'});
+
+  const s = await getSlotInfo();
+  if(s.remain <= 0) return Swal.fire({title:'Slot penuh',text:'Beli slot tambahan dulu',icon:'warning',background:'#1a0e2e',color:'#fff'});
+
+  Swal.fire({title:'Mengunggah...',allowOutsideClick:false,didOpen:()=>Swal.showLoading(),background:'#1a0e2e',color:'#fff'});
+  try{
+    let images = [];
+    if(sellPhotos.length) images = await uploadProductImages();
+    const { data, error } = await sb.rpc('marketplace_create_product', {
+      p_title: title,
+      p_description: description,
+      p_price: price,
+      p_images: images,
+      p_stock: stock
+    });
+    Swal.close();
+    if(error) throw error;
+    if(data && data.success === false) throw new Error(data.message||'Gagal');
+    closeSellForm();
+    Swal.fire({title:'Produk tayang!',icon:'success',background:'#1a0e2e',color:'#fff',timer:2000});
+    loadMyProducts(); loadSlotInfo(); loadMarket();
+  }catch(err){
+    Swal.close();
+    Swal.fire({title:'Gagal',text:err.message,icon:'error',background:'#1a0e2e',color:'#fff'});
+  }
+}
+
+async function loadMyProducts(){
+  const box = $('myProducts');
+  const { data, error } = await sb.from('marketplace_products').select('*').eq('seller_id', currentUser.id).neq('status','deleted').order('created_at',{ascending:false});
+  if(error){ box.innerHTML = `<div class="empty">${escapeHtml(error.message)}</div>`; return; }
+  if(!data?.length){ box.innerHTML = '<div class="empty"><span class="big">📦</span>Belum ada produk</div>'; return; }
+  box.innerHTML = data.map(p => `
+    <div class="card">
+      <div style="font-weight:800;margin-bottom:4px">${escapeHtml(p.title)}</div>
+      <div class="product-meta">
+        <span class="product-price" style="font-size:13px">${formatRp(p.price)}</span>
+        <span class="badge stock">Stok ${p.stock_remaining||0}</span>
+        <span class="stars">${starsHtml(p.avg_rating)}</span>
+        <span class="badge">${escapeHtml(p.status)}</span>
+      </div>
+      <div style="display:flex;gap:6px;margin-top:8px">
+        <button class="btn btn-secondary" style="padding:8px;font-size:11px" onclick="openDetail('${p.id}')">Lihat</button>
+        <button class="btn btn-danger" style="padding:8px;font-size:11px" onclick="deleteProduct('${p.id}')">Hapus</button>
+      </div>
+    </div>`).join('');
+}
+
+async function deleteProduct(id){
+  const c = await Swal.fire({title:'Hapus produk?',showCancelButton:true,confirmButtonColor:'#ef4444',background:'#1a0e2e',color:'#fff'});
+  if(!c.isConfirmed) return;
+  await sb.from('marketplace_products').update({ status: 'deleted' }).eq('id', id).eq('seller_id', currentUser.id);
+  loadMyProducts(); loadSlotInfo(); loadMarket();
+}
+
+/* ========== PENDING ========== */
+async function loadPending(){
+  const box = $('pendingList');
+  const { data, error } = await sb.from('marketplace_pending_balance')
+    .select('*')
+    .eq('seller_id', currentUser.id)
+    .order('created_at',{ascending:false}).limit(50);
+  if(error){ box.innerHTML = `<div class="empty">${escapeHtml(error.message)}</div>`; return; }
+  if(!data?.length){ box.innerHTML = '<div class="empty">Tidak ada saldo pending</div>'; return; }
+  box.innerHTML = data.map(p => {
+    const avail = p.available_at ? new Date(p.available_at).toLocaleString('id-ID',{timeZone:'Asia/Jakarta'}) : '-';
+    return `<div class="card pending-card">
+      <div style="display:flex;justify-content:space-between">
+        <span style="font-weight:900;color:#facc15">${formatRp(p.amount)}</span>
+        <span class="badge">${escapeHtml(p.status)}</span>
+      </div>
+      <div style="font-size:11px;color:#94a3b8;margin-top:4px">Cair: ${avail} WIB</div>
+    </div>`;
+  }).join('');
+}
+
+async function loadAdminPending(){
+  if(!isStaff) return;
+  const box = $('adminPendingList');
+  const { data, error } = await sb.from('marketplace_pending_balance')
+    .select('*, profiles:seller_id(email)')
+    .eq('status','pending')
+    .order('created_at',{ascending:false}).limit(100);
+  if(error){ box.innerHTML = `<div class="empty">${escapeHtml(error.message)}</div>`; return; }
+  if(!data?.length){ box.innerHTML = '<div class="empty">Tidak ada pending</div>'; return; }
+  box.innerHTML = data.map(p => `
+    <div class="card pending-card">
+      <div style="font-size:12px">${escapeHtml(p.profiles?.email||p.seller_id)}</div>
+      <div style="font-weight:900;color:#facc15">${formatRp(p.amount)}</div>
+      <button class="btn btn-danger" style="margin-top:8px;padding:8px;font-size:11px" onclick="cancelPending('${p.id}')">Cancel & Refund Pembeli</button>
+    </div>`).join('');
+}
+
+async function cancelPending(pendingId){
+  const c = await Swal.fire({title:'Cancel pending & refund pembeli?',showCancelButton:true,confirmButtonColor:'#ef4444',background:'#1a0e2e',color:'#fff'});
+  if(!c.isConfirmed) return;
+  const { data, error } = await sb.rpc('marketplace_cancel_pending', { p_pending_id: pendingId });
+  if(error) return Swal.fire({title:'Gagal',text:error.message,icon:'error',background:'#1a0e2e',color:'#fff'});
+  if(data && data.success===false) return Swal.fire({title:'Gagal',text:data.message,icon:'error',background:'#1a0e2e',color:'#fff'});
+  Swal.fire({title:'Refund sukses',icon:'success',background:'#1a0e2e',color:'#fff',timer:2000});
+  loadAdminPending(); loadPending();
+}
+
+/* ========== ORDERS + REVIEW ========== */
+function setOrderTab(t, btn){
+  orderTab = t;
+  document.querySelectorAll('#page-orders .chip').forEach(c=>c.classList.remove('active'));
+  btn.classList.add('active');
+  loadOrders();
+}
+
+async function loadOrders(){
+  const box = $('ordersList');
+  box.innerHTML = '<div class="loading">Memuat...</div>';
+  let q = sb.from('marketplace_orders').select('*, product:product_id(title, images), stock:stock_id(username, password)').order('created_at',{ascending:false}).limit(50);
+  if(orderTab==='buy') q = q.eq('buyer_id', currentUser.id);
+  else q = q.eq('seller_id', currentUser.id);
+  const { data, error } = await q;
+  if(error){ box.innerHTML = `<div class="empty">${escapeHtml(error.message)}</div>`; return; }
+  if(!data?.length){ box.innerHTML = '<div class="empty"><span class="big">📋</span>Belum ada riwayat</div>'; return; }
+
+  // which orders already reviewed
+  const orderIds = data.map(o=>o.id);
+  const { data: revs } = await sb.from('marketplace_reviews').select('order_id').in('order_id', orderIds);
+  const reviewed = new Set((revs||[]).map(r=>r.order_id));
+
+  box.innerHTML = data.map(o => {
+    const img = o.product?.images?.[0];
+    const isBuy = orderTab==='buy';
+    const cred = isBuy ? `<div class="cred-box"><div>Username/Gmail</div><code>${escapeHtml(o.stock?.username||o.delivered_username||'-')}</code>
+      <div style="margin-top:6px">Password</div><code>${escapeHtml(o.stock?.password||o.delivered_password||'-')}</code></div>
+      <div class="note-box">Anda memiliki waktu <b>7 hari</b> untuk mengamankan akun. Jika ada kendala (akun tidak bisa masuk), laporkan ke WhatsApp Shine Shop <a href="https://wa.me/${WA_REPORT}" target="_blank" style="color:#38bdf8">+${WA_REPORT}</a>.</div>` : '';
+    const reviewBtn = isBuy && !reviewed.has(o.id) ? `<button class="btn btn-gold" style="margin-top:8px;padding:8px;font-size:12px" onclick="openReview('${o.id}','${o.product_id}','${o.seller_id}')">⭐ Beri Ulasan</button>` : (isBuy && reviewed.has(o.id)?`<div style="font-size:11px;color:#22c55e;margin-top:6px">✓ Sudah diulas</div>`:'');
+    return `<div class="card">
+      <div style="display:flex;gap:10px">
+        ${img?`<img class="product-thumb" src="${escapeHtml(img)}">`:`<div class="product-thumb" style="display:flex;align-items:center;justify-content:center">🎮</div>`}
+        <div style="flex:1">
+          <div style="font-weight:800;font-size:13px">${escapeHtml(o.product?.title||'Produk')}</div>
+          <div class="product-price" style="font-size:13px;margin-top:4px">${formatRp(o.price)}</div>
+          <div style="font-size:10px;color:#94a3b8;margin-top:4px">${new Date(o.created_at).toLocaleString('id-ID',{timeZone:'Asia/Jakarta'})} WIB</div>
+        </div>
+      </div>
+      ${cred}
+      ${reviewBtn}
+    </div>`;
+  }).join('');
+}
+
+function openReview(orderId, productId, sellerId){
+  let rating = 5;
+  Swal.fire({
+    title: 'Ulasan Produk',
+    html: `<div class="star-pick" id="swalStars">
+      ${[1,2,3,4,5].map(i=>`<button type="button" class="on" data-s="${i}">⭐</button>`).join('')}
+    </div>
+    <textarea id="swalReview" class="swal2-textarea" placeholder="Tulis ulasan (opsional)" style="background:rgba(255,255,255,0.05);color:#fff"></textarea>`,
+    background: '#1a0e2e', color: '#fff', confirmButtonColor: '#ffd700', confirmButtonText: 'Kirim',
+    showCancelButton: true, cancelButtonText: 'Batal',
+    didOpen: () => {
+      const box = document.getElementById('swalStars');
+      box.querySelectorAll('button').forEach(btn => {
+        btn.onclick = () => {
+          rating = parseInt(btn.dataset.s,10);
+          box.querySelectorAll('button').forEach(b => {
+            const v = parseInt(b.dataset.s,10);
+            b.classList.toggle('on', v <= rating);
+            b.style.opacity = v <= rating ? '1' : '0.3';
+            b.style.filter = v <= rating ? 'none' : 'grayscale(1)';
+          });
+        };
+      });
+    },
+    preConfirm: () => ({ rating, comment: document.getElementById('swalReview').value.trim() })
+  }).then(async res => {
+    if(!res.isConfirmed) return;
+    const { data, error } = await sb.rpc('marketplace_submit_review', {
+      p_order_id: orderId,
+      p_product_id: productId,
+      p_seller_id: sellerId,
+      p_rating: res.value.rating,
+      p_comment: res.value.comment||''
+    });
+    if(error) return Swal.fire({title:'Gagal',text:error.message,icon:'error',background:'#1a0e2e',color:'#fff'});
+    if(data && data.success===false) return Swal.fire({title:'Gagal',text:data.message,icon:'error',background:'#1a0e2e',color:'#fff'});
+    Swal.fire({title:'Terima kasih!',icon:'success',background:'#1a0e2e',color:'#fff',timer:1800});
+    loadOrders(); loadMarket();
+  });
+}
+
+// close modals on backdrop
+$('detailModal').addEventListener('click', e => { if(e.target===$('detailModal')) closeDetail(); });
+$('sellModal').addEventListener('click', e => { if(e.target===$('sellModal')) closeSellForm(); });
+
+window.addEventListener('load', async () => {
+  initSb();
+  await initAuth();
+});
+</script>
+</body>
+</html>
