@@ -256,7 +256,7 @@ body{font-family:'Quicksand',sans-serif;background:#0f0818;color:#f1e6f5;min-hei
         <input placeholder="Username / Gmail" id="auctionUser" data-u>
         <input placeholder="Password" id="auctionPass" data-p>
       </div>
-      <p style="font-size:11px;color:#c084fc;margin-top:6px">Lelang otomatis berakhir 24 jam. Pemenang (tawaran tertinggi) dibayar &amp; mendapat akun.</p>
+      <p style="font-size:11px;color:#c084fc;margin-top:6px">Lelang tanpa batas waktu sampai ada tawaran. Setelah tawaran pertama, timer 24 jam dimulai. Pemenang (tawaran tertinggi) dibayar &amp; mendapat akun.</p>
     </div>
     <div class="field">
       <label>Foto (max 5)</label>
@@ -659,6 +659,7 @@ async function openDetail(id){
   let actionBtn = '';
   if (isAuc) {
     const ends = p.auction_ends_at ? new Date(p.auction_ends_at) : null;
+    const timerStarted = !!ends;
     const ended = p.auction_status !== 'active' || (ends && ends.getTime() <= Date.now());
     const high = Number(p.current_bid||0);
     const startP = Number(p.auction_start_price||p.price||0);
@@ -681,9 +682,17 @@ async function openDetail(id){
       }
     } catch(_){ bidsHtml = ''; }
 
+    let timerHtml;
+    if (ended) {
+      timerHtml = '⏹ Lelang berakhir · status: ' + escapeHtml(p.auction_status||'ended');
+    } else if (!timerStarted) {
+      timerHtml = '🟢 Lelang terbuka · belum ada batas waktu<br><span style="font-weight:600;color:#e2e8f0;font-size:11px">Timer 24 jam dimulai otomatis saat ada tawaran pertama</span>';
+    } else {
+      timerHtml = '⏳ Sisa waktu: <span id="auctionCountdown">...</span>';
+    }
     auctionBlock = `
       <div class="auction-timer" id="auctionTimer" data-ends="${ends ? ends.toISOString() : ''}">
-        ${ended ? '⏹ Lelang berakhir · status: ' + escapeHtml(p.auction_status||'ended') : '⏳ Sisa waktu: <span id="auctionCountdown">...</span>'}
+        ${timerHtml}
       </div>
       <div class="product-price" style="margin-bottom:4px">${high>0 ? 'Tawaran tertinggi: ' + formatRp(high) : 'Harga start: ' + formatRp(startP)}</div>
       <div style="font-size:11px;color:#94a3b8;margin-bottom:8px">Start lelang: ${formatRp(startP)}</div>
@@ -742,6 +751,7 @@ async function openDetail(id){
   $('detailModal').classList.add('show');
   if (isAuc && p.auction_status === 'active' && p.auction_ends_at) startAuctionCountdown(p.auction_ends_at);
 }
+
 function closeDetail(){ $('detailModal').classList.remove('show'); }
 
 async function buyProduct(productId){
@@ -1730,7 +1740,8 @@ async function placeBid(productId, currentHigh){
   Swal.close();
   if (error) return Swal.fire({title:'Gagal',text:error.message,icon:'error',background:'#1a0e2e',color:'#fff'});
   if (data && data.success === false) return Swal.fire({title:'Gagal',text:data.message||'Gagal',icon:'error',background:'#1a0e2e',color:'#fff'});
-  Swal.fire({title:'Tawaran masuk!',text:formatRp(amount),icon:'success',background:'#1a0e2e',color:'#fff',timer:1800});
+  const timerMsg = (data && data.ends_at) ? (' · timer berakhir ' + new Date(data.ends_at).toLocaleString('id-ID',{timeZone:'Asia/Jakarta'})) : '';
+  Swal.fire({title:'Tawaran masuk!',text:formatRp(amount)+timerMsg,icon:'success',background:'#1a0e2e',color:'#fff',timer:2200});
   openDetail(productId);
   loadMarket();
 }
