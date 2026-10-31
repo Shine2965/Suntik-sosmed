@@ -3367,16 +3367,18 @@ async function refreshBalance() {
 async function forceRefreshBalanceFromDB() {
   if (!currentUser) return null;
   try {
-    const { data: prof, error } = await supabaseClient
-      .from('profiles')
-      .select('balance')
-      .ilike('email', currentUser.email)
-      .maybeSingle();
-    if (error) throw error;
+    // Prioritas by id (lebih akurat), fallback email
+    let prof = null;
+    const byId = await supabaseClient.from('profiles').select('balance, email, id').eq('id', currentUser.id).maybeSingle();
+    if (!byId.error && byId.data) prof = byId.data;
+    if (!prof) {
+      const byEmail = await supabaseClient.from('profiles').select('balance, email, id').ilike('email', currentUser.email).maybeSingle();
+      if (!byEmail.error && byEmail.data) prof = byEmail.data;
+    }
     if (prof) {
       const bal = parseFloat(prof.balance) || 0;
       if (currentProfile) currentProfile.balance = bal;
-      updateBalanceDisplay(bal);
+      if (typeof updateBalanceDisplay === 'function') updateBalanceDisplay(bal);
       return bal;
     }
   } catch (e) {
@@ -4163,8 +4165,85 @@ async function claimReferralBonusFallback({ userId, userEmail, depositId, unique
   return { reward, pct, uplineEmail, message: credited ? 'fallback_ok' : 'fallback_partial' };
 }
 
-// handleDepositSuccess — stabil (referensi HTML kedua) + guard anti-double + referral
+// handleDepositSuccess — kredit saldo WAJIB (anti-miss + anti-double)
 // ============================================================
+async function creditDepositBalance(depositAmount, uniqueCode, depositId) {
+  // 0) RPC atomik complete_deposit (rekomendasi — update balance + mutasi + flag)
+  if (depositId) {
+    try {
+      const { data, error } = await supabaseClient.rpc('complete_deposit', { p_deposit_id: depositId });
+      if (!error && data && data.success !== false) {
+        if (data.new_balance != null && currentProfile) {
+          currentProfile.balance = data.new_balance;
+          try { updateBalanceDisplay(data.new_balance); } catch (_) {}
+        }
+        return { ok: true, via: 'complete_deposit', data };
+      }
+      console.warn('complete_deposit:', error?.message || data);
+    } catch (e) {
+      console.warn('complete_deposit ex:', e.message);
+    }
+  }
+
+  const email = currentUser?.email || currentProfile?.email;
+  const reasons = [
+    `Deposit QRIS sukses (Kode unik: ${uniqueCode})`,
+    `Deposit QRIS (id:${depositId}, unik:${uniqueCode})`
+  ];
+  // 1) add_user_balance (fallback lama)
+  for (const reason of reasons) {
+    try {
+      const { data, error } = await supabaseClient.rpc('add_user_balance', {
+        p_target_email: email,
+        p_amount: depositAmount,
+        p_reason: reason
+      });
+      if (error) {
+        console.warn('add_user_balance error:', error.message);
+        continue;
+      }
+      if (data && data.success === false) {
+        console.warn('add_user_balance fail:', data.message);
+        continue;
+      }
+      // catat mutasi best-effort
+      try {
+        await supabaseClient.from('balance_mutations').insert({
+          user_id: currentUser.id,
+          email: email,
+          amount: depositAmount,
+          type: 'deposit',
+          reason: reason
+        });
+      } catch (_) {}
+      return { ok: true, via: 'add_user_balance', data };
+    } catch (e) {
+      console.warn('add_user_balance ex:', e.message);
+    }
+  }
+  // 2) add_balance(user_id)
+  try {
+    const { data, error } = await supabaseClient.rpc('add_balance', {
+      p_user_id: currentUser.id,
+      p_amount: depositAmount
+    });
+    if (!error) return { ok: true, via: 'add_balance', data };
+    console.warn('add_balance error:', error.message);
+  } catch (e) {
+    console.warn('add_balance ex:', e.message);
+  }
+  return { ok: false };
+}
+
+async function markDepositBalanceCredited(depositId) {
+  try {
+    await supabaseClient.from('deposits').update({ balance_credited: true }).eq('id', depositId);
+  } catch (e) {
+    // kolom mungkin belum ada — abaikan
+    console.warn('balance_credited update:', e.message);
+  }
+}
+
 async function handleDepositSuccess(opts) {
   if (!currentDeposit) return;
   if (isProcessingDeposit || depositSuccessProcessed) {
@@ -4179,19 +4258,33 @@ async function handleDepositSuccess(opts) {
   const depositId = currentDeposit.id;
   const depositAmount = parseFloat(currentDeposit.amount) || 0;
   const uniqueCode = currentDeposit.unique_code;
+  const balBefore = parseFloat(currentProfile?.balance) || 0;
 
   try {
-    // Cek status DB dulu (callback mungkin sudah kredit)
-    let dbStatus = null;
+    // Ambil status deposit + flag kredit
+    let depRow = null;
     try {
-      const { data: depRow } = await supabaseClient.from('deposits').select('status').eq('id', depositId).maybeSingle();
-      dbStatus = depRow?.status || null;
-    } catch (e) {}
+      const { data } = await supabaseClient
+        .from('deposits')
+        .select('id, status, amount, balance_credited, unique_code, total_amount')
+        .eq('id', depositId)
+        .maybeSingle();
+      depRow = data;
+    } catch (e) {
+      // fallback tanpa kolom balance_credited
+      try {
+        const { data } = await supabaseClient
+          .from('deposits')
+          .select('id, status, amount, unique_code, total_amount')
+          .eq('id', depositId)
+          .maybeSingle();
+        depRow = data;
+      } catch (_) {}
+    }
 
-    const skipCredit = alreadyPaid || dbStatus === 'success';
-
-    if (!skipCredit) {
-      // 1) Tandai deposit sukses di DB (claim pending)
+    // Claim pending → success (jika masih pending)
+    let weClaimed = false;
+    if (!depRow || depRow.status === 'pending') {
       const { data: claimed, error: updErr } = await supabaseClient
         .from('deposits')
         .update({ status: 'success', paid_at: new Date().toISOString() })
@@ -4200,39 +4293,36 @@ async function handleDepositSuccess(opts) {
         .select('id')
         .maybeSingle();
       if (updErr) console.warn('⚠️ Update deposit status:', updErr.message);
-
-      // Jika tidak bisa claim (sudah success oleh callback), jangan kredit lagi
-      if (!claimed && dbStatus === 'success') {
-        // already paid
-      } else if (!claimed) {
-        // cek ulang
-        const { data: again } = await supabaseClient.from('deposits').select('status').eq('id', depositId).maybeSingle();
-        if (again?.status === 'success') {
-          // callback won the race
-        } else if (updErr) {
-          throw updErr;
-        }
-      } else {
-        // 2) Kredit saldo
-        const { data: balResult, error: balErr } = await supabaseClient.rpc('add_user_balance', {
-          p_target_email: currentUser.email,
-          p_amount: depositAmount,
-          p_reason: `Deposit QRIS sukses (Kode unik: ${uniqueCode})`
-        });
-        if (balErr) throw balErr;
-        if (balResult && balResult.success === false) {
-          throw new Error(balResult.message || 'Gagal menambahkan saldo');
-        }
-      }
-    } else {
-      // Pastikan status success (no-op jika sudah)
-      try {
-        await supabaseClient.from('deposits').update({ status: 'success', paid_at: new Date().toISOString() })
-          .eq('id', depositId).eq('status', 'pending');
-      } catch (e) {}
+      weClaimed = !!claimed;
     }
 
-    // 3) Refresh saldo UI
+    const alreadyCredited = !!(depRow && depRow.balance_credited === true);
+
+    // WAJIB kredit jika belum ditandai balance_credited
+    // (meski alreadyPaid dari callback — callback bisa gagal kredit)
+    let creditResult = { ok: alreadyCredited };
+    if (!alreadyCredited) {
+      creditResult = await creditDepositBalance(depositAmount, uniqueCode, depositId);
+      if (creditResult.ok) {
+        await markDepositBalanceCredited(depositId);
+      } else {
+        // Verifikasi: mungkin callback sudah menambah saldo
+        let balNow = balBefore;
+        try {
+          if (typeof forceRefreshBalanceFromDB === 'function') {
+            balNow = parseFloat(await forceRefreshBalanceFromDB()) || balBefore;
+          }
+        } catch (_) {}
+        if (balNow >= balBefore + depositAmount - 0.5) {
+          creditResult = { ok: true, via: 'balance_already_increased' };
+          await markDepositBalanceCredited(depositId);
+        } else {
+          throw new Error('Pembayaran terdeteksi tapi gagal menambah saldo. Klik Cek Status lagi atau hubungi CS. (RPC add_user_balance gagal)');
+        }
+      }
+    }
+
+    // Refresh saldo UI
     let newBalance = null;
     try {
       if (typeof forceRefreshBalanceFromDB === 'function') {
@@ -4245,7 +4335,23 @@ async function handleDepositSuccess(opts) {
       console.warn('⚠️ refresh balance:', e.message);
     }
 
-    // 4) Klaim bonus referral (kode unik × persen) + fallback mutasi
+    // Jika setelah kredit saldo masih belum naik, coba sekali lagi
+    if (newBalance != null && depositAmount > 0) {
+      const nb = parseFloat(newBalance) || 0;
+      if (nb < balBefore + depositAmount - 0.5 && !alreadyCredited) {
+        console.warn('Saldo belum naik, retry credit...');
+        const retry = await creditDepositBalance(depositAmount, uniqueCode, depositId);
+        if (retry.ok) {
+          try {
+            if (typeof forceRefreshBalanceFromDB === 'function') {
+              newBalance = await forceRefreshBalanceFromDB();
+            }
+          } catch (_) {}
+        }
+      }
+    }
+
+    // Referral
     try {
       const uniqueNum = parseFloat(uniqueCode) || 0;
       const claimResult = await processReferralBonusOnDeposit({
@@ -4261,20 +4367,16 @@ async function handleDepositSuccess(opts) {
         Toast.fire({
           icon: 'success',
           title: '🎁 Bonus Referral',
-          html: `<div style="font-size:11.5px;color:#64ffc8;line-height:1.5;">Kode unik Rp ${uniqueNum.toLocaleString('id-ID')} × ${claimResult.pct}%<br>→ Upline <b>${escapeHtml(claimResult.uplineEmail || '')}</b> +Rp ${claimResult.reward.toLocaleString('id-ID')}</div>`
+          html: `Upline dapat Rp ${Number(claimResult.reward).toLocaleString('id-ID')}`
         });
-      } else if (claimResult && claimResult.message) {
-        console.log('ℹ️ Referral claim:', claimResult.message);
-        // Tampilkan info ringkas di console; admin bisa cek relasi upline
-        if (['no_upline', 'credit_failed'].some(x => String(claimResult.message).includes(x))) {
-          console.warn('⚠️ Bonus referral tidak masuk. Penyebab:', claimResult.message, '- Pastikan downline daftar dengan kode referral & jalankan SQL claim_referral_reward di Supabase.');
-        }
+        try {
+          if (typeof forceRefreshBalanceFromDB === 'function') await forceRefreshBalanceFromDB();
+        } catch (_) {}
       }
     } catch (e) {
       console.warn('⚠️ Claim referral exception:', e.message);
     }
 
-    // 5) UI sukses
     depositSuccessProcessed = true;
     const statusEl = document.getElementById('qrisStatus');
     const statusText = document.getElementById('qrisStatusText');
@@ -4284,20 +4386,21 @@ async function handleDepositSuccess(opts) {
     await Swal.fire({
       title: '🎉 Deposit Berhasil!',
       html: `Saldo +<b style="color:#ffd700;">Rp ${depositAmount.toLocaleString('id-ID')}</b>` +
-        (newBalance != null ? `<br><small style="color:#94a3b8;">Saldo sekarang: Rp ${Number(newBalance).toLocaleString('id-ID')}</small>` : ''),
+        (newBalance != null ? `<br><small style="color:#94a3b8;">Saldo sekarang: Rp ${Number(newBalance).toLocaleString('id-ID')}</small>` : '') +
+        (creditResult.via ? `<br><small style="color:#64748b;">via ${creditResult.via}</small>` : ''),
       icon: 'success',
       confirmButtonColor: '#ff6b9d',
       background: '#1a0e2e',
       color: '#fff',
-      timer: 3500,
+      timer: 4000,
       timerProgressBar: true
     });
 
     stopDepositPolling();
+    try { stopDepositRealtime(); } catch (e) {}
     if (depositTimerInterval) { clearInterval(depositTimerInterval); depositTimerInterval = null; }
     closeQrisModal();
 
-    // Refresh mutasi jika tersedia
     try { if (typeof loadMutasiUser === 'function') loadMutasiUser(); } catch (e) {}
 
   } catch (err) {
@@ -4322,6 +4425,7 @@ async function handleDepositSuccess(opts) {
     }
   }
 }
+
 
 function closeQrisModal() {
   document.getElementById('qrisModal').classList.remove('show');
