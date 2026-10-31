@@ -131,6 +131,16 @@ body{font-family:'Quicksand',sans-serif;background:#0f0818;color:#f1e6f5;min-hei
 .chat-input-row .attach{background:rgba(255,255,255,0.08);color:#fff}
 .chat-note{font-size:10px;color:#6b4a7a;text-align:center;padding:6px 10px}
 
+.badge.auction{background:rgba(168,85,247,0.2);color:#c084fc;border:1px solid rgba(168,85,247,0.4)}
+.badge.bid{background:rgba(250,204,21,0.15);color:#facc15;border:1px solid rgba(250,204,21,0.35)}
+.auction-timer{font-size:12px;font-weight:800;color:#c084fc;margin:6px 0;padding:8px 10px;background:rgba(168,85,247,0.1);border:1px solid rgba(168,85,247,0.25);border-radius:10px}
+.bid-list{max-height:160px;overflow-y:auto;margin:8px 0}
+.bid-row{display:flex;justify-content:space-between;font-size:12px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.06)}
+.toggle-row{display:flex;align-items:center;gap:10px;margin:10px 0;padding:10px 12px;background:rgba(168,85,247,0.08);border:1px solid rgba(168,85,247,0.25);border-radius:12px;cursor:pointer}
+.toggle-row input{width:18px;height:18px;accent-color:#a855f7}
+.seller-rating{font-size:11px;color:#ffd700;margin-top:2px}
+
+
 </style>
 </head>
 <body>
@@ -148,6 +158,7 @@ body{font-family:'Quicksand',sans-serif;background:#0f0818;color:#f1e6f5;min-hei
         <button class="chip" data-f="available" onclick="setFilter('available',this)">Ada Stok</button>
         <button class="chip" data-f="cheap" onclick="setFilter('cheap',this)">Termurah</button>
         <button class="chip" data-f="top" onclick="setFilter('top',this)">Rating Tinggi</button>
+        <button class="chip" data-f="auction" onclick="setFilter('auction',this)">🔨 Lelang</button>
       </div>
       <div id="marketList" class="loading">Memuat produk...</div>
     </div>
@@ -229,18 +240,30 @@ body{font-family:'Quicksand',sans-serif;background:#0f0818;color:#f1e6f5;min-hei
     <h3>📤 Upload Produk Akun</h3>
     <div class="field"><label>Judul *</label><input id="sellTitle" maxlength="100" placeholder="Contoh: Netflix Premium 1 Bulan"></div>
     <div class="field"><label>Deskripsi *</label><textarea id="sellDesc" maxlength="2000" placeholder="Detail produk, garansi, dll"></textarea></div>
-    <div class="field"><label>Harga (Rp) *</label><input id="sellPrice" type="number" min="1000" step="100" placeholder="Minimal 1000"></div>
+    <label class="toggle-row" for="sellIsAuction">
+      <input type="checkbox" id="sellIsAuction" onchange="onAuctionToggle()">
+      <span style="font-size:12px;font-weight:700;color:#e2e8f0">🔨 Jual sebagai <b style="color:#c084fc">Lelang</b> (1 akun · 24 jam · tawaran tertinggi menang)</span>
+    </label>
+    <div class="field"><label id="sellPriceLabel">Harga (Rp) *</label><input id="sellPrice" type="number" min="1000" step="100" placeholder="Minimal 1000"></div>
+    <div class="field" id="sellStockField">
+      <label>Stok akun * (username/Gmail + password)</label>
+      <div id="stockRows"></div>
+      <button type="button" class="btn btn-secondary" style="margin-top:6px" id="btnAddStock" onclick="addStockRow()">➕ Tambah baris stok</button>
+    </div>
+    <div class="field" id="sellAuctionStockField" style="display:none">
+      <label>Akun lelang * (hanya 1)</label>
+      <div class="stock-row" id="auctionStockRow">
+        <input placeholder="Username / Gmail" id="auctionUser" data-u>
+        <input placeholder="Password" id="auctionPass" data-p>
+      </div>
+      <p style="font-size:11px;color:#c084fc;margin-top:6px">Lelang otomatis berakhir 24 jam. Pemenang (tawaran tertinggi) dibayar &amp; mendapat akun.</p>
+    </div>
     <div class="field">
       <label>Foto (max 5)</label>
       <input type="file" id="sellPhotos" accept="image/*" multiple hidden onchange="onPhotosPicked(event)">
       <div class="photo-grid" id="photoGrid">
         <div class="photo-slot" onclick="document.getElementById('sellPhotos').click()">➕</div>
       </div>
-    </div>
-    <div class="field">
-      <label>Stok akun * (username/Gmail + password)</label>
-      <div id="stockRows"></div>
-      <button type="button" class="btn btn-secondary" style="margin-top:6px" onclick="addStockRow()">➕ Tambah baris stok</button>
     </div>
     <label class="terms-box" id="sellTermsBox" for="sellAgreeTerms">
       <input type="checkbox" id="sellAgreeTerms">
@@ -304,6 +327,7 @@ let currentThread = null;
 let chatPollTimer = null;
 let chatPendingImage = null;
 const CHAT_TTL_HOURS = 36;
+const AUCTION_HOURS = 24;
 
 
 function $(id){ return document.getElementById(id); }
@@ -538,10 +562,11 @@ async function buyExtraSlots(){
 
 /* ========== MARKET LIST ========== */
 async function loadMarket(){
+  try { await trySettleExpiredAuctions(); } catch(_){}
   const box = $('marketList');
   box.innerHTML = '<div class="loading">Memuat produk...</div>';
   const { data, error } = await sb.from('marketplace_products')
-    .select('id, seller_id, title, description, price, images, stock_remaining, avg_rating, review_count, status, created_at')
+    .select('id, seller_id, title, description, price, images, stock_remaining, avg_rating, review_count, status, created_at, is_auction, auction_start_price, auction_ends_at, current_bid, current_bidder_id, auction_status')
     .eq('status', 'active')
     .order('created_at', { ascending: false })
     .limit(100);
@@ -564,7 +589,8 @@ function renderMarket(){
   let list = [...marketCache];
   const q = ($('searchInput').value||'').trim().toLowerCase();
   if(q) list = list.filter(p => (p.title||'').toLowerCase().includes(q) || (p.description||'').toLowerCase().includes(q));
-  if(marketFilter==='available') list = list.filter(p => (p.stock_remaining||0) > 0);
+  if(marketFilter==='available') list = list.filter(p => (p.stock_remaining||0) > 0 || (p.is_auction && p.auction_status==='active'));
+  if(marketFilter==='auction') list = list.filter(p => !!p.is_auction);
   if(marketFilter==='cheap') list.sort((a,b)=> (a.price||0)-(b.price||0));
   if(marketFilter==='top') list.sort((a,b)=> (b.avg_rating||0)-(a.avg_rating||0));
   const box = $('marketList');
@@ -572,15 +598,23 @@ function renderMarket(){
   box.innerHTML = list.map(p => {
     const img = (p.images && p.images[0]) ? p.images[0] : '';
     const stock = p.stock_remaining||0;
+    const isAuc = !!p.is_auction;
+    const high = Number(p.current_bid||0) > 0 ? p.current_bid : (p.auction_start_price || p.price);
+    const priceLabel = isAuc
+      ? (Number(p.current_bid||0) > 0 ? 'Tawaran: ' + formatRp(high) : 'Start: ' + formatRp(high))
+      : formatRp(p.price);
+    const badge = isAuc
+      ? `<span class="badge auction">🔨 Lelang</span>`
+      : `<span class="badge ${stock>0?'stock':'soldout'}">${stock>0?stock+' stok':'Habis'}</span>`;
     return `<div class="card product-card" onclick="openDetail('${p.id}')">
-      ${img?`<img class="product-thumb" src="${escapeHtml(img)}" alt="" onclick="event.stopPropagation();openImagePreview(this.src)">`:`<div class="product-thumb" style="display:flex;align-items:center;justify-content:center;font-size:28px">🎮</div>`}
+      ${img?`<img class="product-thumb" src="${escapeHtml(img)}" alt="" onclick="event.stopPropagation();openImagePreview(this.src)">`:`<div class="product-thumb" style="display:flex;align-items:center;justify-content:center;font-size:28px">${isAuc?'🔨':'🎮'}</div>`}
       <div class="product-info">
         <div class="product-title">${escapeHtml(p.title)}</div>
         <div class="product-meta">
           <span class="stars">${starsHtml(p.avg_rating)} (${Number(p.avg_rating||0).toFixed(1)})</span>
-          <span class="badge ${stock>0?'stock':'soldout'}">${stock>0?stock+' stok':'Habis'}</span>
+          ${badge}
         </div>
-        <div class="product-price">${formatRp(p.price)}</div>
+        <div class="product-price">${priceLabel}</div>
       </div>
     </div>`;
   }).join('');
@@ -589,7 +623,7 @@ function renderMarket(){
 /* ========== DETAIL + BUY ========== */
 async function openDetail(id){
   const { data: p, error } = await sb.from('marketplace_products')
-    .select('id, seller_id, title, description, price, images, stock_remaining, avg_rating, review_count, status, created_at')
+    .select('id, seller_id, title, description, price, images, stock_remaining, avg_rating, review_count, status, created_at, is_auction, auction_start_price, auction_ends_at, current_bid, current_bidder_id, auction_status')
     .eq('id', id).maybeSingle();
   if(error||!p) return Swal.fire({title:'Error',text:error?.message||'Tidak ditemukan',icon:'error',background:'#1a0e2e',color:'#fff'});
   await resolveEmails([p.seller_id]);
@@ -609,26 +643,104 @@ async function openDetail(id){
       <div style="margin-top:4px;color:#e2e8f0">${escapeHtml(r.comment||'')}</div>
     </div>`).join('') : '<div class="empty" style="padding:12px">Belum ada ulasan</div>';
 
+  // seller rating
+  let sellerRatingHtml = '';
+  try {
+    const { data: sp } = await sb.from('profiles').select('seller_rating, seller_review_count, email').eq('id', p.seller_id).maybeSingle();
+    if (sp) {
+      const sr = Number(sp.seller_rating||0);
+      const sc = Number(sp.seller_review_count||0);
+      sellerRatingHtml = `<div class="seller-rating">${starsHtml(sr)} Seller ${sr.toFixed(1)} (${sc} ulasan)</div>`;
+    }
+  } catch(_){}
+
+  const isAuc = !!p.is_auction;
+  let auctionBlock = '';
+  let actionBtn = '';
+  if (isAuc) {
+    const ends = p.auction_ends_at ? new Date(p.auction_ends_at) : null;
+    const ended = p.auction_status !== 'active' || (ends && ends.getTime() <= Date.now());
+    const high = Number(p.current_bid||0);
+    const startP = Number(p.auction_start_price||p.price||0);
+    const displayBid = high > 0 ? high : startP;
+    // load recent bids
+    let bidsHtml = '';
+    try {
+      const { data: bids } = await sb.from('marketplace_auction_bids')
+        .select('id, bidder_id, amount, created_at')
+        .eq('product_id', id).order('amount', {ascending:false}).limit(15);
+      await resolveEmails((bids||[]).map(b => b.bidder_id));
+      if (bids && bids.length) {
+        bidsHtml = '<div class="bid-list">' + bids.map(b => `
+          <div class="bid-row">
+            <span>${escapeHtml(emailOf(b.bidder_id))}</span>
+            <span style="color:#ffd700;font-weight:800">${formatRp(b.amount)}</span>
+          </div>`).join('') + '</div>';
+      } else {
+        bidsHtml = '<div class="empty" style="padding:8px">Belum ada tawaran</div>';
+      }
+    } catch(_){ bidsHtml = ''; }
+
+    auctionBlock = `
+      <div class="auction-timer" id="auctionTimer" data-ends="${ends ? ends.toISOString() : ''}">
+        ${ended ? '⏹ Lelang berakhir · status: ' + escapeHtml(p.auction_status||'ended') : '⏳ Sisa waktu: <span id="auctionCountdown">...</span>'}
+      </div>
+      <div class="product-price" style="margin-bottom:4px">${high>0 ? 'Tawaran tertinggi: ' + formatRp(high) : 'Harga start: ' + formatRp(startP)}</div>
+      <div style="font-size:11px;color:#94a3b8;margin-bottom:8px">Start lelang: ${formatRp(startP)}</div>
+      ${bidsHtml}`;
+
+    if (p.seller_id === currentUser?.id) {
+      actionBtn = `<button class="btn btn-secondary" disabled>Produk lelang Anda</button>
+        ${ended ? `<button class="btn btn-gold" style="margin-top:8px" onclick="settleAuction('${p.id}')">🏁 Selesaikan Lelang</button>` : ''}`;
+    } else if (ended) {
+      actionBtn = `<button class="btn btn-secondary" disabled>Lelang berakhir</button>`;
+    } else {
+      actionBtn = `<button class="btn btn-primary" onclick="placeBid('${p.id}', ${displayBid})">🔨 Ajukan Tawaran</button>`;
+    }
+  } else {
+    auctionBlock = `<div class="product-price" style="margin-bottom:6px">${formatRp(p.price)}</div>`;
+    actionBtn = `<button class="btn btn-primary" ${stock<1||p.seller_id===currentUser?.id?'disabled':''} onclick="buyProduct('${p.id}')">
+      ${p.seller_id===currentUser?.id?'Produk Anda':(stock<1?'Stok Habis':'🛒 Beli Sekarang')}
+    </button>`;
+  }
+
+  const editBtn = (p.seller_id===currentUser?.id)
+    ? `<button type="button" class="btn btn-secondary" style="margin-top:8px" onclick="openEditProduct('${p.id}')">✏️ Edit Judul / Deskripsi / Harga</button>`
+    : '';
+  const addStockBtn = (!isAuc && p.seller_id===currentUser?.id)
+    ? `<button type="button" class="btn btn-gold" style="margin-top:8px;position:relative;z-index:5" onclick="event.preventDefault();event.stopPropagation();closeDetail();openAddStock('${p.id}')">➕ Tambah Stok</button>`
+    : '';
+
+  // reviews with admin delete
+  const revHtml2 = (reviews||[]).length ? reviews.map(r => `
+    <div style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.06);font-size:12px">
+      <div class="stars">${starsHtml(r.rating)} · <span style="color:#94a3b8">${escapeHtml(emailOf(r.buyer_id))}</span>
+        ${isStaff ? ` <button type="button" style="margin-left:8px;font-size:10px;background:rgba(239,68,68,0.25);color:#ff8080;border:none;border-radius:6px;padding:2px 6px;cursor:pointer" onclick="adminDeleteReview('${r.id}')">Hapus</button>` : ''}
+      </div>
+      <div style="margin-top:4px;color:#e2e8f0">${escapeHtml(r.comment||'')}</div>
+    </div>`).join('') : '<div class="empty" style="padding:12px">Belum ada ulasan</div>';
+
   $('detailSheet').innerHTML = `
-    <h3>${escapeHtml(p.title)}</h3>
+    <h3>${escapeHtml(p.title)} ${isAuc ? '<span class="badge auction">Lelang</span>' : ''}</h3>
     <div class="detail-gallery">${imgs}</div>
-    <div class="product-price" style="margin-bottom:6px">${formatRp(p.price)}</div>
+    ${auctionBlock}
     <div class="product-meta" style="margin-bottom:10px">
       <span class="stars">${starsHtml(p.avg_rating)} ${Number(p.avg_rating||0).toFixed(1)} (${p.review_count||0} ulasan)</span>
-      <span class="badge ${stock>0?'stock':'soldout'}">${stock>0?stock+' stok':'Habis'}</span>
+      ${!isAuc ? `<span class="badge ${stock>0?'stock':'soldout'}">${stock>0?stock+' stok':'Habis'}</span>` : ''}
     </div>
-    <div style="font-size:11px;color:#94a3b8;margin-bottom:8px">Seller: ${escapeHtml(emailOf(p.seller_id))}</div>
-    <div style="font-size:13px;line-height:1.55;white-space:pre-wrap;margin-bottom:12px">${escapeHtml(p.description||'')}</div>
-    <button class="btn btn-primary" ${stock<1||p.seller_id===currentUser?.id?'disabled':''} onclick="buyProduct('${p.id}')">
-      ${p.seller_id===currentUser?.id?'Produk Anda':(stock<1?'Stok Habis':'🛒 Beli Sekarang')}
-    </button>
+    <div style="font-size:11px;color:#94a3b8;margin-bottom:4px">Seller: ${escapeHtml(emailOf(p.seller_id))}</div>
+    ${sellerRatingHtml}
+    <div style="font-size:13px;line-height:1.55;white-space:pre-wrap;margin:10px 0 12px">${escapeHtml(p.description||'')}</div>
+    ${actionBtn}
     ${p.seller_id!==currentUser?.id ? `<button type="button" class="btn btn-secondary" style="margin-top:8px;position:relative;z-index:5" onclick="event.preventDefault();event.stopPropagation();startChatWithSeller('${p.seller_id}','${p.id}')">💬 Chat Penjual</button>` : ''}
-    ${p.seller_id===currentUser?.id ? `<button type="button" class="btn btn-gold" style="margin-top:8px;position:relative;z-index:5" onclick="event.preventDefault();event.stopPropagation();closeDetail();openAddStock('${p.id}')">➕ Tambah Stok</button>` : ''}
+    ${editBtn}
+    ${addStockBtn}
     ${(isStaff || p.seller_id===currentUser?.id) ? `<button class="btn btn-danger" style="margin-top:8px" onclick="deleteProduct('${p.id}')">${isStaff && p.seller_id!==currentUser?.id ? '🛡️ Hapus (Admin)' : 'Hapus Produk'}</button>` : ''}
     <div class="section-title">⭐ Ulasan <div class="line"></div></div>
-    ${revHtml}
+    ${revHtml2}
     <button class="btn btn-secondary" style="margin-top:12px" onclick="closeDetail()">Tutup</button>`;
   $('detailModal').classList.add('show');
+  if (isAuc && p.auction_status === 'active' && p.auction_ends_at) startAuctionCountdown(p.auction_ends_at);
 }
 function closeDetail(){ $('detailModal').classList.remove('show'); }
 
@@ -701,6 +813,8 @@ async function openSellForm(){
   $('sellDesc').value = '';
   $('sellPrice').value = '';
   const ta=$('sellAgreeTerms'); if(ta) ta.checked=false; const tb=$('sellTermsBox'); if(tb) tb.classList.remove('error');
+  const auc=$('sellIsAuction'); if(auc) auc.checked=false; onAuctionToggle();
+  if($('auctionUser')) $('auctionUser').value=''; if($('auctionPass')) $('auctionPass').value='';
   $('stockRows').innerHTML = '';
   stockRowsCount = 0;
   addStockRow();
@@ -863,14 +977,22 @@ async function submitProduct(){
       icon: 'warning', confirmButtonColor: '#00c6ff', background: '#1a0e2e', color: '#fff'
     });
   }
-  const rows = [...document.querySelectorAll('#stockRows .stock-row')];
-  const stock = [];
-  for(const r of rows){
-    const u = r.querySelector('[data-u]').value.trim();
-    const p = r.querySelector('[data-p]').value.trim();
-    if(u && p) stock.push({ username: u, password: p });
+  const isAuction = !!$('sellIsAuction')?.checked;
+  let stock = [];
+  if (isAuction) {
+    const u = ($('auctionUser')?.value || '').trim();
+    const p = ($('auctionPass')?.value || '').trim();
+    if (!u || !p) return Swal.fire({title:'Isi username & password akun lelang',icon:'warning',background:'#1a0e2e',color:'#fff'});
+    stock = [{ username: u, password: p }];
+  } else {
+    const rows = [...document.querySelectorAll('#stockRows .stock-row')];
+    for(const r of rows){
+      const u = r.querySelector('[data-u]').value.trim();
+      const pw = r.querySelector('[data-p]').value.trim();
+      if(u && pw) stock.push({ username: u, password: pw });
+    }
+    if(!stock.length) return Swal.fire({title:'Minimal 1 stok (user + pass)',icon:'warning',background:'#1a0e2e',color:'#fff'});
   }
-  if(!stock.length) return Swal.fire({title:'Minimal 1 stok (user + pass)',icon:'warning',background:'#1a0e2e',color:'#fff'});
 
   const s = await getSlotInfo();
   if(s.remain <= 0) return Swal.fire({title:'Slot penuh',text:'Beli slot tambahan dulu',icon:'warning',background:'#1a0e2e',color:'#fff'});
@@ -884,7 +1006,9 @@ async function submitProduct(){
       p_description: description,
       p_price: price,
       p_images: images,
-      p_stock: stock
+      p_stock: stock,
+      p_is_auction: isAuction,
+      p_auction_hours: AUCTION_HOURS
     });
     Swal.close();
     if(error) throw error;
@@ -903,21 +1027,27 @@ async function loadMyProducts(){
   const { data, error } = await sb.from('marketplace_products').select('*').eq('seller_id', currentUser.id).neq('status','deleted').order('created_at',{ascending:false});
   if(error){ box.innerHTML = `<div class="empty">${escapeHtml(error.message)}</div>`; return; }
   if(!data?.length){ box.innerHTML = '<div class="empty"><span class="big">📦</span>Belum ada produk</div>'; return; }
-  box.innerHTML = data.map(p => `
-    <div class="card">
-      <div style="font-weight:800;margin-bottom:4px">${escapeHtml(p.title)}</div>
+  box.innerHTML = data.map(p => {
+    const isAuc = !!p.is_auction;
+    const priceTxt = isAuc
+      ? (Number(p.current_bid||0)>0 ? 'Bid '+formatRp(p.current_bid) : 'Start '+formatRp(p.auction_start_price||p.price))
+      : formatRp(p.price);
+    return `<div class="card">
+      <div style="font-weight:800;margin-bottom:4px">${escapeHtml(p.title)} ${isAuc?'<span class="badge auction">Lelang</span>':''}</div>
       <div class="product-meta">
-        <span class="product-price" style="font-size:13px">${formatRp(p.price)}</span>
-        <span class="badge stock">Stok ${p.stock_remaining||0}</span>
+        <span class="product-price" style="font-size:13px">${priceTxt}</span>
+        ${isAuc ? `<span class="badge auction">${escapeHtml(p.auction_status||'active')}</span>` : `<span class="badge stock">Stok ${p.stock_remaining||0}</span>`}
         <span class="stars">${starsHtml(p.avg_rating)}</span>
         <span class="badge">${escapeHtml(p.status)}</span>
       </div>
       <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">
         <button class="btn btn-secondary" style="padding:8px;font-size:11px;width:auto;flex:1" onclick="openDetail('${p.id}')">Lihat</button>
-        <button class="btn btn-gold" style="padding:8px;font-size:11px;width:auto;flex:1" onclick="openAddStock('${p.id}','${escapeHtml(p.title).replace(/'/g,"&#39;")}')">➕ Stok</button>
+        <button class="btn btn-secondary" style="padding:8px;font-size:11px;width:auto;flex:1" onclick="openEditProduct('${p.id}')">✏️ Edit</button>
+        ${!isAuc ? `<button class="btn btn-gold" style="padding:8px;font-size:11px;width:auto;flex:1" onclick="openAddStock('${p.id}','${escapeHtml(p.title).replace(/'/g,"&#39;")}')">➕ Stok</button>` : (p.auction_status==='active' && p.auction_ends_at && new Date(p.auction_ends_at)<=new Date() ? `<button class="btn btn-gold" style="padding:8px;font-size:11px;width:auto;flex:1" onclick="settleAuction('${p.id}')">🏁 Selesai</button>` : '')}
         <button class="btn btn-danger" style="padding:8px;font-size:11px;width:auto;flex:1" onclick="deleteProduct('${p.id}')">Hapus</button>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 async function openAddStock(productId, title){
@@ -1104,6 +1234,7 @@ async function loadOrders(){
     (prods || []).forEach(p => { productMap[p.id] = p; });
   }
 
+  await resolveEmails(data.map(o => orderTab==='sell' ? o.buyer_id : o.seller_id));
   const orderIds = data.map(o=>o.id);
   const { data: revs } = await sb.from('marketplace_reviews').select('order_id').in('order_id', orderIds);
   const reviewed = new Set((revs||[]).map(r=>r.order_id));
@@ -1116,6 +1247,9 @@ async function loadOrders(){
       <div style="margin-top:6px">Password</div><code>${escapeHtml(o.delivered_password||'-')}</code></div>
       <div class="note-box">Anda memiliki waktu <b>7 hari</b> untuk mengamankan akun. Jika ada kendala (akun tidak bisa masuk), laporkan ke WhatsApp Shine Shop <a href="https://wa.me/${WA_REPORT}" target="_blank" style="color:#38bdf8">+${WA_REPORT}</a>.</div>` : '';
     const reviewBtn = isBuy && !reviewed.has(o.id) ? `<button class="btn btn-gold" style="margin-top:8px;padding:8px;font-size:12px" onclick="openReview('${o.id}','${o.product_id}','${o.seller_id}')">⭐ Beri Ulasan</button>` : (isBuy && reviewed.has(o.id)?`<div style="font-size:11px;color:#22c55e;margin-top:6px">✓ Sudah diulas</div>`:'');
+    const buyerLine = !isBuy ? `<div style="font-size:11px;color:#94a3b8;margin-top:6px">Pembeli: ${escapeHtml(emailOf(o.buyer_id))}
+      <button type="button" class="btn btn-secondary" style="margin-top:6px;padding:6px;font-size:11px" onclick="startChatWithSeller('${o.buyer_id}','${o.product_id}','${escapeHtml(prod.title||'').replace(/'/g,"&#39;")}')">💬 Chat Pembeli</button>
+    </div>` : '';
     return `<div class="card">
       <div style="display:flex;gap:10px">
         ${img?`<img class="product-thumb" src="${escapeHtml(img)}" onclick="event.stopPropagation();openImagePreview(this.src)" style="cursor:zoom-in">`:`<div class="product-thumb" style="display:flex;align-items:center;justify-content:center">🎮</div>`}
@@ -1123,6 +1257,7 @@ async function loadOrders(){
           <div style="font-weight:800;font-size:13px">${escapeHtml(prod.title||'Produk')}</div>
           <div class="product-price" style="font-size:13px;margin-top:4px">${formatRp(o.price)}</div>
           <div style="font-size:10px;color:#94a3b8;margin-top:4px">${new Date(o.created_at).toLocaleString('id-ID',{timeZone:'Asia/Jakarta'})} WIB</div>
+          ${buyerLine}
         </div>
       </div>
       ${cred}
@@ -1542,7 +1677,138 @@ async function sendChatMessage(){
 }
 
 
+
+/* ========== AUCTION + EDIT ========== */
+function onAuctionToggle(){
+  const on = !!$('sellIsAuction')?.checked;
+  const stockField = $('sellStockField');
+  const aucField = $('sellAuctionStockField');
+  const label = $('sellPriceLabel');
+  if (stockField) stockField.style.display = on ? 'none' : 'block';
+  if (aucField) aucField.style.display = on ? 'block' : 'none';
+  if (label) label.textContent = on ? 'Harga start lelang (Rp) *' : 'Harga (Rp) *';
+}
+
+function startAuctionCountdown(endsAt){
+  const el = $('auctionCountdown');
+  if (!el) return;
+  function tick(){
+    const left = new Date(endsAt).getTime() - Date.now();
+    if (left <= 0) {
+      el.textContent = '00:00:00';
+      return;
+    }
+    const h = Math.floor(left/3600000);
+    const m = Math.floor((left%3600000)/60000);
+    const s = Math.floor((left%60000)/1000);
+    el.textContent = String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
+    setTimeout(tick, 1000);
+  }
+  tick();
+}
+
+async function placeBid(productId, currentHigh){
+  const minBid = Math.max(1000, Number(currentHigh||0) + (Number(currentHigh||0) > 0 ? 1 : 0));
+  const { value: amount } = await Swal.fire({
+    title: 'Ajukan Tawaran',
+    html: `<p style="font-size:12px;color:#94a3b8;margin-bottom:8px">Minimal ${formatRp(minBid)}. Saldo harus cukup.</p>
+      <input id="bidAmount" type="number" class="swal2-input" min="${minBid}" step="100" value="${minBid}" style="width:90%">`,
+    background: '#1a0e2e', color: '#fff', showCancelButton: true,
+    confirmButtonText: 'Tawar', cancelButtonText: 'Batal', confirmButtonColor: '#a855f7',
+    preConfirm: () => {
+      const v = parseInt(document.getElementById('bidAmount')?.value, 10);
+      if (!v || v < minBid) {
+        Swal.showValidationMessage('Tawaran harus ≥ ' + formatRp(minBid));
+        return false;
+      }
+      return v;
+    }
+  });
+  if (!amount) return;
+  Swal.fire({title:'Mengirim tawaran...',allowOutsideClick:false,didOpen:()=>Swal.showLoading(),background:'#1a0e2e',color:'#fff'});
+  const { data, error } = await sb.rpc('marketplace_place_bid', { p_product_id: productId, p_amount: amount });
+  Swal.close();
+  if (error) return Swal.fire({title:'Gagal',text:error.message,icon:'error',background:'#1a0e2e',color:'#fff'});
+  if (data && data.success === false) return Swal.fire({title:'Gagal',text:data.message||'Gagal',icon:'error',background:'#1a0e2e',color:'#fff'});
+  Swal.fire({title:'Tawaran masuk!',text:formatRp(amount),icon:'success',background:'#1a0e2e',color:'#fff',timer:1800});
+  openDetail(productId);
+  loadMarket();
+}
+
+async function settleAuction(productId){
+  const c = await Swal.fire({
+    title: 'Selesaikan lelang?',
+    text: 'Pemenang (tawaran tertinggi) akan ditagih & mendapat akun.',
+    icon: 'question', showCancelButton: true, confirmButtonColor: '#a855f7',
+    background: '#1a0e2e', color: '#fff', confirmButtonText: 'Selesaikan', cancelButtonText: 'Batal'
+  });
+  if (!c.isConfirmed) return;
+  Swal.fire({title:'Memproses...',allowOutsideClick:false,didOpen:()=>Swal.showLoading(),background:'#1a0e2e',color:'#fff'});
+  const { data, error } = await sb.rpc('marketplace_settle_auction', { p_product_id: productId });
+  Swal.close();
+  if (error) return Swal.fire({title:'Gagal',text:error.message,icon:'error',background:'#1a0e2e',color:'#fff'});
+  if (data && data.success === false) return Swal.fire({title:'Info',text:data.message||'Gagal',icon:'info',background:'#1a0e2e',color:'#fff'});
+  Swal.fire({title:'Lelang selesai',text: data?.amount ? 'Terjual ' + formatRp(data.amount) : (data?.message||'OK'), icon:'success',background:'#1a0e2e',color:'#fff'});
+  closeDetail(); loadMarket(); loadMyProducts(); loadOrders();
+}
+
+async function openEditProduct(productId){
+  const { data: p, error } = await sb.from('marketplace_products')
+    .select('id, title, description, price, is_auction, current_bid, seller_id')
+    .eq('id', productId).maybeSingle();
+  if (error || !p) return Swal.fire({title:'Error',text:error?.message||'Tidak ditemukan',icon:'error',background:'#1a0e2e',color:'#fff'});
+  if (p.seller_id !== currentUser?.id) return;
+  const canPrice = !(p.is_auction && Number(p.current_bid||0) > 0);
+  const { value: form } = await Swal.fire({
+    title: 'Edit Produk',
+    html: `<input id="edTitle" class="swal2-input" placeholder="Judul" value="${escapeHtml(p.title||'')}" style="width:90%">
+      <textarea id="edDesc" class="swal2-textarea" placeholder="Deskripsi" style="width:90%;background:rgba(255,255,255,0.05);color:#fff">${escapeHtml(p.description||'')}</textarea>
+      <input id="edPrice" type="number" class="swal2-input" min="1000" step="100" value="${p.price||1000}" ${canPrice?'':'disabled'} style="width:90%" placeholder="Harga">
+      ${!canPrice ? '<p style="font-size:11px;color:#facc15">Harga start lelang terkunci (sudah ada tawaran)</p>' : ''}`,
+    background: '#1a0e2e', color: '#fff', showCancelButton: true,
+    confirmButtonText: 'Simpan', cancelButtonText: 'Batal', confirmButtonColor: '#ff6b9d',
+    preConfirm: () => {
+      const title = document.getElementById('edTitle')?.value?.trim();
+      const description = document.getElementById('edDesc')?.value?.trim();
+      const price = parseInt(document.getElementById('edPrice')?.value, 10);
+      if (!title) { Swal.showValidationMessage('Judul wajib'); return false; }
+      return { title, description, price: canPrice ? price : null };
+    }
+  });
+  if (!form) return;
+  const payload = { p_product_id: productId, p_title: form.title, p_description: form.description };
+  if (form.price != null) payload.p_price = form.price;
+  const { data, error: err2 } = await sb.rpc('marketplace_edit_product', payload);
+  if (err2) return Swal.fire({title:'Gagal',text:err2.message,icon:'error',background:'#1a0e2e',color:'#fff'});
+  if (data && data.success === false) return Swal.fire({title:'Gagal',text:data.message,icon:'error',background:'#1a0e2e',color:'#fff'});
+  Swal.fire({title:'Tersimpan',icon:'success',background:'#1a0e2e',color:'#fff',timer:1500});
+  openDetail(productId); loadMarket(); loadMyProducts();
+}
+
+async function adminDeleteReview(reviewId){
+  if (!isStaff) return;
+  const c = await Swal.fire({title:'Hapus ulasan ini?',showCancelButton:true,confirmButtonColor:'#ef4444',background:'#1a0e2e',color:'#fff'});
+  if (!c.isConfirmed) return;
+  const { data, error } = await sb.rpc('marketplace_admin_delete_review', { p_review_id: reviewId });
+  if (error) return Swal.fire({title:'Gagal',text:error.message,icon:'error',background:'#1a0e2e',color:'#fff'});
+  if (data && data.success === false) return Swal.fire({title:'Gagal',text:data.message,icon:'error',background:'#1a0e2e',color:'#fff'});
+  Swal.fire({title:'Dihapus',icon:'success',background:'#1a0e2e',color:'#fff',timer:1200});
+  // refresh if detail open
+  try { closeDetail(); } catch(_){}
+  loadMarket();
+}
+
+// Auto-settle expired auctions when opening market
+async function trySettleExpiredAuctions(){
+  try { await sb.rpc('marketplace_settle_expired_auctions'); } catch(_){}
+}
+
 window.startChatWithSeller = startChatWithSeller;
+window.placeBid = placeBid;
+window.settleAuction = settleAuction;
+window.openEditProduct = openEditProduct;
+window.adminDeleteReview = adminDeleteReview;
+window.onAuctionToggle = onAuctionToggle;
 window.openChatPanel = openChatPanel;
 window.openAddStock = openAddStock;
 window.addEventListener('load', async () => {
