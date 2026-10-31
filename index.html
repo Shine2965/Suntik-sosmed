@@ -906,6 +906,8 @@ body.chat-open .cs-bubble-container{display:none !important}
           <div class="balance-value" id="balanceValue">Rp 0</div>
           <div class="balance-actions"><button class="balance-btn deposit" onclick="openDepositDialog()">💵 Deposit</button><button class="balance-btn refresh" onclick="refreshBalance()">🔄</button></div>
           <div class="balance-actions" style="margin-top:8px;"><button class="balance-btn transfer" onclick="openTransferDialog()">💸 Transfer Saldo</button></div>
+          <button type="button" onclick="toggleDepositHistory()" style="margin-top:10px;width:100%;padding:10px;border-radius:10px;border:1px solid rgba(255,215,0,0.35);background:rgba(255,215,0,0.08);color:#ffd700;font-weight:800;font-family:inherit;font-size:12px;cursor:pointer;">Riwayat Deposit</button>
+          <div id="depositHistoryBox" style="display:none;margin-top:10px;"></div>
         </div>
       </div>
 
@@ -3501,7 +3503,26 @@ async function openTransferDialog() {
 // ============================================================
 // DEPOSIT / QRIS
 // ============================================================
-function generateUniqueCode() { return Math.floor(Math.random() * 200) + 1; }
+async function generateUniqueCodeForAmount(baseAmount) {
+  const base = Math.floor(Number(baseAmount) || 0);
+  for (let attempt = 0; attempt < 80; attempt++) {
+    const code = Math.floor(Math.random() * 999) + 1;
+    const total = base + code;
+    try {
+      const { data } = await supabaseClient
+        .from('deposits')
+        .select('id, expires_at, status')
+        .eq('status', 'pending')
+        .eq('total_amount', total)
+        .limit(5);
+      const now = Date.now();
+      const conflict = (data || []).some(d => !d.expires_at || new Date(d.expires_at).getTime() > now);
+      if (!conflict) return code;
+    } catch (_) { return code; }
+  }
+  return (Date.now() % 900) + 100;
+}
+function generateUniqueCode() { return Math.floor(Math.random() * 999) + 1; }
 function crc16(str) {
   let crc = 0xFFFF;
   for (let i = 0; i < str.length; i++) { crc ^= str.charCodeAt(i) << 8; for (let j = 0; j < 8; j++) { if (crc & 0x8000) crc = (crc << 1) ^ 0x1021; else crc <<= 1; crc &= 0xFFFF; } }
@@ -3580,6 +3601,153 @@ function isTransactionMatch(m, targetAmount) {
   return { match: true, amt, data: m };
 }
 
+
+/* ========== RIWAYAT DEPOSIT ========== */
+function toggleDepositHistory() {
+  const box = document.getElementById('depositHistoryBox');
+  if (!box) return;
+  const open = box.style.display !== 'none' && box.style.display !== '';
+  box.style.display = open ? 'none' : 'block';
+  if (!open) loadDepositHistory();
+}
+async function cleanupExpiredDeposits() {
+  if (!currentUser || !supabaseClient) return;
+  try {
+    const nowIso = new Date().toISOString();
+    const { data: olds } = await supabaseClient.from('deposits').select('id').eq('user_id', currentUser.id).eq('status', 'pending').lt('expires_at', nowIso).limit(50);
+    for (const d of (olds || [])) {
+      try { await supabaseClient.from('deposits').update({ status: 'expired' }).eq('id', d.id).eq('status', 'pending'); }
+      catch (_) { try { await supabaseClient.from('deposits').delete().eq('id', d.id).eq('status', 'pending'); } catch (e2) {} }
+    }
+  } catch (e) { console.warn('cleanup expired', e.message); }
+}
+async function loadDepositHistory() {
+  const box = document.getElementById('depositHistoryBox');
+  if (!box || !currentUser) return;
+  box.innerHTML = '<div style="font-size:11px;color:#94a3b8;padding:8px;">Memuat...</div>';
+  await cleanupExpiredDeposits();
+  try {
+    const { data, error } = await supabaseClient.from('deposits').select('*').eq('user_id', currentUser.id).order('created_at', { ascending: false }).limit(30);
+    if (error) throw error;
+    const now = Date.now();
+    const rows = (data || []).filter(d => {
+      if (d.status === 'expired') return false;
+      if (d.status === 'pending' && d.expires_at && new Date(d.expires_at).getTime() <= now) return false;
+      return ['pending', 'success', 'cancelled'].includes(d.status);
+    });
+    if (!rows.length) {
+      box.innerHTML = '<div style="font-size:11px;color:#6b4a7a;padding:10px;text-align:center;">Belum ada riwayat deposit</div>';
+      return;
+    }
+    box.innerHTML = rows.map(d => {
+      const st = d.status || '-';
+      const total = Number(d.total_amount || 0);
+      const amt = Number(d.amount || 0);
+      const uniq = d.unique_code;
+      const created = d.created_at ? new Date(d.created_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) : '-';
+      const exp = d.expires_at ? new Date(d.expires_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) : '-';
+      const isPend = st === 'pending';
+      const badge = isPend ? '#facc15' : (st === 'success' ? '#22c55e' : '#94a3b8');
+      const actions = isPend ? ('<div style="display:flex;gap:6px;margin-top:8px;">' +
+        '<button type="button" onclick="resumeDepositQris(\'' + d.id + '\')" style="flex:1;padding:8px;border:none;border-radius:8px;background:linear-gradient(135deg,#ffd700,#ffb300);color:#1a0e2e;font-weight:800;font-size:11px;cursor:pointer;">Tampilkan QRIS</button>' +
+        '<button type="button" onclick="cancelPendingDeposit(\'' + d.id + '\')" style="padding:8px 10px;border:none;border-radius:8px;background:rgba(239,68,68,0.25);color:#ff8080;font-weight:800;font-size:11px;cursor:pointer;">Batal</button></div>') : '';
+      return '<div style="background:rgba(0,0,0,0.25);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:10px 12px;margin-bottom:8px;text-align:left;">' +
+        '<div style="display:flex;justify-content:space-between;gap:8px;align-items:center;">' +
+        '<span style="font-weight:900;color:#ffd700;font-size:13px;">Rp ' + total.toLocaleString('id-ID') + '</span>' +
+        '<span style="font-size:10px;font-weight:800;color:' + badge + ';text-transform:uppercase;">' + st + '</span></div>' +
+        '<div style="font-size:11px;color:#b39ddb;margin-top:4px;">Nominal Rp ' + amt.toLocaleString('id-ID') + ' + unik <b style="color:#fff">' + uniq + '</b></div>' +
+        '<div style="font-size:10px;color:#6b4a7a;margin-top:2px;">' + created + ' WIB' + (isPend ? ' · exp ' + exp : '') + '</div>' + actions + '</div>';
+    }).join('');
+    const pend = rows.filter(d => d.status === 'pending');
+    if (pend.length && !window._depositHistPoll) {
+      window._depositHistPoll = setInterval(() => {
+        if (document.visibilityState === 'visible') {
+          pend.forEach(d => silentWatchDeposit(d));
+          loadDepositHistory();
+        }
+      }, 8000);
+    }
+  } catch (e) {
+    box.innerHTML = '<div style="color:#ff8080;font-size:11px;padding:8px;">' + (e.message || e) + '</div>';
+  }
+}
+async function silentWatchDeposit(dep) {
+  if (!dep || !dep.id || dep.status !== 'pending') return;
+  try {
+    const { data } = await supabaseClient.from('deposits').select('*').eq('id', dep.id).maybeSingle();
+    if (data && data.status === 'success') {
+      if (!currentDeposit) currentDeposit = data;
+      if (!depositSuccessProcessed) await handleDepositSuccess({ alreadyPaid: true });
+      return;
+    }
+    if (data && data.expires_at && new Date(data.expires_at).getTime() <= Date.now()) {
+      try { await supabaseClient.from('deposits').update({ status: 'expired' }).eq('id', dep.id).eq('status', 'pending'); } catch (_) {}
+      return;
+    }
+    const target = Math.floor(Number(dep.total_amount) || 0);
+    if (!target) return;
+    const res = await fetch('/api/mutasi?amount=' + encodeURIComponent(target) + '&t=' + Date.now(), { cache: 'no-store' });
+    if (!res.ok) return;
+    const json = await res.json();
+    const list = (typeof extractMutasiList === 'function') ? extractMutasiList(json) : (json.data || []);
+    for (const m of list) {
+      if (isTransactionMatch(m, target).match) {
+        currentDeposit = data || dep;
+        await handleDepositSuccess({ alreadyPaid: false });
+        return;
+      }
+    }
+  } catch (_) {}
+}
+async function resumeDepositQris(depositId) {
+  try {
+    const { data, error } = await supabaseClient.from('deposits').select('*').eq('id', depositId).maybeSingle();
+    if (error || !data) throw new Error((error && error.message) || 'Deposit tidak ditemukan');
+    if (data.status !== 'pending') throw new Error('Deposit tidak lagi pending');
+    if (data.expires_at && new Date(data.expires_at).getTime() <= Date.now()) {
+      try { await supabaseClient.from('deposits').update({ status: 'expired' }).eq('id', data.id); } catch (_) {}
+      throw new Error('Deposit sudah expired');
+    }
+    currentDeposit = data;
+    depositSuccessProcessed = false;
+    isProcessingDeposit = false;
+    const totalAmount = Math.floor(Number(data.total_amount) || 0);
+    const amount = Math.floor(Number(data.amount) || 0);
+    const uniqueCode = data.unique_code;
+    document.getElementById('qrisAmount').textContent = 'Rp ' + totalAmount.toLocaleString('id-ID');
+    document.getElementById('qrisAmountDetail').innerHTML = 'Nominal: Rp ' + amount.toLocaleString('id-ID') + ' + Kode Unik: <b style="color:#ffd700;">' + uniqueCode + '</b>';
+    const stEl = document.getElementById('qrisStatus');
+    if (stEl) { stEl.textContent = 'Menunggu pembayaran... auto-cek aktif'; stEl.className = 'qris-status waiting'; }
+    document.getElementById('qrisModal').classList.add('show');
+    setTimeout(function() { renderQrisToCanvas(buildDynamicQris(QRIS_CRC, totalAmount)); }, 100);
+    const expiresAt = data.expires_at ? new Date(data.expires_at) : new Date(Date.now() + 10 * 60 * 1000);
+    startDepositTimer(expiresAt);
+    startDepositRealtime(data.id);
+    startDepositPolling(totalAmount);
+    try { loadDepositHistory(); } catch(_){}
+  } catch (e) {
+    Swal.fire({ title: 'Gagal', text: e.message, icon: 'error', background: '#1a0e2e', color: '#fff' });
+    loadDepositHistory();
+  }
+}
+async function cancelPendingDeposit(depositId) {
+  const c = await Swal.fire({
+    title: 'Batalkan deposit?',
+    text: 'QRIS pending akan dibatalkan. Jika sudah transfer, hubungi CS.',
+    icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444',
+    background: '#1a0e2e', color: '#fff', confirmButtonText: 'Batalkan', cancelButtonText: 'Kembali'
+  });
+  if (!c.isConfirmed) return;
+  try { await supabaseClient.from('deposits').update({ status: 'cancelled' }).eq('id', depositId).eq('status', 'pending'); }
+  catch (e) { try { await supabaseClient.from('deposits').delete().eq('id', depositId).eq('status', 'pending'); } catch (_) {} }
+  if (currentDeposit && currentDeposit.id === depositId) { try { closeQrisModal(); } catch (_) {} }
+  loadDepositHistory();
+}
+window.toggleDepositHistory = toggleDepositHistory;
+window.loadDepositHistory = loadDepositHistory;
+window.resumeDepositQris = resumeDepositQris;
+window.cancelPendingDeposit = cancelPendingDeposit;
+
 async function openDepositDialog() {
   if (!currentUser) return;
   if (isProcessingDeposit) {
@@ -3607,7 +3775,7 @@ async function openDepositDialog() {
 async function createDeposit(amount) {
   amount = Math.floor(Number(amount));
   if (!amount || amount < 1000) return;
-  const uniqueCode = generateUniqueCode();
+  const uniqueCode = await generateUniqueCodeForAmount(amount);
   const totalAmount = amount + uniqueCode;
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
   try {
