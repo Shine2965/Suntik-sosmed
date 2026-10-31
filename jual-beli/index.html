@@ -190,6 +190,8 @@ body{font-family:'Quicksand',sans-serif;background:#0f0818;color:#f1e6f5;min-hei
         <div style="font-weight:800;word-break:break-all" id="profileEmail">—</div>
         <div style="margin-top:8px;font-size:12px;color:#94a3b8">Role <span id="profileRole" class="admin-tag" style="display:none">ADMIN</span></div>
         <div style="font-weight:800" id="profileRoleText">user</div>
+        <div style="margin-top:10px;font-size:12px;color:#94a3b8">Rating Seller</div>
+        <div style="font-weight:800;color:#ffd700" id="profileSellerRating">★★★★★ 5.0 (0 ulasan)</div>
         <div style="margin-top:10px;font-size:12px;color:#94a3b8">Saldo</div>
         <div style="font-size:20px;font-weight:900;color:#ffd700;font-family:Poppins,sans-serif" id="profileBalance">Rp 0</div>
       </div>
@@ -496,6 +498,14 @@ function updateBalanceUI(){
   const b = Number(currentProfile?.balance)||0;
   $('balancePill').textContent = formatRp(b);
   $('profileBalance').textContent = formatRp(b);
+  const el = $('profileSellerRating');
+  if (el) {
+    const rd = ratingDisplay(currentProfile?.seller_rating, currentProfile?.seller_review_count);
+    const c = Number(currentProfile?.seller_review_count) || 0;
+    el.textContent = rd.stars.replace(/</g,'') + ' ' + rd.num + ' (' + c + ' ulasan)';
+    // stars are unicode ★ so fine as textContent
+    el.innerHTML = rd.stars + ' ' + rd.num + ' <span style="color:#94a3b8;font-weight:600">(' + c + ' ulasan)</span>';
+  }
 }
 
 async function refreshBalance(){
@@ -659,17 +669,18 @@ async function openDetail(id){
       <div style="margin-top:4px;color:#e2e8f0">${escapeHtml(r.comment||'')}</div>
     </div>`).join('') : '<div class="empty" style="padding:12px">Belum ada ulasan</div>';
 
-  // seller rating
+  // seller rating — sama seperti produk: default ★★★★★ 5.0 jika belum ada ulasan
   let sellerRatingHtml = '';
   try {
     const { data: sp } = await sb.from('profiles').select('seller_rating, seller_review_count, email').eq('id', p.seller_id).maybeSingle();
-    if (sp) {
-      const sr = Number(sp.seller_rating||0);
-      const sc = Number(sp.seller_review_count||0);
-      const rd = ratingDisplay(sr, sc);
-      sellerRatingHtml = `<div class="seller-rating">${rd.stars} Seller ${rd.num} (${sc} ulasan)</div>`;
-    }
-  } catch(_){}
+    const sr = Number(sp?.seller_rating ?? 0);
+    const sc = Number(sp?.seller_review_count ?? 0);
+    const rd = ratingDisplay(sr, sc);
+    sellerRatingHtml = `<div class="seller-rating">${rd.stars} Seller ${rd.num} (${sc} ulasan)</div>`;
+  } catch(_){
+    const rd = ratingDisplay(5, 0);
+    sellerRatingHtml = `<div class="seller-rating">${rd.stars} Seller ${rd.num} (0 ulasan)</div>`;
+  }
 
   const isAuc = !!p.is_auction;
   let auctionBlock = '';
