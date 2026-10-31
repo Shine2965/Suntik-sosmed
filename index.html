@@ -4165,165 +4165,202 @@ async function claimReferralBonusFallback({ userId, userEmail, depositId, unique
   return { reward, pct, uplineEmail, message: credited ? 'fallback_ok' : 'fallback_partial' };
 }
 
-// handleDepositSuccess — kredit saldo WAJIB (anti-miss + anti-double)
+// handleDepositSuccess — kredit SALDO LANGSUNG ke Supabase (client auth)
 // ============================================================
-async function creditDepositBalance(depositAmount, uniqueCode, depositId) {
-  // 0) RPC atomik complete_deposit (rekomendasi — update balance + mutasi + flag)
-  if (depositId) {
-    try {
-      const { data, error } = await supabaseClient.rpc('complete_deposit', { p_deposit_id: depositId });
-      if (!error && data && data.success !== false) {
-        if (data.new_balance != null && currentProfile) {
-          currentProfile.balance = data.new_balance;
-          try { updateBalanceDisplay(data.new_balance); } catch (_) {}
-        }
-        return { ok: true, via: 'complete_deposit', data };
-      }
-      console.warn('complete_deposit:', error?.message || data);
-    } catch (e) {
-      console.warn('complete_deposit ex:', e.message);
-    }
+async function forceCreditDepositToSupabase(deposit) {
+  const depositId = deposit.id;
+  const userId = deposit.user_id || currentUser?.id;
+  const email = deposit.email || currentUser?.email || currentProfile?.email;
+  const amount = Math.floor(Number(deposit.amount) || 0);
+  const uniqueCode = deposit.unique_code;
+  if (!depositId || !userId || amount < 1) {
+    return { ok: false, message: 'Data deposit tidak lengkap' };
   }
 
-  const email = currentUser?.email || currentProfile?.email;
-  const reasons = [
-    `Deposit QRIS sukses (Kode unik: ${uniqueCode})`,
-    `Deposit QRIS (id:${depositId}, unik:${uniqueCode})`
-  ];
-  // 1) add_user_balance (fallback lama)
-  for (const reason of reasons) {
-    try {
-      const { data, error } = await supabaseClient.rpc('add_user_balance', {
-        p_target_email: email,
-        p_amount: depositAmount,
-        p_reason: reason
-      });
-      if (error) {
-        console.warn('add_user_balance error:', error.message);
-        continue;
-      }
-      if (data && data.success === false) {
-        console.warn('add_user_balance fail:', data.message);
-        continue;
-      }
-      // catat mutasi best-effort
-      try {
-        await supabaseClient.from('balance_mutations').insert({
-          user_id: currentUser.id,
-          email: email,
-          amount: depositAmount,
-          type: 'deposit',
-          reason: reason
-        });
-      } catch (_) {}
-      return { ok: true, via: 'add_user_balance', data };
-    } catch (e) {
-      console.warn('add_user_balance ex:', e.message);
-    }
-  }
-  // 2) add_balance(user_id)
+  // 1) Coba RPC complete_deposit (kalau sudah dijalankan SQL-nya)
   try {
-    const { data, error } = await supabaseClient.rpc('add_balance', {
-      p_user_id: currentUser.id,
-      p_amount: depositAmount
-    });
-    if (!error) return { ok: true, via: 'add_balance', data };
-    console.warn('add_balance error:', error.message);
+    const { data, error } = await supabaseClient.rpc('complete_deposit', { p_deposit_id: depositId });
+    if (!error && data && data.success !== false) {
+      return {
+        ok: true,
+        via: 'complete_deposit',
+        newBalance: data.new_balance,
+        data
+      };
+    }
+    console.warn('complete_deposit:', error?.message || data);
   } catch (e) {
-    console.warn('add_balance ex:', e.message);
+    console.warn('complete_deposit skip:', e.message);
   }
-  return { ok: false };
+
+  // 2) Coba add_user_balance
+  try {
+    const { data, error } = await supabaseClient.rpc('add_user_balance', {
+      p_target_email: email,
+      p_amount: amount,
+      p_reason: 'Deposit QRIS sukses (unik: ' + uniqueCode + ')'
+    });
+    if (!error && (!data || data.success !== false)) {
+      // pastikan mutasi tercatat
+      await insertBalanceMutation({ userId, email, amount, uniqueCode, depositId });
+      await markDepositDone(depositId);
+      let newBalance = data?.new_balance ?? data?.balance ?? null;
+      if (newBalance == null) {
+        try {
+          const { data: pr } = await supabaseClient.from('profiles').select('balance').eq('id', userId).maybeSingle();
+          newBalance = pr?.balance;
+        } catch (_) {}
+      }
+      return { ok: true, via: 'add_user_balance', newBalance, data };
+    }
+    console.warn('add_user_balance:', error?.message || data);
+  } catch (e) {
+    console.warn('add_user_balance skip:', e.message);
+  }
+
+  // 3) LANGSUNG update profiles.balance + insert balance_mutations (tanpa env)
+  try {
+    const { data: pr, error: rErr } = await supabaseClient
+      .from('profiles')
+      .select('id, balance')
+      .eq('id', userId)
+      .maybeSingle();
+    if (rErr) throw rErr;
+    if (!pr) throw new Error('Profile tidak ditemukan');
+
+    const before = parseFloat(pr.balance) || 0;
+    const after = before + amount;
+
+    const { data: upd, error: uErr } = await supabaseClient
+      .from('profiles')
+      .update({ balance: after })
+      .eq('id', userId)
+      .select('balance')
+      .maybeSingle();
+    if (uErr) throw uErr;
+
+    // verifikasi benar-benar naik
+    const verified = parseFloat(upd?.balance ?? after);
+    if (verified < before + amount - 0.01) {
+      throw new Error('Update balance ditolak (RLS?). Jalankan SQL complete_deposit atau longgarkan policy profiles.');
+    }
+
+    await insertBalanceMutation({ userId, email, amount, uniqueCode, depositId, balanceAfter: verified });
+    await markDepositDone(depositId);
+
+    return { ok: true, via: 'profiles_direct', newBalance: verified };
+  } catch (e) {
+    console.error('direct credit fail:', e);
+    return { ok: false, message: e.message || String(e) };
+  }
 }
 
-async function markDepositBalanceCredited(depositId) {
-  try {
-    await supabaseClient.from('deposits').update({ balance_credited: true }).eq('id', depositId);
-  } catch (e) {
-    // kolom mungkin belum ada — abaikan
-    console.warn('balance_credited update:', e.message);
+async function insertBalanceMutation({ userId, email, amount, uniqueCode, depositId, balanceAfter }) {
+  const reason = 'Deposit QRIS sukses (unik: ' + (uniqueCode ?? '-') + ')';
+  const variants = [
+    { user_id: userId, email, amount, type: 'deposit', reason, created_at: new Date().toISOString() },
+    { user_id: userId, email, amount, type: 'deposit', description: reason },
+    { user_id: userId, amount, mutation_type: 'deposit', note: reason },
+    { user_id: userId, amount, type: 'credit', reason },
+    { user_id: userId, email, amount, type: 'deposit', reason, balance_after: balanceAfter, ref_id: depositId }
+  ];
+  for (const row of variants) {
+    try {
+      const { error } = await supabaseClient.from('balance_mutations').insert(row);
+      if (!error) {
+        console.log('✅ balance_mutations inserted', Object.keys(row));
+        return true;
+      }
+      console.warn('mutasi variant fail:', error.message);
+    } catch (e) {
+      console.warn('mutasi variant ex:', e.message);
+    }
   }
+  console.warn('⚠️ Semua insert balance_mutations gagal — cek kolom tabel');
+  return false;
+}
+
+async function markDepositDone(depositId) {
+  const payloads = [
+    { status: 'success', paid_at: new Date().toISOString(), balance_credited: true },
+    { status: 'success', paid_at: new Date().toISOString() },
+    { status: 'success' }
+  ];
+  for (const patch of payloads) {
+    try {
+      const { error } = await supabaseClient.from('deposits').update(patch).eq('id', depositId);
+      if (!error) return true;
+    } catch (_) {}
+  }
+  return false;
 }
 
 async function handleDepositSuccess(opts) {
   if (!currentDeposit) return;
   if (isProcessingDeposit || depositSuccessProcessed) {
-    console.log('🛑 handleDepositSuccess diblok (sudah diproses / sedang proses)');
+    console.log('🛑 handleDepositSuccess diblok');
     return;
   }
   isProcessingDeposit = true;
-  const alreadyPaid = !!(opts && opts.alreadyPaid);
   const btn = document.getElementById('qrisCheckBtn');
-  if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Memproses...'; }
+  if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Memproses saldo...'; }
 
   const depositId = currentDeposit.id;
-  const depositAmount = parseFloat(currentDeposit.amount) || 0;
+  const depositAmount = Math.floor(Number(currentDeposit.amount) || 0);
   const uniqueCode = currentDeposit.unique_code;
   const balBefore = parseFloat(currentProfile?.balance) || 0;
 
   try {
-    // Ambil status deposit + flag kredit
-    let depRow = null;
+    // Pastikan row deposit punya user_id
+    let dep = { ...currentDeposit, user_id: currentDeposit.user_id || currentUser?.id };
     try {
       const { data } = await supabaseClient
         .from('deposits')
-        .select('id, status, amount, balance_credited, unique_code, total_amount')
+        .select('*')
         .eq('id', depositId)
         .maybeSingle();
-      depRow = data;
-    } catch (e) {
-      // fallback tanpa kolom balance_credited
+      if (data) dep = data;
+    } catch (_) {}
+
+    // Jika sudah balance_credited, hanya refresh UI
+    if (dep.balance_credited === true) {
+      depositSuccessProcessed = true;
+      let newBalance = balBefore;
       try {
-        const { data } = await supabaseClient
-          .from('deposits')
-          .select('id, status, amount, unique_code, total_amount')
-          .eq('id', depositId)
-          .maybeSingle();
-        depRow = data;
+        if (typeof forceRefreshBalanceFromDB === 'function') newBalance = await forceRefreshBalanceFromDB();
+        else if (typeof refreshBalance === 'function') { await refreshBalance(); newBalance = currentProfile?.balance; }
       } catch (_) {}
+      await Swal.fire({
+        title: '🎉 Deposit Berhasil!',
+        html: `Saldo +<b style="color:#ffd700;">Rp ${depositAmount.toLocaleString('id-ID')}</b>` +
+          (newBalance != null ? `<br><small>Saldo: Rp ${Number(newBalance).toLocaleString('id-ID')}</small>` : ''),
+        icon: 'success', confirmButtonColor: '#ff6b9d', background: '#1a0e2e', color: '#fff', timer: 3500
+      });
+      stopDepositPolling();
+      try { stopDepositRealtime(); } catch (e) {}
+      if (depositTimerInterval) { clearInterval(depositTimerInterval); depositTimerInterval = null; }
+      closeQrisModal();
+      try { if (typeof loadMutasiUser === 'function') loadMutasiUser(); } catch (e) {}
+      return;
     }
 
-    // Claim pending → success (jika masih pending)
-    let weClaimed = false;
-    if (!depRow || depRow.status === 'pending') {
-      const { data: claimed, error: updErr } = await supabaseClient
-        .from('deposits')
-        .update({ status: 'success', paid_at: new Date().toISOString() })
-        .eq('id', depositId)
-        .eq('status', 'pending')
-        .select('id')
-        .maybeSingle();
-      if (updErr) console.warn('⚠️ Update deposit status:', updErr.message);
-      weClaimed = !!claimed;
-    }
-
-    const alreadyCredited = !!(depRow && depRow.balance_credited === true);
-
-    // WAJIB kredit jika belum ditandai balance_credited
-    // (meski alreadyPaid dari callback — callback bisa gagal kredit)
-    let creditResult = { ok: alreadyCredited };
-    if (!alreadyCredited) {
-      creditResult = await creditDepositBalance(depositAmount, uniqueCode, depositId);
-      if (creditResult.ok) {
-        await markDepositBalanceCredited(depositId);
+    // KREDIT WAJIB ke Supabase
+    const credit = await forceCreditDepositToSupabase(dep);
+    if (!credit.ok) {
+      // cek apakah saldo sudah naik dari proses lain
+      let balNow = balBefore;
+      try {
+        if (typeof forceRefreshBalanceFromDB === 'function') balNow = parseFloat(await forceRefreshBalanceFromDB()) || balBefore;
+      } catch (_) {}
+      if (balNow >= balBefore + depositAmount - 0.5) {
+        await markDepositDone(depositId);
       } else {
-        // Verifikasi: mungkin callback sudah menambah saldo
-        let balNow = balBefore;
-        try {
-          if (typeof forceRefreshBalanceFromDB === 'function') {
-            balNow = parseFloat(await forceRefreshBalanceFromDB()) || balBefore;
-          }
-        } catch (_) {}
-        if (balNow >= balBefore + depositAmount - 0.5) {
-          creditResult = { ok: true, via: 'balance_already_increased' };
-          await markDepositBalanceCredited(depositId);
-        } else {
-          throw new Error('Pembayaran terdeteksi tapi gagal menambah saldo. Klik Cek Status lagi atau hubungi CS. (RPC add_user_balance gagal)');
-        }
+        throw new Error(credit.message || 'Gagal menambah saldo di database. Cek RLS profiles / jalankan SQL complete_deposit.');
       }
     }
 
-    // Refresh saldo UI
-    let newBalance = null;
+    // Refresh UI
+    let newBalance = credit.newBalance;
     try {
       if (typeof forceRefreshBalanceFromDB === 'function') {
         newBalance = await forceRefreshBalanceFromDB();
@@ -4332,62 +4369,40 @@ async function handleDepositSuccess(opts) {
         newBalance = currentProfile?.balance;
       }
     } catch (e) {
-      console.warn('⚠️ refresh balance:', e.message);
+      console.warn('refresh balance', e.message);
+    }
+    if (newBalance != null && currentProfile) {
+      currentProfile.balance = newBalance;
+      try { updateBalanceDisplay(newBalance); } catch (_) {}
     }
 
-    // Jika setelah kredit saldo masih belum naik, coba sekali lagi
-    if (newBalance != null && depositAmount > 0) {
-      const nb = parseFloat(newBalance) || 0;
-      if (nb < balBefore + depositAmount - 0.5 && !alreadyCredited) {
-        console.warn('Saldo belum naik, retry credit...');
-        const retry = await creditDepositBalance(depositAmount, uniqueCode, depositId);
-        if (retry.ok) {
-          try {
-            if (typeof forceRefreshBalanceFromDB === 'function') {
-              newBalance = await forceRefreshBalanceFromDB();
-            }
-          } catch (_) {}
-        }
-      }
-    }
-
-    // Referral
+    // Referral best-effort
     try {
       const uniqueNum = parseFloat(uniqueCode) || 0;
-      const claimResult = await processReferralBonusOnDeposit({
-        userId: currentUser.id,
-        userEmail: currentUser.email,
-        depositId,
-        depositAmount,
-        uniqueCode: uniqueNum
-      });
-      console.log('🎁 Referral claim result:', claimResult);
-      if (claimResult && claimResult.reward > 0) {
-        const Toast = Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 5000, timerProgressBar: true, background: '#1a0e2e', color: '#fff' });
-        Toast.fire({
-          icon: 'success',
-          title: '🎁 Bonus Referral',
-          html: `Upline dapat Rp ${Number(claimResult.reward).toLocaleString('id-ID')}`
+      if (typeof processReferralBonusOnDeposit === 'function') {
+        await processReferralBonusOnDeposit({
+          userId: currentUser.id,
+          userEmail: currentUser.email,
+          depositId,
+          depositAmount,
+          uniqueCode: uniqueNum
         });
-        try {
-          if (typeof forceRefreshBalanceFromDB === 'function') await forceRefreshBalanceFromDB();
-        } catch (_) {}
       }
     } catch (e) {
-      console.warn('⚠️ Claim referral exception:', e.message);
+      console.warn('referral', e.message);
     }
 
     depositSuccessProcessed = true;
-    const statusEl = document.getElementById('qrisStatus');
     const statusText = document.getElementById('qrisStatusText');
-    if (statusEl) statusEl.className = 'qris-status';
     if (statusText) statusText.textContent = '✅ Berhasil!';
+    const statusEl = document.getElementById('qrisStatus');
+    if (statusEl) statusEl.className = 'qris-status';
 
     await Swal.fire({
       title: '🎉 Deposit Berhasil!',
       html: `Saldo +<b style="color:#ffd700;">Rp ${depositAmount.toLocaleString('id-ID')}</b>` +
         (newBalance != null ? `<br><small style="color:#94a3b8;">Saldo sekarang: Rp ${Number(newBalance).toLocaleString('id-ID')}</small>` : '') +
-        (creditResult.via ? `<br><small style="color:#64748b;">via ${creditResult.via}</small>` : ''),
+        (credit.via ? `<br><small style="color:#64748b;">via ${credit.via}</small>` : ''),
       icon: 'success',
       confirmButtonColor: '#ff6b9d',
       background: '#1a0e2e',
@@ -4400,23 +4415,21 @@ async function handleDepositSuccess(opts) {
     try { stopDepositRealtime(); } catch (e) {}
     if (depositTimerInterval) { clearInterval(depositTimerInterval); depositTimerInterval = null; }
     closeQrisModal();
-
     try { if (typeof loadMutasiUser === 'function') loadMutasiUser(); } catch (e) {}
 
   } catch (err) {
-    console.error('❌ handleDepositSuccess error:', err);
+    console.error('❌ handleDepositSuccess', err);
     Swal.fire({
-      title: '❌ Gagal Proses Deposit',
+      title: '❌ Gagal menambah saldo',
       html: `<div style="text-align:left;color:#ddd;font-size:13px;">
-        <p>${typeof escapeHtml === 'function' ? escapeHtml(err.message) : (err.message || 'Unknown error')}</p>
-        <p style="margin-top:8px;font-size:11.5px;color:#facc15;">⚠️ Kalau pembayaran sudah masuk, klik "Cek Status" lagi atau hubungi CS.</p>
+        <p>${typeof escapeHtml === 'function' ? escapeHtml(err.message) : (err.message || '')}</p>
+        <p style="margin-top:8px;font-size:11.5px;color:#facc15;">Pembayaran mungkin sudah masuk. Klik <b>Cek Status</b> lagi. Jika tetap gagal, policy RLS tabel <code>profiles</code> / <code>balance_mutations</code> memblokir update — jalankan SQL <code>complete_deposit</code>.</p>
       </div>`,
       icon: 'error',
       confirmButtonColor: '#ff4444',
       background: '#1a0e2e',
       color: '#fff'
     });
-    try { if (typeof forceRefreshBalanceFromDB === 'function') await forceRefreshBalanceFromDB(); } catch (e) {}
   } finally {
     isProcessingDeposit = false;
     if (btn && !depositSuccessProcessed) {
