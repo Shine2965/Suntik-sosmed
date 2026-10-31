@@ -3549,14 +3549,31 @@ function parseAmount(rawAmount) {
   return isNaN(num) ? 0 : Math.floor(num);
 }
 function isTransactionMatch(m, targetAmount) {
-  const amt = parseAmount(m.amount ?? m.nominal ?? m.total ?? 0);
-  if (amt !== targetAmount) return { match: false, amt };
-  const type = String(m.type || m.status || '').trim().toUpperCase();
-  const isCredit = type === 'CR' || type === 'CREDIT' || type === 'SUCCESS' || type === 'IN';
-  if (!isCredit) return { match: false, amt };
-  const dateStr = m.date || m.time || m.created_at;
+  if (m == null) return { match: false, amt: 0 };
+  const target = Math.floor(Number(targetAmount) || 0);
+  const amt = parseAmount(m.amount ?? m.nominal ?? m.total ?? m._amount ?? 0);
+  if (!target || amt !== target) return { match: false, amt };
+  // Type: terima CR / kosong (beberapa response tidak kirim type)
+  const type = String(m.type || m.status || m.qris || '').trim().toUpperCase();
+  if (type === 'DB' || type === 'DEBIT' || type === 'OUT') return { match: false, amt };
+  // Window waktu longgar (45 menit) — callback + polling
+  const dateStr = m.date || m.time || m.created_at || m.datetime;
   if (dateStr) {
-    try { const isoStr = String(dateStr).replace(' ', 'T') + '+07:00'; const txTime = new Date(isoStr); if (!isNaN(txTime.getTime())) { const diffMin = (Date.now() - txTime.getTime()) / 1000 / 60; if (diffMin > 30) return { match: false, amt }; } } catch(e) {}
+    try {
+      let isoStr = String(dateStr).trim();
+      // format DD/MM/YYYY HH:mm
+      const mdy = isoStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})/);
+      if (mdy) {
+        isoStr = mdy[3] + '-' + mdy[2].padStart(2,'0') + '-' + mdy[1].padStart(2,'0') + 'T' + mdy[4].padStart(2,'0') + ':' + mdy[5] + ':00+07:00';
+      } else if (/^\d{4}-\d{2}-\d{2} /.test(isoStr)) {
+        isoStr = isoStr.replace(' ', 'T') + '+07:00';
+      }
+      const txTime = new Date(isoStr);
+      if (!isNaN(txTime.getTime())) {
+        const diffMin = (Date.now() - txTime.getTime()) / 1000 / 60;
+        if (diffMin > 45 || diffMin < -5) return { match: false, amt };
+      }
+    } catch (e) {}
   }
   return { match: true, amt, data: m };
 }
@@ -3599,9 +3616,12 @@ async function createDeposit(amount) {
     isProcessingDeposit = false;
     document.getElementById('qrisAmount').textContent = 'Rp ' + totalAmount.toLocaleString('id-ID');
     document.getElementById('qrisAmountDetail').innerHTML = `Nominal: Rp ${amount.toLocaleString('id-ID')} + Kode Unik: <b style="color:#ffd700;">${uniqueCode}</b>`;
+    const stEl = document.getElementById('qrisStatus');
+    if (stEl) { stEl.textContent = '⏳ Menunggu pembayaran… auto-cek aktif'; stEl.className = 'qris-status waiting'; }
     document.getElementById('qrisModal').classList.add('show');
     setTimeout(() => renderQrisToCanvas(buildDynamicQris(QRIS_CRC, totalAmount)), 100);
     startDepositTimer(expiresAt);
+    startDepositRealtime(data.id);
     startDepositPolling(totalAmount);
   } catch (err) { Swal.fire({ title: '❌ Gagal', text: err.message, icon: 'error', confirmButtonColor: '#ff4444', background: '#1a0e2e', color: '#fff' }); }
 }
@@ -3618,36 +3638,127 @@ function startDepositTimer(expiresAt) {
   tick();
   depositTimerInterval = setInterval(tick, 1000);
 }
+function extractMutasiList(json) {
+  if (!json) return [];
+  if (Array.isArray(json.data)) return json.data;
+  if (Array.isArray(json.mutasi)) return json.mutasi;
+  if (Array.isArray(json.result)) return json.result;
+  const raw = json.raw;
+  if (Array.isArray(raw?.data)) return raw.data;
+  if (Array.isArray(raw?.mutasi)) return raw.mutasi;
+  if (Array.isArray(raw?.result)) return raw.result;
+  if (Array.isArray(raw?.transactions)) return raw.transactions;
+  if (Array.isArray(raw)) return raw;
+  return [];
+}
+
+let depositRealtimeChannel = null;
+function stopDepositRealtime() {
+  if (depositRealtimeChannel && typeof supabaseClient !== 'undefined') {
+    try { supabaseClient.removeChannel(depositRealtimeChannel); } catch (e) {}
+  }
+  depositRealtimeChannel = null;
+}
+
+function startDepositRealtime(depositId) {
+  stopDepositRealtime();
+  if (!depositId || !supabaseClient) return;
+  depositRealtimeChannel = supabaseClient
+    .channel('deposit_' + depositId)
+    .on('postgres_changes', {
+      event: 'UPDATE',
+      schema: 'public',
+      table: 'deposits',
+      filter: 'id=eq.' + depositId
+    }, async (payload) => {
+      const row = payload.new;
+      if (!row) return;
+      if (row.status === 'success' && !depositSuccessProcessed && !isProcessingDeposit) {
+        // Callback server sudah proses — UI saja (jangan double kredit)
+        await handleDepositSuccess({ alreadyPaid: true });
+      }
+    })
+    .subscribe();
+}
+
 function startDepositPolling(targetAmount) {
   if (depositPollingInterval) { clearInterval(depositPollingInterval); depositPollingInterval = null; }
+  let consecutiveErrors = 0;
+
+  async function checkDbStatus() {
+    if (!currentDeposit?.id || depositSuccessProcessed || isProcessingDeposit) return false;
+    try {
+      const { data } = await supabaseClient
+        .from('deposits')
+        .select('id, status, amount, unique_code, total_amount')
+        .eq('id', currentDeposit.id)
+        .maybeSingle();
+      if (data && data.status === 'success') {
+        await handleDepositSuccess({ alreadyPaid: true });
+        return true;
+      }
+    } catch (e) {}
+    return false;
+  }
+
   async function checkMutation() {
     if (depositSuccessProcessed || isProcessingDeposit || !currentDeposit) return;
+    // 1) Cek DB dulu (callback mungkin sudah sukses)
+    if (await checkDbStatus()) return;
+
     try {
-      const res = await fetch(`/api/mutasi?amount=${targetAmount}&t=${Date.now()}`);
-      if (!res.ok) return;
+      const res = await fetch(`/api/mutasi?amount=${encodeURIComponent(targetAmount)}&t=${Date.now()}`, {
+        cache: 'no-store',
+        headers: { Accept: 'application/json' }
+      });
+      if (!res.ok) { consecutiveErrors++; return; }
       const json = await res.json();
-      if (!json.success) return;
-      const raw = json.raw || {};
-      let mutasiList = [];
-      if (Array.isArray(raw?.data)) mutasiList = raw.data;
-      else if (Array.isArray(raw?.mutasi)) mutasiList = raw.mutasi;
-      else if (Array.isArray(raw?.result)) mutasiList = raw.result;
-      else if (Array.isArray(raw)) mutasiList = raw;
+      consecutiveErrors = 0;
+      if (!json || json.success === false) {
+        // tetap coba all list jika ada
+      }
+
+      let mutasiList = extractMutasiList(json);
+      if (Array.isArray(json.all) && json.all.length) {
+        // gabung agar tidak miss karena filter server
+        const ids = new Set(mutasiList.map(x => JSON.stringify(x)));
+        for (const m of json.all) {
+          const k = JSON.stringify(m);
+          if (!ids.has(k)) mutasiList.push(m);
+        }
+      }
+      const target = Math.floor(Number(targetAmount) || 0);
       for (const m of mutasiList) {
-        if (isTransactionMatch(m, targetAmount).match) {
+        if (isTransactionMatch(m, target).match) {
           clearInterval(depositPollingInterval);
           depositPollingInterval = null;
           if (depositTimerInterval) { clearInterval(depositTimerInterval); depositTimerInterval = null; }
-          await handleDepositSuccess();
+          stopDepositRealtime();
+          await handleDepositSuccess({ alreadyPaid: false });
           return;
         }
       }
-    } catch (err) { /* silent */ }
+      // Update status UI
+      const st = document.getElementById('qrisStatus');
+      if (st && !depositSuccessProcessed) {
+        st.textContent = consecutiveErrors > 2
+          ? '⏳ Menunggu… (cek mutasi gagal, coba "Cek Status")'
+          : '⏳ Menunggu pembayaran… auto-cek aktif';
+      }
+    } catch (err) {
+      consecutiveErrors++;
+      console.warn('poll mutasi', err.message || err);
+    }
   }
+
   checkMutation();
-  depositPollingInterval = setInterval(checkMutation, 5000);
+  // Lebih rapat: 2.5 detik
+  depositPollingInterval = setInterval(checkMutation, 2000);
 }
-function stopDepositPolling() { if (depositPollingInterval) { clearInterval(depositPollingInterval); depositPollingInterval = null; } }
+function stopDepositPolling() {
+  if (depositPollingInterval) { clearInterval(depositPollingInterval); depositPollingInterval = null; }
+  stopDepositRealtime();
+}
 
 // ============================================================
 
@@ -4054,13 +4165,14 @@ async function claimReferralBonusFallback({ userId, userEmail, depositId, unique
 
 // handleDepositSuccess — stabil (referensi HTML kedua) + guard anti-double + referral
 // ============================================================
-async function handleDepositSuccess() {
+async function handleDepositSuccess(opts) {
   if (!currentDeposit) return;
   if (isProcessingDeposit || depositSuccessProcessed) {
     console.log('🛑 handleDepositSuccess diblok (sudah diproses / sedang proses)');
     return;
   }
   isProcessingDeposit = true;
+  const alreadyPaid = !!(opts && opts.alreadyPaid);
   const btn = document.getElementById('qrisCheckBtn');
   if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Memproses...'; }
 
@@ -4069,23 +4181,55 @@ async function handleDepositSuccess() {
   const uniqueCode = currentDeposit.unique_code;
 
   try {
-    // 1) Tandai deposit sukses di DB
-    const { error: updErr } = await supabaseClient
-      .from('deposits')
-      .update({ status: 'success', paid_at: new Date().toISOString() })
-      .eq('id', depositId)
-      .eq('status', 'pending');
-    if (updErr) console.warn('⚠️ Update deposit status:', updErr.message);
+    // Cek status DB dulu (callback mungkin sudah kredit)
+    let dbStatus = null;
+    try {
+      const { data: depRow } = await supabaseClient.from('deposits').select('status').eq('id', depositId).maybeSingle();
+      dbStatus = depRow?.status || null;
+    } catch (e) {}
 
-    // 2) Kredit saldo lewat RPC yang sudah terbukti (sama seperti HTML referensi)
-    const { data: balResult, error: balErr } = await supabaseClient.rpc('add_user_balance', {
-      p_target_email: currentUser.email,
-      p_amount: depositAmount,
-      p_reason: `Deposit QRIS sukses (Kode unik: ${uniqueCode})`
-    });
-    if (balErr) throw balErr;
-    if (balResult && balResult.success === false) {
-      throw new Error(balResult.message || 'Gagal menambahkan saldo');
+    const skipCredit = alreadyPaid || dbStatus === 'success';
+
+    if (!skipCredit) {
+      // 1) Tandai deposit sukses di DB (claim pending)
+      const { data: claimed, error: updErr } = await supabaseClient
+        .from('deposits')
+        .update({ status: 'success', paid_at: new Date().toISOString() })
+        .eq('id', depositId)
+        .eq('status', 'pending')
+        .select('id')
+        .maybeSingle();
+      if (updErr) console.warn('⚠️ Update deposit status:', updErr.message);
+
+      // Jika tidak bisa claim (sudah success oleh callback), jangan kredit lagi
+      if (!claimed && dbStatus === 'success') {
+        // already paid
+      } else if (!claimed) {
+        // cek ulang
+        const { data: again } = await supabaseClient.from('deposits').select('status').eq('id', depositId).maybeSingle();
+        if (again?.status === 'success') {
+          // callback won the race
+        } else if (updErr) {
+          throw updErr;
+        }
+      } else {
+        // 2) Kredit saldo
+        const { data: balResult, error: balErr } = await supabaseClient.rpc('add_user_balance', {
+          p_target_email: currentUser.email,
+          p_amount: depositAmount,
+          p_reason: `Deposit QRIS sukses (Kode unik: ${uniqueCode})`
+        });
+        if (balErr) throw balErr;
+        if (balResult && balResult.success === false) {
+          throw new Error(balResult.message || 'Gagal menambahkan saldo');
+        }
+      }
+    } else {
+      // Pastikan status success (no-op jika sudah)
+      try {
+        await supabaseClient.from('deposits').update({ status: 'success', paid_at: new Date().toISOString() })
+          .eq('id', depositId).eq('status', 'pending');
+      } catch (e) {}
     }
 
     // 3) Refresh saldo UI
@@ -4183,6 +4327,7 @@ function closeQrisModal() {
   document.getElementById('qrisModal').classList.remove('show');
   if (depositTimerInterval) { clearInterval(depositTimerInterval); depositTimerInterval = null; }
   stopDepositPolling();
+  try { stopDepositRealtime(); } catch (e) {}
   currentDeposit = null;
   depositSuccessProcessed = false;
   isProcessingDeposit = false;
@@ -4199,23 +4344,24 @@ async function manualCheckPayment() {
   const btn = document.getElementById('qrisCheckBtn');
   if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Memeriksa...'; }
   try {
-    const targetAmount = currentDeposit.total_amount;
-    const res = await fetch(`/api/mutasi?amount=${targetAmount}&t=${Date.now()}`);
+    // 1) Cek status deposit di DB (callback server)
+    const { data: depRow } = await supabaseClient.from('deposits').select('status').eq('id', currentDeposit.id).maybeSingle();
+    if (depRow?.status === 'success') {
+      await handleDepositSuccess({ alreadyPaid: true });
+      return;
+    }
+    const targetAmount = Math.floor(Number(currentDeposit.total_amount) || 0);
+    const res = await fetch(`/api/mutasi?amount=${encodeURIComponent(targetAmount)}&t=${Date.now()}`, { cache: 'no-store' });
     const json = await res.json();
-    if (!json.success) throw new Error('Gagal ambil data mutasi');
-    const raw = json.raw || {};
-    let mutasiList = [];
-    if (Array.isArray(raw?.data)) mutasiList = raw.data;
-    else if (Array.isArray(raw?.mutasi)) mutasiList = raw.mutasi;
-    else if (Array.isArray(raw?.result)) mutasiList = raw.result;
-    else if (Array.isArray(raw)) mutasiList = raw;
+    if (!json.success) throw new Error(json.message || 'Gagal ambil data mutasi');
+    const mutasiList = (typeof extractMutasiList === 'function') ? extractMutasiList(json) : (json.data || []);
     for (const m of mutasiList) {
       if (isTransactionMatch(m, targetAmount).match) {
-        await handleDepositSuccess();
+        await handleDepositSuccess({ alreadyPaid: false });
         return;
       }
     }
-    Swal.fire({ title: '⏳ Belum Ada', text: 'Coba lagi beberapa saat.', icon: 'info', confirmButtonColor: '#00c6ff', background: '#1a0e2e', color: '#fff' });
+    Swal.fire({ title: '⏳ Belum terdeteksi', text: 'Pastikan transfer tepat nominal total (harga + kode unik). Auto-cek tetap berjalan.', icon: 'info', confirmButtonColor: '#00c6ff', background: '#1a0e2e', color: '#fff' });
   } catch (err) {
     Swal.fire({ title: '❌ Gagal', text: err.message, icon: 'error', confirmButtonColor: '#ff4444', background: '#1a0e2e', color: '#fff' });
   } finally {
