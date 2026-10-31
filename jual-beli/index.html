@@ -392,11 +392,27 @@ document.addEventListener('keydown', (e) => {
 });
 
 function formatRp(n){ return 'Rp ' + (Number(n)||0).toLocaleString('id-ID'); }
-function starsHtml(avg){
-  const a = Math.round(Number(avg)||0);
+function starsHtml(avg, reviewCount){
+  // Shopee-style: skala 5 bintang. Belum ada ulasan → tampil 5 penuh.
+  // Ada ulasan → isi sesuai rata-rata (dibulatkan).
+  let a;
+  if (reviewCount === 0 || reviewCount === '0') {
+    a = 5;
+  } else if (avg == null || avg === '' || (Number(avg) === 0 && !reviewCount)) {
+    a = 5;
+  } else {
+    a = Math.round(Number(avg) || 0);
+  }
+  a = Math.max(0, Math.min(5, a));
   let h = '';
-  for(let i=1;i<=5;i++) h += i<=a ? '★' : '☆';
+  for (let i = 1; i <= 5; i++) h += i <= a ? '★' : '☆';
   return h;
+}
+function ratingDisplay(avg, reviewCount){
+  const c = Number(reviewCount) || 0;
+  if (c <= 0) return { stars: starsHtml(5, 0), num: '5.0', count: 0 };
+  const n = Number(avg) || 0;
+  return { stars: starsHtml(n, c), num: n.toFixed(1), count: c };
 }
 
 function initSb(){
@@ -611,7 +627,7 @@ function renderMarket(){
       <div class="product-info">
         <div class="product-title">${escapeHtml(p.title)}</div>
         <div class="product-meta">
-          <span class="stars">${starsHtml(p.avg_rating)} (${Number(p.avg_rating||0).toFixed(1)})</span>
+          <span class="stars">${ratingDisplay(p.avg_rating, p.review_count).stars} (${ratingDisplay(p.avg_rating, p.review_count).num})</span>
           ${badge}
         </div>
         <div class="product-price">${priceLabel}</div>
@@ -650,7 +666,8 @@ async function openDetail(id){
     if (sp) {
       const sr = Number(sp.seller_rating||0);
       const sc = Number(sp.seller_review_count||0);
-      sellerRatingHtml = `<div class="seller-rating">${starsHtml(sr)} Seller ${sr.toFixed(1)} (${sc} ulasan)</div>`;
+      const rd = ratingDisplay(sr, sc);
+      sellerRatingHtml = `<div class="seller-rating">${rd.stars} Seller ${rd.num} (${sc} ulasan)</div>`;
     }
   } catch(_){}
 
@@ -734,7 +751,7 @@ async function openDetail(id){
     <div class="detail-gallery">${imgs}</div>
     ${auctionBlock}
     <div class="product-meta" style="margin-bottom:10px">
-      <span class="stars">${starsHtml(p.avg_rating)} ${Number(p.avg_rating||0).toFixed(1)} (${p.review_count||0} ulasan)</span>
+      <span class="stars">${ratingDisplay(p.avg_rating, p.review_count).stars} ${ratingDisplay(p.avg_rating, p.review_count).num} (${p.review_count||0} ulasan)</span>
       ${!isAuc ? `<span class="badge ${stock>0?'stock':'soldout'}">${stock>0?stock+' stok':'Habis'}</span>` : ''}
     </div>
     <div style="font-size:11px;color:#94a3b8;margin-bottom:4px">Seller: ${escapeHtml(emailOf(p.seller_id))}</div>
@@ -1047,7 +1064,7 @@ async function loadMyProducts(){
       <div class="product-meta">
         <span class="product-price" style="font-size:13px">${priceTxt}</span>
         ${isAuc ? `<span class="badge auction">${escapeHtml(p.auction_status||'active')}</span>` : `<span class="badge stock">Stok ${p.stock_remaining||0}</span>`}
-        <span class="stars">${starsHtml(p.avg_rating)}</span>
+        <span class="stars">${ratingDisplay(p.avg_rating, p.review_count).stars}</span>
         <span class="badge">${escapeHtml(p.status)}</span>
       </div>
       <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">
