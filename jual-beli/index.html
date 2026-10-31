@@ -745,7 +745,8 @@ async function openDetail(id){
     ? `<button type="button" class="btn btn-secondary" style="margin-top:8px" onclick="openEditProduct('${p.id}')">✏️ Edit Judul / Deskripsi / Harga</button>`
     : '';
   const addStockBtn = (!isAuc && p.seller_id===currentUser?.id)
-    ? `<button type="button" class="btn btn-gold" style="margin-top:8px;position:relative;z-index:5" onclick="event.preventDefault();event.stopPropagation();closeDetail();openAddStock('${p.id}')">➕ Tambah Stok</button>`
+    ? `<button type="button" class="btn btn-gold" style="margin-top:8px;position:relative;z-index:5" onclick="event.preventDefault();event.stopPropagation();closeDetail();openAddStock('${p.id}')">➕ Tambah Stok</button>
+       <button type="button" class="btn btn-secondary" style="margin-top:8px;position:relative;z-index:5" onclick="event.preventDefault();event.stopPropagation();closeDetail();openManageStock('${p.id}')">🗑 Kelola / Hapus Stok</button>`
     : '';
 
   // reviews with admin delete
@@ -1081,7 +1082,8 @@ async function loadMyProducts(){
       <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">
         <button class="btn btn-secondary" style="padding:8px;font-size:11px;width:auto;flex:1" onclick="openDetail('${p.id}')">Lihat</button>
         <button class="btn btn-secondary" style="padding:8px;font-size:11px;width:auto;flex:1" onclick="openEditProduct('${p.id}')">✏️ Edit</button>
-        ${!isAuc ? `<button class="btn btn-gold" style="padding:8px;font-size:11px;width:auto;flex:1" onclick="openAddStock('${p.id}','${escapeHtml(p.title).replace(/'/g,"&#39;")}')">➕ Stok</button>` : (p.auction_status==='active' && p.auction_ends_at && new Date(p.auction_ends_at)<=new Date() ? `<button class="btn btn-gold" style="padding:8px;font-size:11px;width:auto;flex:1" onclick="settleAuction('${p.id}')">🏁 Selesai</button>` : '')}
+        ${!isAuc ? `<button class="btn btn-gold" style="padding:8px;font-size:11px;width:auto;flex:1" onclick="openAddStock('${p.id}','${escapeHtml(p.title).replace(/'/g,"&#39;")}')">➕ Stok</button>
+        <button class="btn btn-secondary" style="padding:8px;font-size:11px;width:auto;flex:1" onclick="openManageStock('${p.id}','${escapeHtml(p.title).replace(/'/g,"&#39;")}')">🗑 Stok</button>` : (p.auction_status==='active' && p.auction_ends_at && new Date(p.auction_ends_at)<=new Date() ? `<button class="btn btn-gold" style="padding:8px;font-size:11px;width:auto;flex:1" onclick="settleAuction('${p.id}')">🏁 Selesai</button>` : '')}
         <button class="btn btn-danger" style="padding:8px;font-size:11px;width:auto;flex:1" onclick="deleteProduct('${p.id}')">Hapus</button>
       </div>
     </div>`;
@@ -1146,6 +1148,111 @@ async function openAddStock(productId, title){
   Swal.fire({ title: 'Stok ditambah!', text: `+${data?.added || formValues.length} stok`, icon: 'success', background: '#1a0e2e', color: '#fff', timer: 2000 });
   loadMyProducts(); loadMarket();
 }
+
+
+async function openManageStock(productId, title){
+  if (!title && productId) {
+    try {
+      const { data: prod } = await sb.from('marketplace_products').select('title').eq('id', productId).maybeSingle();
+      if (prod) title = prod.title;
+    } catch (_) {}
+  }
+  Swal.fire({ title: 'Memuat stok...', allowOutsideClick: false, didOpen: () => Swal.showLoading(), background: '#1a0e2e', color: '#fff' });
+  // Prefer RPC; fallback direct select
+  let rows = [];
+  let errMsg = null;
+  try {
+    const { data, error } = await sb.rpc('marketplace_list_stock', { p_product_id: productId });
+    if (error) throw error;
+    if (data && data.success === false) throw new Error(data.message || 'Gagal');
+    rows = data?.items || data || [];
+    if (!Array.isArray(rows)) rows = [];
+  } catch (e1) {
+    try {
+      const { data, error } = await sb.from('marketplace_stock')
+        .select('id, username, password, is_sold')
+        .eq('product_id', productId)
+        .eq('is_sold', false)
+        .order('created_at', { ascending: true });
+      if (error) throw error;
+      rows = data || [];
+    } catch (e2) {
+      errMsg = e2.message || e1.message || String(e2);
+    }
+  }
+  Swal.close();
+  if (errMsg) {
+    return Swal.fire({ title: 'Gagal memuat stok', text: errMsg + '\nJalankan SQL marketplace_list_stock / pastikan RLS stok untuk seller.', icon: 'error', background: '#1a0e2e', color: '#fff' });
+  }
+  if (!rows.length) {
+    return Swal.fire({ title: 'Stok kosong', text: 'Tidak ada stok tersisa yang bisa dihapus.', icon: 'info', background: '#1a0e2e', color: '#fff' });
+  }
+
+  const listHtml = rows.map((r, i) => {
+    const id = r.id;
+    const u = escapeHtml(r.username || '-');
+    const p = escapeHtml(r.password || '-');
+    return `<label style="display:flex;gap:10px;align-items:flex-start;padding:10px;margin-bottom:6px;border-radius:10px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);cursor:pointer;text-align:left">
+      <input type="checkbox" class="stk-del" value="${escapeHtml(id)}" style="width:18px;height:18px;margin-top:2px;accent-color:#ef4444;flex-shrink:0">
+      <span style="font-size:12px;line-height:1.4;min-width:0;word-break:break-all">
+        <b style="color:#fff">${u}</b><br>
+        <span style="color:#94a3b8">Pass: ${p}</span>
+      </span>
+    </label>`;
+  }).join('');
+
+  const { value: selected } = await Swal.fire({
+    title: 'Kelola / Hapus Stok',
+    html: `<div style="text-align:left;font-size:12px;color:#94a3b8;margin-bottom:8px">${escapeHtml(title || '')} · ${rows.length} stok tersedia</div>
+      <div style="max-height:50vh;overflow-y:auto;margin-bottom:8px">${listHtml}</div>
+      <div style="display:flex;gap:8px;margin-bottom:6px">
+        <button type="button" id="stkSelectAll" class="swal2-styled" style="background:#333;flex:1;font-size:12px;padding:8px">Pilih semua</button>
+        <button type="button" id="stkSelectNone" class="swal2-styled" style="background:#333;flex:1;font-size:12px;padding:8px">Batal pilih</button>
+      </div>
+      <p style="font-size:11px;color:#facc15;text-align:left">Centang stok yang ingin dihapus. Stok yang sudah terjual tidak tampil.</p>`,
+    background: '#1a0e2e', color: '#fff', showCancelButton: true,
+    confirmButtonText: '🗑 Hapus yang dipilih', cancelButtonText: 'Tutup',
+    confirmButtonColor: '#ef4444', width: 440,
+    didOpen: () => {
+      document.getElementById('stkSelectAll')?.addEventListener('click', () => {
+        document.querySelectorAll('.stk-del').forEach(c => { c.checked = true; });
+      });
+      document.getElementById('stkSelectNone')?.addEventListener('click', () => {
+        document.querySelectorAll('.stk-del').forEach(c => { c.checked = false; });
+      });
+    },
+    preConfirm: () => {
+      const ids = [...document.querySelectorAll('.stk-del:checked')].map(c => c.value).filter(Boolean);
+      if (!ids.length) {
+        Swal.showValidationMessage('Pilih minimal 1 stok untuk dihapus');
+        return false;
+      }
+      return ids;
+    }
+  });
+  if (!selected || !selected.length) return;
+
+  const conf = await Swal.fire({
+    title: `Hapus ${selected.length} stok?`,
+    text: 'Stok yang dihapus tidak bisa dikembalikan.',
+    icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444',
+    confirmButtonText: 'Ya, hapus', cancelButtonText: 'Batal',
+    background: '#1a0e2e', color: '#fff'
+  });
+  if (!conf.isConfirmed) return;
+
+  Swal.fire({ title: 'Menghapus...', allowOutsideClick: false, didOpen: () => Swal.showLoading(), background: '#1a0e2e', color: '#fff' });
+  const { data, error } = await sb.rpc('marketplace_remove_stock', {
+    p_product_id: productId,
+    p_stock_ids: selected
+  });
+  Swal.close();
+  if (error) return Swal.fire({ title: 'Gagal', text: error.message, icon: 'error', background: '#1a0e2e', color: '#fff' });
+  if (data && data.success === false) return Swal.fire({ title: 'Gagal', text: data.message || 'Gagal', icon: 'error', background: '#1a0e2e', color: '#fff' });
+  Swal.fire({ title: 'Stok dihapus', text: `-${data?.removed || selected.length} stok · sisa ${data?.remaining ?? '—'}`, icon: 'success', background: '#1a0e2e', color: '#fff', timer: 2000 });
+  loadMyProducts(); loadMarket(); loadSlotInfo();
+}
+
 
 async function deleteProduct(id){
   const c = await Swal.fire({
@@ -1850,6 +1957,7 @@ window.adminDeleteReview = adminDeleteReview;
 window.onAuctionToggle = onAuctionToggle;
 window.openChatPanel = openChatPanel;
 window.openAddStock = openAddStock;
+window.openManageStock = openManageStock;
 window.addEventListener('load', async () => {
   initSb();
   await initAuth();
