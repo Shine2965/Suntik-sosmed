@@ -1,5 +1,5 @@
-// /api/mutasi.js
-// Proxy ambil mutasi QRIS dari Qiospay — response selalu normalisasi ke data[]
+// /api/mutasi.js — Proxy mutasi QRIS Qiospay
+// Frontend: /api/mutasi?amount=51000
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -19,6 +19,8 @@ export default async function handler(req, res) {
     const targetAmount = parseInt(req.query?.amount || req.body?.amount || 0, 10) || 0;
 
     const url = `https://qiospay.id/api/mutasi/qris/${merchantCode}/${apiKey}`;
+    console.log('📡 Fetch mutasi merchant:', merchantCode, 'target:', targetAmount);
+
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15000);
 
@@ -26,8 +28,12 @@ export default async function handler(req, res) {
     try {
       response = await fetch(url, {
         method: 'GET',
-        headers: { Accept: 'application/json', 'User-Agent': 'Shine-Shop/1.0' },
-        signal: controller.signal,
+        headers: {
+          Accept: 'application/json',
+          'User-Agent': 'Shine-Shop/1.0',
+          'Cache-Control': 'no-cache'
+        },
+        signal: controller.signal
       });
     } finally {
       clearTimeout(timeoutId);
@@ -45,54 +51,57 @@ export default async function handler(req, res) {
       throw new Error(`Qiospay response bukan JSON: ${rawText.substring(0, 200)}`);
     }
 
+    const isSuccess =
+      data.status === 'success' ||
+      data.success === true ||
+      data.status === true ||
+      data.status === 'ok' ||
+      Array.isArray(data.data) ||
+      Array.isArray(data);
+
+    if (!isSuccess) {
+      return res.status(200).json({
+        success: false,
+        message: data.message || data.messages || data.msg || 'Qiospay response tidak sukses',
+        raw: data
+      });
+    }
+
     let mutasiList = [];
-    if (Array.isArray(data?.data)) mutasiList = data.data;
-    else if (Array.isArray(data?.mutasi)) mutasiList = data.mutasi;
-    else if (Array.isArray(data?.result)) mutasiList = data.result;
-    else if (Array.isArray(data?.transactions)) mutasiList = data.transactions;
+    if (Array.isArray(data.data)) mutasiList = data.data;
+    else if (Array.isArray(data.mutasi)) mutasiList = data.mutasi;
+    else if (Array.isArray(data.result)) mutasiList = data.result;
+    else if (Array.isArray(data.transactions)) mutasiList = data.transactions;
     else if (Array.isArray(data)) mutasiList = data;
 
-    function rowAmount(m) {
-      if (m == null) return 0;
-      if (typeof m === 'number') return Math.floor(m);
-      const v = m.amount ?? m.nominal ?? m.total ?? m.kredit ?? m.credit ?? m.value ?? 0;
-      let str = String(v).trim().replace(/[Rr][Pp]/g, '').replace(/\s/g, '');
-      if (str.includes(',') && str.includes('.')) {
-        if (str.lastIndexOf('.') > str.lastIndexOf(',')) str = str.replace(/,/g, '');
-        else str = str.replace(/\./g, '').replace(',', '.');
-      } else if (str.includes(',')) str = str.replace(/\./g, '').replace(',', '.');
-      else if ((str.match(/\./g) || []).length > 1) str = str.replace(/\./g, '');
-      const n = parseFloat(str);
-      return isNaN(n) ? 0 : Math.floor(n);
-    }
+    // Normalisasi amount ke number
+    mutasiList = mutasiList.map((m) => {
+      if (!m || typeof m !== 'object') return m;
+      const amt = Math.floor(parseFloat(String(m.amount ?? m.nominal ?? m.total ?? 0).replace(/[^\d.-]/g, '')) || 0);
+      return { ...m, amount: amt, _amount: amt };
+    });
 
     let filtered = mutasiList;
     if (targetAmount > 0) {
-      filtered = mutasiList.filter((m) => rowAmount(m) === targetAmount);
+      filtered = mutasiList.filter((m) => Math.floor(Number(m.amount) || 0) === targetAmount);
     }
-
-    // Normalisasi agar frontend mudah match
-    const normalized = filtered.map((m) => ({
-      ...m,
-      amount: rowAmount(m),
-      nominal: rowAmount(m),
-    }));
 
     return res.status(200).json({
       success: true,
       target_amount: targetAmount,
-      count: normalized.length,
+      count: filtered.length,
       total: mutasiList.length,
-      data: normalized,
-      mutasi: normalized,
-      raw: data,
+      data: filtered,
+      // kirim juga list penuh agar client bisa match manual
+      all: targetAmount > 0 ? mutasiList.slice(0, 50) : undefined,
+      raw: data
     });
   } catch (error) {
     console.error('❌ Mutasi error:', error.message);
     return res.status(500).json({
       success: false,
       message: error.message || 'Internal server error',
-      code: error.code || null,
+      code: error.name === 'AbortError' ? 'TIMEOUT' : null
     });
   }
 }
