@@ -861,11 +861,28 @@ body.chat-open .cs-bubble-container{display:none !important}
 @media(max-width:360px){.auth-stats{grid-template-columns:1fr;}.auth-stat-card .as-value{font-size:16px}}
 .auth-stats-note{font-size:10px;color:#6b4a7a;text-align:center;margin-top:6px;font-style:italic}
 
+
+.maint-overlay{position:fixed;inset:0;z-index:9999;background:rgba(10,5,20,0.97);display:none;align-items:center;justify-content:center;padding:24px;text-align:center}
+.maint-overlay.show{display:flex}
+.maint-card{max-width:400px;width:100%;background:linear-gradient(135deg,rgba(250,204,21,0.12),rgba(255,107,157,0.08));border:1.5px solid rgba(250,204,21,0.4);border-radius:20px;padding:28px 22px}
+.maint-card h2{font-size:20px;font-weight:900;color:#facc15;margin-bottom:10px}
+.maint-card p{font-size:13px;color:#e2e8f0;line-height:1.55;margin-bottom:12px}
+.maint-card .maint-meta{font-size:11px;color:#94a3b8}
+
 </style>
 </head>
 <body>
 
 <div id="modToastWrap" class="mod-toast-wrap" aria-live="polite"></div>
+
+<div class="maint-overlay" id="maintOverlay">
+  <div class="maint-card">
+    <h2>🛠️ Maintenance</h2>
+    <p id="maintOverlayMsg">Sedang maintenance. Silakan coba lagi nanti.</p>
+    <div class="maint-meta" id="maintOverlayMeta"></div>
+  </div>
+</div>
+
 <div class="app">
   <div class="app-bar">
     <div class="app-logo"><img src="/home/logo.png" alt="Shine" onerror="this.style.display='none';this.parentElement.innerHTML='✨'"></div>
@@ -1064,6 +1081,28 @@ body.chat-open .cs-bubble-container{display:none !important}
           <div class="link-info"><div class="link-title">Buka Halaman Member</div><div class="link-sub">Filter, cari, ubah role, kelola, dan hapus akun user</div></div>
           <span class="link-badge" id="adminMemberCount">0</span>
           <span class="link-arrow">→</span>
+        </div>
+
+
+        <div class="section-title" style="margin-top:14px;">🛠️ Maintenance<div class="line"></div></div>
+        <div class="withdraw-card" style="background:linear-gradient(135deg,rgba(250,204,21,0.08),rgba(239,68,68,0.05));border-color:rgba(250,204,21,0.3);margin-bottom:14px;">
+          <div class="wc-title" style="color:#facc15;">Mode Maintenance</div>
+          <div class="wc-subtitle">Jika aktif, hanya <b>Owner &amp; Admin</b> yang bisa mengakses Shine Shop &amp; Account Market. User/CS diblokir. Status tersinkron otomatis.</div>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin:10px 0;padding:10px 12px;background:rgba(0,0,0,0.2);border-radius:10px;">
+            <span style="font-size:13px;font-weight:800;" id="maintStatusLabel">Status: OFF</span>
+            <button type="button" id="maintToggleBtn" onclick="toggleMaintenanceNow()" style="padding:10px 14px;border-radius:10px;border:none;font-weight:800;font-family:inherit;cursor:pointer;background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;">Aktifkan</button>
+          </div>
+          <div class="bf-label" style="margin-top:8px;">Pesan untuk user</div>
+          <textarea id="maintMessage" class="bf-textarea" rows="2" maxlength="300" placeholder="Sedang maintenance..." style="min-height:60px;">Sedang maintenance. Silakan coba lagi nanti.</textarea>
+          <div class="bf-label">Jadwal mulai (opsional, WIB)</div>
+          <input type="datetime-local" id="maintStart" class="bf-input" style="color-scheme:dark;">
+          <div class="bf-label">Jadwal selesai (opsional, WIB)</div>
+          <input type="datetime-local" id="maintEnd" class="bf-input" style="color-scheme:dark;">
+          <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
+            <button class="withdraw-btn" style="flex:1;min-width:120px;" onclick="saveMaintenanceSettings()">💾 Simpan</button>
+            <button class="withdraw-btn" style="flex:1;min-width:120px;background:rgba(255,255,255,0.08);color:#fff;border:1px solid rgba(255,255,255,0.15);" onclick="clearMaintenanceSchedule()">🧹 Hapus Jadwal</button>
+          </div>
+          <div id="maintScheduleInfo" style="margin-top:8px;font-size:11px;color:#94a3b8;"></div>
         </div>
 
         <div class="section-title" style="margin-top:14px;">⚙️ Pengaturan Referral<div class="line"></div></div>
@@ -3125,6 +3164,7 @@ async function updateAuthUI(user) {
     startBalanceRealtime();
     isCS = (role === 'cs');
     isAdminOrOwner = (role === 'admin' || role === 'owner');
+    try { applyMaintenanceGate(); } catch(e) {}
     isOwner = (role === 'owner');
     isStaff = (isAdminOrOwner || isCS);
     const wdSaldo = document.getElementById('wdSaldoValue');
@@ -7973,7 +8013,194 @@ window.addEventListener('load', async () => {
   if (bfTitle) bfTitle.addEventListener('input', updateBroadcastCharCount);
   if (bfMessage) bfMessage.addEventListener('input', updateBroadcastCharCount);
   document.getElementById('chatHubModal').addEventListener('click', (e) => { if (e.target.id === 'chatHubModal') closeChatHub(); });
-  console.log('🌸 Shine Shop ready!');
+  
+/* ========== SITE MAINTENANCE ========== */
+let maintenanceState = { enabled: false, message: '', scheduled_start: null, scheduled_end: null };
+let maintenanceChannel = null;
+
+function isMaintenanceActive(state) {
+  if (!state) return false;
+  if (state.enabled) return true;
+  const now = Date.now();
+  const a = state.scheduled_start ? new Date(state.scheduled_start).getTime() : null;
+  const b = state.scheduled_end ? new Date(state.scheduled_end).getTime() : null;
+  if (a && b) return now >= a && now <= b;
+  if (a && !b) return now >= a;
+  return false;
+}
+
+function canBypassMaintenance() {
+  const role = currentProfile?.role || '';
+  return role === 'owner' || role === 'admin';
+}
+
+function applyMaintenanceGate() {
+  const active = isMaintenanceActive(maintenanceState);
+  const bypass = canBypassMaintenance();
+  const overlay = document.getElementById('maintOverlay');
+  if (!overlay) return;
+  if (active && !bypass) {
+    overlay.classList.add('show');
+    const msg = document.getElementById('maintOverlayMsg');
+    if (msg) msg.textContent = maintenanceState.message || 'Sedang maintenance. Silakan coba lagi nanti.';
+    let meta = '';
+    if (maintenanceState.scheduled_start || maintenanceState.scheduled_end) {
+      const fmt = (x) => x ? new Date(x).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) + ' WIB' : '—';
+      meta = 'Jadwal: ' + fmt(maintenanceState.scheduled_start) + ' → ' + fmt(maintenanceState.scheduled_end);
+    }
+    const metaEl = document.getElementById('maintOverlayMeta');
+    if (metaEl) metaEl.textContent = meta;
+    try { document.body.style.overflow = 'hidden'; } catch(e) {}
+  } else {
+    overlay.classList.remove('show');
+    try { document.body.style.overflow = ''; } catch(e) {}
+  }
+  updateMaintenanceAdminUI();
+}
+
+function updateMaintenanceAdminUI() {
+  if (!isAdminOrOwner) return;
+  const active = isMaintenanceActive(maintenanceState);
+  const label = document.getElementById('maintStatusLabel');
+  const btn = document.getElementById('maintToggleBtn');
+  if (label) label.textContent = active ? 'Status: ON (user diblokir)' : 'Status: OFF';
+  if (btn) {
+    btn.textContent = maintenanceState.enabled ? 'Nonaktifkan' : 'Aktifkan';
+    btn.style.background = maintenanceState.enabled
+      ? 'linear-gradient(135deg,#ef4444,#b91c1c)'
+      : 'linear-gradient(135deg,#22c55e,#16a34a)';
+  }
+  const msg = document.getElementById('maintMessage');
+  if (msg && document.activeElement !== msg) msg.value = maintenanceState.message || msg.value;
+  const info = document.getElementById('maintScheduleInfo');
+  if (info) {
+    if (maintenanceState.scheduled_start || maintenanceState.scheduled_end) {
+      const fmt = (x) => x ? new Date(x).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) + ' WIB' : '—';
+      info.textContent = 'Jadwal tersimpan: ' + fmt(maintenanceState.scheduled_start) + ' → ' + fmt(maintenanceState.scheduled_end);
+    } else info.textContent = 'Tidak ada jadwal otomatis.';
+  }
+}
+
+function toLocalInputValue(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const pad = (n) => String(n).padStart(2, '0');
+  // datetime-local is local time
+  return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate()) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+}
+
+async function loadMaintenanceState() {
+  try {
+    const client = typeof supabaseClient !== 'undefined' ? supabaseClient : (typeof sb !== 'undefined' ? sb : null);
+    if (!client) return;
+    const { data, error } = await client.from('site_maintenance').select('*').eq('id', 1).maybeSingle();
+    if (error) { console.warn('maintenance load', error.message); return; }
+    if (data) {
+      maintenanceState = {
+        enabled: !!data.enabled,
+        message: data.message || 'Sedang maintenance. Silakan coba lagi nanti.',
+        scheduled_start: data.scheduled_start,
+        scheduled_end: data.scheduled_end
+      };
+      const st = document.getElementById('maintStart');
+      const en = document.getElementById('maintEnd');
+      if (st && document.activeElement !== st) st.value = toLocalInputValue(data.scheduled_start);
+      if (en && document.activeElement !== en) en.value = toLocalInputValue(data.scheduled_end);
+    }
+  } catch (e) { console.warn(e); }
+  applyMaintenanceGate();
+}
+
+function subscribeMaintenance() {
+  try {
+    const client = typeof supabaseClient !== 'undefined' ? supabaseClient : null;
+    if (!client) return;
+    if (maintenanceChannel) { try { client.removeChannel(maintenanceChannel); } catch(e) {} }
+    maintenanceChannel = client.channel('site_maint')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'site_maintenance' }, (payload) => {
+        const d = payload.new || payload.old;
+        if (d) {
+          maintenanceState = {
+            enabled: !!d.enabled,
+            message: d.message || maintenanceState.message,
+            scheduled_start: d.scheduled_start,
+            scheduled_end: d.scheduled_end
+          };
+          applyMaintenanceGate();
+        }
+      })
+      .subscribe();
+  } catch (e) { console.warn(e); }
+  // also poll every 30s for schedule window without DB change
+  setInterval(() => applyMaintenanceGate(), 30000);
+}
+
+async function toggleMaintenanceNow() {
+  if (!isAdminOrOwner) return;
+  const next = !maintenanceState.enabled;
+  const conf = await Swal.fire({
+    title: next ? 'Aktifkan maintenance?' : 'Nonaktifkan maintenance?',
+    text: next ? 'User & CS tidak bisa mengakses app.' : 'Semua user bisa masuk lagi.',
+    icon: 'warning', showCancelButton: true, confirmButtonColor: next ? '#ef4444' : '#22c55e',
+    background: '#1a0e2e', color: '#fff', confirmButtonText: next ? 'Aktifkan' : 'Nonaktifkan', cancelButtonText: 'Batal'
+  });
+  if (!conf.isConfirmed) return;
+  const msg = document.getElementById('maintMessage')?.value || maintenanceState.message;
+  const { data, error } = await supabaseClient.rpc('set_site_maintenance', {
+    p_enabled: next,
+    p_message: msg,
+    p_clear_schedule: false
+  });
+  if (error) return Swal.fire({ title: 'Gagal', text: error.message, icon: 'error', background: '#1a0e2e', color: '#fff' });
+  if (data && data.success === false) return Swal.fire({ title: 'Gagal', text: data.message, icon: 'error', background: '#1a0e2e', color: '#fff' });
+  await loadMaintenanceState();
+  Swal.fire({ title: next ? 'Maintenance ON' : 'Maintenance OFF', icon: 'success', background: '#1a0e2e', color: '#fff', timer: 1500 });
+}
+
+async function saveMaintenanceSettings() {
+  if (!isAdminOrOwner) return;
+  const msg = document.getElementById('maintMessage')?.value?.trim() || 'Sedang maintenance. Silakan coba lagi nanti.';
+  const st = document.getElementById('maintStart')?.value;
+  const en = document.getElementById('maintEnd')?.value;
+  let startIso = st ? new Date(st).toISOString() : null;
+  let endIso = en ? new Date(en).toISOString() : null;
+  if (st && en && new Date(en) <= new Date(st)) {
+    return Swal.fire({ title: 'Jadwal invalid', text: 'Waktu selesai harus setelah mulai', icon: 'warning', background: '#1a0e2e', color: '#fff' });
+  }
+  const { data, error } = await supabaseClient.rpc('set_site_maintenance', {
+    p_enabled: maintenanceState.enabled,
+    p_message: msg,
+    p_scheduled_start: startIso,
+    p_scheduled_end: endIso,
+    p_clear_schedule: (!st && !en)
+  });
+  if (error) return Swal.fire({ title: 'Gagal', text: error.message, icon: 'error', background: '#1a0e2e', color: '#fff' });
+  if (data && data.success === false) return Swal.fire({ title: 'Gagal', text: data.message, icon: 'error', background: '#1a0e2e', color: '#fff' });
+  await loadMaintenanceState();
+  Swal.fire({ title: 'Tersimpan', icon: 'success', background: '#1a0e2e', color: '#fff', timer: 1500 });
+}
+
+async function clearMaintenanceSchedule() {
+  if (!isAdminOrOwner) return;
+  const { data, error } = await supabaseClient.rpc('set_site_maintenance', {
+    p_enabled: maintenanceState.enabled,
+    p_clear_schedule: true
+  });
+  if (error) return Swal.fire({ title: 'Gagal', text: error.message, icon: 'error', background: '#1a0e2e', color: '#fff' });
+  const st = document.getElementById('maintStart');
+  const en = document.getElementById('maintEnd');
+  if (st) st.value = '';
+  if (en) en.value = '';
+  await loadMaintenanceState();
+  Swal.fire({ title: 'Jadwal dihapus', icon: 'success', background: '#1a0e2e', color: '#fff', timer: 1200 });
+}
+
+window.toggleMaintenanceNow = toggleMaintenanceNow;
+window.saveMaintenanceSettings = saveMaintenanceSettings;
+window.clearMaintenanceSchedule = clearMaintenanceSchedule;
+
+  try { loadMaintenanceState(); subscribeMaintenance(); } catch(e) {}
+console.log('🌸 Shine Shop ready!');
 });
 
 
