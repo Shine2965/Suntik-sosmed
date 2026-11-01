@@ -850,15 +850,30 @@ function closeDetail(){ $('detailModal').classList.remove('show'); }
 
 
 /* ========== QRIS BELI PRODUK (referensi Shine Shop) ========== */
+const MARKET_QRIS_FEE_PCT = 0.05;
 const QRIS_CRC = '00020101021126670016COM.NOBUBANK.WWW01189360050300000907180214260818000016290303UMI51440014ID.CO.QRIS.WWW0215ID10265728797100303UMI5204481253033605802ID5918SHINE SHOP ID CELL6008SURABAYA61056011162070703A016304743A';
 let currentDeposit = null;
 let currentQrisProductId = null;
+let currentQrisProductPrice = null;
+let currentQrisFee = null;
 let depositPollingInterval = null;
 let depositTimerInterval = null;
 let depositSuccessProcessed = false;
 let isProcessingDeposit = false;
 
-function generateUniqueCode() { return Math.floor(Math.random() * 200) + 1; }
+async function generateUniqueCodeForAmount(baseAmount) {
+  const base = Math.floor(Number(baseAmount) || 0);
+  for (let attempt = 0; attempt < 40; attempt++) {
+    const code = Math.floor(Math.random() * 900) + 1;
+    const total = base + code;
+    try {
+      const { data } = await sb.from('deposits').select('id').eq('status', 'pending').eq('total_amount', total).limit(1);
+      if (!data || !data.length) return code;
+    } catch (_) { return code; }
+  }
+  return Math.floor(Math.random() * 900) + 100;
+}
+function generateUniqueCode() { return Math.floor(Math.random() * 900) + 1; }
 function crc16(str) {
   let crc = 0xFFFF;
   for (let i = 0; i < str.length; i++) {
@@ -1027,18 +1042,32 @@ async function buyProductWithQris(productId){
   if ((p.stock_remaining||0) < 1) return Swal.fire({title:'Stok habis',icon:'warning',background:'#1a0e2e',color:'#fff'});
   if (p.seller_id === currentUser.id) return Swal.fire({title:'Tidak bisa beli produk sendiri',icon:'info',background:'#1a0e2e',color:'#fff'});
 
-  const amount = Math.floor(Number(p.price) || 0);
-  if (amount < 1000) return Swal.fire({title:'Harga tidak valid',icon:'error',background:'#1a0e2e',color:'#fff'});
+  const price = Math.floor(Number(p.price) || 0);
+  if (price < 1000) return Swal.fire({title:'Harga tidak valid',icon:'error',background:'#1a0e2e',color:'#fff'});
 
-  const uniqueCode = generateUniqueCode();
-  const totalAmount = amount + uniqueCode;
+  const fee = Math.max(1, Math.ceil(price * MARKET_QRIS_FEE_PCT));
+  const basePay = price + fee;
+  const uniqueCode = await generateUniqueCodeForAmount(basePay);
+  const totalAmount = basePay + uniqueCode;
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+
+  const confFee = await Swal.fire({
+    title: 'Bayar QRIS + Admin 5%',
+    html: '<div style="text-align:left;font-size:13px;color:#ddd;line-height:1.6">' +
+      '<div>Harga produk: <b style="color:#ffd700">' + formatRp(price) + '</b></div>' +
+      '<div>Biaya admin 5%: <b style="color:#facc15">' + formatRp(fee) + '</b></div>' +
+      '<div>Subtotal: <b>' + formatRp(basePay) + '</b> + kode unik</div>' +
+      '<div style="margin-top:8px;font-size:11px;color:#94a3b8">Batalkan sebelum bayar = tanpa charge. Jika sudah bayar dan dibatalkan/gagal kirim akun, dana masuk ke <b>saldo</b>.</div></div>',
+    icon: 'info', showCancelButton: true, confirmButtonText: 'Lanjut QRIS', cancelButtonText: 'Batal',
+    confirmButtonColor: '#00c6ff', background: '#1a0e2e', color: '#fff'
+  });
+  if (!confFee.isConfirmed) return;
 
   try {
     const { data, error: insErr } = await sb.from('deposits').insert({
       user_id: currentUser.id,
       email: currentUser.email || currentProfile?.email,
-      amount,
+      amount: price,
       unique_code: uniqueCode,
       total_amount: totalAmount,
       status: 'pending',
@@ -1048,13 +1077,15 @@ async function buyProductWithQris(productId){
 
     currentDeposit = data;
     currentQrisProductId = productId;
+    currentQrisProductPrice = price;
+    currentQrisFee = fee;
     depositSuccessProcessed = false;
     isProcessingDeposit = false;
 
     const titleEl = $('qrisProductTitle');
     if (titleEl) titleEl.textContent = p.title || 'Pembelian akun';
     $('qrisAmount').textContent = 'Rp ' + totalAmount.toLocaleString('id-ID');
-    $('qrisAmountDetail').innerHTML = `Harga produk: Rp ${amount.toLocaleString('id-ID')} + Kode unik: <b style="color:#ffd700;">${uniqueCode}</b><br><span style="font-size:10px;color:#94a3b8">Transfer tepat total di atas</span>`;
+    $('qrisAmountDetail').innerHTML = `Produk ${formatRp(price)} + Admin ${formatRp(fee)} = ${formatRp(basePay)} + unik <b style=\"color:#ffd700;\">${uniqueCode}</b><br><span style=\"font-size:10px;color:#94a3b8\">Transfer tepat total di atas</span>`;
     $('qrisStatus').textContent = '⏳ Menunggu pembayaran...';
     $('qrisStatus').style.color = '#facc15';
     const t = $('qrisTimer'); if (t) { t.textContent = '10:00'; t.classList.remove('expired'); }
@@ -1137,21 +1168,27 @@ async function handleMarketQrisSuccess() {
   const productId = currentQrisProductId;
 
   try {
-    const { error: updErr } = await sb.from('deposits')
-      .update({ status: 'success', paid_at: new Date().toISOString() })
-      .eq('id', depositId)
-      .eq('status', 'pending');
-    if (updErr) console.warn('deposit update', updErr.message);
-
-    const email = currentUser.email || currentProfile?.email;
-    const { data: balResult, error: balErr } = await sb.rpc('add_user_balance', {
-      p_target_email: email,
-      p_amount: depositAmount,
-      p_reason: `Deposit QRIS Market (unik: ${uniqueCode})`
-    });
-    if (balErr) throw balErr;
-    if (balResult && balResult.success === false) throw new Error(balResult.message || 'Gagal kredit saldo');
-
+    // Kredit saldo (harga + admin) — jika produk gagal/dibatalkan, dana tetap di saldo
+    let credited = false;
+    try {
+      const { data: done, error: cErr } = await sb.rpc('complete_deposit', { p_deposit_id: depositId });
+      if (!cErr && done && done.success !== false) credited = true;
+    } catch (_) {}
+    if (!credited) {
+      const email = currentUser.email || currentProfile?.email;
+      const { data: balResult, error: balErr } = await sb.rpc('add_user_balance', {
+        p_target_email: email,
+        p_amount: depositAmount,
+        p_reason: 'Deposit QRIS Market (unik: ' + uniqueCode + ')'
+      });
+      if (balErr) throw balErr;
+      if (balResult && balResult.success === false) throw new Error(balResult.message || 'Gagal kredit saldo');
+      try {
+        await sb.from('deposits').update({ status: 'success', paid_at: new Date().toISOString(), balance_credited: true }).eq('id', depositId);
+      } catch (_) {
+        try { await sb.from('deposits').update({ status: 'success', paid_at: new Date().toISOString() }).eq('id', depositId); } catch (e2) {}
+      }
+    }
     await refreshBalance();
 
     // Auto beli produk setelah saldo masuk
@@ -1188,13 +1225,29 @@ async function handleMarketQrisSuccess() {
   }
 }
 
-function closeQrisModal() {
+async function closeQrisModal(force) {
+  if (!force && currentDeposit && !depositSuccessProcessed) {
+    const c = await Swal.fire({
+      title: 'Batalkan pembayaran?',
+      html: '<div style="text-align:left;font-size:12px;color:#ddd">Belum transfer: QRIS dibatalkan.<br>Sudah transfer & terdeteksi: dana masuk ke <b>saldo akun</b>.</div>',
+      icon: 'warning', showCancelButton: true, confirmButtonText: 'Ya, tutup', cancelButtonText: 'Kembali',
+      confirmButtonColor: '#ef4444', background: '#1a0e2e', color: '#fff'
+    });
+    if (!c.isConfirmed) return;
+    try {
+      if (currentDeposit?.id) {
+        await sb.from('deposits').update({ status: 'cancelled' }).eq('id', currentDeposit.id).eq('status', 'pending');
+      }
+    } catch (_) {}
+  }
   const m = document.getElementById('qrisModal');
   if (m) m.classList.remove('show');
   if (depositTimerInterval) { clearInterval(depositTimerInterval); depositTimerInterval = null; }
   stopDepositPolling();
   currentDeposit = null;
   currentQrisProductId = null;
+  currentQrisProductPrice = null;
+  currentQrisFee = null;
   depositSuccessProcessed = false;
   isProcessingDeposit = false;
   const btn = document.getElementById('qrisCheckBtn');
@@ -2372,11 +2425,50 @@ window.closeQrisModal = closeQrisModal;
 window.manualCheckMarketPayment = manualCheckMarketPayment;
 
 /* ========== SITE MAINTENANCE (sync dari Shine Shop) ========== */
-let maintenanceState = { enabled: false, message: '', scheduled_start: null, scheduled_end: null };
+let maintenanceState = { enabled: false, message: '', scheduled_start: null, scheduled_end: null, daily_enabled: false, daily_start_time: null, daily_end_time: null };
+
+function parseTimeToMinutes(t) {
+  if (!t) return null;
+  const str = String(t).slice(0, 8); // HH:MM or HH:MM:SS
+  const parts = str.split(':');
+  if (parts.length < 2) return null;
+  const h = parseInt(parts[0], 10);
+  const m = parseInt(parts[1], 10);
+  if (isNaN(h) || isNaN(m)) return null;
+  return h * 60 + m;
+}
+
+function getWibMinutesNow() {
+  try {
+    const parts = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit', hour12: false
+    }).formatToParts(new Date());
+    const h = parseInt(parts.find(p => p.type === 'hour').value, 10);
+    const m = parseInt(parts.find(p => p.type === 'minute').value, 10);
+    return h * 60 + m;
+  } catch (_) {
+    // fallback UTC+7
+    const d = new Date(Date.now() + 7 * 3600 * 1000);
+    return d.getUTCHours() * 60 + d.getUTCMinutes();
+  }
+}
+
+function isDailyMaintenanceWindow(state) {
+  if (!state || !state.daily_enabled) return false;
+  const start = parseTimeToMinutes(state.daily_start_time);
+  const end = parseTimeToMinutes(state.daily_end_time);
+  if (start == null || end == null) return false;
+  const now = getWibMinutesNow();
+  if (start === end) return true; // 24 jam
+  if (start < end) return now >= start && now < end;
+  // lewat tengah malam: e.g. 23:00 - 05:00
+  return now >= start || now < end;
+}
 
 function isMaintenanceActive(state) {
   if (!state) return false;
   if (state.enabled) return true;
+  if (isDailyMaintenanceWindow(state)) return true;
   const now = Date.now();
   const a = state.scheduled_start ? new Date(state.scheduled_start).getTime() : null;
   const b = state.scheduled_end ? new Date(state.scheduled_end).getTime() : null;
@@ -2398,7 +2490,11 @@ function applyMaintenanceGate() {
     const msg = document.getElementById('maintOverlayMsg');
     if (msg) msg.textContent = maintenanceState.message || 'Sedang maintenance. Silakan coba lagi nanti.';
     let meta = '';
-    if (maintenanceState.scheduled_start || maintenanceState.scheduled_end) {
+    if (maintenanceState.daily_enabled) {
+      const a = (maintenanceState.daily_start_time || '').toString().slice(0, 5);
+      const b = (maintenanceState.daily_end_time || '').toString().slice(0, 5);
+      meta = 'Maintenance harian: setiap hari ' + a + '–' + b + ' WIB (UTC+7)';
+    } else if (maintenanceState.scheduled_start || maintenanceState.scheduled_end) {
       const fmt = (x) => x ? new Date(x).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) + ' WIB' : '—';
       meta = 'Jadwal: ' + fmt(maintenanceState.scheduled_start) + ' → ' + fmt(maintenanceState.scheduled_end);
     }
@@ -2417,7 +2513,10 @@ async function loadMaintenanceState() {
         enabled: !!data.enabled,
         message: data.message || 'Sedang maintenance. Silakan coba lagi nanti.',
         scheduled_start: data.scheduled_start,
-        scheduled_end: data.scheduled_end
+        scheduled_end: data.scheduled_end,
+        daily_enabled: !!data.daily_enabled,
+        daily_start_time: data.daily_start_time || null,
+        daily_end_time: data.daily_end_time || null
       };
     }
   } catch (e) { console.warn('maint', e); }
@@ -2434,7 +2533,10 @@ function subscribeMaintenance() {
             enabled: !!d.enabled,
             message: d.message || maintenanceState.message,
             scheduled_start: d.scheduled_start,
-            scheduled_end: d.scheduled_end
+            scheduled_end: d.scheduled_end,
+            daily_enabled: !!d.daily_enabled,
+            daily_start_time: d.daily_start_time || null,
+            daily_end_time: d.daily_end_time || null
           };
           applyMaintenanceGate();
         }
