@@ -4525,57 +4525,133 @@ async function creditAmountToUser(userId, email, amount, reason, typeHint) {
   }
 }
 
-async function applyUniqueCodeShare(dep) {
-  const uniqueNum = Math.floor(Number(dep.unique_code) || 0);
-  if (uniqueNum < 1) return { userShare: 0, refShare: 0 };
-  const userShare = Math.floor(uniqueNum * 0.7); // 70% ke user deposit
-  const refShare = Math.floor(uniqueNum * 0.1);  // 10% ke pemilik kode referral
-  let userOk = false, refOk = false, uplineEmail = '';
+const _uniqueShareInFlight = new Set();
+const _uniqueShareDone = new Set();
 
-  if (userShare > 0) {
-    const r = await creditAmountToUser(
-      dep.user_id || currentUser?.id,
-      dep.email || currentUser?.email,
-      userShare,
-      'Cashback 70% kode unik deposit #' + (dep.id || '') + ' (unik: ' + uniqueNum + ')',
-      'unique_cashback'
-    );
-    userOk = !!r.ok;
-  }
+async function wasUniqueShareAlreadyPaid(depositId) {
+  if (!depositId) return false;
+  if (_uniqueShareDone.has(depositId)) return true;
+  try {
+    const { data } = await supabaseClient.from('deposits')
+      .select('unique_share_credited')
+      .eq('id', depositId)
+      .maybeSingle();
+    if (data && data.unique_share_credited === true) return true;
+  } catch (_) {}
+  // cek mutasi: reason mengandung deposit id + Cashback 70%
+  try {
+    const { data: rows } = await supabaseClient.from('balance_mutations')
+      .select('id, reason, type')
+      .or('type.eq.unique_cashback,reason.ilike.%Cashback 70% kode unik%')
+      .limit(50);
+    const hit = (rows || []).some(r => {
+      const reason = String(r.reason || '');
+      return reason.includes(String(depositId)) || reason.includes('deposit #' + depositId);
+    });
+    if (hit) return true;
+  } catch (_) {}
+  return false;
+}
 
-  if (refShare > 0) {
+async function markUniqueShareCredited(depositId) {
+  if (!depositId) return;
+  _uniqueShareDone.add(depositId);
+  const patches = [
+    { unique_share_credited: true },
+    { unique_cashback_done: true }
+  ];
+  for (const patch of patches) {
     try {
-      // cari upline dari profile depositor
-      const uid = dep.user_id || currentUser?.id;
-      const { data: me } = await supabaseClient.from('profiles')
-        .select('referred_by_user_id, referred_by_code, referral_code')
-        .eq('id', uid).maybeSingle();
-      let uplineId = me?.referred_by_user_id || null;
-      if (!uplineId && me?.referred_by_code) {
-        const { data: up } = await supabaseClient.from('profiles')
-          .select('id, email').eq('referral_code', me.referred_by_code).maybeSingle();
-        if (up) { uplineId = up.id; uplineEmail = up.email; }
-      }
-      if (uplineId && uplineId !== uid) {
-        if (!uplineEmail) {
-          const { data: up2 } = await supabaseClient.from('profiles').select('email').eq('id', uplineId).maybeSingle();
-          uplineEmail = up2?.email || '';
-        }
-        const r2 = await creditAmountToUser(
-          uplineId,
-          uplineEmail,
-          refShare,
-          'Bonus referral 10% kode unik dari ' + (dep.email || 'downline') + ' (unik: ' + uniqueNum + ')',
-          'referral_bonus'
-        );
-        refOk = !!r2.ok;
-      }
-    } catch (e) {
-      console.warn('ref share', e.message);
-    }
+      const { error } = await supabaseClient.from('deposits').update(patch).eq('id', depositId);
+      if (!error) return true;
+    } catch (_) {}
   }
+  return false;
+}
 
-  return { userShare, refShare, userOk, refOk, uplineEmail, uniqueNum };
+async function applyUniqueCodeShare(dep) {
+  const depositId = dep?.id;
+  const uniqueNum = Math.floor(Number(dep.unique_code) || 0);
+  if (uniqueNum < 1) return { userShare: 0, refShare: 0, skipped: true };
+
+  // Anti-double: memory lock + DB flag + mutasi
+  if (depositId && _uniqueShareInFlight.has(depositId)) {
+    return { userShare: 0, refShare: 0, skipped: true, reason: 'in_flight' };
+  }
+  if (depositId && await wasUniqueShareAlreadyPaid(depositId)) {
+    return { userShare: 0, refShare: 0, skipped: true, reason: 'already_paid' };
+  }
+  if (depositId) _uniqueShareInFlight.add(depositId);
+
+  try {
+    const userShare = Math.floor(uniqueNum * 0.7);
+    const refShare = Math.floor(uniqueNum * 0.1);
+    let userOk = false, refOk = false, uplineEmail = '';
+
+    if (userShare > 0) {
+      const r = await creditAmountToUser(
+        dep.user_id || currentUser?.id,
+        dep.email || currentUser?.email,
+        userShare,
+        'Cashback 70% kode unik deposit #' + (depositId || '') + ' (unik: ' + uniqueNum + ')',
+        'unique_cashback'
+      );
+      userOk = !!r.ok;
+    }
+
+    if (refShare > 0) {
+      try {
+        const uid = dep.user_id || currentUser?.id;
+        const { data: me } = await supabaseClient.from('profiles')
+          .select('referred_by_user_id, referred_by_code, referral_code')
+          .eq('id', uid).maybeSingle();
+        let uplineId = me?.referred_by_user_id || null;
+        if (!uplineId && me?.referred_by_code) {
+          const { data: up } = await supabaseClient.from('profiles')
+            .select('id, email').eq('referral_code', me.referred_by_code).maybeSingle();
+          if (up) { uplineId = up.id; uplineEmail = up.email; }
+        }
+        if (uplineId && uplineId !== uid) {
+          if (!uplineEmail) {
+            const { data: up2 } = await supabaseClient.from('profiles').select('email').eq('id', uplineId).maybeSingle();
+            uplineEmail = up2?.email || '';
+          }
+          // cek mutasi referral untuk deposit ini
+          let refAlready = false;
+          try {
+            const { data: mrows } = await supabaseClient.from('balance_mutations')
+              .select('id, reason')
+              .eq('user_id', uplineId)
+              .limit(30);
+            refAlready = (mrows || []).some(r => String(r.reason || '').includes(String(depositId)) && /referral|10%/i.test(String(r.reason || '')));
+          } catch (_) {}
+          if (!refAlready) {
+            const r2 = await creditAmountToUser(
+              uplineId,
+              uplineEmail,
+              refShare,
+              'Bonus referral 10% kode unik dari ' + (dep.email || 'downline') + ' deposit #' + (depositId || '') + ' (unik: ' + uniqueNum + ')',
+              'referral_bonus'
+            );
+            refOk = !!r2.ok;
+          } else {
+            refOk = true; // already
+          }
+        }
+      } catch (e) {
+        console.warn('ref share', e.message);
+      }
+    }
+
+    // Tandai selesai jika minimal cashback user sukses (atau 0)
+    if (userOk || userShare === 0) {
+      await markUniqueShareCredited(depositId);
+    }
+
+    return { userShare: userOk ? userShare : 0, refShare: refOk ? refShare : 0, userOk, refOk, uplineEmail, uniqueNum };
+  } finally {
+    if (depositId) _uniqueShareInFlight.delete(depositId);
+  }
 }
 
 
@@ -4606,17 +4682,22 @@ async function handleDepositSuccess(opts) {
       if (data) dep = data;
     } catch (_) {}
 
-    // Jika sudah balance_credited, hanya refresh UI
+    // Jika saldo deposit sudah dikredit, tetap coba cashback unik sekali (anti-double di applyUniqueCodeShare)
     if (dep.balance_credited === true) {
+      let uniqueShareInfo = { userShare: 0, refShare: 0 };
+      try { uniqueShareInfo = await applyUniqueCodeShare(dep); } catch (_) {}
       depositSuccessProcessed = true;
       let newBalance = balBefore;
       try {
         if (typeof forceRefreshBalanceFromDB === 'function') newBalance = await forceRefreshBalanceFromDB();
         else if (typeof refreshBalance === 'function') { await refreshBalance(); newBalance = currentProfile?.balance; }
       } catch (_) {}
+      const cb = uniqueShareInfo.userShare || 0;
       await Swal.fire({
         title: '🎉 Deposit Berhasil!',
         html: `Saldo +<b style="color:#ffd700;">Rp ${depositAmount.toLocaleString('id-ID')}</b>` +
+          (cb > 0 ? `<br>Cashback unik +<b style="color:#22c55e;">Rp ${cb.toLocaleString('id-ID')}</b>` : '') +
+          (uniqueShareInfo.skipped ? `<br><small style="color:#94a3b8;">Cashback unik sudah pernah diproses</small>` : '') +
           (newBalance != null ? `<br><small>Saldo: Rp ${Number(newBalance).toLocaleString('id-ID')}</small>` : ''),
         icon: 'success', confirmButtonColor: '#ff6b9d', background: '#1a0e2e', color: '#fff', timer: 3500
       });
@@ -4660,45 +4741,8 @@ async function handleDepositSuccess(opts) {
       try { updateBalanceDisplay(newBalance); } catch (_) {}
     }
 
-        // Cashback 70% dari kode unik → user yang deposit
-    try {
-      const uniqueNum = Math.floor(Number(uniqueCode) || 0);
-      const cashback = Math.floor(uniqueNum * 0.7);
-      if (cashback > 0) {
-        let cbOk = false;
-        try {
-          const { data: cbData, error: cbErr } = await supabaseClient.rpc('add_user_balance', {
-            p_target_email: currentUser.email,
-            p_amount: cashback,
-            p_reason: 'Cashback 70% kode unik deposit (' + uniqueNum + ')'
-          });
-          if (!cbErr && (!cbData || cbData.success !== false)) cbOk = true;
-        } catch (_) {}
-        if (!cbOk) {
-          try {
-            const { data: pr } = await supabaseClient.from('profiles').select('balance').eq('id', currentUser.id).maybeSingle();
-            const next = (parseFloat(pr?.balance) || 0) + cashback;
-            const { error: uErr } = await supabaseClient.from('profiles').update({ balance: next }).eq('id', currentUser.id);
-            if (!uErr) cbOk = true;
-          } catch (e2) { console.warn('cashback direct', e2.message); }
-        }
-        if (cbOk) {
-          try {
-            await supabaseClient.from('balance_mutations').insert({
-              user_id: currentUser.id,
-              email: currentUser.email,
-              amount: cashback,
-              type: 'deposit',
-              reason: 'Cashback 70% kode unik (' + uniqueNum + ')'
-            });
-          } catch (_) {}
-          console.log('Cashback unik 70%:', cashback);
-          try { if (typeof forceRefreshBalanceFromDB === 'function') await forceRefreshBalanceFromDB(); } catch(_){}
-        }
-      }
-    } catch (e) { console.warn('cashback unik', e.message); }
-
-    // Bagi kode unik: 70% user + 10% referral (sisa 20% platform)
+        
+// Bagi kode unik: 70% user + 10% referral (sisa 20% platform)
     let uniqueShareInfo = { userShare: 0, refShare: 0 };
     try {
       uniqueShareInfo = await applyUniqueCodeShare(dep);
