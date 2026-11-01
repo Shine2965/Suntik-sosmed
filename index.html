@@ -1098,11 +1098,31 @@ body.chat-open .cs-bubble-container{display:none !important}
           <textarea id="maintMessage" class="bf-textarea" rows="2" maxlength="300" placeholder="Sedang maintenance..." style="min-height:60px;">Sedang maintenance. Silakan coba lagi nanti.</textarea>
           <div class="bf-label">Jadwal mulai (opsional, WIB)</div>
           <input type="datetime-local" id="maintStart" class="bf-input" style="color-scheme:dark;">
-          <div class="bf-label">Jadwal selesai (opsional, WIB)</div>
+          <div class="bf-label">Jadwal selesai sekali (opsional, WIB)</div>
           <input type="datetime-local" id="maintEnd" class="bf-input" style="color-scheme:dark;">
+          <div style="margin-top:14px;padding:12px;border-radius:12px;background:rgba(250,204,21,0.06);border:1px solid rgba(250,204,21,0.25);">
+            <div style="font-size:12px;font-weight:800;color:#facc15;margin-bottom:6px;">Jadwal maintenance harian (otomatis tiap hari)</div>
+            <div style="font-size:11px;color:#94a3b8;margin-bottom:8px;line-height:1.4;">Aktif setiap hari pada jam yang dipilih (zona <b>WIB / UTC+7</b>). Contoh: 01:00–05:00.</div>
+            <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#fff;margin-bottom:8px;cursor:pointer;">
+              <input type="checkbox" id="maintDailyEnabled" style="width:16px;height:16px;accent-color:#facc15;">
+              Aktifkan jadwal harian
+            </label>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+              <div>
+                <div class="bf-label" style="margin:0 0 4px;">Mulai (WIB)</div>
+                <input type="time" id="maintDailyStart" class="bf-input" style="color-scheme:dark;" value="01:00">
+              </div>
+              <div>
+                <div class="bf-label" style="margin:0 0 4px;">Selesai (WIB)</div>
+                <input type="time" id="maintDailyEnd" class="bf-input" style="color-scheme:dark;" value="05:00">
+              </div>
+            </div>
+            <div style="font-size:10px;color:#94a3b8;margin-top:6px;">Jika jam selesai &lt; jam mulai, dianggap lewat tengah malam (mis. 23:00–02:00).</div>
+          </div>
           <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
-            <button class="withdraw-btn" style="flex:1;min-width:120px;" onclick="saveMaintenanceSettings()">💾 Simpan</button>
-            <button class="withdraw-btn" style="flex:1;min-width:120px;background:rgba(255,255,255,0.08);color:#fff;border:1px solid rgba(255,255,255,0.15);" onclick="clearMaintenanceSchedule()">🧹 Hapus Jadwal</button>
+            <button class="withdraw-btn" style="flex:1;min-width:120px;" onclick="saveMaintenanceSettings()">Simpan</button>
+            <button class="withdraw-btn" style="flex:1;min-width:120px;background:rgba(255,255,255,0.08);color:#fff;border:1px solid rgba(255,255,255,0.15);" onclick="clearMaintenanceSchedule()">Hapus jadwal sekali</button>
+            <button class="withdraw-btn" style="flex:1;min-width:120px;background:rgba(239,68,68,0.2);color:#ff8080;border:1px solid rgba(239,68,68,0.3);" onclick="clearDailyMaintenance()">Hapus jadwal harian</button>
           </div>
           <div id="maintScheduleInfo" style="margin-top:8px;font-size:11px;color:#94a3b8;"></div>
         </div>
@@ -8653,12 +8673,51 @@ window.addEventListener('load', async () => {
   document.getElementById('chatHubModal').addEventListener('click', (e) => { if (e.target.id === 'chatHubModal') closeChatHub(); });
   
 /* ========== SITE MAINTENANCE ========== */
-let maintenanceState = { enabled: false, message: '', scheduled_start: null, scheduled_end: null };
+let maintenanceState = { enabled: false, message: '', scheduled_start: null, scheduled_end: null, daily_enabled: false, daily_start_time: null, daily_end_time: null };
 let maintenanceChannel = null;
+
+function parseTimeToMinutes(t) {
+  if (!t) return null;
+  const str = String(t).slice(0, 8); // HH:MM or HH:MM:SS
+  const parts = str.split(':');
+  if (parts.length < 2) return null;
+  const h = parseInt(parts[0], 10);
+  const m = parseInt(parts[1], 10);
+  if (isNaN(h) || isNaN(m)) return null;
+  return h * 60 + m;
+}
+
+function getWibMinutesNow() {
+  try {
+    const parts = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit', hour12: false
+    }).formatToParts(new Date());
+    const h = parseInt(parts.find(p => p.type === 'hour').value, 10);
+    const m = parseInt(parts.find(p => p.type === 'minute').value, 10);
+    return h * 60 + m;
+  } catch (_) {
+    // fallback UTC+7
+    const d = new Date(Date.now() + 7 * 3600 * 1000);
+    return d.getUTCHours() * 60 + d.getUTCMinutes();
+  }
+}
+
+function isDailyMaintenanceWindow(state) {
+  if (!state || !state.daily_enabled) return false;
+  const start = parseTimeToMinutes(state.daily_start_time);
+  const end = parseTimeToMinutes(state.daily_end_time);
+  if (start == null || end == null) return false;
+  const now = getWibMinutesNow();
+  if (start === end) return true; // 24 jam
+  if (start < end) return now >= start && now < end;
+  // lewat tengah malam: e.g. 23:00 - 05:00
+  return now >= start || now < end;
+}
 
 function isMaintenanceActive(state) {
   if (!state) return false;
   if (state.enabled) return true;
+  if (isDailyMaintenanceWindow(state)) return true;
   const now = Date.now();
   const a = state.scheduled_start ? new Date(state.scheduled_start).getTime() : null;
   const b = state.scheduled_end ? new Date(state.scheduled_end).getTime() : null;
@@ -8682,7 +8741,11 @@ function applyMaintenanceGate() {
     const msg = document.getElementById('maintOverlayMsg');
     if (msg) msg.textContent = maintenanceState.message || 'Sedang maintenance. Silakan coba lagi nanti.';
     let meta = '';
-    if (maintenanceState.scheduled_start || maintenanceState.scheduled_end) {
+    if (maintenanceState.daily_enabled) {
+      const a = (maintenanceState.daily_start_time || '').toString().slice(0, 5);
+      const b = (maintenanceState.daily_end_time || '').toString().slice(0, 5);
+      meta = 'Maintenance harian: setiap hari ' + a + '–' + b + ' WIB (UTC+7)';
+    } else if (maintenanceState.scheduled_start || maintenanceState.scheduled_end) {
       const fmt = (x) => x ? new Date(x).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) + ' WIB' : '—';
       meta = 'Jadwal: ' + fmt(maintenanceState.scheduled_start) + ' → ' + fmt(maintenanceState.scheduled_end);
     }
@@ -8712,10 +8775,17 @@ function updateMaintenanceAdminUI() {
   if (msg && document.activeElement !== msg) msg.value = maintenanceState.message || msg.value;
   const info = document.getElementById('maintScheduleInfo');
   if (info) {
+    const parts = [];
     if (maintenanceState.scheduled_start || maintenanceState.scheduled_end) {
       const fmt = (x) => x ? new Date(x).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) + ' WIB' : '—';
-      info.textContent = 'Jadwal tersimpan: ' + fmt(maintenanceState.scheduled_start) + ' → ' + fmt(maintenanceState.scheduled_end);
-    } else info.textContent = 'Tidak ada jadwal otomatis.';
+      parts.push('Sekali: ' + fmt(maintenanceState.scheduled_start) + ' → ' + fmt(maintenanceState.scheduled_end));
+    }
+    if (maintenanceState.daily_enabled) {
+      const a = (maintenanceState.daily_start_time || '—').toString().slice(0, 5);
+      const b = (maintenanceState.daily_end_time || '—').toString().slice(0, 5);
+      parts.push('Harian: setiap hari ' + a + '–' + b + ' WIB' + (isDailyMaintenanceWindow(maintenanceState) ? ' (sedang aktif)' : ''));
+    }
+    info.textContent = parts.length ? parts.join(' · ') : 'Tidak ada jadwal otomatis.';
   }
 }
 
@@ -8738,8 +8808,19 @@ async function loadMaintenanceState() {
         enabled: !!data.enabled,
         message: data.message || 'Sedang maintenance. Silakan coba lagi nanti.',
         scheduled_start: data.scheduled_start,
-        scheduled_end: data.scheduled_end
+        scheduled_end: data.scheduled_end,
+        daily_enabled: !!data.daily_enabled,
+        daily_start_time: data.daily_start_time || null,
+        daily_end_time: data.daily_end_time || null
       };
+      try {
+        const de = document.getElementById('maintDailyEnabled');
+        const ds = document.getElementById('maintDailyStart');
+        const dd = document.getElementById('maintDailyEnd');
+        if (de) de.checked = !!data.daily_enabled;
+        if (ds && data.daily_start_time) ds.value = String(data.daily_start_time).slice(0, 5);
+        if (dd && data.daily_end_time) dd.value = String(data.daily_end_time).slice(0, 5);
+      } catch (_) {}
       const st = document.getElementById('maintStart');
       const en = document.getElementById('maintEnd');
       if (st && document.activeElement !== st) st.value = toLocalInputValue(data.scheduled_start);
@@ -8762,7 +8843,10 @@ function subscribeMaintenance() {
             enabled: !!d.enabled,
             message: d.message || maintenanceState.message,
             scheduled_start: d.scheduled_start,
-            scheduled_end: d.scheduled_end
+            scheduled_end: d.scheduled_end,
+            daily_enabled: !!d.daily_enabled,
+            daily_start_time: d.daily_start_time || null,
+            daily_end_time: d.daily_end_time || null
           };
           applyMaintenanceGate();
         }
@@ -8803,20 +8887,78 @@ async function saveMaintenanceSettings() {
   let startIso = st ? new Date(st).toISOString() : null;
   let endIso = en ? new Date(en).toISOString() : null;
   if (st && en && new Date(en) <= new Date(st)) {
-    return Swal.fire({ title: 'Jadwal invalid', text: 'Waktu selesai harus setelah mulai', icon: 'warning', background: '#1a0e2e', color: '#fff' });
+    return Swal.fire({ title: 'Jadwal invalid', text: 'Waktu selesai sekali harus setelah mulai', icon: 'warning', background: '#1a0e2e', color: '#fff' });
   }
-  const { data, error } = await supabaseClient.rpc('set_site_maintenance', {
+  const dailyOn = !!document.getElementById('maintDailyEnabled')?.checked;
+  const ds = document.getElementById('maintDailyStart')?.value || null;
+  const dd = document.getElementById('maintDailyEnd')?.value || null;
+  if (dailyOn && (!ds || !dd)) {
+    return Swal.fire({ title: 'Jadwal harian incomplete', text: 'Isi jam mulai & selesai harian', icon: 'warning', background: '#1a0e2e', color: '#fff' });
+  }
+  const payload = {
     p_enabled: maintenanceState.enabled,
     p_message: msg,
     p_scheduled_start: startIso,
     p_scheduled_end: endIso,
-    p_clear_schedule: (!st && !en)
-  });
+    p_clear_schedule: (!st && !en),
+    p_daily_enabled: dailyOn,
+    p_daily_start_time: dailyOn ? (ds + ':00') : null,
+    p_daily_end_time: dailyOn ? (dd + ':00') : null,
+    p_clear_daily: false
+  };
+  let { data, error } = await supabaseClient.rpc('set_site_maintenance', payload);
+  // fallback jika RPC lama belum support param harian
+  if (error && /daily|argument|function/i.test(error.message || '')) {
+    ({ data, error } = await supabaseClient.rpc('set_site_maintenance', {
+      p_enabled: maintenanceState.enabled,
+      p_message: msg,
+      p_scheduled_start: startIso,
+      p_scheduled_end: endIso,
+      p_clear_schedule: (!st && !en)
+    }));
+    if (!error) {
+      try {
+        await supabaseClient.from('site_maintenance').update({
+          daily_enabled: dailyOn,
+          daily_start_time: dailyOn ? ds + ':00' : null,
+          daily_end_time: dailyOn ? dd + ':00' : null
+        }).eq('id', 1);
+      } catch (e2) {
+        console.warn('daily update', e2.message);
+      }
+    }
+  }
   if (error) return Swal.fire({ title: 'Gagal', text: error.message, icon: 'error', background: '#1a0e2e', color: '#fff' });
   if (data && data.success === false) return Swal.fire({ title: 'Gagal', text: data.message, icon: 'error', background: '#1a0e2e', color: '#fff' });
   await loadMaintenanceState();
-  Swal.fire({ title: 'Tersimpan', icon: 'success', background: '#1a0e2e', color: '#fff', timer: 1500 });
+  Swal.fire({ title: 'Tersimpan', text: dailyOn ? ('Harian ' + ds + '–' + dd + ' WIB') : 'OK', icon: 'success', background: '#1a0e2e', color: '#fff', timer: 1800 });
 }
+
+async function clearDailyMaintenance() {
+  if (!isAdminOrOwner) return;
+  const { data, error } = await supabaseClient.rpc('set_site_maintenance', {
+    p_enabled: maintenanceState.enabled,
+    p_clear_daily: true,
+    p_daily_enabled: false
+  });
+  if (error) {
+    try {
+      await supabaseClient.from('site_maintenance').update({
+        daily_enabled: false, daily_start_time: null, daily_end_time: null
+      }).eq('id', 1);
+    } catch (e) {
+      return Swal.fire({ title: 'Gagal', text: error.message, icon: 'error', background: '#1a0e2e', color: '#fff' });
+    }
+  } else if (data && data.success === false) {
+    return Swal.fire({ title: 'Gagal', text: data.message, icon: 'error', background: '#1a0e2e', color: '#fff' });
+  }
+  const de = document.getElementById('maintDailyEnabled');
+  if (de) de.checked = false;
+  await loadMaintenanceState();
+  Swal.fire({ title: 'Jadwal harian dihapus', icon: 'success', background: '#1a0e2e', color: '#fff', timer: 1200 });
+}
+window.clearDailyMaintenance = clearDailyMaintenance;
+
 
 async function clearMaintenanceSchedule() {
   if (!isAdminOrOwner) return;
