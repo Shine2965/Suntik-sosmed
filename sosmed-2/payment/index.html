@@ -133,6 +133,14 @@ p.warning-text{color:#fca5a5;font-size:13px;line-height:1.7;margin-top:16px;marg
   .method-btn .m-sub{font-size:9px}
   .saldo-info .si-value{font-size:20px}
 }
+
+.maint-overlay{position:fixed;inset:0;z-index:99999;background:rgba(10,5,20,0.97);display:none;align-items:center;justify-content:center;padding:24px;text-align:center}
+.maint-overlay.show{display:flex}
+.maint-card{max-width:400px;width:100%;background:linear-gradient(135deg,rgba(250,204,21,0.12),rgba(255,107,157,0.08));border:1.5px solid rgba(250,204,21,0.4);border-radius:20px;padding:28px 22px}
+.maint-card h2{font-size:20px;font-weight:900;color:#facc15;margin-bottom:10px;-webkit-text-fill-color:#facc15}
+.maint-card p{font-size:13px;color:#e2e8f0;line-height:1.55;margin-bottom:12px}
+.maint-card .maint-meta{font-size:11px;color:#94a3b8}
+
 </style>
 </head>
 <body>
@@ -140,6 +148,16 @@ p.warning-text{color:#fca5a5;font-size:13px;line-height:1.7;margin-top:16px;marg
 <div class="orb orb-1"></div>
 <div class="orb orb-2"></div>
 <div class="orb orb-3"></div>
+
+
+<div class="maint-overlay" id="maintOverlay">
+  <div class="maint-card">
+    <div style="font-size:40px;margin-bottom:8px;">🛠️</div>
+    <h2>Maintenance</h2>
+    <p id="maintOverlayMsg">Sedang maintenance. Silakan coba lagi nanti.</p>
+    <div class="maint-meta" id="maintOverlayMeta"></div>
+  </div>
+</div>
 
 <div id="bannedContainer" style="display:none;" class="banned-page">
   <div class="banned-card">
@@ -264,6 +282,148 @@ try {
   supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, storage: window.localStorage, storageKey: 'shine-shop-auth' }
   });
+
+/* ========== SITE MAINTENANCE (sync Shine Shop) ========== */
+let maintenanceState = {
+  enabled: false, message: '', scheduled_start: null, scheduled_end: null,
+  daily_enabled: false, daily_start_time: null, daily_end_time: null
+};
+let maintenanceChannel = null;
+let _maintIsStaff = false;
+
+function parseTimeToMinutes(t) {
+  if (!t) return null;
+  const str = String(t).slice(0, 8);
+  const parts = str.split(':');
+  if (parts.length < 2) return null;
+  const h = parseInt(parts[0], 10), m = parseInt(parts[1], 10);
+  if (isNaN(h) || isNaN(m)) return null;
+  return h * 60 + m;
+}
+function getWibMinutesNow() {
+  try {
+    const parts = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit', hour12: false
+    }).formatToParts(new Date());
+    const h = parseInt(parts.find(p => p.type === 'hour').value, 10);
+    const m = parseInt(parts.find(p => p.type === 'minute').value, 10);
+    return h * 60 + m;
+  } catch (_) {
+    const d = new Date(Date.now() + 7 * 3600 * 1000);
+    return d.getUTCHours() * 60 + d.getUTCMinutes();
+  }
+}
+function isDailyMaintenanceWindow(state) {
+  if (!state || !state.daily_enabled) return false;
+  const start = parseTimeToMinutes(state.daily_start_time);
+  const end = parseTimeToMinutes(state.daily_end_time);
+  if (start == null || end == null) return false;
+  const now = getWibMinutesNow();
+  if (start === end) return true;
+  if (start < end) return now >= start && now < end;
+  return now >= start || now < end;
+}
+function isMaintenanceActive(state) {
+  if (!state) return false;
+  if (state.enabled) return true;
+  if (isDailyMaintenanceWindow(state)) return true;
+  const now = Date.now();
+  const a = state.scheduled_start ? new Date(state.scheduled_start).getTime() : null;
+  const b = state.scheduled_end ? new Date(state.scheduled_end).getTime() : null;
+  if (a && b) return now >= a && now <= b;
+  if (a && !b) return now >= a;
+  return false;
+}
+function applyMaintenanceGate() {
+  const active = isMaintenanceActive(maintenanceState);
+  const overlay = document.getElementById('maintOverlay');
+  if (!overlay) return;
+  if (active && !_maintIsStaff) {
+    overlay.classList.add('show');
+    const msg = document.getElementById('maintOverlayMsg');
+    if (msg) msg.textContent = maintenanceState.message || 'Sedang maintenance. Silakan coba lagi nanti.';
+    let meta = '';
+    if (maintenanceState.daily_enabled) {
+      const a = (maintenanceState.daily_start_time || '').toString().slice(0, 5);
+      const b = (maintenanceState.daily_end_time || '').toString().slice(0, 5);
+      meta = 'Maintenance harian: setiap hari ' + a + '–' + b + ' WIB (UTC+7)';
+    } else if (maintenanceState.scheduled_start || maintenanceState.scheduled_end) {
+      const fmt = (x) => x ? new Date(x).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) + ' WIB' : '—';
+      meta = 'Jadwal: ' + fmt(maintenanceState.scheduled_start) + ' → ' + fmt(maintenanceState.scheduled_end);
+    }
+    const metaEl = document.getElementById('maintOverlayMeta');
+    if (metaEl) metaEl.textContent = meta;
+    const card = document.getElementById('qrisCard');
+    if (card) card.style.display = 'none';
+  } else {
+    overlay.classList.remove('show');
+    const card = document.getElementById('qrisCard');
+    if (card && !document.getElementById('bannedContainer')?.style.display || document.getElementById('bannedContainer')?.style.display === 'none') {
+      // only restore if not banned
+    }
+    if (card) {
+      const ban = document.getElementById('bannedContainer');
+      if (!ban || ban.style.display === 'none') card.style.display = '';
+    }
+  }
+}
+async function loadMaintenanceState() {
+  if (!supabaseClient) return;
+  try {
+    const { data } = await supabaseClient.from('site_maintenance').select('*').eq('id', 1).maybeSingle();
+    if (data) {
+      maintenanceState = {
+        enabled: !!data.enabled,
+        message: data.message || 'Sedang maintenance. Silakan coba lagi nanti.',
+        scheduled_start: data.scheduled_start,
+        scheduled_end: data.scheduled_end,
+        daily_enabled: !!data.daily_enabled,
+        daily_start_time: data.daily_start_time || null,
+        daily_end_time: data.daily_end_time || null
+      };
+    }
+  } catch (e) { console.warn('maint', e); }
+  applyMaintenanceGate();
+}
+function subscribeMaintenance() {
+  if (!supabaseClient) return;
+  try {
+    if (maintenanceChannel) { try { supabaseClient.removeChannel(maintenanceChannel); } catch (_) {} }
+    maintenanceChannel = supabaseClient.channel('site_maint_pay_' + Date.now())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'site_maintenance' }, (payload) => {
+        const d = payload.new;
+        if (d) {
+          maintenanceState = {
+            enabled: !!d.enabled,
+            message: d.message || maintenanceState.message,
+            scheduled_start: d.scheduled_start,
+            scheduled_end: d.scheduled_end,
+            daily_enabled: !!d.daily_enabled,
+            daily_start_time: d.daily_start_time || null,
+            daily_end_time: d.daily_end_time || null
+          };
+          applyMaintenanceGate();
+        }
+      })
+      .subscribe();
+  } catch (e) {}
+  setInterval(() => applyMaintenanceGate(), 30000);
+}
+async function initMaintenanceGate() {
+  try {
+    if (supabaseClient) {
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      if (session?.user?.id) {
+        const { data: pr } = await supabaseClient.from('profiles').select('role').eq('id', session.user.id).maybeSingle();
+        _maintIsStaff = pr && (pr.role === 'admin' || pr.role === 'owner');
+      }
+    }
+  } catch (_) {}
+  await loadMaintenanceState();
+  subscribeMaintenance();
+}
+
+
   console.log('✅ Supabase initialized');
 } catch (e) {
   console.error('❌ Supabase init error:', e);
@@ -2029,6 +2189,7 @@ window.showRefundHistory = showRefundHistory;
 
 (async function() {
   // 🆕 CEK URL PARAMS DULU → block + redirect kalau kosong
+  try { await initMaintenanceGate(); } catch (e) { console.warn("maint", e); }
   const paramsValid = await checkUrlParamsAndAutoRefund();
   if (!paramsValid) return;
   
