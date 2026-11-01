@@ -859,7 +859,7 @@ body.chat-open .cs-bubble-container{display:none !important}
 .auth-stat-card.count .as-value{color:#a78bfa}
 .auth-stat-card .as-value{font-size:14px}
 @media(max-width:360px){.auth-stats{grid-template-columns:1fr;}.auth-stat-card .as-value{font-size:16px}}
-.auth-stats-note{font-size:11.5px;color:#cbd5e1;text-align:center;margin-top:10px;line-height:1.5;padding:8px 10px;background:rgba(255,255,255,0.04);border-radius:10px;border:1px solid rgba(255,255,255,0.06)}
+.auth-stats-note{font-size:11.5px;color:#cbd5e1;text-align:center;margin-top:10px;line-height:1.5;padding:8px 10px;background:rgba(255,255,255,0.04);border-radius:10px;border:1px solid rgba(255,255,255,0.06)}@keyframes authLivePulse{0%,100%{opacity:1}50%{opacity:0.45}}.auth-stats-note span{animation:authLivePulse 1.6s ease-in-out infinite}
 
 
 .maint-overlay{position:fixed;inset:0;z-index:9999;background:rgba(10,5,20,0.97);display:none;align-items:center;justify-content:center;padding:24px;text-align:center}
@@ -1309,7 +1309,7 @@ body.chat-open .cs-bubble-container{display:none !important}
         <div class="as-label">Total Omzet Order<br>Bulan Berjalan</div>
       </div>
     </div>
-    <div class="auth-stats-note" id="authStatsNote">Ringkasan publik Shine Shop: total member terdaftar, banyaknya order, dan omzet order pada bulan ini (waktu WIB). Angka diperbarui otomatis.</div>
+    <div class="auth-stats-note" id="authStatsNote">Ringkasan publik Shine Shop (realtime): total member, order bulan ini, dan omzet. Update otomatis saat ada perubahan.</div>
     <div class="auth-tabs"><button class="auth-tab active" id="tabLogin" onclick="switchAuthTab('login')">🔑 Masuk</button><button class="auth-tab" id="tabSignup" onclick="switchAuthTab('signup')">✨ Daftar</button></div>
     <form class="auth-form active" id="formLogin" onsubmit="handleLogin(event)"><div class="auth-field"><label>Email</label><input type="email" id="loginEmail" placeholder="email@gmail.com" required></div><div class="auth-field"><label>Password</label><input type="password" id="loginPassword" placeholder="••••••••" required minlength="6"></div><button type="submit" class="auth-submit" id="btnLoginSubmit">🔑 Masuk Sekarang</button><div class="auth-footer">Belum punya akun? <a onclick="switchAuthTab('signup')">Daftar</a></div></form>
     <form class="auth-form" id="formSignup" onsubmit="handleSignup(event)">
@@ -2518,13 +2518,18 @@ async function loadAuthPublicStats() {
   if (!usersEl || !txEl) return;
 
   const { startIso, endIso, monthName } = getMonthRangeWIB();
-  if (noteEl) noteEl.textContent = 'Memuat statistik publik bulan ' + monthName + '…';
 
   function applyStats(users, count, total) {
     if (users != null && usersEl) usersEl.textContent = formatAuthStatNumber(users);
     if (count != null && txCountEl) txCountEl.textContent = formatAuthStatNumber(count);
     if (total != null && txEl) txEl.textContent = 'Rp ' + formatAuthStatNumber(Math.round(Number(total) || 0));
-    if (noteEl) noteEl.textContent = 'Periode ' + monthName + ' (WIB) · Kolom 1: total akun terdaftar · Kolom 2: banyak order bulan ini · Kolom 3: total nilai order (omzet) bulan ini';
+    if (noteEl) {
+      const nowStr = new Date().toLocaleString('id-ID', {
+        timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+      });
+      noteEl.innerHTML = '<span style="color:#22c55e;font-weight:800;">● LIVE</span> · ' + monthName +
+        ' (WIB) · User · Order · Omzet · update ' + nowStr + ' WIB';
+    }
   }
 
   // 1) RPC publik
@@ -2539,6 +2544,7 @@ async function loadAuthPublicStats() {
           const total = row.month_tx_total ?? row.total_tx ?? row.tx_total ?? row.month_total;
           if (users != null || count != null || total != null) {
             applyStats(users, count, total);
+            startAuthPublicStatsRealtime();
             return;
           }
         }
@@ -2559,7 +2565,6 @@ async function loadAuthPublicStats() {
     } catch (_) {}
 
     try {
-      // count + sum via select
       const { data, error, count: c2 } = await supabaseClient
         .from('orders_detail')
         .select('total_payment', { count: 'exact' })
@@ -2587,28 +2592,136 @@ async function loadAuthPublicStats() {
           if (!isNaN(v) && v > 0) total += v;
         });
       }
-    } catch (e2) {
-      console.warn('auth stats tx', e2.message);
-    }
+    } catch (e) { console.warn('orders_detail stats', e.message); }
 
     applyStats(users, count, total);
   } catch (e) {
     console.warn('loadAuthPublicStats', e.message);
-    if (usersEl) usersEl.textContent = '—';
-    if (txCountEl) txCountEl.textContent = '—';
-    if (txEl) txEl.textContent = '—';
+    if (noteEl) noteEl.textContent = 'Statistik belum tersedia';
   }
-  if (noteEl) noteEl.textContent = 'Periode ' + monthName + ' (WIB) · Kolom 1: total akun terdaftar · Kolom 2: banyak order bulan ini · Kolom 3: total nilai order (omzet) bulan ini';
+
+  startAuthPublicStatsRealtime();
 }
 
-function switchAuthTab(tab) {
-  const tabLogin = document.getElementById('tabLogin');
-  const tabSignup = document.getElementById('tabSignup');
-  const formLogin = document.getElementById('formLogin');
-  const formSignup = document.getElementById('formSignup');
-  if (tab === 'login') { tabLogin.classList.add('active'); tabSignup.classList.remove('active'); formLogin.classList.add('active'); formSignup.classList.remove('active'); }
-  else { tabSignup.classList.add('active'); tabLogin.classList.remove('active'); formSignup.classList.add('active'); formLogin.classList.remove('active'); initSignupReferralField(); }
+let authStatsRealtimeStarted = false;
+let authStatsChannel = null;
+let authStatsPollTimer = null;
+
+function startAuthPublicStatsRealtime() {
+  if (authStatsRealtimeStarted) return;
+  authStatsRealtimeStarted = true;
+
+  // Polling ringan setiap 12 detik (aman tanpa publication)
+  if (authStatsPollTimer) clearInterval(authStatsPollTimer);
+  authStatsPollTimer = setInterval(() => {
+    try {
+      const overlay = document.getElementById('authOverlay') || document.getElementById('loginPage');
+      const authVisible = document.getElementById('authPublicStats');
+      // refresh selama elemen stats masih di DOM (login page)
+      if (authVisible && document.body.contains(authVisible)) {
+        // reload tanpa re-bind realtime
+        _refreshAuthPublicStatsOnly();
+      }
+    } catch (_) {}
+  }, 12000);
+
+  // Realtime Supabase: profiles insert/delete → user count, orders_detail → omzet
+  if (!supabaseClient) return;
+  try {
+    if (authStatsChannel) {
+      try { supabaseClient.removeChannel(authStatsChannel); } catch (_) {}
+      authStatsChannel = null;
+    }
+    authStatsChannel = supabaseClient
+      .channel('auth_public_stats_live_' + Date.now())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
+        _refreshAuthPublicStatsOnly();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders_detail' }, () => {
+        _refreshAuthPublicStatsOnly();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
+        _refreshAuthPublicStatsOnly();
+      })
+      .subscribe((status) => {
+        console.log('auth stats realtime:', status);
+      });
+  } catch (e) {
+    console.warn('auth stats realtime', e.message);
+  }
+
+  // Visibility: refresh saat tab aktif
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') _refreshAuthPublicStatsOnly();
+  });
 }
+
+let _authStatsRefreshing = false;
+async function _refreshAuthPublicStatsOnly() {
+  if (_authStatsRefreshing) return;
+  _authStatsRefreshing = true;
+  try {
+    // temporary disable start flag side-effect by calling core logic inline
+    const usersEl = document.getElementById('authStatUsers');
+    const txCountEl = document.getElementById('authStatTxCount');
+    const txEl = document.getElementById('authStatTx');
+    const noteEl = document.getElementById('authStatsNote');
+    if (!usersEl || !txEl) return;
+    const { startIso, endIso, monthName } = getMonthRangeWIB();
+
+    function applyStats(users, count, total) {
+      if (users != null && usersEl) usersEl.textContent = formatAuthStatNumber(users);
+      if (count != null && txCountEl) txCountEl.textContent = formatAuthStatNumber(count);
+      if (total != null && txEl) txEl.textContent = 'Rp ' + formatAuthStatNumber(Math.round(Number(total) || 0));
+      if (noteEl) {
+        const nowStr = new Date().toLocaleString('id-ID', {
+          timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+        });
+        noteEl.innerHTML = '<span style="color:#22c55e;font-weight:800;">● LIVE</span> · ' + monthName +
+          ' (WIB) · User · Order · Omzet · update ' + nowStr + ' WIB';
+      }
+    }
+
+    try {
+      const { data, error } = await supabaseClient.rpc('get_public_auth_stats');
+      if (!error && data) {
+        const row = Array.isArray(data) ? data[0] : data;
+        if (row) {
+          applyStats(
+            row.total_users ?? row.users ?? row.user_count,
+            row.month_tx_count ?? row.tx_count ?? row.order_count ?? row.count,
+            row.month_tx_total ?? row.total_tx ?? row.tx_total ?? row.month_total
+          );
+          return;
+        }
+      }
+    } catch (_) {}
+
+    let users = null, count = null, total = 0;
+    try {
+      const { count: c } = await supabaseClient.from('profiles').select('id', { count: 'exact', head: true });
+      if (c != null) users = c;
+    } catch (_) {}
+    try {
+      const { data, count: c2 } = await supabaseClient
+        .from('orders_detail')
+        .select('total_payment', { count: 'exact' })
+        .gte('created_at', startIso)
+        .lt('created_at', endIso)
+        .limit(10000);
+      if (c2 != null) count = c2;
+      else if (data) count = data.length;
+      (data || []).forEach(r => {
+        const v = parseFloat(r.total_payment);
+        if (!isNaN(v) && v > 0) total += v;
+      });
+    } catch (_) {}
+    applyStats(users, count, total);
+  } finally {
+    _authStatsRefreshing = false;
+  }
+}
+
 
 async function loginToChatProject(email, password) {
   if (!chatClient) return false;
