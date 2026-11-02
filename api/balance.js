@@ -2,7 +2,7 @@
 
 const API_URL = 'https://fayupedia.id/api/balance';
 const API_ID = 5522;
-const API_KEY = '6mnjom-ing8mx-a4csgp-6bwv4c-4zdv1l';
+const API_KEY = 'iv0d2o-nuynvp-dwwarq-dpjxto-adknbv';
 
 /**
  * Format angka menjadi Rupiah Indonesia
