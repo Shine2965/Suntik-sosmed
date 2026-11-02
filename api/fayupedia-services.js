@@ -294,7 +294,7 @@ export default async function handler(req, res) {
 
     // ===== GROUP BY CATEGORY + MARKUP 7.5% =====
     const grouped = {};
-    const MARKUP = 1.085;
+    const MARKUP = 1.095;
 
     for (const s of data.services) {
       const category = (s.category || 'Lainnya').trim() || 'Lainnya';
