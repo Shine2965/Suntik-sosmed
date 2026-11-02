@@ -35,7 +35,7 @@ export default function handler(req, res) {
         const orderSecretKey = process.env.ORDER_SECRET_KEY || process.env.ORDERSOSMED_SECRET_KEY || 'Alvino11';
 
         // ===== FAYUPEDIA CONFIG (TETAP ADA) =====
-        const fayupediaApiKey = process.env.FAYUPEDIA_API_KEY || 'iv0d2o-nuynvp-dwwarq-dpjxto-adknbv';
+        const fayupediaApiKey = process.env.FAYUPEDIA_API_KEY || '';
         const fayupediaApiId = parseInt(process.env.FAYUPEDIA_API_ID) || 287358;
 
         // ===== IRVANKARDE CONFIG =====
