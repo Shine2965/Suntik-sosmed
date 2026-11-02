@@ -176,6 +176,32 @@ body{font-family:'Quicksand',sans-serif;background:#0f0818;color:#f1e6f5;min-hei
 .maint-card p{font-size:13px;color:#e2e8f0;line-height:1.55;margin-bottom:12px}
 .maint-card .maint-meta{font-size:11px;color:#94a3b8}
 
+
+.mc-room-modal{position:fixed;inset:0;z-index:90;background:rgba(0,0,0,0.55);display:none;align-items:flex-end;justify-content:center}
+.mc-room-modal.show{display:flex}
+.mc-room-sheet{width:100%;max-width:480px;height:min(92vh,720px);background:#140a28;border-radius:18px 18px 0 0;display:flex;flex-direction:column;border:1px solid rgba(255,255,255,0.08)}
+.mc-room-head{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid rgba(255,255,255,0.08)}
+.mc-room-head button{background:rgba(255,255,255,0.06);border:none;color:#fff;width:36px;height:36px;border-radius:10px;font-size:18px;cursor:pointer}
+.mc-room-title{font-weight:900;font-size:14px;color:#fff}
+.mc-room-code{font-size:11px;color:#facc15;font-weight:800;letter-spacing:1px}
+.mc-room-meta{padding:10px 14px;font-size:12px;color:#cbd5e1;line-height:1.5;background:rgba(250,204,21,0.06);border-bottom:1px solid rgba(255,255,255,0.06)}
+.mc-room-actions{display:flex;flex-wrap:wrap;gap:6px;padding:8px 12px;border-bottom:1px solid rgba(255,255,255,0.06)}
+.mc-room-actions button{flex:1;min-width:120px;padding:10px;border:none;border-radius:10px;font-weight:800;font-family:inherit;font-size:11px;cursor:pointer}
+.mc-msgs{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px}
+.mc-bubble{max-width:85%;padding:8px 11px;border-radius:12px;font-size:12.5px;line-height:1.45}
+.mc-bubble.me{align-self:flex-end;background:linear-gradient(135deg,#ff6b9d,#ff4080);color:#fff}
+.mc-bubble.them{align-self:flex-start;background:rgba(255,255,255,0.08);color:#e2e8f0}
+.mc-bubble .mc-time{font-size:9px;opacity:0.75;margin-top:4px}
+.mc-bubble img{max-width:100%;border-radius:8px;margin-top:4px}
+.mc-input-row{display:flex;gap:6px;padding:10px;border-top:1px solid rgba(255,255,255,0.08);align-items:flex-end}
+.mc-input-row textarea{flex:1;border-radius:12px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.05);color:#fff;padding:10px;font-family:inherit;font-size:13px;resize:none;max-height:90px}
+.mc-attach,.mc-send{width:40px;height:40px;border:none;border-radius:12px;cursor:pointer;font-size:16px}
+.mc-attach{background:rgba(255,255,255,0.08);color:#fff}
+.mc-send{background:linear-gradient(135deg,#ff6b9d,#ff4080);color:#fff}
+.mc-card{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:12px;margin-bottom:10px}
+.mc-card .mc-c-code{font-weight:900;color:#facc15;letter-spacing:1px}
+.mc-card .mc-c-meta{font-size:11px;color:#94a3b8;margin-top:4px}
+
 </style>
 </head>
 <body>
@@ -249,9 +275,57 @@ body{font-family:'Quicksand',sans-serif;background:#0f0818;color:#f1e6f5;min-hei
     </div>
   </div>
 
+  
+    <!-- MC / REKBER -->
+    <div class="page" id="page-mc">
+      <div class="section-title">🤝 Rekber / MC <div class="line"></div></div>
+      <div class="note-box" style="margin-bottom:12px;font-size:11px;line-height:1.5">
+        <b style="color:#facc15">Yang wajib membuat room MC adalah BUYER</b> (pemegang dana).<br>
+        Seller hanya <b>join via kode</b> setelah room dibuat.<br><br>
+        Fee flat <b>Rp 2.000</b>/room. Bisa bayar dengan <b>Saldo</b> atau <b>QRIS</b>.<br>
+        Hold = nominal + fee. Seller join via kode.<br>
+        Selesai: kedua pihak konfirmasi. Seller konfirmasi + buyer diam 12 jam → auto selesai (saldo ke seller).<br>
+        Batal sebelum seller join → room <b>otomatis dihapus</b>, refund <b>penuh</b> (nominal+fee).<br>
+        Batal setelah seller join → wajib setuju kedua pihak → refund nominal + <b>50% fee</b>. Room hapus 8 jam setelah tutup.
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+        <button class="btn btn-primary" style="flex:1;min-width:140px" onclick="mcOpenCreate()">➕ Buat Room MC</button>
+        <button class="btn btn-gold" style="flex:1;min-width:140px" onclick="mcOpenJoin()">🔑 Join Kode</button>
+      </div>
+      <button class="btn btn-secondary" style="width:100%;margin-bottom:12px" onclick="loadMcRooms()">🔄 Refresh</button>
+      <div id="mcRoomList" class="loading">Memuat room...</div>
+      <div id="mcOwnerSection" style="display:none;margin-top:16px">
+        <div class="section-title">🛡️ Semua Room (Owner) <div class="line"></div></div>
+        <div id="mcOwnerList"></div>
+      </div>
+    </div>
+
+    <div class="mc-room-modal" id="mcRoomModal">
+      <div class="mc-room-sheet">
+        <div class="mc-room-head">
+          <button type="button" onclick="mcCloseRoom()">‹</button>
+          <div>
+            <div class="mc-room-title" id="mcRoomTitle">Room MC</div>
+            <div class="mc-room-code" id="mcRoomCode">—</div>
+          </div>
+          <button type="button" onclick="mcCloseRoom()">✕</button>
+        </div>
+        <div class="mc-room-meta" id="mcRoomMeta"></div>
+        <div class="mc-room-actions" id="mcRoomActions"></div>
+        <div class="mc-msgs" id="mcMsgs"></div>
+        <div class="mc-input-row" id="mcInputRow">
+          <input type="file" id="mcImageInput" accept="image/*" style="display:none" onchange="mcOnImage(event)">
+          <button type="button" class="mc-attach" onclick="document.getElementById('mcImageInput').click()">🖼️</button>
+          <textarea id="mcInput" rows="1" placeholder="Chat..." maxlength="2000"></textarea>
+          <button type="button" class="mc-send" onclick="mcSendMsg()">➤</button>
+        </div>
+      </div>
+    </div>
+
   <div class="bottom-nav">
     <button class="nav-item active" onclick="switchPage('market')"><span class="ico">🏪</span>Market</button>
     <button class="nav-item" onclick="switchPage('sell')"><span class="ico">📤</span>Jual</button>
+    <button class="nav-item" onclick="switchPage('mc')"><span class="ico">🤝</span>MC</button>
     <button class="nav-item" onclick="switchPage('orders')"><span class="ico">📋</span>Riwayat</button>
     <button class="nav-item" onclick="switchPage('profile')"><span class="ico">👤</span>Akun</button>
   </div>
@@ -549,7 +623,8 @@ async function onLogin(user){
   const fab=$('chatFab'); if(fab) fab.style.display='block';
   updateBalanceUI();
   try { cleanupMarketChats(); } catch(_){}
-  try { startChatBadgePolling(); } catch(_){}
+  try { startChatBadgePolling();
+  try { startMcGlobalNotif(); } catch(_){} } catch(_){}
   $('profileEmail').textContent = currentProfile.email || user.email;
   $('profileRoleText').textContent = currentProfile.role || 'user';
   $('profileRole').style.display = isStaff ? 'inline' : 'none';
@@ -607,11 +682,11 @@ function switchPage(name){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   $('page-'+name).classList.add('active');
-  const map = {market:0,sell:1,orders:2,profile:3};
+  const map={market:0,sell:1,mc:2,orders:3,profile:4};
   document.querySelectorAll('.nav-item')[map[name]]?.classList.add('active');
   if(name==='market') loadMarket();
   if(name==='sell'){ loadMyProducts(); loadPending(); loadSlotInfo(); }
-  if(name==='orders') loadOrders();
+  if(name==='mc'){try{loadMcRooms()}catch(e){}}if(name==='orders') loadOrders();
   if(name==='profile'){ refreshBalance(); if(isStaff){ loadAdminPending(); loadAdminProducts(); } }
 }
 
@@ -1190,6 +1265,16 @@ async function handleMarketQrisSuccess() {
       }
     }
     await refreshBalance();
+
+    // MC QRIS → buat room setelah saldo hold masuk
+    if (window._mcQrisMode && window._mcPendingAmount) {
+      depositSuccessProcessed = true;
+      stopDepositPolling();
+      if (depositTimerInterval) { clearInterval(depositTimerInterval); depositTimerInterval = null; }
+      try { closeQrisModal(true); } catch(_){}
+      await mcFinishCreateAfterQris();
+      return;
+    }
 
     // Auto beli produk setelah saldo masuk
     if (productId) {
@@ -2551,6 +2636,551 @@ window.addEventListener('load', async () => {
   await initAuth();
   try { await loadMaintenanceState(); subscribeMaintenance(); } catch(e) {}
 });
+
+/* ===================== MC / REKBER ===================== */
+const MC_FEE = 2000;
+let currentMcRoom = null;
+let mcMsgChannel = null;
+let mcRoomChannel = null;
+
+function mcFmt(n){ return 'Rp ' + Number(n||0).toLocaleString('id-ID'); }
+function mcStatusLabel(st){
+  const m = {
+    waiting_seller:'Menunggu seller',
+    active:'Aktif',
+    seller_confirmed:'Seller sudah konfirmasi',
+    buyer_confirmed:'Buyer sudah konfirmasi',
+    completed:'Selesai',
+    cancel_pending:'Menunggu setuju batal',
+    cancelled:'Dibatalkan'
+  };
+  return m[st] || st;
+}
+
+
+function mcShowToast(title, body, kind){
+  const wrap = document.getElementById('mcToastWrap');
+  if(!wrap){
+    try { Swal.fire({toast:true,position:'top-end',icon: kind==='warn'?'warning':'info',title:title,text:body,timer:4500,showConfirmButton:false,background:'#1a0e2e',color:'#fff'}); } catch(_){}
+    return;
+  }
+  const el = document.createElement('div');
+  el.className = 'mc-toast ' + (kind === 'warn' ? 'warn' : (kind === 'ok' ? 'ok' : ''));
+  el.innerHTML = '<div class="t">' + escapeHtml(title) + '</div><div class="b">' + escapeHtml(body || '') + '</div>';
+  wrap.appendChild(el);
+  while(wrap.children.length > 4) try { wrap.removeChild(wrap.firstChild); } catch(_){}
+  setTimeout(() => { try { if(el.parentNode) el.parentNode.removeChild(el); } catch(_){} }, 8000);
+}
+
+async function mcResolveEmails(room){
+  const ids = [room.buyer_id, room.seller_id].filter(Boolean);
+  const map = {};
+  if(!ids.length) return map;
+  try {
+    const { data } = await sb.from('profiles').select('id, email, role').in('id', ids);
+    (data || []).forEach(p => { map[p.id] = p; });
+  } catch(_){}
+  return map;
+}
+
+let mcGlobalNotifChannel = null;
+let mcNotifSeen = new Set();
+function startMcGlobalNotif(){
+  if(!sb || !currentUser || mcGlobalNotifChannel) return;
+  try {
+    mcGlobalNotifChannel = sb.channel('mc_notif_' + currentUser.id)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'mc_rooms' }, (payload) => {
+        try {
+          const n = payload.new || {};
+          const o = payload.old || {};
+          const uid = currentUser.id;
+          if(n.buyer_id !== uid && n.seller_id !== uid && !(isStaff)) return;
+          // only parties + staff
+          const key = n.id + '|' + n.status + '|' + (n.seller_confirmed_at||'') + '|' + (n.buyer_confirmed_at||'') + '|' + n.cancel_buyer_ok + '|' + n.cancel_seller_ok;
+          if(mcNotifSeen.has(key)) return;
+          mcNotifSeen.add(key);
+          setTimeout(() => mcNotifSeen.delete(key), 15000);
+
+          const code = n.code || '';
+          // seller joined
+          if(o.seller_id == null && n.seller_id && n.buyer_id === uid){
+            mcShowToast('Seller bergabung', 'Room ' + code + ' — seller sudah join.', 'ok');
+          }
+          // confirm
+          if(!o.seller_confirmed_at && n.seller_confirmed_at){
+            if(n.buyer_id === uid) mcShowToast('Seller konfirmasi selesai', 'Room ' + code + ' — seller menandai transaksi selesai. Konfirmasi Anda juga.', 'ok');
+            else if(n.seller_id === uid) mcShowToast('Konfirmasi terkirim', 'Room ' + code + ' — menunggu buyer / auto 12 jam.', 'ok');
+          }
+          if(!o.buyer_confirmed_at && n.buyer_confirmed_at){
+            if(n.seller_id === uid) mcShowToast('Buyer konfirmasi selesai', 'Room ' + code + ' — buyer menandai selesai.', 'ok');
+            else if(n.buyer_id === uid) mcShowToast('Konfirmasi terkirim', 'Room ' + code + ' — menunggu seller.', 'ok');
+          }
+          if(o.status !== 'completed' && n.status === 'completed'){
+            mcShowToast('MC selesai', 'Room ' + code + ' — saldo diteruskan ke seller.', 'ok');
+          }
+          // cancel requests
+          if(!o.cancel_buyer_ok && n.cancel_buyer_ok){
+            if(n.seller_id === uid) mcShowToast('Buyer ajukan batal', 'Room ' + code + ' — setujui batal jika sepakat.', 'warn');
+            else if(n.buyer_id === uid) mcShowToast('Permintaan batal terkirim', 'Room ' + code + ' — menunggu seller.', 'warn');
+          }
+          if(!o.cancel_seller_ok && n.cancel_seller_ok){
+            if(n.buyer_id === uid) mcShowToast('Seller ajukan batal', 'Room ' + code + ' — setujui batal jika sepakat.', 'warn');
+            else if(n.seller_id === uid) mcShowToast('Permintaan batal terkirim', 'Room ' + code + ' — menunggu buyer.', 'warn');
+          }
+          if(o.status !== 'cancelled' && n.status === 'cancelled'){
+            mcShowToast('MC dibatalkan', 'Room ' + code + ' — refund diproses.', 'warn');
+          }
+          if(currentMcRoom && currentMcRoom.id === n.id){
+            try { mcOpenRoom(n.id); } catch(_){}
+          }
+          try { if(document.getElementById('page-mc')?.classList.contains('active')) loadMcRooms(); } catch(_){}
+        } catch(e){ console.warn('mc notif', e); }
+      })
+      .subscribe();
+  } catch(e){ console.warn(e); }
+}
+
+async function loadMcRooms(){
+  const box = document.getElementById('mcRoomList');
+  if(!box || !currentUser){ if(box) box.innerHTML = '<div class="empty">Login dulu</div>'; return; }
+  try { await sb.rpc('mc_process_auto_confirm'); } catch(_){}
+  try { await sb.rpc('mc_cleanup_expired'); } catch(_){}
+  box.innerHTML = '<div class="loading">Memuat...</div>';
+  try {
+    const { data, error } = await sb.from('mc_rooms')
+      .select('*')
+      .or('buyer_id.eq.'+currentUser.id+',seller_id.eq.'+currentUser.id)
+      .order('created_at', { ascending: false })
+      .limit(40);
+    if(error) throw error;
+    const rows = data || [];
+    if(!rows.length){
+      box.innerHTML = '<div class="empty">Belum ada room MC</div>';
+    } else {
+      box.innerHTML = rows.map(r => {
+        const role = r.buyer_id === currentUser.id ? 'Buyer' : 'Seller';
+        return `<div class="mc-card" onclick="mcOpenRoom('${r.id}')">
+          <div class="mc-c-code">🔑 ${escapeHtml(r.code)} · ${role}</div>
+          <div class="mc-c-meta">${mcFmt(r.amount)} + fee ${mcFmt(r.fee)} · ${mcStatusLabel(r.status)}</div>
+          <div class="mc-c-meta">${new Date(r.created_at).toLocaleString('id-ID',{timeZone:'Asia/Jakarta'})} WIB</div>
+        </div>`;
+      }).join('');
+    }
+  } catch(e){
+    box.innerHTML = `<div class="empty">${escapeHtml(e.message)}</div>`;
+  }
+
+  // Owner view-all
+  const ownSec = document.getElementById('mcOwnerSection');
+  if(ownSec && isStaff){
+    ownSec.style.display = 'block';
+    try {
+      const { data } = await sb.from('mc_rooms').select('*').order('created_at',{ascending:false}).limit(50);
+      const ids = [];
+      (data||[]).forEach(r => { if(r.buyer_id) ids.push(r.buyer_id); if(r.seller_id) ids.push(r.seller_id); });
+      let em = {};
+      if(ids.length){
+        try {
+          const { data: ps } = await sb.from('profiles').select('id,email').in('id', [...new Set(ids)]);
+          (ps||[]).forEach(p => em[p.id]=p.email);
+        } catch(_){}
+      }
+      document.getElementById('mcOwnerList').innerHTML = (data||[]).map(r =>
+        `<div class="mc-card" onclick="mcOpenRoom('${r.id}')">
+          <div class="mc-c-code">${escapeHtml(r.code)} · ${mcStatusLabel(r.status)}</div>
+          <div class="mc-c-meta">${mcFmt(r.amount)}</div>
+          <div class="mc-c-meta">Buyer: ${escapeHtml(em[r.buyer_id]||'-')}</div>
+          <div class="mc-c-meta">Seller: ${escapeHtml(em[r.seller_id]||'(belum join)')}</div>
+        </div>`
+      ).join('') || '<div class="empty">Kosong</div>';
+    } catch(e){
+      document.getElementById('mcOwnerList').innerHTML = escapeHtml(e.message);
+    }
+  }
+}
+
+async function mcOpenCreate(){
+  if(!currentUser) return Swal.fire({title:'Login dulu',icon:'info',background:'#1a0e2e',color:'#fff'});
+  const step1 = await Swal.fire({
+    title: 'Buat Room MC (Buyer)',
+    html: `<div style="text-align:left;font-size:12px;color:#ddd;line-height:1.55">
+      <b style="color:#facc15">Hanya BUYER yang membuat room.</b> Seller join dengan kode nanti.<br><br>
+      Fee flat <b style="color:#facc15">${mcFmt(MC_FEE)}</b>. Total bayar = nominal + fee.<br>
+      Batal sebelum seller join = room dihapus & refund penuh.
+    </div>`,
+    input: 'number',
+    inputLabel: 'Nominal MC (Rp)',
+    inputAttributes: { min: 1000, step: 1 },
+    inputValue: 10000,
+    showCancelButton: true,
+    confirmButtonText: 'Lanjut',
+    background: '#1a0e2e', color: '#fff', confirmButtonColor: '#22c55e'
+  });
+  if(step1.value == null) return;
+  const nom = Math.floor(Number(step1.value)||0);
+  if(nom < 1000) return Swal.fire({title:'Minimal Rp 1.000',icon:'warning',background:'#1a0e2e',color:'#fff'});
+  const totalHold = nom + MC_FEE;
+
+  const pay = await Swal.fire({
+    title: 'Metode Bayar MC',
+    html: `<div style="text-align:left;font-size:13px;color:#ddd">Nominal <b>${mcFmt(nom)}</b> + fee <b>${mcFmt(MC_FEE)}</b><br>Total hold: <b style="color:#ffd700">${mcFmt(totalHold)}</b></div>`,
+    showDenyButton: true,
+    showCancelButton: true,
+    confirmButtonText: '💰 Saldo',
+    denyButtonText: '📱 QRIS',
+    cancelButtonText: 'Batal',
+    confirmButtonColor: '#facc15',
+    denyButtonColor: '#00c6ff',
+    background: '#1a0e2e', color: '#fff'
+  });
+  if(pay.isDismissed) return;
+  if(pay.isConfirmed){
+    Swal.fire({title:'Membuat room...',allowOutsideClick:false,didOpen:()=>Swal.showLoading(),background:'#1a0e2e',color:'#fff'});
+    const { data, error } = await sb.rpc('mc_create_room', { p_amount: nom });
+    Swal.close();
+    if(error) return Swal.fire({title:'Gagal',text:error.message,icon:'error',background:'#1a0e2e',color:'#fff'});
+    if(data && data.success === false) return Swal.fire({title:'Gagal',text:data.message,icon:'error',background:'#1a0e2e',color:'#fff'});
+    await refreshBalance();
+    await loadMcRooms();
+    Swal.fire({title:'Room dibuat',html:`Kode: <b style="color:#facc15;font-size:20px">${data.code}</b><br>Hold ${mcFmt(data.total_hold)}`,icon:'success',background:'#1a0e2e',color:'#fff'});
+    if(data.room_id) mcOpenRoom(data.room_id);
+    return;
+  }
+  if(pay.isDenied){
+    await mcCreateRoomWithQris(nom, totalHold);
+  }
+}
+
+async function mcCreateRoomWithQris(nom, totalHold){
+  if(isProcessingDeposit || currentDeposit){
+    return Swal.fire({title:'Tunggu',text:'Ada QRIS yang masih berjalan',icon:'info',background:'#1a0e2e',color:'#fff'});
+  }
+  // unique code vs total hold
+  let uniqueCode = 1;
+  try {
+    if(typeof generateUniqueCodeForAmount === 'function') uniqueCode = await generateUniqueCodeForAmount(totalHold);
+    else uniqueCode = Math.floor(Math.random()*200)+1;
+  } catch(_){ uniqueCode = Math.floor(Math.random()*200)+1; }
+  const totalAmount = totalHold + uniqueCode;
+  const expiresAt = new Date(Date.now() + 10*60*1000);
+  try {
+    const { data, error: insErr } = await sb.from('deposits').insert({
+      user_id: currentUser.id,
+      email: currentUser.email || currentProfile?.email,
+      amount: totalHold,
+      unique_code: uniqueCode,
+      total_amount: totalAmount,
+      status: 'pending',
+      expires_at: expiresAt.toISOString()
+    }).select().single();
+    if(insErr) throw insErr;
+    currentDeposit = data;
+    currentQrisProductId = null;
+    window._mcPendingAmount = nom;
+    window._mcPendingTotalHold = totalHold;
+    window._mcQrisMode = true;
+
+    if($('qrisProductTitle')) $('qrisProductTitle').textContent = 'Bayar MC / Rekber';
+    if($('qrisAmount')) $('qrisAmount').textContent = mcFmt(totalAmount);
+    if($('qrisAmountDetail')) $('qrisAmountDetail').innerHTML =
+      `MC nominal ${mcFmt(nom)} + fee ${mcFmt(MC_FEE)} + unik <b style="color:#ffd700">${uniqueCode}</b><br><span style="font-size:10px;color:#94a3b8">Setelah lunas, room MC otomatis dibuat (buyer).</span>`;
+    if($('qrisStatus')){ $('qrisStatus').textContent = 'Menunggu pembayaran MC...'; $('qrisStatus').style.color = '#facc15'; }
+    $('qrisModal').classList.add('show');
+    setTimeout(() => {
+      try {
+        if(typeof renderQrisToCanvas === 'function' && typeof buildDynamicQris === 'function')
+          renderQrisToCanvas(buildDynamicQris(typeof QRIS_CRC !== 'undefined' ? QRIS_CRC : '', totalAmount));
+      } catch(e){ console.warn(e); }
+    }, 100);
+    if(typeof startDepositTimer === 'function') startDepositTimer(expiresAt);
+    if(typeof startDepositPolling === 'function') startDepositPolling(totalAmount);
+    if(typeof startDepositRealtime === 'function') startDepositRealtime(data.id);
+  } catch(e){
+    Swal.fire({title:'Gagal buat QRIS MC',text:e.message,icon:'error',background:'#1a0e2e',color:'#fff'});
+    window._mcQrisMode = false;
+  }
+}
+
+async function mcFinishCreateAfterQris(){
+  const nom = Math.floor(Number(window._mcPendingAmount)||0);
+  if(!nom) return;
+  try {
+    const { data, error } = await sb.rpc('mc_create_room', { p_amount: nom });
+    if(error) throw error;
+    if(data && data.success === false) throw new Error(data.message || 'Gagal buat room');
+    window._mcQrisMode = false;
+    window._mcPendingAmount = null;
+    await refreshBalance();
+    await loadMcRooms();
+    await Swal.fire({
+      title: 'Room MC dibuat',
+      html: `Kode: <b style="color:#facc15;font-size:20px">${data.code}</b><br>Hold ${mcFmt(data.total_hold)}`,
+      icon: 'success', background: '#1a0e2e', color: '#fff'
+    });
+    if(data.room_id) mcOpenRoom(data.room_id);
+  } catch(e){
+    window._mcQrisMode = false;
+    Swal.fire({
+      title: 'Pembayaran OK, room gagal',
+      html: escapeHtml(e.message) + '<br><small>Saldo sudah masuk. Buka MC → Buat Room (Saldo).</small>',
+      icon: 'warning', background: '#1a0e2e', color: '#fff'
+    });
+  }
+}
+
+
+async function mcOpenJoin(){
+  if(!currentUser) return Swal.fire({title:'Login dulu',icon:'info',background:'#1a0e2e',color:'#fff'});
+  const { value: code } = await Swal.fire({
+    title: 'Join Room (Seller)',
+    input: 'text',
+    inputLabel: 'Kode room',
+    inputAttributes: { maxlength: 12, autocapitalize: 'characters' },
+    showCancelButton: true,
+    confirmButtonText: 'Join',
+    background: '#1a0e2e', color: '#fff', confirmButtonColor: '#00c6ff'
+  });
+  if(!code) return;
+  const { data, error } = await sb.rpc('mc_join_room', { p_code: String(code).trim() });
+  if(error) return Swal.fire({title:'Gagal',text:error.message,icon:'error',background:'#1a0e2e',color:'#fff'});
+  if(data && data.success === false) return Swal.fire({title:'Gagal',text:data.message,icon:'error',background:'#1a0e2e',color:'#fff'});
+  await loadMcRooms();
+  mcShowToast('Join berhasil', 'Anda masuk sebagai SELLER di room ' + (data.code||'') + '.', 'ok');
+  mcOpenRoom(data.room_id);
+}
+
+async function mcOpenRoom(roomId){
+  if(!currentUser) return;
+  const { data: room, error } = await sb.from('mc_rooms').select('*').eq('id', roomId).maybeSingle();
+  if(error || !room) return Swal.fire({title:'Room tidak ada',icon:'error',background:'#1a0e2e',color:'#fff'});
+  currentMcRoom = room;
+  const modal = document.getElementById('mcRoomModal');
+  modal.classList.add('show');
+  document.getElementById('mcRoomTitle').textContent = 'Room MC · ' + mcStatusLabel(room.status);
+  document.getElementById('mcRoomCode').textContent = 'Kode: ' + room.code;
+  const isBuyer = room.buyer_id === currentUser.id;
+  const isSeller = room.seller_id === currentUser.id;
+  const isOwnerOnly = isStaff && !isBuyer && !isSeller;
+  const people = await mcResolveEmails(room);
+  const buyerEmail = people[room.buyer_id]?.email || (room.buyer_id ? String(room.buyer_id).slice(0,8)+'…' : '—');
+  const sellerEmail = room.seller_id ? (people[room.seller_id]?.email || String(room.seller_id).slice(0,8)+'…') : 'Belum ada (menunggu join)';
+  let roleLine = '';
+  if(isBuyer) roleLine = '<div style="margin-top:6px;color:#38bdf8;font-weight:800">Peran Anda: BUYER (pembuat room)</div>';
+  else if(isSeller) roleLine = '<div style="margin-top:6px;color:#a78bfa;font-weight:800">Peran Anda: SELLER (join via kode)</div>';
+  else if(isOwnerOnly) roleLine = '<div style="margin-top:6px;color:#facc15;font-weight:800">Mode Owner: lihat saja (tidak bisa chat)</div>';
+  let parties = '';
+  if(isStaff || isBuyer || isSeller){
+    parties = `<div style="margin-top:8px;padding:8px;border-radius:10px;background:rgba(0,0,0,0.25);font-size:11px;line-height:1.5">
+      <div>👤 <b>Buyer</b> (buat room): <span style="color:#ffd700">${escapeHtml(buyerEmail)}</span></div>
+      <div>🏪 <b>Seller</b> (join kode): <span style="color:#ffd700">${escapeHtml(sellerEmail)}</span></div>
+    </div>`;
+  }
+  document.getElementById('mcRoomMeta').innerHTML =
+    `Nominal: <b style="color:#ffd700">${mcFmt(room.amount)}</b> · Fee: ${mcFmt(room.fee)}<br>` +
+    `Status: <b>${mcStatusLabel(room.status)}</b>` +
+    roleLine + parties +
+    (room.seller_confirmed_at ? `<br>Seller konfirmasi: ${new Date(room.seller_confirmed_at).toLocaleString('id-ID',{timeZone:'Asia/Jakarta'})} WIB` : '') +
+    (room.buyer_confirmed_at ? `<br>Buyer konfirmasi: ${new Date(room.buyer_confirmed_at).toLocaleString('id-ID',{timeZone:'Asia/Jakarta'})} WIB` : '') +
+    (room.cancel_buyer_ok || room.cancel_seller_ok ? `<br><span style="color:#ff8080">Batal: buyer ${room.cancel_buyer_ok?'✓':'…'} · seller ${room.cancel_seller_ok?'✓':'…'}</span>` : '') +
+    (room.delete_after ? `<br>Hapus otomatis: ${new Date(room.delete_after).toLocaleString('id-ID',{timeZone:'Asia/Jakarta'})} WIB` : '');
+
+  const actions = document.getElementById('mcRoomActions');
+  const closed = ['completed','cancelled'].includes(room.status);
+  let btns = '';
+  if(!closed && isBuyer){
+    btns += `<button style="background:#334155;color:#fff" onclick="mcChangeAmount()">Ubah Nominal</button>`;
+  }
+  if(!closed && (isBuyer || isSeller)){
+    btns += `<button style="background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff" onclick="mcConfirm()">Konfirmasi Selesai</button>`;
+    btns += `<button style="background:rgba(239,68,68,0.25);color:#ff8080" onclick="mcCancel()">${currentMcRoom.status==='waiting_seller'?'Batalkan & Hapus Room':'Ajukan Batal'}</button>`;
+  }
+  if(isOwnerOnly){
+    btns += `<span style="font-size:11px;color:#94a3b8;padding:8px">Owner: view only (tidak bisa chat)</span>`;
+  }
+  actions.innerHTML = btns || '<span style="font-size:11px;color:#94a3b8">Room ditutup — riwayat chat read-only</span>';
+
+  const inputRow = document.getElementById('mcInputRow');
+  if(isOwnerOnly || closed){
+    inputRow.style.display = 'none';
+  } else if(isBuyer || isSeller){
+    inputRow.style.display = 'flex';
+  } else {
+    inputRow.style.display = 'none';
+  }
+
+  await mcLoadMessages(room.id);
+  mcSubscribe(room.id);
+}
+
+function mcCloseRoom(){
+  document.getElementById('mcRoomModal').classList.remove('show');
+  currentMcRoom = null;
+  try { if(mcMsgChannel) sb.removeChannel(mcMsgChannel); } catch(_){}
+  try { if(mcRoomChannel) sb.removeChannel(mcRoomChannel); } catch(_){}
+  mcMsgChannel = null; mcRoomChannel = null;
+  loadMcRooms();
+}
+
+async function mcLoadMessages(roomId){
+  const box = document.getElementById('mcMsgs');
+  box.innerHTML = '<div class="loading">Memuat chat...</div>';
+  const { data, error } = await sb.from('mc_messages')
+    .select('*').eq('room_id', roomId).order('created_at',{ascending:true}).limit(200);
+  if(error){ box.innerHTML = escapeHtml(error.message); return; }
+  box.innerHTML = (data||[]).map(m => {
+    const me = m.sender_id === currentUser.id;
+    const img = m.image_url ? `<img src="${escapeHtml(m.image_url)}" alt="">` : '';
+    const body = m.body ? escapeHtml(m.body) : '';
+    return `<div class="mc-bubble ${me?'me':'them'}">${body}${img}<div class="mc-time">${new Date(m.created_at).toLocaleString('id-ID',{timeZone:'Asia/Jakarta'})}</div></div>`;
+  }).join('') || '<div class="empty">Belum ada pesan</div>';
+  box.scrollTop = box.scrollHeight;
+}
+
+function mcSubscribe(roomId){
+  try { if(mcMsgChannel) sb.removeChannel(mcMsgChannel); } catch(_){}
+  try { if(mcRoomChannel) sb.removeChannel(mcRoomChannel); } catch(_){}
+  mcMsgChannel = sb.channel('mc_msg_'+roomId)
+    .on('postgres_changes',{event:'INSERT',schema:'public',table:'mc_messages',filter:`room_id=eq.${roomId}`}, () => mcLoadMessages(roomId))
+    .subscribe();
+  mcRoomChannel = sb.channel('mc_room_'+roomId)
+    .on('postgres_changes',{event:'UPDATE',schema:'public',table:'mc_rooms',filter:`id=eq.${roomId}`}, async (payload) => {
+      if(payload.new) { currentMcRoom = payload.new; mcOpenRoom(roomId); }
+    })
+    .subscribe();
+}
+
+async function mcSendMsg(){
+  if(!currentMcRoom || !currentUser) return;
+  if(isStaff && currentMcRoom.buyer_id !== currentUser.id && currentMcRoom.seller_id !== currentUser.id){
+    return Swal.fire({title:'Owner tidak bisa chat',icon:'info',background:'#1a0e2e',color:'#fff'});
+  }
+  const ta = document.getElementById('mcInput');
+  const text = (ta.value || '').trim();
+  if(!text) return;
+  ta.value = '';
+  const { error } = await sb.from('mc_messages').insert({
+    room_id: currentMcRoom.id,
+    sender_id: currentUser.id,
+    body: text
+  });
+  if(error) Swal.fire({title:'Gagal kirim',text:error.message,icon:'error',background:'#1a0e2e',color:'#fff'});
+  else mcLoadMessages(currentMcRoom.id);
+}
+
+async function mcOnImage(ev){
+  const file = ev.target.files && ev.target.files[0];
+  ev.target.value = '';
+  if(!file || !currentMcRoom) return;
+  if(isStaff && currentMcRoom.buyer_id !== currentUser.id && currentMcRoom.seller_id !== currentUser.id){
+    return Swal.fire({title:'Owner tidak bisa chat',icon:'info',background:'#1a0e2e',color:'#fff'});
+  }
+  try {
+    const path = `mc/${currentMcRoom.id}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g,'_')}`;
+    const { error: upErr } = await sb.storage.from('chat-images').upload(path, file, { upsert: false });
+    let url = null;
+    if(!upErr){
+      const { data } = sb.storage.from('chat-images').getPublicUrl(path);
+      url = data?.publicUrl;
+    }
+    if(!url){
+      // fallback data url kecil
+      url = await new Promise((res,rej)=>{
+        const r = new FileReader();
+        r.onload = () => res(r.result);
+        r.onerror = rej;
+        r.readAsDataURL(file);
+      });
+    }
+    await sb.from('mc_messages').insert({
+      room_id: currentMcRoom.id,
+      sender_id: currentUser.id,
+      body: '[gambar]',
+      image_url: url
+    });
+    mcLoadMessages(currentMcRoom.id);
+  } catch(e){
+    Swal.fire({title:'Gagal upload',text:e.message,icon:'error',background:'#1a0e2e',color:'#fff'});
+  }
+}
+
+async function mcChangeAmount(){
+  if(!currentMcRoom) return;
+  const { value } = await Swal.fire({
+    title: 'Ubah Nominal MC',
+    input: 'number',
+    inputValue: currentMcRoom.amount,
+    inputAttributes: { min: 1000 },
+    showCancelButton: true,
+    background: '#1a0e2e', color: '#fff', confirmButtonColor: '#facc15'
+  });
+  if(value == null) return;
+  const { data, error } = await sb.rpc('mc_update_amount', { p_room_id: currentMcRoom.id, p_new_amount: Math.floor(Number(value)) });
+  if(error) return Swal.fire({title:'Gagal',text:error.message,icon:'error',background:'#1a0e2e',color:'#fff'});
+  if(data && data.success === false) return Swal.fire({title:'Gagal',text:data.message,icon:'error',background:'#1a0e2e',color:'#fff'});
+  await refreshBalance();
+  mcOpenRoom(currentMcRoom.id);
+}
+
+async function mcConfirm(){
+  if(!currentMcRoom) return;
+  const c = await Swal.fire({title:'Konfirmasi transaksi selesai?',icon:'question',showCancelButton:true,confirmButtonText:'Ya, selesai',background:'#1a0e2e',color:'#fff',confirmButtonColor:'#22c55e'});
+  if(!c.isConfirmed) return;
+  const { data, error } = await sb.rpc('mc_confirm', { p_room_id: currentMcRoom.id });
+  if(error) return Swal.fire({title:'Gagal',text:error.message,icon:'error',background:'#1a0e2e',color:'#fff'});
+  if(data && data.success === false) return Swal.fire({title:'Gagal',text:data.message,icon:'error',background:'#1a0e2e',color:'#fff'});
+  await refreshBalance();
+  if(data.status === 'completed'){
+    mcShowToast('MC selesai', 'Saldo diteruskan ke seller.', 'ok');
+    Swal.fire({title:'MC Selesai',text:'Saldo diteruskan ke seller',icon:'success',background:'#1a0e2e',color:'#fff'});
+  } else {
+    mcShowToast('Konfirmasi tersimpan', 'Notifikasi dikirim ke lawan transaksi.', 'ok');
+    Swal.fire({title:'Konfirmasi tersimpan',text:'Menunggu pihak lain / auto 12 jam',icon:'success',background:'#1a0e2e',color:'#fff'});
+  }
+  mcOpenRoom(currentMcRoom.id);
+}
+
+async function mcCancel(){
+  if(!currentMcRoom) return;
+  const c = await Swal.fire({
+    title:'Ajukan pembatalan MC?',
+    html:'Wajib disetujui <b>kedua pihak</b>. Refund: nominal + 50% fee ke buyer.',
+    icon:'warning',showCancelButton:true,confirmButtonText:'Ajukan batal',confirmButtonColor:'#ef4444',
+    background:'#1a0e2e',color:'#fff'
+  });
+  if(!c.isConfirmed) return;
+  const { data, error } = await sb.rpc('mc_request_cancel', { p_room_id: currentMcRoom.id });
+  if(error) return Swal.fire({title:'Gagal',text:error.message,icon:'error',background:'#1a0e2e',color:'#fff'});
+  if(data && data.success === false) return Swal.fire({title:'Gagal',text:data.message,icon:'error',background:'#1a0e2e',color:'#fff'});
+  await refreshBalance();
+  if(data.status === 'deleted'){
+    Swal.fire({title:'Room dihapus',html:`Seller belum join. Refund penuh ${mcFmt(data.refund)}`,icon:'success',background:'#1a0e2e',color:'#fff'});
+    mcCloseRoom();
+    await loadMcRooms();
+    return;
+  }
+  if(data.status === 'cancelled'){
+    mcShowToast('MC dibatalkan', 'Refund diproses ke buyer.', 'warn');
+    Swal.fire({title:'MC Dibatalkan',html:`Refund ${mcFmt(data.refund)} ke buyer`,icon:'success',background:'#1a0e2e',color:'#fff'});
+  } else {
+    mcShowToast('Permintaan batal', 'Menunggu persetujuan pihak lain.', 'warn');
+    Swal.fire({title:'Menunggu pihak lain setuju batal',icon:'info',background:'#1a0e2e',color:'#fff'});
+  }
+  if(currentMcRoom) mcOpenRoom(currentMcRoom.id);
+}
+
+window.loadMcRooms = loadMcRooms;
+window.mcOpenCreate = mcOpenCreate;
+window.mcCreateRoomWithQris = mcCreateRoomWithQris;
+window.mcFinishCreateAfterQris = mcFinishCreateAfterQris;
+window.mcOpenJoin = mcOpenJoin;
+window.mcOpenRoom = mcOpenRoom;
+window.mcCloseRoom = mcCloseRoom;
+window.mcSendMsg = mcSendMsg;
+window.mcOnImage = mcOnImage;
+window.mcChangeAmount = mcChangeAmount;
+window.mcConfirm = mcConfirm;
+window.mcCancel = mcCancel;
+
 </script>
 </body>
 </html>
