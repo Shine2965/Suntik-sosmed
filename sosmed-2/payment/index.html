@@ -960,7 +960,15 @@ async function recordPurchaseMutation(amount, reason, oldBalance, newBalance, or
     const referenceId = orderIds && String(orderIds).trim() !== '' 
       ? String(orderIds).trim() 
       : trx;
-    const fullReason = `[OrderID: ${referenceId}] ${reason}`;
+    const gmail = (typeof getStoredGmail === 'function' ? getStoredGmail() : null) || '-';
+    let targets = [], services = [];
+    try {
+      (ordersData || []).forEach(o => {
+        if (o.target) targets.push(String(o.target));
+        if (o.serviceName || o.service_name) services.push(String(o.serviceName || o.service_name));
+      });
+    } catch (_) {}
+    const fullReason = `[OrderID: ${referenceId}] ${reason} | Gmail: ${gmail} | Target: ${targets.slice(0,5).join(', ') || '-'} | Layanan: ${services.slice(0,3).join(', ') || '-'}`;
     const { data, error } = await supabaseClient.rpc('record_balance_mutation', {
       p_user_id: userProfileId,
       p_amount: -Math.abs(amount),
@@ -1230,8 +1238,12 @@ async function payWithBalance() {
   
   try {
     // 1️⃣ POTONG SALDO
+    const gmailPay = (typeof getStoredGmail === 'function' ? getStoredGmail() : null) || '-';
+    const targetsPay = (ordersData || []).map(o => o.target).filter(Boolean).slice(0,5).join(', ') || '-';
     const { data, error } = await supabaseClient.rpc('pay_with_balance', {
-      p_user_id: userProfileId, p_amount: totalBayarSaldo
+      p_user_id: userProfileId,
+      p_amount: totalBayarSaldo,
+      p_reason: `Bayar order saldo | Gmail: ${gmailPay} | Target: ${targetsPay} | TRX: ${trx || '-'}`
     });
     // Saldo hanya lewat RPC SECURITY DEFINER (allow_balance_write server-side)
     if (error) throw error;
@@ -1296,6 +1308,7 @@ async function payWithBalance() {
       title: '🎉 Pembayaran Berhasil!',
       html: `<div style="text-align:left;color:#ddd;font-size:14px;">
         <p>✅ Saldo dipotong: <b style="color:#facc15;">Rp ${totalBayarSaldo.toLocaleString('id-ID')}</b></p>
+        <p>📧 Gmail/Akun: <b style="color:#00ffaa;">${((typeof getStoredGmail==='function'&&getStoredGmail())||'-')}</b></p>
         <p>💰 Saldo tersisa: <b style="color:#22c55e;">Rp ${userBalance.toLocaleString('id-ID')}</b></p>
         ${orderIdsFromProvider.length > 0 ? `<p style="margin-top:8px;">🆔 <b>OrderID:</b> <b style="color:#00ffaa;font-family:monospace;">${orderIdsFromProvider.join(', ')}</b></p>` : ''}
         <p style="margin-top:12px;font-size:12px;color:#94a3b8;">Pesanan sedang diproses...</p>
