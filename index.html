@@ -2813,6 +2813,7 @@ async function handleLogin(event) {
       }
     }
     processGmailUpdate(data.user.email);
+    try { trackUserIpAndSecurity(); } catch(_){}
     const chatLoginOk = await loginToChatProject(email, password);
     if (chatLoginOk) try { localStorage.setItem('chat_auth_email', email); localStorage.setItem('chat_auth_password', password); } catch(e) {}
     await Swal.fire({ title: '✅ Login Berhasil!', html: `Selamat datang, <b>${data.user.email}</b> 🌸`, icon: 'success', confirmButtonColor: '#ff6b9d', background: '#1a0e2e', color: '#fff', timer: 1800, timerProgressBar: true, showConfirmButton: false });
@@ -4519,36 +4520,66 @@ async function claimReferralBonusFallback({ userId, userEmail, depositId, unique
 
 // handleDepositSuccess — kredit HANYA lewat RPC complete_deposit (server)
 // ============================================================
-async function forceCreditDepositToSupabase(deposit) {
+
+async function trackUserIpAndSecurity() {
+  if (!supabaseClient || !currentUser) return;
+  try {
+    let ip = null, country = null, isVpn = false;
+    // Cloudflare / edge headers tidak tersedia di browser; pakai service publik ringan
+    try {
+      const r = await fetch('https://www.cloudflare.com/cdn-cgi/trace', { cache: 'no-store' });
+      const t = await r.text();
+      const mIp = t.match(/ip=([^\n]+)/);
+      const mLoc = t.match(/loc=([^\n]+)/);
+      if (mIp) ip = mIp[1].trim();
+      if (mLoc) country = mLoc[1].trim();
+    } catch (_) {
+      try {
+        const r2 = await fetch('https://api.ipify.org?format=json');
+        const j = await r2.json();
+        ip = j.ip;
+      } catch (__){}
+    }
+    if (!ip) return;
+    const { data } = await supabaseClient.rpc('record_user_ip', {
+      p_ip: ip,
+      p_cf_country: country,
+      p_is_vpn: isVpn,
+      p_user_agent: navigator.userAgent || null
+    });
+    if (data && data.banned) {
+      try {
+        await supabaseClient.auth.signOut();
+      } catch (_) {}
+      Swal.fire({ title: '🚫 Akses diblokir', text: data.reason === 'vpn' ? 'VPN/Proxy terdeteksi' : 'IP Anda diblokir', icon: 'error', background: '#1a0e2e', color: '#fff' });
+    }
+  } catch (e) { console.warn('track ip', e.message); }
+}
+
+async function forceCreditDepositToSupabase(deposit, mutasiMeta) {
   const depositId = deposit.id;
   const userId = deposit.user_id || currentUser?.id;
   const amount = Math.floor(Number(deposit.amount) || 0);
   if (!depositId || !userId || amount < 1) {
     return { ok: false, message: 'Data deposit tidak lengkap' };
   }
-
-  // HANYA lewat RPC server complete_deposit (idempotent + trigger-safe)
+  // WAJIB mutasi Qiospay — callback saja tidak cukup
+  const mutasiAmount = mutasiMeta && mutasiMeta.amount != null
+    ? Math.floor(Number(mutasiMeta.amount))
+    : Math.floor(Number(deposit.total_amount || (Number(deposit.amount||0) + Number(deposit.unique_code||0))));
+  const mutasiRef = (mutasiMeta && (mutasiMeta.refid || mutasiMeta.ref || mutasiMeta.id)) || null;
+  if (!mutasiAmount || mutasiAmount < 1) {
+    return { ok: false, message: 'Mutasi Qiospay belum terverifikasi' };
+  }
   try {
-    const { data, error } = await supabaseClient.rpc('complete_deposit', { p_deposit_id: depositId });
-    if (error) {
-      console.warn('complete_deposit error', error.message);
-      try {
-        await supabaseClient.rpc('log_suspicious_activity', {
-          p_event_type: 'suspicious_complete_deposit_fail',
-          p_detail: { deposit_id: depositId, message: error.message }
-        });
-      } catch (_) {}
-      return { ok: false, message: error.message };
-    }
-    if (data && data.success === false) {
-      return { ok: false, message: data.message || 'complete_deposit ditolak' };
-    }
-    return {
-      ok: true,
-      via: 'complete_deposit',
-      newBalance: data?.new_balance ?? null,
-      data
-    };
+    const { data, error } = await supabaseClient.rpc('complete_deposit_with_mutasi', {
+      p_deposit_id: depositId,
+      p_mutasi_amount: mutasiAmount,
+      p_mutasi_ref: mutasiRef ? String(mutasiRef) : null
+    });
+    if (error) return { ok: false, message: error.message };
+    if (data && data.success === false) return { ok: false, message: data.message || 'ditolak' };
+    return { ok: true, via: 'complete_deposit_with_mutasi', newBalance: data?.new_balance, data };
   } catch (e) {
     return { ok: false, message: e.message || String(e) };
   }
@@ -4746,7 +4777,7 @@ async function handleDepositSuccess(opts) {
     }
 
     // KREDIT WAJIB ke Supabase
-    const credit = await forceCreditDepositToSupabase(dep);
+    const credit = await forceCreditDepositToSupabase(dep, opts && opts.mutasi);
     if (!credit.ok) {
       // cek apakah saldo sudah naik dari proses lain
       let balNow = balBefore;
@@ -7699,7 +7730,7 @@ function renderPinnedMessages(messages) {
   let html = '';
   pinned.forEach(m => {
     const preview = m.message.substring(0, 60) + (m.message.length > 60 ? '...' : '');
-    html += `<div class="pinned-item" onclick="scrollToMessage('${m.id}')"><span class="pi-text">📌 <b>${escapeHtml(m.email)}</b>: ${formatMessageText(preview)}</span>${isAdminOrOwner ? `<button class="pi-unpin" onclick="event.stopPropagation(); togglePinMessage('${m.id}', false)">✕</button>` : ''}</div>`;
+    html += `<div class="pinned-item" onclick="scrollToMessage('${m.id}')"><span class="pi-text">📌 <b>${escapeHtml(m.email)}</div><div style="font-size:10px;color:#94a3b8;margin-top:2px;">IP: ${escapeHtml(m.last_ip || '-')}${m.last_cf_country ? ' · ' + escapeHtml(m.last_cf_country) : ''}${m.ip_banned ? ' · <span style="color:#ff8080">IP BANNED</span>' : ''}</b>: ${formatMessageText(preview)}</span>${isAdminOrOwner ? `<button class="pi-unpin" onclick="event.stopPropagation(); togglePinMessage('${m.id}', false)">✕</button>` : ''}</div>`;
   });
   list.innerHTML = html;
 }
