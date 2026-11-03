@@ -2922,13 +2922,21 @@ async function handleLogin(event) {
   const password = document.getElementById('loginPassword').value;
   if (!email || !password) return;
   const captchaTok = (document.getElementById('loginCaptchaToken') || {}).value || '';
-  if (!(await verifyTurnstileToken(captchaTok))) {
+  if (!captchaTok || captchaTok.length < 10) {
     Swal.fire({ title: '🤖 Captcha', text: 'Selesaikan Cloudflare Captcha terlebih dahulu.', icon: 'warning', background: '#1a0e2e', color: '#fff', confirmButtonColor: '#00c6ff' });
+    try { renderTurnstileWidgets(true); } catch (_) {}
     return;
   }
+  // opsional: verifikasi server sendiri (jika API belum ada, lanjut pakai token ke Supabase)
+  try { await verifyTurnstileToken(captchaTok); } catch (_) {}
   btn.disabled = true; btn.innerHTML = '⏳ Memproses...';
   try {
-    const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+    // WAJIB: kirim captchaToken ke Supabase Auth (Captcha protection ON)
+    const { data, error } = await supabaseClient.auth.signInWithPassword({
+      email,
+      password,
+      options: { captchaToken: captchaTok }
+    });
     if (error) throw error;
     await autoUnbanCheck();
     const profile = await fetchProfile(data.user.id);
@@ -2956,7 +2964,13 @@ async function handleLogin(event) {
   } catch (err) {
     let msg = err.message || 'Error';
     if (msg.includes('Invalid login credentials')) msg = 'Email/password salah.';
+    if (msg.toLowerCase().includes('captcha')) msg = 'Captcha gagal/expired. Centang captcha lagi lalu coba login.';
     Swal.fire({ title: '❌ Login Gagal', text: msg, icon: 'error', confirmButtonColor: '#ff4444', background: '#1a0e2e', color: '#fff' });
+    try {
+      const t = document.getElementById('loginCaptchaToken'); if (t) t.value = '';
+      loginTurnstileWidgetId = null;
+      renderTurnstileWidgets(true);
+    } catch (_) {}
   } finally { btn.disabled = false; btn.innerHTML = '🔑 Masuk Sekarang'; }
 }
 
@@ -2971,8 +2985,9 @@ async function handleSignup(event) {
     return;
   }
   const signupCaptcha = (document.getElementById('signupCaptchaToken') || {}).value || '';
-  if (!(await verifyTurnstileToken(signupCaptcha))) {
+  if (!signupCaptcha || signupCaptcha.length < 10) {
     Swal.fire({ title: '🤖 Captcha', text: 'Selesaikan Cloudflare Captcha terlebih dahulu.', icon: 'warning', background: '#1a0e2e', color: '#fff', confirmButtonColor: '#00c6ff' });
+    try { renderTurnstileWidgets(true); } catch (_) {}
     return;
   }
   const referralInput = document.getElementById('signupReferralCode');
@@ -3022,7 +3037,18 @@ async function handleSignup(event) {
   }
 
   try {
-    const { data, error } = await supabaseClient.auth.signUp({ email, password, options: { emailRedirectTo: window.location.origin + window.location.pathname } });
+    const signupCaptchaTok = (document.getElementById('signupCaptchaToken') || {}).value || '';
+    if (!signupCaptchaTok || signupCaptchaTok.length < 10) {
+      throw new Error('Selesaikan Cloudflare Captcha terlebih dahulu.');
+    }
+    const { data, error } = await supabaseClient.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: window.location.origin + window.location.pathname,
+        captchaToken: signupCaptchaTok
+      }
+    });
     if (error) throw error;
     if (data.user && !data.session) {
       await Swal.fire({ title: '⚠️ Email Belum Dikonfirmasi', html: 'Matikan "Confirm email" di Supabase.', icon: 'warning', confirmButtonColor: '#ff6b9d', background: '#1a0e2e', color: '#fff' });
