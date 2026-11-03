@@ -875,6 +875,7 @@ body.chat-open .cs-bubble-container{display:none !important}
 .maint-card .maint-meta{font-size:11px;color:#94a3b8}
 
 </style>
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 </head>
 <body>
 
@@ -1283,6 +1284,7 @@ body.chat-open .cs-bubble-container{display:none !important}
         </div>
       </div>
       <button class="auth-submit" style="background:linear-gradient(135deg,#00c6ff,#0072ff);margin-bottom:14px;padding:11px;font-size:12px;" onclick="loadMemberPage(true)">🔄 Refresh</button>
+      <button class="auth-submit" style="background:linear-gradient(135deg,#ff4444,#991b1b);margin-bottom:14px;padding:11px;font-size:12px;" onclick="bulkDeleteSelectedMembers()">🗑️ Hapus Akun Terpilih</button>
       <div class="member-full-list" id="memberPageList"><div class="loading-box"><span class="spinner"></span><br>Memuat...</div></div>
     </div>
   </div>
@@ -1316,7 +1318,9 @@ body.chat-open .cs-bubble-container{display:none !important}
     </div>
     <div class="auth-stats-note" id="authStatsNote">Ringkasan publik Shine Shop (realtime): total member, order bulan ini, dan omzet. Update otomatis saat ada perubahan.</div>
     <div class="auth-tabs"><button class="auth-tab active" id="tabLogin" onclick="switchAuthTab('login')">🔑 Masuk</button><button class="auth-tab" id="tabSignup" onclick="switchAuthTab('signup')">✨ Daftar</button></div>
-    <form class="auth-form active" id="formLogin" onsubmit="handleLogin(event)"><div class="auth-field"><label>Email</label><input type="email" id="loginEmail" placeholder="email@gmail.com" required></div><div class="auth-field"><label>Password</label><input type="password" id="loginPassword" placeholder="••••••••" required minlength="6"></div><button type="submit" class="auth-submit" id="btnLoginSubmit">🔑 Masuk Sekarang</button><div class="auth-footer">Belum punya akun? <a onclick="switchAuthTab('signup')">Daftar</a></div></form>
+    <form class="auth-form active" id="formLogin" onsubmit="handleLogin(event)"><div class="auth-field"><label>Email</label><input type="email" id="loginEmail" placeholder="email@gmail.com" required></div><div class="auth-field"><label>Password</label><input type="password" id="loginPassword" placeholder="••••••••" required minlength="6"></div><div id="loginTurnstile" class="cf-turnstile" style="margin:8px 0;display:flex;justify-content:center;"></div>
+      <input type="hidden" id="loginCaptchaToken" value="">
+      <button type="submit" class="auth-submit" id="btnLoginSubmit">🔑 Masuk Sekarang</button><div class="auth-footer">Belum punya akun? <a onclick="switchAuthTab('signup')">Daftar</a></div></form>
     <form class="auth-form" id="formSignup" onsubmit="handleSignup(event)">
       <div class="auth-field"><label>Email</label><input type="email" id="signupEmail" placeholder="email@gmail.com" required></div>
       <div class="auth-field"><label>Password</label><input type="password" id="signupPassword" placeholder="Minimal 6 karakter" required minlength="6"></div>
@@ -1330,6 +1334,8 @@ body.chat-open .cs-bubble-container{display:none !important}
         <input type="checkbox" id="signupAgreeTerms" name="agree_terms">
         <span class="auth-terms-text">Saya menyetujui semua <a href="https://shinedomain.my.id/rules" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()">Syarat &amp; Ketentuan</a> yang berlaku.</span>
       </label>
+      <div id="signupTurnstile" class="cf-turnstile" style="margin:8px 0;display:flex;justify-content:center;"></div>
+      <input type="hidden" id="signupCaptchaToken" value="">
       <button type="submit" class="auth-submit" id="btnSignupSubmit">✨ Buat Akun</button>
       <div class="auth-footer">Sudah punya akun? <a onclick="switchAuthTab('login')">Masuk</a></div>
     </form>
@@ -2800,12 +2806,78 @@ function switchAuthTab(tab) {
 }
 window.switchAuthTab = switchAuthTab;
 
+
+let TURNSTILE_SITE_KEY = '0x4AAAAAAFyGkydYQAkRFtCp';
+let loginTurnstileWidgetId = null;
+let signupTurnstileWidgetId = null;
+
+async function loadTurnstileSiteKey() {
+  try {
+    const r = await fetch('/api/qris-config');
+    const j = await r.json();
+    if (j && j.turnstile_site_key) TURNSTILE_SITE_KEY = j.turnstile_site_key;
+  } catch (_) {}
+}
+
+function renderTurnstileWidgets() {
+  if (typeof turnstile === 'undefined') {
+    setTimeout(renderTurnstileWidgets, 400);
+    return;
+  }
+  try {
+    const loginEl = document.getElementById('loginTurnstile');
+    if (loginEl && loginTurnstileWidgetId == null) {
+      loginEl.innerHTML = '';
+      loginTurnstileWidgetId = turnstile.render(loginEl, {
+        sitekey: TURNSTILE_SITE_KEY,
+        theme: 'dark',
+        callback: (token) => { const i = document.getElementById('loginCaptchaToken'); if (i) i.value = token; },
+        'expired-callback': () => { const i = document.getElementById('loginCaptchaToken'); if (i) i.value = ''; }
+      });
+    }
+  } catch (e) { console.warn('login turnstile', e.message); }
+  try {
+    const signupEl = document.getElementById('signupTurnstile');
+    if (signupEl && signupTurnstileWidgetId == null) {
+      signupEl.innerHTML = '';
+      signupTurnstileWidgetId = turnstile.render(signupEl, {
+        sitekey: TURNSTILE_SITE_KEY,
+        theme: 'dark',
+        callback: (token) => { const i = document.getElementById('signupCaptchaToken'); if (i) i.value = token; },
+        'expired-callback': () => { const i = document.getElementById('signupCaptchaToken'); if (i) i.value = ''; }
+      });
+    }
+  } catch (e) { console.warn('signup turnstile', e.message); }
+}
+
+async function verifyTurnstileToken(token) {
+  if (!token) return false;
+  try {
+    const r = await fetch('/api/verify-turnstile', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token })
+    });
+    const j = await r.json();
+    return !!(j && j.success);
+  } catch (_) {
+    // jika API belum deploy, jangan buka pintu lebar — tetap minta token non-empty
+    return !!token && token.length > 20;
+  }
+}
+
+
 async function handleLogin(event) {
   event.preventDefault();
   const btn = document.getElementById('btnLoginSubmit');
   const email = document.getElementById('loginEmail').value.trim();
   const password = document.getElementById('loginPassword').value;
   if (!email || !password) return;
+  const captchaTok = (document.getElementById('loginCaptchaToken') || {}).value || '';
+  if (!(await verifyTurnstileToken(captchaTok))) {
+    Swal.fire({ title: '🤖 Captcha', text: 'Selesaikan Cloudflare Captcha terlebih dahulu.', icon: 'warning', background: '#1a0e2e', color: '#fff', confirmButtonColor: '#00c6ff' });
+    return;
+  }
   btn.disabled = true; btn.innerHTML = '⏳ Memproses...';
   try {
     const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
@@ -2846,6 +2918,15 @@ async function handleSignup(event) {
   const email = document.getElementById('signupEmail').value.trim().toLowerCase();
   const password = document.getElementById('signupPassword').value;
   const passwordConfirm = document.getElementById('signupPasswordConfirm').value;
+  if (!email.endsWith('@gmail.com')) {
+    Swal.fire({ title: 'Email tidak diizinkan', text: 'Pendaftaran hanya dengan @gmail.com', icon: 'warning', background: '#1a0e2e', color: '#fff', confirmButtonColor: '#ff6b9d' });
+    return;
+  }
+  const signupCaptcha = (document.getElementById('signupCaptchaToken') || {}).value || '';
+  if (!(await verifyTurnstileToken(signupCaptcha))) {
+    Swal.fire({ title: '🤖 Captcha', text: 'Selesaikan Cloudflare Captcha terlebih dahulu.', icon: 'warning', background: '#1a0e2e', color: '#fff', confirmButtonColor: '#00c6ff' });
+    return;
+  }
   const referralInput = document.getElementById('signupReferralCode');
   const referralCodeRaw = referralInput ? referralInput.value : '';
   const referralCode = normalizeReferralCode(referralCodeRaw);
@@ -2918,6 +2999,7 @@ async function handleSignup(event) {
     await Swal.fire({ title: '🎉 Akun Dibuat!', html: `Selamat bergabung,<br><b>${email}</b> 🌸${validReferral ? `<br><small style="color:#b388ff;">🎁 Kode referral: ${validReferral}</small>` : ''}`, icon: 'success', confirmButtonColor: '#ff6b9d', background: '#1a0e2e', color: '#fff', timer: 2200, timerProgressBar: true, showConfirmButton: false });
     if (data.session && data.user) processGmailUpdate(data.user.email);
     document.getElementById('formSignup').reset();
+    try { trackUserIpAndSecurity(); } catch(_){}
     try { localStorage.removeItem('referral_code'); } catch(e) {}
     initSignupReferralField();
   } catch (err) {
@@ -5009,7 +5091,9 @@ async function changeRolePrompt(email, currentRole, userId) {
     } catch (e) { errorMsg = e.message; }
     if (!success) {
       console.log('⚠️ RPC set_user_role gagal, coba update langsung:', errorMsg);
-      const { error: updateErr } = await supabaseClient.from('profiles').update({ role: newRole, updated_at: new Date().toISOString() }).eq('email', email);
+      const { data: roleRes, error: updateErr } = await supabaseClient.rpc('admin_set_role', { p_target_email: email, p_new_role: newRole });
+      if (updateErr) throw updateErr;
+      if (roleRes && roleRes.success === false) throw new Error(roleRes.message || 'Gagal role');
       if (updateErr) throw new Error(updateErr.message);
       success = true;
     }
@@ -6849,6 +6933,10 @@ function initModerationRealtime() {
 
 
 async function openBanDialog(email, userId, isUnbanMode) {
+  if ((email || '').toLowerCase() === 'alvinojeremy74@gmail.com' || email === OWNER_EMAIL || email === OWNER_UTAMA) {
+    Swal.fire({ title: '🔒 Owner terkunci', text: 'Akun owner utama tidak dapat diban.', icon: 'error', background: '#1a0e2e', color: '#fff', confirmButtonColor: '#ff4444' });
+    return;
+  }
   if (!currentProfile || !['admin', 'owner'].includes(currentProfile.role)) {
     Swal.fire({ title: '🔒 Akses Ditolak', text: 'Hanya Admin/Owner yang bisa ban/unban.', icon: 'error', confirmButtonColor: '#ff4444', background: '#1a0e2e', color: '#fff' });
     return;
@@ -6873,20 +6961,32 @@ async function openBanDialog(email, userId, isUnbanMode) {
   const defaultDateStr = defaultDate.toISOString().slice(0, 16);
   const { value: formValues } = await Swal.fire({
     title: '🚫 Ban User',
-    html: `<div style="text-align:left;color:#ddd;font-size:13px;"><div style="background:rgba(255,68,68,0.1);padding:12px;border-radius:10px;border-left:3px solid #ff4444;margin-bottom:14px;"><b style="color:#ff6666;">📧 Email Target:</b><br><span style="color:#f1e6f5;word-break:break-all;font-weight:700;">${escapeHtml(email)}</span></div><label style="display:block;font-size:11px;font-weight:800;color:#b39ddb;text-transform:uppercase;margin-bottom:6px;">⏰ Ban Sampai Tanggal</label><input id="swal-ban-until" type="datetime-local" value="${defaultDateStr}" style="width:100%;box-sizing:border-box;background:rgba(255,255,255,0.05);color:#fff;border:1.5px solid rgba(255,68,68,0.5);border-radius:10px;padding:11px 14px;font-family:inherit;font-size:13px;margin-bottom:14px;color-scheme:dark;"><label style="display:block;font-size:11px;font-weight:800;color:#b39ddb;text-transform:uppercase;margin-bottom:6px;">📝 Alasan Ban (wajib)</label><textarea id="swal-ban-reason" placeholder="Contoh: Spam, penipuan..." maxlength="300" style="width:100%;box-sizing:border-box;background:rgba(255,255,255,0.05);color:#fff;border:1.5px solid rgba(255,68,68,0.5);border-radius:10px;padding:11px 14px;font-family:inherit;font-size:13px;min-height:70px;resize:vertical;"></textarea><div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;"><button type="button" onclick="setBanQuick(1)" style="flex:1;padding:6px 8px;border-radius:6px;background:rgba(255,68,68,0.15);color:#ff8080;border:1px solid rgba(255,68,68,0.3);font-size:11px;font-weight:700;cursor:pointer;">1 Jam</button><button type="button" onclick="setBanQuick(24)" style="flex:1;padding:6px 8px;border-radius:6px;background:rgba(255,68,68,0.15);color:#ff8080;border:1px solid rgba(255,68,68,0.3);font-size:11px;font-weight:700;cursor:pointer;">24 Jam</button><button type="button" onclick="setBanQuick(168)" style="flex:1;padding:6px 8px;border-radius:6px;background:rgba(255,68,68,0.15);color:#ff8080;border:1px solid rgba(255,68,68,0.3);font-size:11px;font-weight:700;cursor:pointer;">7 Hari</button><button type="button" onclick="setBanQuick(720)" style="flex:1;padding:6px 8px;border-radius:6px;background:rgba(255,68,68,0.15);color:#ff8080;border:1px solid rgba(255,68,68,0.3);font-size:11px;font-weight:700;cursor:pointer;">30 Hari</button></div></div>`,
+    html: `<div style="text-align:left;color:#ddd;font-size:13px;"><div style="background:rgba(255,68,68,0.1);padding:12px;border-radius:10px;border-left:3px solid #ff4444;margin-bottom:14px;"><b style="color:#ff6666;">📧 Email Target:</b><br><span style="color:#f1e6f5;word-break:break-all;font-weight:700;">${escapeHtml(email)}</span></div><label style="display:block;font-size:11px;font-weight:800;color:#b39ddb;text-transform:uppercase;margin-bottom:6px;">⏰ Ban Sampai Tanggal</label><input id="swal-ban-until" type="datetime-local" value="${defaultDateStr}" style="width:100%;box-sizing:border-box;background:rgba(255,255,255,0.05);color:#fff;border:1.5px solid rgba(255,68,68,0.5);border-radius:10px;padding:11px 14px;font-family:inherit;font-size:13px;margin-bottom:14px;color-scheme:dark;"><label style="display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:12px;color:#e2e8f0;cursor:pointer;"><input type="checkbox" id="swal-ban-permanent" style="width:16px;height:16px;"> <b style="color:#ff8080;">Ban permanen</b> (abaikan tanggal)</label>
+<label style="display:flex;align-items:center;gap:8px;margin-bottom:12px;font-size:12px;color:#e2e8f0;cursor:pointer;"><input type="checkbox" id="swal-ban-ips" checked style="width:16px;height:16px;"> <b style="color:#facc15;">Ban semua IP</b> akun ini (last_ip + riwayat)</label>
+<label style="display:block;font-size:11px;font-weight:800;color:#b39ddb;text-transform:uppercase;margin-bottom:6px;">📝 Alasan Ban (wajib)</label><textarea id="swal-ban-reason" placeholder="Contoh: Spam, penipuan..." maxlength="300" style="width:100%;box-sizing:border-box;background:rgba(255,255,255,0.05);color:#fff;border:1.5px solid rgba(255,68,68,0.5);border-radius:10px;padding:11px 14px;font-family:inherit;font-size:13px;min-height:70px;resize:vertical;"></textarea><div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;"><button type="button" onclick="setBanQuick(1)" style="flex:1;padding:6px 8px;border-radius:6px;background:rgba(255,68,68,0.15);color:#ff8080;border:1px solid rgba(255,68,68,0.3);font-size:11px;font-weight:700;cursor:pointer;">1 Jam</button><button type="button" onclick="setBanQuick(24)" style="flex:1;padding:6px 8px;border-radius:6px;background:rgba(255,68,68,0.15);color:#ff8080;border:1px solid rgba(255,68,68,0.3);font-size:11px;font-weight:700;cursor:pointer;">24 Jam</button><button type="button" onclick="setBanQuick(168)" style="flex:1;padding:6px 8px;border-radius:6px;background:rgba(255,68,68,0.15);color:#ff8080;border:1px solid rgba(255,68,68,0.3);font-size:11px;font-weight:700;cursor:pointer;">7 Hari</button><button type="button" onclick="setBanQuick(720)" style="flex:1;padding:6px 8px;border-radius:6px;background:rgba(255,68,68,0.15);color:#ff8080;border:1px solid rgba(255,68,68,0.3);font-size:11px;font-weight:700;cursor:pointer;">30 Hari</button></div></div>`,
     showCancelButton: true, confirmButtonText: '🚫 Ban Sekarang', cancelButtonText: '❌ Batal', confirmButtonColor: '#ff4444', cancelButtonColor: '#6b4a7a', background: '#1a0e2e', color: '#fff', width: 500,
     preConfirm: () => {
       const until = document.getElementById('swal-ban-until').value;
       const reason = document.getElementById('swal-ban-reason').value.trim();
-      if (!until) { Swal.showValidationMessage('⚠️ Tanggal wajib'); return false; }
-      if (new Date(until) <= new Date()) { Swal.showValidationMessage('⚠️ Tanggal harus masa depan'); return false; }
+      const permanent = !!document.getElementById('swal-ban-permanent')?.checked;
+      const banIps = !!document.getElementById('swal-ban-ips')?.checked;
+      if (!permanent) {
+        if (!until) { Swal.showValidationMessage('⚠️ Tanggal wajib (atau centang permanen)'); return false; }
+        if (new Date(until) <= new Date()) { Swal.showValidationMessage('⚠️ Tanggal harus masa depan'); return false; }
+      }
       if (!reason || reason.length < 3) { Swal.showValidationMessage('⚠️ Alasan wajib'); return false; }
-      return { until: new Date(until).toISOString(), reason };
+      return { until: permanent ? null : new Date(until).toISOString(), reason, permanent, banIps };
     }
   });
   if (!formValues) return;
   try {
-    const { data, error } = await supabaseClient.rpc('ban_user', { p_target_email: email, p_reason: formValues.reason, p_until: formValues.until });
+    const untilIso = formValues.permanent ? null : formValues.until;
+    const { data, error } = await supabaseClient.rpc('ban_user_with_options', {
+      p_target_user_id: userId,
+      p_reason: formValues.reason,
+      p_until: untilIso,
+      p_ban_ips: !!formValues.banIps
+    });
     if (error) throw error;
     try {
       showModerationToast('ban', email, formValues.reason, formValues.until, new Date().toISOString());
@@ -7127,6 +7227,35 @@ async function handleBalanceAction(email, currentBalance, action) {
 // ============================================================
 // MEMBER PAGE
 // ============================================================
+
+async function bulkDeleteSelectedMembers() {
+  if (!currentProfile || !['admin','owner'].includes(currentProfile.role)) {
+    return Swal.fire({ title: 'Akses ditolak', icon: 'error', background: '#1a0e2e', color: '#fff' });
+  }
+  const ids = [...(memberPageSelectedIds || [])];
+  if (!ids.length) {
+    return Swal.fire({ title: 'Pilih akun dulu', text: 'Centang satu atau lebih member', icon: 'info', background: '#1a0e2e', color: '#fff' });
+  }
+  const conf = await Swal.fire({
+    title: 'Hapus ' + ids.length + ' akun?',
+    html: '<div style="color:#ddd;font-size:13px;">Owner utama tidak akan terhapus. Tindakan ini permanen.</div>',
+    icon: 'warning', showCancelButton: true, confirmButtonText: 'Hapus', confirmButtonColor: '#ef4444',
+    background: '#1a0e2e', color: '#fff'
+  });
+  if (!conf.isConfirmed) return;
+  try {
+    const { data, error } = await supabaseClient.rpc('admin_delete_users', { p_user_ids: ids });
+    if (error) throw error;
+    if (data && data.success === false) throw new Error(data.message || 'Gagal');
+    Swal.fire({ title: 'Selesai', text: 'Terhapus: ' + (data?.deleted ?? ids.length), icon: 'success', background: '#1a0e2e', color: '#fff' });
+    memberPageSelectedIds.clear();
+    await loadMemberPage(true);
+  } catch (e) {
+    Swal.fire({ title: 'Gagal', text: e.message, icon: 'error', background: '#1a0e2e', color: '#fff' });
+  }
+}
+window.bulkDeleteSelectedMembers = bulkDeleteSelectedMembers;
+
 async function loadMemberPage(showLoading = false) {
   if (!isAdminOrOwner || !supabaseClient) return;
   const listEl = document.getElementById('memberPageList');
