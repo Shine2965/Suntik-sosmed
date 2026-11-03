@@ -4428,7 +4428,8 @@ async function claimReferralBonusFallback({ userId, userEmail, depositId, unique
       const { data: up } = await supabaseClient.from('profiles').select('balance').eq('id', uplineId).maybeSingle();
       const before = parseFloat(up?.balance) || 0;
       const after = before + reward;
-      const { error: uErr } = await supabaseClient.from('profiles').update({ balance: after }).eq('id', uplineId);
+      // BLOKIR: update balance client-side (wajib RPC staff-only)
+      const uErr = { message: 'client balance update disabled' };
       if (uErr) throw uErr;
       credited = true;
     } catch (e2) {
@@ -4516,92 +4517,39 @@ async function claimReferralBonusFallback({ userId, userEmail, depositId, unique
   return { reward, pct, uplineEmail, message: credited ? 'fallback_ok' : 'fallback_partial' };
 }
 
-// handleDepositSuccess — kredit SALDO LANGSUNG ke Supabase (client auth)
+// handleDepositSuccess — kredit HANYA lewat RPC complete_deposit (server)
 // ============================================================
 async function forceCreditDepositToSupabase(deposit) {
   const depositId = deposit.id;
   const userId = deposit.user_id || currentUser?.id;
-  const email = deposit.email || currentUser?.email || currentProfile?.email;
   const amount = Math.floor(Number(deposit.amount) || 0);
-  const uniqueCode = deposit.unique_code;
   if (!depositId || !userId || amount < 1) {
     return { ok: false, message: 'Data deposit tidak lengkap' };
   }
 
-  // 1) Coba RPC complete_deposit (kalau sudah dijalankan SQL-nya)
+  // HANYA lewat RPC server complete_deposit (idempotent + trigger-safe)
   try {
     const { data, error } = await supabaseClient.rpc('complete_deposit', { p_deposit_id: depositId });
-    if (!error && data && data.success !== false) {
-      return {
-        ok: true,
-        via: 'complete_deposit',
-        newBalance: data.new_balance,
-        data
-      };
+    if (error) {
+      console.warn('complete_deposit error', error.message);
+      try {
+        await supabaseClient.rpc('log_suspicious_activity', {
+          p_event_type: 'suspicious_complete_deposit_fail',
+          p_detail: { deposit_id: depositId, message: error.message }
+        });
+      } catch (_) {}
+      return { ok: false, message: error.message };
     }
-    console.warn('complete_deposit:', error?.message || data);
-  } catch (e) {
-    console.warn('complete_deposit skip:', e.message);
-  }
-
-  // 2) Coba add_user_balance
-  try {
-    const { data, error } = await supabaseClient.rpc('add_user_balance', {
-      p_target_email: email,
-      p_amount: amount,
-      p_reason: 'Deposit QRIS sukses (unik: ' + uniqueCode + ')'
-    });
-    if (!error && (!data || data.success !== false)) {
-      // pastikan mutasi tercatat
-      await insertBalanceMutation({ userId, email, amount, uniqueCode, depositId });
-      await markDepositDone(depositId);
-      let newBalance = data?.new_balance ?? data?.balance ?? null;
-      if (newBalance == null) {
-        try {
-          const { data: pr } = await supabaseClient.from('profiles').select('balance').eq('id', userId).maybeSingle();
-          newBalance = pr?.balance;
-        } catch (_) {}
-      }
-      return { ok: true, via: 'add_user_balance', newBalance, data };
+    if (data && data.success === false) {
+      return { ok: false, message: data.message || 'complete_deposit ditolak' };
     }
-    console.warn('add_user_balance:', error?.message || data);
+    return {
+      ok: true,
+      via: 'complete_deposit',
+      newBalance: data?.new_balance ?? null,
+      data
+    };
   } catch (e) {
-    console.warn('add_user_balance skip:', e.message);
-  }
-
-  // 3) LANGSUNG update profiles.balance + insert balance_mutations (tanpa env)
-  try {
-    const { data: pr, error: rErr } = await supabaseClient
-      .from('profiles')
-      .select('id, balance')
-      .eq('id', userId)
-      .maybeSingle();
-    if (rErr) throw rErr;
-    if (!pr) throw new Error('Profile tidak ditemukan');
-
-    const before = parseFloat(pr.balance) || 0;
-    const after = before + amount;
-
-    const { data: upd, error: uErr } = await supabaseClient
-      .from('profiles')
-      .update({ balance: after })
-      .eq('id', userId)
-      .select('balance')
-      .maybeSingle();
-    if (uErr) throw uErr;
-
-    // verifikasi benar-benar naik
-    const verified = parseFloat(upd?.balance ?? after);
-    if (verified < before + amount - 0.01) {
-      throw new Error('Update balance ditolak (RLS?). Jalankan SQL complete_deposit atau longgarkan policy profiles.');
-    }
-
-    await insertBalanceMutation({ userId, email, amount, uniqueCode, depositId, balanceAfter: verified });
-    await markDepositDone(depositId);
-
-    return { ok: true, via: 'profiles_direct', newBalance: verified };
-  } catch (e) {
-    console.error('direct credit fail:', e);
     return { ok: false, message: e.message || String(e) };
   }
 }
@@ -4649,42 +4597,16 @@ async function markDepositDone(depositId) {
 
 // Bagi kode unik deposit: 70% ke depositor, 10% ke pemilik referral (max unik 200)
 async function creditAmountToUser(userId, email, amount, reason, typeHint) {
-  amount = Math.floor(Number(amount) || 0);
-  if (!userId || amount < 1) return { ok: false };
-  // prefer add_user_balance by email
-  if (email) {
-    try {
-      const { data, error } = await supabaseClient.rpc('add_user_balance', {
-        p_target_email: email,
-        p_amount: amount,
-        p_reason: reason
-      });
-      if (!error && (!data || data.success !== false)) {
-        try {
-          await supabaseClient.from('balance_mutations').insert({
-            user_id: userId, email, amount, type: typeHint || 'bonus', reason
-          });
-        } catch (_) {}
-        return { ok: true, via: 'add_user_balance', data };
-      }
-    } catch (_) {}
-  }
+  // Client TIDAK boleh menambah saldo langsung.
+  // Cashback unik harus lewat RPC credit_unique_share(deposit_id).
+  console.warn('creditAmountToUser diblokir — gunakan RPC server saja', typeHint, amount);
   try {
-    const { data: pr, error } = await supabaseClient.from('profiles').select('balance').eq('id', userId).maybeSingle();
-    if (error) throw error;
-    const next = (parseFloat(pr?.balance) || 0) + amount;
-    const { error: uErr } = await supabaseClient.from('profiles').update({ balance: next }).eq('id', userId);
-    if (uErr) throw uErr;
-    try {
-      await supabaseClient.from('balance_mutations').insert({
-        user_id: userId, email, amount, type: typeHint || 'bonus', reason
-      });
-    } catch (_) {}
-    return { ok: true, via: 'profiles_direct', newBalance: next };
-  } catch (e) {
-    console.warn('creditAmountToUser', e.message);
-    return { ok: false, message: e.message };
-  }
+    await supabaseClient.rpc('log_suspicious_activity', {
+      p_event_type: 'suspicious_client_credit_attempt',
+      p_detail: { reason, typeHint, amount, userId }
+    });
+  } catch (_) {}
+  return { ok: false, message: 'Client credit diblokir. Gunakan RPC.' };
 }
 
 const _uniqueShareInFlight = new Set();
@@ -4733,89 +4655,41 @@ async function markUniqueShareCredited(depositId) {
 
 async function applyUniqueCodeShare(dep) {
   const depositId = dep?.id;
-  const uniqueNum = Math.floor(Number(dep.unique_code) || 0);
-  if (uniqueNum < 1) return { userShare: 0, refShare: 0, skipped: true };
-
-  // Anti-double: memory lock + DB flag + mutasi
-  if (depositId && _uniqueShareInFlight.has(depositId)) {
+  if (!depositId) return { userShare: 0, refShare: 0, skipped: true };
+  if (_uniqueShareInFlight.has(depositId)) {
     return { userShare: 0, refShare: 0, skipped: true, reason: 'in_flight' };
   }
-  if (depositId && await wasUniqueShareAlreadyPaid(depositId)) {
-    return { userShare: 0, refShare: 0, skipped: true, reason: 'already_paid' };
+  if (_uniqueShareDone.has(depositId)) {
+    return { userShare: 0, refShare: 0, skipped: true, reason: 'memory' };
   }
-  if (depositId) _uniqueShareInFlight.add(depositId);
-
+  _uniqueShareInFlight.add(depositId);
   try {
-    const userShare = Math.floor(uniqueNum * 0.7);
-    const refShare = Math.floor(uniqueNum * 0.1);
-    let userOk = false, refOk = false, uplineEmail = '';
-
-    if (userShare > 0) {
-      const r = await creditAmountToUser(
-        dep.user_id || currentUser?.id,
-        dep.email || currentUser?.email,
-        userShare,
-        'Cashback 70% kode unik deposit #' + (depositId || '') + ' (unik: ' + uniqueNum + ')',
-        'unique_cashback'
-      );
-      userOk = !!r.ok;
+    const { data, error } = await supabaseClient.rpc('credit_unique_share', { p_deposit_id: depositId });
+    if (error) {
+      console.warn('credit_unique_share', error.message);
+      return { userShare: 0, refShare: 0, error: error.message };
     }
-
-    if (refShare > 0) {
-      try {
-        const uid = dep.user_id || currentUser?.id;
-        const { data: me } = await supabaseClient.from('profiles')
-          .select('referred_by_user_id, referred_by_code, referral_code')
-          .eq('id', uid).maybeSingle();
-        let uplineId = me?.referred_by_user_id || null;
-        if (!uplineId && me?.referred_by_code) {
-          const { data: up } = await supabaseClient.from('profiles')
-            .select('id, email').eq('referral_code', me.referred_by_code).maybeSingle();
-          if (up) { uplineId = up.id; uplineEmail = up.email; }
-        }
-        if (uplineId && uplineId !== uid) {
-          if (!uplineEmail) {
-            const { data: up2 } = await supabaseClient.from('profiles').select('email').eq('id', uplineId).maybeSingle();
-            uplineEmail = up2?.email || '';
-          }
-          // cek mutasi referral untuk deposit ini
-          let refAlready = false;
-          try {
-            const { data: mrows } = await supabaseClient.from('balance_mutations')
-              .select('id, reason')
-              .eq('user_id', uplineId)
-              .limit(30);
-            refAlready = (mrows || []).some(r => String(r.reason || '').includes(String(depositId)) && /referral|10%/i.test(String(r.reason || '')));
-          } catch (_) {}
-          if (!refAlready) {
-            const r2 = await creditAmountToUser(
-              uplineId,
-              uplineEmail,
-              refShare,
-              'Bonus referral 10% kode unik dari ' + (dep.email || 'downline') + ' deposit #' + (depositId || '') + ' (unik: ' + uniqueNum + ')',
-              'referral_bonus'
-            );
-            refOk = !!r2.ok;
-          } else {
-            refOk = true; // already
-          }
-        }
-      } catch (e) {
-        console.warn('ref share', e.message);
-      }
+    if (data && data.already) {
+      _uniqueShareDone.add(depositId);
+      return { userShare: 0, refShare: 0, skipped: true, reason: 'already_paid' };
     }
-
-    // Tandai selesai jika minimal cashback user sukses (atau 0)
-    if (userOk || userShare === 0) {
-      await markUniqueShareCredited(depositId);
+    if (data && data.success === false) {
+      return { userShare: 0, refShare: 0, error: data.message };
     }
-
-    return { userShare: userOk ? userShare : 0, refShare: refOk ? refShare : 0, userOk, refOk, uplineEmail, uniqueNum };
+    _uniqueShareDone.add(depositId);
+    return {
+      userShare: Number(data?.user_share) || 0,
+      refShare: Number(data?.ref_share) || 0,
+      userOk: true,
+      refOk: (Number(data?.ref_share) || 0) > 0,
+      uniqueNum: data?.unique
+    };
+  } catch (e) {
+    return { userShare: 0, refShare: 0, error: e.message };
   } finally {
-    if (depositId) _uniqueShareInFlight.delete(depositId);
+    _uniqueShareInFlight.delete(depositId);
   }
 }
-
 
 async function handleDepositSuccess(opts) {
   if (!currentDeposit) return;
