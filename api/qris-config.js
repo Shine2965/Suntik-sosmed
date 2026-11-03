@@ -43,7 +43,7 @@ export default function handler(req, res) {
         const irvankardeApiId = parseInt(process.env.IRVANKARDE_API_ID) || 81074;
 
         // ===== LOLLIPOP CONFIG =====
-        const lollipopApiKey = process.env.LOLLIPOP_API_KEY || '8c2ed537ebc1125e55be03cf722a8e0b';
+        const lollipopApiKey = process.env.LOLLIPOP_API_KEY || '';
 
         // ===== RESPONSE =====
         return res.status(200).json({
