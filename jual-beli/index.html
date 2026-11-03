@@ -1255,19 +1255,9 @@ async function handleMarketQrisSuccess() {
       if (!cErr && done && done.success !== false) credited = true;
     } catch (_) {}
     if (!credited) {
-      const email = currentUser.email || currentProfile?.email;
-      const { data: balResult, error: balErr } = await sb.rpc('add_user_balance', {
-        p_target_email: email,
-        p_amount: depositAmount,
-        p_reason: 'Deposit QRIS Market (unik: ' + uniqueCode + ')'
-      });
-      if (balErr) throw balErr;
-      if (balResult && balResult.success === false) throw new Error(balResult.message || 'Gagal kredit saldo');
-      try {
-        await sb.from('deposits').update({ status: 'success', paid_at: new Date().toISOString(), balance_credited: true }).eq('id', depositId);
-      } catch (_) {
-        try { await sb.from('deposits').update({ status: 'success', paid_at: new Date().toISOString() }).eq('id', depositId); } catch (e2) {}
-      }
+      // Tidak pakai add_user_balance dari client (staff-only / rentan).
+      // Wajib complete_deposit_with_mutasi setelah nominal mutasi cocok.
+      throw new Error('Deposit belum terverifikasi mutasi Qiospay. Tunggu deteksi otomatis atau cek status lagi.');
     }
     await refreshBalance();
 
