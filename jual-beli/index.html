@@ -1246,7 +1246,12 @@ async function handleMarketQrisSuccess() {
     // Kredit saldo (harga + admin) — jika produk gagal/dibatalkan, dana tetap di saldo
     let credited = false;
     try {
-      const { data: done, error: cErr } = await sb.rpc('complete_deposit', { p_deposit_id: depositId });
+      const needAmt = Math.floor(Number(currentDeposit.total_amount || (depositAmount + Number(uniqueCode||0))));
+      const { data: done, error: cErr } = await sb.rpc('complete_deposit_with_mutasi', {
+        p_deposit_id: depositId,
+        p_mutasi_amount: needAmt,
+        p_mutasi_ref: 'market-poll'
+      });
       if (!cErr && done && done.success !== false) credited = true;
     } catch (_) {}
     if (!credited) {
