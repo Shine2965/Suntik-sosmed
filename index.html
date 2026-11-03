@@ -875,7 +875,7 @@ body.chat-open .cs-bubble-container{display:none !important}
 .maint-card .maint-meta{font-size:11px;color:#94a3b8}
 
 </style>
-<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer onload="window.__turnstileReady=true;try{if(typeof initShineTurnstile==='function')initShineTurnstile();}catch(e){}"></script>
 </head>
 <body>
 
@@ -2775,6 +2775,7 @@ function switchAuthTab(tab) {
     if (signupTab) signupTab.classList.add('active');
     formLogin.classList.remove('active');
     formSignup.classList.add('active');
+    try { renderTurnstileWidgets(true); } catch (_) {}
     try {
       const ref = document.getElementById('signupReferralCode');
       if (ref && !ref.value) {
@@ -2796,6 +2797,7 @@ function switchAuthTab(tab) {
     if (loginTab) loginTab.classList.add('active');
     formSignup.classList.remove('active');
     formLogin.classList.add('active');
+    try { renderTurnstileWidgets(true); } catch (_) {}
     try {
       setTimeout(() => {
         const email = document.getElementById('loginEmail');
@@ -2810,6 +2812,7 @@ window.switchAuthTab = switchAuthTab;
 let TURNSTILE_SITE_KEY = '0x4AAAAAAFyGkydYQAkRFtCp';
 let loginTurnstileWidgetId = null;
 let signupTurnstileWidgetId = null;
+let turnstileInitStarted = false;
 
 async function loadTurnstileSiteKey() {
   try {
@@ -2819,36 +2822,81 @@ async function loadTurnstileSiteKey() {
   } catch (_) {}
 }
 
-function renderTurnstileWidgets() {
+function renderTurnstileWidgets(force) {
   if (typeof turnstile === 'undefined') {
-    setTimeout(renderTurnstileWidgets, 400);
+    setTimeout(function(){ renderTurnstileWidgets(force); }, 300);
     return;
   }
   try {
     const loginEl = document.getElementById('loginTurnstile');
-    if (loginEl && loginTurnstileWidgetId == null) {
-      loginEl.innerHTML = '';
-      loginTurnstileWidgetId = turnstile.render(loginEl, {
-        sitekey: TURNSTILE_SITE_KEY,
-        theme: 'dark',
-        callback: (token) => { const i = document.getElementById('loginCaptchaToken'); if (i) i.value = token; },
-        'expired-callback': () => { const i = document.getElementById('loginCaptchaToken'); if (i) i.value = ''; }
-      });
+    if (loginEl) {
+      if (force || loginTurnstileWidgetId == null) {
+        try { if (loginTurnstileWidgetId != null) turnstile.remove(loginTurnstileWidgetId); } catch (_) {}
+        loginEl.innerHTML = '';
+        loginTurnstileWidgetId = turnstile.render(loginEl, {
+          sitekey: TURNSTILE_SITE_KEY,
+          theme: 'dark',
+          size: 'normal',
+          callback: function(token) {
+            var i = document.getElementById('loginCaptchaToken');
+            if (i) i.value = token || '';
+          },
+          'expired-callback': function() {
+            var i = document.getElementById('loginCaptchaToken');
+            if (i) i.value = '';
+          },
+          'error-callback': function() {
+            console.warn('turnstile login error');
+          }
+        });
+      }
     }
-  } catch (e) { console.warn('login turnstile', e.message); }
+  } catch (e) { console.warn('login turnstile', e && e.message); }
   try {
     const signupEl = document.getElementById('signupTurnstile');
-    if (signupEl && signupTurnstileWidgetId == null) {
-      signupEl.innerHTML = '';
-      signupTurnstileWidgetId = turnstile.render(signupEl, {
-        sitekey: TURNSTILE_SITE_KEY,
-        theme: 'dark',
-        callback: (token) => { const i = document.getElementById('signupCaptchaToken'); if (i) i.value = token; },
-        'expired-callback': () => { const i = document.getElementById('signupCaptchaToken'); if (i) i.value = ''; }
-      });
+    if (signupEl) {
+      if (force || signupTurnstileWidgetId == null) {
+        try { if (signupTurnstileWidgetId != null) turnstile.remove(signupTurnstileWidgetId); } catch (_) {}
+        signupEl.innerHTML = '';
+        signupTurnstileWidgetId = turnstile.render(signupEl, {
+          sitekey: TURNSTILE_SITE_KEY,
+          theme: 'dark',
+          size: 'normal',
+          callback: function(token) {
+            var i = document.getElementById('signupCaptchaToken');
+            if (i) i.value = token || '';
+          },
+          'expired-callback': function() {
+            var i = document.getElementById('signupCaptchaToken');
+            if (i) i.value = '';
+          }
+        });
+      }
     }
-  } catch (e) { console.warn('signup turnstile', e.message); }
+  } catch (e) { console.warn('signup turnstile', e && e.message); }
 }
+
+async function initShineTurnstile() {
+  if (turnstileInitStarted) {
+    renderTurnstileWidgets(false);
+    return;
+  }
+  turnstileInitStarted = true;
+  await loadTurnstileSiteKey();
+  renderTurnstileWidgets(true);
+}
+window.initShineTurnstile = initShineTurnstile;
+
+document.addEventListener('DOMContentLoaded', function() {
+  try { initShineTurnstile(); } catch (e) { console.warn('turnstile init', e); }
+});
+// fallback jika DOM sudah ready
+if (document.readyState !== 'loading') {
+  try { initShineTurnstile(); } catch (e) {}
+}
+setTimeout(function(){ try { initShineTurnstile(); } catch(e){} }, 800);
+setTimeout(function(){ try { renderTurnstileWidgets(false); } catch(e){} }, 2000);
+
 
 async function verifyTurnstileToken(token) {
   if (!token) return false;
