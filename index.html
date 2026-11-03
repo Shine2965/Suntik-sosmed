@@ -1991,12 +1991,20 @@ async function processAutoRefund(order, newStatus) {
       .from('refunds')
       .insert({
         user_id: finalUserId,
-        email: order.email || '-',
+        email: order.email || order.user_email || '-',
+        gmail_target: order.gmail_target || order.gmail || null,
+        target: order.target || null,
+        service_name: order.service_name || null,
+        service_id: order.service_id || null,
+        sosmed_type: order.sosmed_type || null,
         order_id: String(refundKeyId),
         trx_id: String(refundKeyId),
         amount: refundAmount,
-        reason: refundReason,
-        source_method: 'saldo',
+        reason: refundReason +
+          (order.gmail_target || order.gmail ? ' | Gmail: ' + (order.gmail_target || order.gmail) : '') +
+          (order.target ? ' | Target: ' + order.target : '') +
+          (order.service_name ? ' | Layanan: ' + order.service_name : ''),
+        source_method: order.payment_method || order.source_method || 'saldo',
         status: 'pending',
         created_at: new Date().toISOString()
       })
@@ -2034,7 +2042,7 @@ async function processAutoRefund(order, newStatus) {
     try { localStorage.setItem('refund_done_' + refundKey, '1'); } catch (e) {}
 
     const Toast = Swal.mixin({ toast: true, position: 'top', showConfirmButton: false, timer: 6000, timerProgressBar: true, background: '#1a0e2e', color: '#fff' });
-    Toast.fire({ icon: 'success', title: `💰 Auto-Refund ${newStatus.toUpperCase()}`, html: `<div style="font-size:11.5px;color:#64ffc8;">OrderID: ${refundKeyId}<br>→ ${order.email}<br>Rp ${refundAmount.toLocaleString('id-ID')}</div>` });
+    Toast.fire({ icon: 'success', title: `💰 Auto-Refund ${newStatus.toUpperCase()}`, html: `<div style="font-size:11.5px;color:#64ffc8;">OrderID: ${refundKeyId}<br>User: ${order.email||'-'}<br>Gmail/Akun: ${order.gmail_target||order.gmail||'-'}<br>Target: ${order.target||'-'}<br>Rp ${refundAmount.toLocaleString('id-ID')}</div>` });
 
     if (order.email === currentUser?.email) setTimeout(() => refreshBalance(), 800);
     if (document.getElementById('mutasiManagerUser')?.classList.contains('open')) setTimeout(() => loadMutasiUser(), 500);
@@ -2397,12 +2405,19 @@ async function autoCleanupOrdersWithoutProviderId(showToast = true) {
               .from('refunds')
               .insert({
                 user_id: finalUserId,
-                email: finalEmail || '-',
+                email: finalEmail || order.email || '-',
+                gmail_target: order.gmail_target || order.gmail || null,
+                target: order.target || null,
+                service_name: order.service_name || null,
+                service_id: order.service_id || null,
+                sosmed_type: order.sosmed_type || null,
                 order_id: refundKeyId,
                 trx_id: refundKeyId,
                 amount: totalPayment,
-                reason: refundReason,
-                source_method: 'saldo',
+                reason: refundReason +
+                  (order.gmail_target || order.gmail ? ' | Gmail: ' + (order.gmail_target || order.gmail) : '') +
+                  (order.target ? ' | Target: ' + order.target : ''),
+                source_method: order.payment_method || 'saldo',
                 status: 'pending',
                 created_at: new Date().toISOString()
               })
@@ -6340,6 +6355,30 @@ function getMutasiTypeInfo(type) {
   };
   return map[t] || { label: type || 'Mutasi', cls: 'deposit', icon: '💸' };
 }
+
+function parseMutasiReason(reason) {
+  const r = String(reason || '');
+  const out = { raw: r, gmail: '', target: '', layanan: '', orderId: '' };
+  const g = r.match(/Gmail:\s*([^|]+)/i); if (g) out.gmail = g[1].trim();
+  const t = r.match(/Target:\s*([^|]+)/i); if (t) out.target = t[1].trim();
+  const l = r.match(/Layanan:\s*([^|]+)/i); if (l) out.layanan = l[1].trim();
+  const o = r.match(/\[OrderID:\s*([^\]]+)\]/i); if (o) out.orderId = o[1].trim();
+  return out;
+}
+function formatMutasiReasonHtml(reason) {
+  const p = parseMutasiReason(reason);
+  let html = `<div style="font-size:11px;color:#cbd5e1;line-height:1.45;word-break:break-word;">${escapeHtml(p.raw)}</div>`;
+  if (p.gmail || p.target || p.layanan || p.orderId) {
+    html += `<div style="margin-top:6px;padding:7px 9px;border-radius:8px;background:rgba(0,198,255,0.08);border:1px solid rgba(0,198,255,0.22);font-size:10.5px;line-height:1.5;color:#e2e8f0;">`;
+    if (p.orderId) html += `<div>🆔 <b>OrderID:</b> ${escapeHtml(p.orderId)}</div>`;
+    if (p.gmail) html += `<div>📧 <b style="color:#00ffaa;">Gmail/Akun:</b> <span style="color:#fff;font-weight:800;">${escapeHtml(p.gmail)}</span></div>`;
+    if (p.target) html += `<div>🎯 <b>Target:</b> ${escapeHtml(p.target)}</div>`;
+    if (p.layanan) html += `<div>🛠️ <b>Layanan:</b> ${escapeHtml(p.layanan)}</div>`;
+    html += `</div>`;
+  }
+  return html;
+}
+
 async function loadMutasiUser() {
   const listEl = document.getElementById('mutasiListUser');
   if (!listEl) return;
@@ -6388,7 +6427,7 @@ function renderMutasiUserList(data) {
     const reasonStr = String(m.reason || m.description || '').toLowerCase();
     if (!typeStr && (reasonStr.includes('refund') || reasonStr.includes('pengembalian'))) typeStr = 'refund';
     const typeInfo = getMutasiTypeInfo(typeStr);
-    html += `<div class="mutasi-item ${typeClass}"><div class="mutasi-icon">${icon}</div><div class="mutasi-info"><div class="mutasi-top"><div class="mutasi-email">${escapeHtml(m.reason || m.description || 'Tidak ada keterangan')}</div><div class="mutasi-amount">${prefix}Rp ${amountFormatted}</div></div><div class="mutasi-meta"><span class="mutasi-type-badge ${typeInfo.cls}">${typeInfo.icon} ${typeInfo.label}</span><span>🕐 ${createdAt} WIB</span></div></div></div>`;
+    html += `<div class="mutasi-item ${typeClass}"><div class="mutasi-icon">${icon}</div><div class="mutasi-info"><div class="mutasi-top"><div class="mutasi-email">${typeInfo.icon} ${escapeHtml(typeInfo.label)}</div><div class="mutasi-amount">${prefix}Rp ${amountFormatted}</div></div><div class="mutasi-reason">${formatMutasiReasonHtml(m.reason || m.description || '-')}</div><div class="mutasi-meta"><span class="mutasi-type-badge ${typeInfo.cls}">${typeInfo.icon} ${typeInfo.label}</span><span>🕐 ${createdAt} WIB</span></div></div></div>`;
   });
   listEl.innerHTML = html;
 }
@@ -6426,7 +6465,7 @@ function renderMutasiAdminList(data) {
     const prefix = isCredit ? '+' : '-';
     const createdAt = m.created_at ? new Date(m.created_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '-';
     const typeInfo = getMutasiTypeInfo(m.type);
-    html += `<div class="mutasi-item ${isCredit ? 'credit' : 'debit'}"><div class="mutasi-icon">${icon}</div><div class="mutasi-info"><div class="mutasi-top"><div class="mutasi-email">📧 ${escapeHtml(m.email || '-')}</div><div class="mutasi-amount">${prefix}Rp ${amountFormatted}</div></div><div class="mutasi-reason">${escapeHtml(m.reason || m.description || '-')}</div><div class="mutasi-meta"><span class="mutasi-type-badge ${typeInfo.cls}">${typeInfo.icon} ${typeInfo.label}</span><span>🕐 ${createdAt}</span></div></div></div>`;
+    html += `<div class="mutasi-item ${isCredit ? 'credit' : 'debit'}"><div class="mutasi-icon">${icon}</div><div class="mutasi-info"><div class="mutasi-top"><div class="mutasi-email">👤 ${escapeHtml(m.email || '-')}</div><div class="mutasi-amount">${prefix}Rp ${amountFormatted}</div></div><div class="mutasi-reason">${formatMutasiReasonHtml(m.reason || m.description || '-')}</div><div class="mutasi-meta"><span class="mutasi-type-badge ${typeInfo.cls}">${typeInfo.icon} ${typeInfo.label}</span><span>🕐 ${createdAt}</span></div></div></div>`;
   });
   listEl.innerHTML = html;
 }
@@ -6443,13 +6482,54 @@ async function loadPendingRefunds() {
     if (error) throw error;
     if (!data || data.length === 0) { container.innerHTML = `<div class="refund-empty">✅ Tidak ada refund pending</div>`; return; }
     let html = '';
+    // Lengkapi data Gmail/target dari orders_detail jika kolom refund kosong
+    const needEnrich = (data || []).filter(r => !r.gmail_target && !r.target && (r.order_id || r.trx_id));
+    let orderMap = {};
+    if (needEnrich.length) {
+      try {
+        const ids = [...new Set(needEnrich.map(r => String(r.order_id || r.trx_id)).filter(Boolean))];
+        const { data: ods } = await supabaseClient.from('orders_detail')
+          .select('id, order_id, provider_order_id, email, gmail_target, gmail, target, service_name, service_id, sosmed_type')
+          .or(ids.map(id => `order_id.eq.${id},provider_order_id.eq.${id},id.eq.${id}`).join(','))
+          .limit(100);
+        (ods || []).forEach(o => {
+          const keys = [o.id, o.order_id, o.provider_order_id].filter(Boolean).map(String);
+          keys.forEach(k => { orderMap[k] = o; });
+        });
+      } catch (e) { console.warn('enrich refund', e.message); }
+    }
+
     data.forEach(r => {
+      const od = orderMap[String(r.order_id || '')] || orderMap[String(r.trx_id || '')] || {};
+      const userEmail = r.email || od.email || '-';
+      const gmailAkun = r.gmail_target || r.gmail || od.gmail_target || od.gmail || '-';
+      const target = r.target || od.target || '-';
+      const layanan = r.service_name || od.service_name || '-';
+      const serviceId = r.service_id || od.service_id || '';
       const sourceLabel = r.source_method === 'qris' ? '📱 QRIS' : '💰 Saldo';
       const sourceClass = r.source_method === 'qris' ? 'qris' : 'saldo';
       const createdAgo = formatTimeAgo(r.created_at);
       const amountFormatted = parseFloat(r.amount || 0).toLocaleString('id-ID');
       const orderIdShow = r.order_id || r.trx_id || '-';
-      html += `<div class="refund-card"><div class="refund-header"><div><div class="refund-email">📧 ${escapeHtml(r.email || '-')}<span class="refund-source ${sourceClass}">${sourceLabel}</span></div><div class="refund-meta">🆔 ${escapeHtml(orderIdShow)} · 🕐 ${createdAgo}</div></div><div class="refund-amount">+Rp ${amountFormatted}</div></div><div class="refund-reason"><b style="color:#facc15;">📝 Alasan:</b> ${escapeHtml(r.reason || '-')}</div><div class="refund-actions"><button class="refund-btn approve" onclick="approveRefund('${r.id}', this)">✅ Konfirmasi</button><button class="refund-btn reject" onclick="rejectRefund('${r.id}', this)">❌ Tolak</button></div></div>`;
+      html += `<div class="refund-card">
+        <div class="refund-header">
+          <div>
+            <div class="refund-email">👤 ${escapeHtml(userEmail)} <span class="refund-source ${sourceClass}">${sourceLabel}</span></div>
+            <div class="refund-meta">🆔 ${escapeHtml(orderIdShow)} · 🕐 ${createdAgo}</div>
+          </div>
+          <div class="refund-amount">+Rp ${amountFormatted}</div>
+        </div>
+        <div style="background:rgba(0,198,255,0.08);border:1px solid rgba(0,198,255,0.25);border-radius:10px;padding:8px 10px;margin-bottom:8px;font-size:11.5px;line-height:1.55;color:#e2e8f0;">
+          <div><b style="color:#00c6ff;">📧 Gmail / Akun:</b> <span style="color:#fff;font-weight:800;word-break:break-all;">${escapeHtml(gmailAkun)}</span></div>
+          <div><b style="color:#a78bfa;">🎯 Target:</b> ${escapeHtml(target)}</div>
+          <div><b style="color:#facc15;">🛠️ Layanan:</b> ${escapeHtml(layanan)}${serviceId ? ' · ID ' + escapeHtml(String(serviceId)) : ''}</div>
+        </div>
+        <div class="refund-reason"><b style="color:#facc15;">📝 Alasan:</b> ${escapeHtml(r.reason || '-')}</div>
+        <div class="refund-actions">
+          <button class="refund-btn approve" onclick="approveRefund('${r.id}', this)">✅ Konfirmasi</button>
+          <button class="refund-btn reject" onclick="rejectRefund('${r.id}', this)">❌ Tolak</button>
+        </div>
+      </div>`;
     });
     container.innerHTML = html;
   } catch (err) { container.innerHTML = `<div class="refund-empty" style="color:#ff8080;">❌ ${escapeHtml(err.message)}</div>`; }
