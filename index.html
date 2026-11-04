@@ -1936,13 +1936,101 @@ async function isOrderAlreadyRefunded(orderIdKey) {
   } catch (e) { return false; }
 }
 
+
+/** Refund tanpa OrderID provider: pending saja, tidak auto-kredit saldo */
+async function createPendingRefundNoProvider(order, newStatus) {
+  try {
+    const refundKeyId = String(order.id);
+    const refundKey = refundKeyId + '_' + (newStatus || 'pending');
+    if (autoRefundProcessedSet.has(refundKey)) return false;
+    try {
+      if (localStorage.getItem('refund_pending_' + refundKey) === '1') {
+        autoRefundProcessedSet.add(refundKey);
+        return false;
+      }
+    } catch (_) {}
+    const already = await isOrderAlreadyRefunded(refundKeyId);
+    if (already) {
+      autoRefundProcessedSet.add(refundKey);
+      return false;
+    }
+    const totalPayment = Math.floor(parseFloat(order.total_payment || 0));
+    if (totalPayment < 1) return false;
+    let finalUserId = order.user_id;
+    if (!finalUserId && order.email) {
+      try {
+        const { data: prof } = await supabaseClient.from('profiles').select('id, email').eq('email', order.email).maybeSingle();
+        if (prof?.id) finalUserId = prof.id;
+      } catch (_) {}
+    }
+    if (!finalUserId) return false;
+    const reason = 'PENDING ADMIN: tanpa OrderID provider [' + (newStatus || '-') + '] · ' +
+      (order.service_name || 'Layanan') +
+      (order.gmail_target || order.gmail ? ' | Gmail: ' + (order.gmail_target || order.gmail) : '') +
+      (order.target ? ' | Target: ' + order.target : '') +
+      ' · Rp ' + totalPayment.toLocaleString('id-ID') +
+      ' · menunggu persetujuan admin/owner';
+    const { error: insertErr } = await supabaseClient.from('refunds').insert({
+      user_id: finalUserId,
+      email: order.email || '-',
+      gmail_target: order.gmail_target || order.gmail || null,
+      target: order.target || null,
+      service_name: order.service_name || null,
+      service_id: order.service_id || null,
+      sosmed_type: order.sosmed_type || null,
+      order_id: refundKeyId,
+      trx_id: order.trx_id || refundKeyId,
+      amount: totalPayment,
+      reason,
+      source_method: order.payment_method || order.source_method || 'saldo',
+      status: 'pending',
+      created_at: new Date().toISOString()
+    });
+    if (insertErr) {
+      const msg = String(insertErr.message || '').toLowerCase();
+      if (insertErr.code === '23505' || msg.includes('duplicate') || msg.includes('unique')) {
+        autoRefundProcessedSet.add(refundKey);
+        return false;
+      }
+      console.warn('pending refund insert', insertErr.message);
+      return false;
+    }
+    autoRefundProcessedSet.add(refundKey);
+    try { localStorage.setItem('refund_pending_' + refundKey, '1'); } catch (_) {}
+    try {
+      // tandai order menunggu refund (opsional)
+      await supabaseClient.from('orders_detail').update({
+        order_status: order.order_status || newStatus || 'failed',
+        updated_at: new Date().toISOString()
+      }).eq('id', order.id);
+    } catch (_) {}
+    if (isAdminOrOwner) {
+      try { loadPendingRefunds(); } catch (_) {}
+    }
+    const Toast = Swal.mixin({ toast: true, position: 'top', showConfirmButton: false, timer: 7000, timerProgressBar: true, background: '#1a0e2e', color: '#fff' });
+    Toast.fire({
+      icon: 'info',
+      title: '⏳ Refund menunggu admin',
+      html: '<div style="font-size:11.5px;color:#facc15;">Tanpa OrderID provider — tidak auto-refund.<br>Rp ' + totalPayment.toLocaleString('id-ID') + ' menunggu persetujuan.</div>'
+    });
+    return true;
+  } catch (e) {
+    console.warn('createPendingRefundNoProvider', e.message);
+    return false;
+  }
+}
+
 async function processAutoRefund(order, newStatus) {
   if (!supabaseClient || !order) return false;
   if (!['partial', 'canceled'].includes(newStatus)) return false;
   if (!order.user_id && !order.email) { console.warn('⚠️ Auto-refund skip: no user', order); return false; }
 
   const providerOrderId = getProviderOrderId(order);
-  const refundKeyId = providerOrderId || String(order.id);
+  // TANPA OrderID provider → HANYA ajukan pending (butuh approve admin/owner)
+  if (!providerOrderId) {
+    return await createPendingRefundNoProvider(order, newStatus);
+  }
+  const refundKeyId = providerOrderId;
 
   const refundKey = `${refundKeyId}_${newStatus}`;
   if (autoRefundProcessedSet.has(refundKey)) return false;
@@ -2405,7 +2493,7 @@ async function autoCleanupOrdersWithoutProviderId(showToast = true) {
               continue;
             }
 
-            const refundReason = `Auto-refund (tanpa OrderID provider): ${order.service_name || 'Layanan'}. Rp ${totalPayment.toLocaleString('id-ID')} dikembalikan.`;
+            const refundReason = `PENDING ADMIN: tanpa OrderID provider · ${order.service_name || 'Layanan'}. Rp ${totalPayment.toLocaleString('id-ID')} — menunggu persetujuan admin/owner`;
 
             const { data: insertData, error: insertErr } = await supabaseClient
               .from('refunds')
@@ -2435,26 +2523,9 @@ async function autoCleanupOrdersWithoutProviderId(showToast = true) {
               const isDup = insertErr.code === '23505' || errMsg.includes('duplicate') || errMsg.includes('unique') || errMsg.includes('conflict');
               if (!isDup) throw new Error('Insert refund: ' + insertErr.message);
             } else {
-              const { data: rpcData, error: rpcError } = await supabaseClient.rpc('auto_refund_on_failure', {
-                p_user_id: finalUserId,
-                p_amount: totalPayment,
-                p_trx_id: refundKeyId,
-                p_reason: refundReason
-              });
-              if (rpcError) {
-                try { await supabaseClient.from('refunds').delete().eq('id', insertData.id); } catch(e) {}
-                throw new Error('RPC refund: ' + rpcError.message);
-              }
-              if (!rpcData || !rpcData.success) {
-                try { await supabaseClient.from('refunds').delete().eq('id', insertData.id); } catch(e) {}
-                throw new Error(rpcData?.message || 'RPC failed');
-              }
-              await supabaseClient.from('refunds').update({
-                status: 'success',
-                approved_at: new Date().toISOString(),
-                updated_at: new Date().toISOString()
-              }).eq('id', insertData.id);
-              refundedCount++;
+              // TANPA OrderID: jangan auto-kredit — biarkan status pending untuk admin/owner
+              refundedCount++  // dihitung sebagai "diajukan", bukan dikredit
+              console.log('⏳ Refund pending admin (tanpa OrderID):', refundKeyId);;
             }
           }
         }
@@ -4046,9 +4117,13 @@ async function silentWatchDeposit(dep) {
     const json = await res.json();
     const list = (typeof extractMutasiList === 'function') ? extractMutasiList(json) : (json.data || []);
     for (const m of list) {
-      if (isTransactionMatch(m, target).match) {
+      const match = isTransactionMatch(m, target);
+      if (match && match.match) {
         currentDeposit = data || dep;
-        await handleDepositSuccess({ alreadyPaid: false });
+        await handleDepositSuccess({
+          alreadyPaid: false,
+          mutasi: { amount: target, refid: m.refid || m.ref || m.id || m.trx_id || null, raw: m }
+        });
         return;
       }
     }
@@ -4259,7 +4334,10 @@ function startDepositPolling(targetAmount) {
           depositPollingInterval = null;
           if (depositTimerInterval) { clearInterval(depositTimerInterval); depositTimerInterval = null; }
           stopDepositRealtime();
-          await handleDepositSuccess({ alreadyPaid: false });
+          await handleDepositSuccess({
+            alreadyPaid: false,
+            mutasi: { amount: targetAmount, refid: (found && (found.refid || found.ref || found.id)) || null, raw: found }
+          });
           return;
         }
       }
@@ -4728,20 +4806,49 @@ async function trackUserIpAndSecurity() {
 }
 
 async function forceCreditDepositToSupabase(deposit, mutasiMeta) {
-  const depositId = deposit.id;
-  const userId = deposit.user_id || currentUser?.id;
-  const amount = Math.floor(Number(deposit.amount) || 0);
-  if (!depositId || !userId || amount < 1) {
-    return { ok: false, message: 'Data deposit tidak lengkap' };
+  const depositId = deposit && deposit.id;
+  if (!depositId) return { ok: false, message: 'Data deposit tidak lengkap' };
+
+  // Selalu ambil ulang dari DB — jangan percaya object client/local saja
+  let row = null;
+  try {
+    const { data, error } = await supabaseClient.from('deposits')
+      .select('id, user_id, email, amount, unique_code, total_amount, status, balance_credited, mutasi_verified')
+      .eq('id', depositId)
+      .maybeSingle();
+    if (error) return { ok: false, message: error.message };
+    row = data;
+  } catch (e) {
+    return { ok: false, message: e.message || String(e) };
   }
-  // WAJIB mutasi Qiospay — callback saja tidak cukup
-  const mutasiAmount = mutasiMeta && mutasiMeta.amount != null
-    ? Math.floor(Number(mutasiMeta.amount))
-    : Math.floor(Number(deposit.total_amount || (Number(deposit.amount||0) + Number(deposit.unique_code||0))));
-  const mutasiRef = (mutasiMeta && (mutasiMeta.refid || mutasiMeta.ref || mutasiMeta.id)) || null;
-  if (!mutasiAmount || mutasiAmount < 1) {
-    return { ok: false, message: 'Mutasi Qiospay belum terverifikasi' };
+  if (!row) return { ok: false, message: 'Deposit tidak ditemukan di server' };
+
+  // Hanya pemilik deposit (atau staff lewat RPC)
+  const uid = currentUser?.id;
+  if (uid && row.user_id && row.user_id !== uid) {
+    return { ok: false, message: 'Deposit bukan milik akun ini' };
   }
+
+  if (row.balance_credited === true || row.status === 'success') {
+    return { ok: true, via: 'already_credited', newBalance: null, already: true };
+  }
+
+  const amount = Math.floor(Number(row.amount) || 0);
+  const expectedTotal = Math.floor(Number(row.total_amount) || (amount + Math.floor(Number(row.unique_code) || 0)));
+  if (amount < 1 || expectedTotal < 1) {
+    return { ok: false, message: 'Nominal deposit invalid di server' };
+  }
+
+  // Mutasi WAJIB dari hasil cek Qiospay (bukan tebakan client)
+  if (!mutasiMeta || mutasiMeta.amount == null) {
+    return { ok: false, message: 'Mutasi Qiospay belum terverifikasi (tidak boleh kredit manual)' };
+  }
+  const mutasiAmount = Math.floor(Number(mutasiMeta.amount));
+  if (mutasiAmount !== expectedTotal && mutasiAmount !== amount) {
+    return { ok: false, message: 'Nominal mutasi tidak cocok dengan deposit server' };
+  }
+  const mutasiRef = mutasiMeta.refid || mutasiMeta.ref || mutasiMeta.id || null;
+
   try {
     const { data, error } = await supabaseClient.rpc('complete_deposit_with_mutasi', {
       p_deposit_id: depositId,
@@ -4749,7 +4856,7 @@ async function forceCreditDepositToSupabase(deposit, mutasiMeta) {
       p_mutasi_ref: mutasiRef ? String(mutasiRef) : null
     });
     if (error) return { ok: false, message: error.message };
-    if (data && data.success === false) return { ok: false, message: data.message || 'ditolak' };
+    if (data && data.success === false) return { ok: false, message: data.message || 'ditolak server' };
     return { ok: true, via: 'complete_deposit_with_mutasi', newBalance: data?.new_balance, data };
   } catch (e) {
     return { ok: false, message: e.message || String(e) };
@@ -4947,8 +5054,40 @@ async function handleDepositSuccess(opts) {
       return;
     }
 
-    // KREDIT WAJIB ke Supabase
-    const credit = await forceCreditDepositToSupabase(dep, opts && opts.mutasi);
+    // alreadyPaid: hanya UI refresh jika DB sudah success (callback server)
+    if (opts && opts.alreadyPaid) {
+      const { data: dbDep } = await supabaseClient.from('deposits')
+        .select('status, balance_credited, amount')
+        .eq('id', depositId).maybeSingle();
+      if (!dbDep || (dbDep.status !== 'success' && !dbDep.balance_credited)) {
+        throw new Error('Deposit belum success di server. Tunggu mutasi terverifikasi.');
+      }
+      // jangan panggil kredit ulang
+      depositSuccessProcessed = true;
+      let newBalance = balBefore;
+      try {
+        if (typeof forceRefreshBalanceFromDB === 'function') newBalance = await forceRefreshBalanceFromDB();
+        else if (typeof refreshBalance === 'function') { await refreshBalance(); newBalance = currentProfile?.balance; }
+      } catch (_) {}
+      await Swal.fire({
+        title: '🎉 Deposit Berhasil!',
+        html: `Saldo +<b style="color:#ffd700;">Rp ${depositAmount.toLocaleString('id-ID')}</b>` +
+          (newBalance != null ? `<br><small>Saldo: Rp ${Number(newBalance).toLocaleString('id-ID')}</small>` : ''),
+        icon: 'success', confirmButtonColor: '#ff6b9d', background: '#1a0e2e', color: '#fff', timer: 3200
+      });
+      stopDepositPolling();
+      try { stopDepositRealtime(); } catch (e) {}
+      if (depositTimerInterval) { clearInterval(depositTimerInterval); depositTimerInterval = null; }
+      closeQrisModal();
+      try { if (typeof loadMutasiUser === 'function') loadMutasiUser(); } catch (e) {}
+      return;
+    }
+
+    // Kredit HANYA jika ada bukti mutasi (anti manipulasi callback/local)
+    if (!opts || !opts.mutasi || opts.mutasi.amount == null) {
+      throw new Error('Mutasi Qiospay belum terdeteksi. Tidak dapat menambah saldo.');
+    }
+    const credit = await forceCreditDepositToSupabase(dep, opts.mutasi);
     if (!credit.ok) {
       // cek apakah saldo sudah naik dari proses lain
       let balNow = balBefore;
@@ -5086,8 +5225,12 @@ async function manualCheckPayment() {
     if (!json.success) throw new Error(json.message || 'Gagal ambil data mutasi');
     const mutasiList = (typeof extractMutasiList === 'function') ? extractMutasiList(json) : (json.data || []);
     for (const m of mutasiList) {
-      if (isTransactionMatch(m, targetAmount).match) {
-        await handleDepositSuccess({ alreadyPaid: false });
+      const match = isTransactionMatch(m, targetAmount);
+      if (match && match.match) {
+        await handleDepositSuccess({
+          alreadyPaid: false,
+          mutasi: { amount: targetAmount, refid: m.refid || m.ref || m.id || null, raw: m }
+        });
         return;
       }
     }
