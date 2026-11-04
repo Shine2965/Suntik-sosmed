@@ -1466,13 +1466,19 @@ cekAkses();
   // ===== SALDO PROVIDER STATE =====
   let providerBalance = 0;
 
-  // ===== SUPABASE (untuk hitung rata-rata waktu selesai) =====
+  // ===== SUPABASE =====
   const SUPABASE_URL = 'https://vvzgpbiesvupuhqqoxrg.supabase.co';
   const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ2emdwYmllc3Z1cHVocXFveHJnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIwNzE3MTUsImV4cCI6MjEwNzY0NzcxNX0.W3_Ck8B5Q-nEfNlsyeufJsLsTqbM8xPcAeHoAHfGRwY';
   let supabaseClient = null;
   try {
+    // ⭐ Session login dibaca (storageKey sama dengan halaman payment)
     supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      auth: { persistSession: false, autoRefreshToken: false }
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        storage: window.localStorage,
+        storageKey: 'shine-shop-auth'
+      }
     });
   } catch (e) { console.warn('Supabase init error:', e); }
 
@@ -1483,10 +1489,6 @@ cekAkses();
   const averageCache = {};
   const averageLoading = {};
 
-  /**
-   * Ambil rata-rata waktu selesai dari Supabase.
-   * completed_at - created_at, filter by sosmed_type + service_id.
-   */
   async function fetchAverageDuration(sosmedType, serviceId) {
     const key = `${sosmedType}|${serviceId}`;
     if (averageCache[key] !== undefined) return averageCache[key];
@@ -2133,7 +2135,6 @@ cekAkses();
       commentInfo.classList.remove('show');
     }
 
-    // ⭐ Rata-rata dari Supabase (based on service_id + sosmed_type 'sosmed-1')
     renderAverageForService(selectedService);
 
     document.getElementById('infoLayanan').innerHTML =
@@ -2274,8 +2275,32 @@ cekAkses();
     }
   }
 
+  // ============================================================
+  // ⭐ BUAT TRANSAKSI PENDING DI SUPABASE (data tidak lagi lewat URL)
+  // ============================================================
+  async function createPendingTransaction(ordersArr, total, isMass) {
+    if (!supabaseClient) throw new Error('Koneksi database belum siap');
+
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (!session) throw new Error('Silakan login terlebih dahulu di halaman utama');
+
+    const trxID = 'TRX' + Date.now() + Math.floor(Math.random() * 1000);
+
+    const { error } = await supabaseClient.from('pending_transactions').insert({
+      trx_id: trxID,
+      user_id: session.user.id,
+      sosmed_type: SOSMED_TYPE,
+      is_mass: isMass,
+      orders: ordersArr,
+      total: total
+    });
+
+    if (error) throw error;
+    return trxID;
+  }
+
   // ===== SINGLE CHECKOUT =====
-  function singleCheckout() {
+  async function singleCheckout() {
     if (!termsCheckbox.checked) {
       termsError.classList.add('show');
       document.getElementById('termsContainer').scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -2327,8 +2352,6 @@ cekAkses();
     const hargaAktif = getActivePrice(selectedService);
     const total = calcTotal(jumlah, hargaAktif);
 
-    const trxID = 'TRX' + Date.now() + Math.floor(Math.random() * 1000);
-
     const orderData = [{
       serviceId: selectedService.id,
       serviceName: selectedService.name,
@@ -2339,16 +2362,17 @@ cekAkses();
       comment: requiresComment ? document.getElementById('comments').value : null
     }];
 
-    let url = 'payment/?trx=' + trxID +
-      '&total=' + total +
-      '&mass=0' +
-      '&layanan=' + encodeURIComponent(selectedService.name) +
-      '&target=' + encodeURIComponent(target) +
-      '&jumlah=' + jumlah +
-      '&serviceId=' + selectedService.id +
-      '&orders=' + encodeURIComponent(JSON.stringify(orderData));
-
-    window.location.href = url;
+    const btn = document.getElementById('btnSingleCheckout');
+    btn.disabled = true;
+    btn.textContent = '⏳ Membuat transaksi...';
+    try {
+      const trxID = await createPendingTransaction(orderData, total, false);
+      window.location.href = 'payment/?trx=' + encodeURIComponent(trxID);
+    } catch (err) {
+      console.error('❌ createPendingTransaction:', err);
+      checkBalanceAndToggleButtons();
+      alert('Gagal membuat transaksi: ' + (err.message || err));
+    }
   }
 
   // ===== MASSAL - TAMBAH ORDER =====
@@ -2513,7 +2537,7 @@ cekAkses();
   window.clearOrders = clearOrders;
 
   // ===== MASSAL CHECKOUT =====
-  function massalCheckout() {
+  async function massalCheckout() {
     if (!termsCheckbox.checked) {
       termsError.classList.add('show');
       document.getElementById('termsContainer').scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -2536,7 +2560,6 @@ cekAkses();
       return;
     }
 
-    const trxID = 'TRX' + Date.now() + Math.floor(Math.random() * 1000);
     const totalBayar = orders.reduce((sum, o) => sum + o.total, 0);
 
     const ordersData = orders.map(o => ({
@@ -2549,12 +2572,17 @@ cekAkses();
       comment: o.comment
     }));
 
-    let url = 'payment/?trx=' + trxID +
-      '&total=' + totalBayar +
-      '&mass=1' +
-      '&orders=' + encodeURIComponent(JSON.stringify(ordersData));
-
-    window.location.href = url;
+    const btn = document.getElementById('btnMassalCheckout');
+    btn.disabled = true;
+    btn.textContent = '⏳ Membuat transaksi...';
+    try {
+      const trxID = await createPendingTransaction(ordersData, totalBayar, true);
+      window.location.href = 'payment/?trx=' + encodeURIComponent(trxID);
+    } catch (err) {
+      console.error('❌ createPendingTransaction:', err);
+      checkBalanceAndToggleButtons();
+      alert('Gagal membuat transaksi: ' + (err.message || err));
+    }
   }
 
   // ===== SEARCH =====
