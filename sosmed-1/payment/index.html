@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="id">
 <head>
@@ -358,9 +357,6 @@ function applyMaintenanceGate() {
   } else {
     overlay.classList.remove('show');
     const card = document.getElementById('qrisCard');
-    if (card && !document.getElementById('bannedContainer')?.style.display || document.getElementById('bannedContainer')?.style.display === 'none') {
-      // only restore if not banned
-    }
     if (card) {
       const ban = document.getElementById('bannedContainer');
       if (!ban || ban.style.display === 'none') card.style.display = '';
@@ -442,10 +438,11 @@ function normalizeTotal(amount) {
   return Math.ceil(n);
 }
 
+// ⭐ Dari URL hanya ambil ID transaksi. Sisanya (orders, total, mass) dari Supabase.
 const p = new URLSearchParams(location.search);
 let trx = p.get("trx") || "-";
-let total = normalizeTotal(p.get("total") || 0);
-let isMass = p.get("mass") === "1";
+let total = 0;        // diisi dari Supabase (pending_transactions.total)
+let isMass = false;   // diisi dari Supabase (pending_transactions.is_mass)
 let ordersData = [];
 
 let paymentMethod = 'qris';
@@ -453,64 +450,61 @@ let userBalance = 0;
 let userEmail = null;
 let userProfileId = null;
 
-function getUrlParamsKey(trxId) { return `url_params_${trxId}`; }
+// Variabel total (dideklarasikan di atas agar bisa di-set oleh loader)
+let originalTotal = total;
+let finalTotal = total;
 
-function saveUrlParams() {
+// 🚀 AMBIL TRANSAKSI DARI SUPABASE DENGAN ID TRX
+// 1) pending_transactions (valid 10 menit, dijaga RLS)
+// 2) cadangan: orders_detail (transaksi yang sudah dibayar)
+async function loadOrdersFromSupabase() {
+  if (!trx || trx === "-" || !supabaseClient) return [];
   try {
-    if (!trx || trx === "-") return;
-    const data = { trx, total, isMass, orders: ordersData, savedAt: new Date().toISOString() };
-    localStorage.setItem(getUrlParamsKey(trx), JSON.stringify(data));
-    localStorage.setItem('last_trx', trx);
-  } catch (e) { console.warn('Gagal simpan URL params:', e); }
-}
+    const { data, error } = await supabaseClient
+      .from('pending_transactions')
+      .select('orders, total, is_mass')
+      .eq('trx_id', trx)
+      .maybeSingle();
 
-function loadUrlParams() {
-  try {
-    const ordersParam = p.get("orders");
-    if (ordersParam && trx !== "-") {
-      ordersData = JSON.parse(decodeURIComponent(ordersParam));
-      saveUrlParams();
-      return true;
+    if (!error && data) {
+      total = normalizeTotal(data.total);
+      isMass = !!data.is_mass;
+      originalTotal = total;
+      finalTotal = total;
+      return Array.isArray(data.orders) ? data.orders : [];
     }
-    if (trx === "-" || !p.get("trx")) {
-      const storedTrx = localStorage.getItem('last_trx');
-      if (storedTrx) {
-        const key = getUrlParamsKey(storedTrx);
-        const stored = localStorage.getItem(key);
-        if (stored) {
-          const data = JSON.parse(stored);
-          trx = data.trx;
-          total = normalizeTotal(data.total);
-          isMass = data.isMass;
-          ordersData = data.orders || [];
-          try {
-            const newUrl = new URL(window.location.href);
-            newUrl.searchParams.set('trx', trx);
-            newUrl.searchParams.set('total', total);
-            if (isMass) newUrl.searchParams.set('mass', '1');
-            if (ordersData.length > 0) newUrl.searchParams.set('orders', encodeURIComponent(JSON.stringify(ordersData)));
-            window.history.replaceState({}, '', newUrl.toString());
-          } catch(e) {}
-          return true;
-        }
-      }
-    } else if (trx !== "-" && !ordersParam) {
-      const stored = localStorage.getItem(getUrlParamsKey(trx));
-      if (stored) {
-        const data = JSON.parse(stored);
-        ordersData = data.orders || [];
-      }
-    }
-  } catch (e) { console.warn('Gagal load URL params:', e); }
-  return false;
-}
 
-if (trx && trx !== "-") localStorage.setItem('last_trx', trx);
-loadUrlParams();
+    const { data: paid, error: paidErr } = await supabaseClient
+      .from('orders_detail')
+      .select('*')
+      .eq('trx_id', trx);
+
+    if (!paidErr && paid && paid.length > 0) {
+      total = normalizeTotal(paid.reduce((s, o) => s + (Number(o.total_payment) || 0), 0));
+      isMass = paid.length > 1;
+      originalTotal = total;
+      finalTotal = total;
+      return paid.map(o => ({
+        serviceId: o.service_id,
+        serviceName: o.service_name,
+        kategori: o.sosmed_type,
+        jumlah: o.quantity,
+        target: o.target,
+        total: o.total_payment,
+        comment: o.comment
+      }));
+    }
+
+    console.warn('⚠️ Transaksi tidak ditemukan / sudah kedaluwarsa:', error?.message || paidErr?.message || 'data kosong');
+  } catch (err) {
+    console.error('❌ loadOrdersFromSupabase error:', err);
+  }
+  return [];
+}
 
 async function checkUrlParamsAndAutoRefund() {
-  if (!trx || trx === '-' || !ordersData || ordersData.length === 0) {
-    console.warn('⚠️ URL params kosong atau tidak valid:', { trx, ordersCount: ordersData.length });
+  if (!trx || trx === '-' || !ordersData || ordersData.length === 0 || total <= 0) {
+    console.warn('⚠️ Data transaksi dari Supabase tidak valid:', { trx, ordersCount: ordersData.length, total });
     IS_URL_PARAMS_INVALID = true;
     
     await Swal.fire({
@@ -519,7 +513,7 @@ async function checkUrlParamsAndAutoRefund() {
         <div style="text-align:center;color:#ddd;font-size:14px;line-height:1.7;">
           <div style="font-size:60px;margin-bottom:12px;">🔗</div>
           <p style="font-size:16px;font-weight:700;color:#fff;margin-bottom:12px;">
-            URL Params Kosong atau Tidak Valid!
+            Data Transaksi Tidak Ditemukan!
           </p>
           <div style="background:rgba(239,68,68,0.1);padding:14px;border-radius:12px;border-left:3px solid #ef4444;text-align:left;margin-bottom:16px;">
             <div style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">📌 Yang terdeteksi:</div>
@@ -617,8 +611,6 @@ async function fetchConfigFromEnv() {
 
 const QIOSPAY_MUTASI_URL = () => `https://qiospay.id/api/mutasi/qris/${MERCHANT_CODE}/${QIOSPAY_API_KEY}`;
 
-let originalTotal = total;
-let finalTotal = total;
 let appliedVoucher = null;
 let appliedDiscount = 0;
 let uniqueCode = 0;
@@ -769,16 +761,6 @@ function checkGmailAndRedirect() {
 
 async function saveAllOrdersDetailToDB(method) {
   if (!supabaseClient || !userProfileId) return false;
-  if ((!ordersData || ordersData.length === 0) && trx && trx !== '-') {
-    try {
-      const urlOrders = new URLSearchParams(location.search).get('orders');
-      if (urlOrders) ordersData = JSON.parse(decodeURIComponent(urlOrders));
-      else {
-        const stored = localStorage.getItem(`url_params_${trx}`);
-        if (stored) { const data = JSON.parse(stored); ordersData = data.orders || []; }
-      }
-    } catch(e) {}
-  }
   if (!ordersData || ordersData.length === 0) return false;
   try {
     const gmail = getStoredGmail();
@@ -824,7 +806,7 @@ async function updateOrderStatusInDB(order, status, providerOrderId, failReason)
 }
 
 // ============================================================
-// 🆕 RECORD MUTASI SALDO untuk pembelian dengan saldo
+// RECORD MUTASI SALDO untuk pembelian dengan saldo
 //    Referensi = OrderID dari provider (BUKAN TRX)
 // ============================================================
 async function recordPurchaseMutation(amount, reason, oldBalance, newBalance, orderIds) {
@@ -1044,7 +1026,7 @@ function selectPaymentMethod(method) {
 }
 
 // ============================================================
-// 🆕 payWithBalance: Mutasi purchase pakai OrderID provider
+// payWithBalance: Mutasi purchase pakai OrderID provider
 // ============================================================
 async function payWithBalance() {
   if (IS_GMAIL_BLOCKED || IS_URL_PARAMS_INVALID) return;
@@ -1147,7 +1129,7 @@ async function payWithBalance() {
       orderIdsFromProvider = loadOrderIds();
     }
     
-    // 3️⃣ 🆕 CATAT MUTASI PURCHASE pakai OrderID PROVIDER
+    // 3️⃣ CATAT MUTASI PURCHASE pakai OrderID PROVIDER
     if (orderIdsFromProvider.length > 0) {
       const orderIdsStr = orderIdsFromProvider.join(', ');
       await recordPurchaseMutation(
@@ -2059,95 +2041,15 @@ window.showRefundHistory = showRefundHistory;
 
 (async function() {
   try { await initMaintenanceGate(); } catch (e) { console.warn("maint", e); }
+
+  await fetchConfigFromEnv();
+  configLoaded = true;
+
+  // 🚀 AMBIL DATA TRANSAKSI (orders, total, mass) DARI SUPABASE DENGAN ID TRX
+  ordersData = await loadOrdersFromSupabase();
+
   const paramsValid = await checkUrlParamsAndAutoRefund();
   if (!paramsValid) return;
   
-  await fetchConfigFromEnv();
-  configLoaded = true;
-  
   const gmailValid = checkGmailAndRedirect();
-  if (!gmailValid) return;
-  
-  const isBanned = await checkAndHandleBan();
-  if (isBanned) return;
-  
-  await loadUserBalance();
-  
-  const gmailNow = getStoredGmail();
-  if (!gmailNow || !validateEmail(gmailNow)) {
-    checkGmailAndRedirect();
-    return;
-  }
-  
-  const savedState = getPaymentState();
-  if (savedState && savedState.verified === true && savedState.verifiedAt) {
-    const verifiedAt = new Date(savedState.verifiedAt).getTime();
-    if ((Date.now() - verifiedAt) / 1000 / 60 < 60) {
-      isPaymentVerified = true; transactionLocked = true;
-      if (savedState.method === 'balance') {
-        paymentMethod = 'balance';
-        document.getElementById('btnMethodQris').classList.remove('active', 'qris');
-        document.getElementById('btnMethodSaldo').classList.add('active', 'saldo');
-        document.getElementById('qrisSection').classList.add('hide');
-        document.getElementById('saldoInfo').classList.add('show');
-        document.getElementById('btnPaySaldo').disabled = true;
-        document.getElementById('btnPaySaldo').innerHTML = '✅ Sudah Dibayar';
-      } else {
-        document.getElementById('confirmBtn').disabled = true;
-        document.getElementById('confirmBtn').textContent = '✅ Pembayaran Terverifikasi';
-      }
-      document.getElementById('paymentStatus').className = 'payment-status success';
-      document.getElementById('paymentStatus').textContent = '✅ Pembayaran sudah terverifikasi!';
-      document.getElementById('paymentStatus').style.display = 'block';
-      if (savedState.orderSent === false && ordersData.length > 0) {
-        await sendOrdersToLollipop();
-        savedState.orderSent = true;
-        savePaymentState(savedState);
-      }
-      displayStoredOrderIds();
-      return;
-    } else { clearPaymentState(); }
-  }
-  
-  if (checkTransactionLockLocal()) {
-    transactionLocked = true; isPaymentVerified = true;
-    document.getElementById('confirmBtn').disabled = true;
-    document.getElementById('confirmBtn').textContent = '✅ Transaksi Sudah Dikonfirmasi';
-    document.getElementById('paymentStatus').className = 'payment-status success';
-    document.getElementById('paymentStatus').textContent = '✅ Pembayaran sudah terverifikasi!';
-    document.getElementById('paymentStatus').style.display = 'block';
-    displayStoredOrderIds();
-    return;
-  }
-  
-  updateDisplay();
-  displayStoredOrderIds();
-  startQrisTimer();
-  
-  setTimeout(() => {
-    if (paymentMethod === 'qris') {
-      checkPaymentStatus();
-      verificationInterval = setInterval(checkPaymentStatus, 10000);
-    }
-  }, 3000);
-  
-  window.addEventListener('beforeunload', function() {
-    if (isPaymentVerified) {
-      savePaymentState({ verified: true, orderSent: isOrderAlreadySent(), verifiedAt: new Date().toISOString(), method: paymentMethod });
-    }
-  });
-})();
-
-document.addEventListener("keydown", function(e){
-  if(e.key === "F12") e.preventDefault();
-  if(e.ctrlKey && e.shiftKey && ["I","J"].includes(e.key)) e.preventDefault();
-  if(e.ctrlKey && e.key === "u") e.preventDefault();
-});
-
-console.log(`💳 Payment ${SOSMED_TYPE} ready!`);
-console.log(`📦 Orders: ${ordersData.length} items`);
-console.log(`💰 Mutasi purchase reference: ORDER ID PROVIDER`);
-console.log(`🔄 Auto-refund on provider failure: enabled`);
-</script>
-</body>
-</html>
+  if (!gm
