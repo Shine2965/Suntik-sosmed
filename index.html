@@ -864,6 +864,16 @@ body.chat-open .cs-bubble-container{display:none !important}
 .auth-stat-card.count .as-value{color:#a78bfa}
 .auth-stat-card .as-value{font-size:14px}
 @media(max-width:360px){.auth-stats{grid-template-columns:1fr;}.auth-stat-card .as-value{font-size:16px}}
+
+.owner-profit-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.owner-profit-card{background:linear-gradient(135deg,rgba(34,197,94,0.12),rgba(250,204,21,0.06));border:1.5px solid rgba(34,197,94,0.35);border-radius:14px;padding:14px 12px;text-align:center}
+.owner-profit-card.month{background:linear-gradient(135deg,rgba(0,198,255,0.12),rgba(139,92,246,0.08));border-color:rgba(0,198,255,0.35)}
+.owner-profit-card .op-label{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;margin-bottom:4px}
+.owner-profit-card .op-value{font-size:18px;font-weight:900;color:#22c55e;font-family:'Poppins',sans-serif;line-height:1.2}
+.owner-profit-card.month .op-value{color:#00c6ff}
+.owner-profit-card .op-sub{font-size:10px;color:#94a3b8;margin-top:6px}
+.owner-profit-card .op-orders{color:#facc15;font-weight:700}
+@media(max-width:360px){.owner-profit-grid{grid-template-columns:1fr}}
 .auth-stats-note{font-size:11.5px;color:#cbd5e1;text-align:center;margin-top:10px;line-height:1.5;padding:8px 10px;background:rgba(255,255,255,0.04);border-radius:10px;border:1px solid rgba(255,255,255,0.06)}@keyframes authLivePulse{0%,100%{opacity:1}50%{opacity:0.45}}.auth-stats-note span{animation:authLivePulse 1.6s ease-in-out infinite}
 
 
@@ -1081,6 +1091,26 @@ body.chat-open .cs-bubble-container{display:none !important}
           <div class="stat-card"><div class="stat-num" id="statTotalMessages">-</div><div class="stat-label">Pesan</div></div>
           <div class="stat-card"><div class="stat-num" id="statTotalMuted">-</div><div class="stat-label">Di-mute</div></div>
           <div class="stat-card"><div class="stat-num" id="statTotalPinned">-</div><div class="stat-label">Pinned</div></div>
+        </div>
+
+        <div id="ownerProfitSection" style="display:none;">
+          <div class="section-title" style="margin-top:6px;">📈 Keuntungan Toko<div class="line"></div></div>
+          <div class="owner-profit-grid">
+            <div class="owner-profit-card">
+              <div class="op-label">🌅 Hari Ini (WIB)</div>
+              <div class="op-value" id="ownerProfitToday">Rp 0</div>
+              <div class="op-sub"><span class="op-orders" id="ownerOrdersToday">0</span> order sukses</div>
+            </div>
+            <div class="owner-profit-card month">
+              <div class="op-label">📅 Bulan Ini (WIB)</div>
+              <div class="op-value" id="ownerProfitMonth">Rp 0</div>
+              <div class="op-sub"><span class="op-orders" id="ownerOrdersMonth">0</span> order sukses</div>
+            </div>
+          </div>
+          <div style="font-size:10px;color:#94a3b8;text-align:center;margin:-6px 0 12px;line-height:1.4;">
+            Total pembayaran user (order success/completed/partial). Dihitung dari <b>orders_detail</b>.
+            <button type="button" onclick="loadOwnerProfitStats()" style="display:inline-block;margin-left:6px;background:rgba(34,197,94,0.15);border:1px solid rgba(34,197,94,0.4);color:#22c55e;border-radius:8px;padding:2px 8px;font-size:10px;font-weight:800;cursor:pointer;">🔄 Refresh</button>
+          </div>
         </div>
 
         <div class="section-title" style="margin-top:14px;">👥 Kelola Member<div class="line"></div></div>
@@ -3602,7 +3632,7 @@ async function updateAuthUI(user) {
       document.getElementById('adminIcon').textContent = role === 'owner' ? '👑' : '🛡️';
       loadChatStats();
       loadPendingRefunds();
-      if (isOwner) { loadOwnerWithdrawals(); setTimeout(loadAdminMissions, 1500); setTimeout(loadBannedPublicList, 600); }
+      if (isOwner) { loadOwnerWithdrawals(); setTimeout(loadAdminMissions, 1500); setTimeout(loadBannedPublicList, 600); setTimeout(loadOwnerProfitStats, 400); }
     // notif ban/mute ke SEMUA user online
     setTimeout(initModerationRealtime, 700); setTimeout(initChatMuteRealtime, 900); try { startDeletedAccountWatcher(); } catch (e) {}
       startMemberRealtime();
@@ -3850,6 +3880,99 @@ async function getDepositStatusFromDB(depositId) {
 // ============================================================
 // TRANSFER SALDO ANTAR USER
 // ============================================================
+
+function wibDayBounds() {
+  // WIB = UTC+7
+  const now = new Date();
+  const wibMs = now.getTime() + (7 * 60 * 60 * 1000);
+  const wib = new Date(wibMs);
+  const y = wib.getUTCFullYear();
+  const m = wib.getUTCMonth();
+  const d = wib.getUTCDate();
+  // start of day WIB as UTC ISO
+  const startToday = new Date(Date.UTC(y, m, d, 0, 0, 0) - 7 * 3600 * 1000);
+  const startTomorrow = new Date(startToday.getTime() + 24 * 3600 * 1000);
+  const startMonth = new Date(Date.UTC(y, m, 1, 0, 0, 0) - 7 * 3600 * 1000);
+  const startNextMonth = (m === 11)
+    ? new Date(Date.UTC(y + 1, 0, 1, 0, 0, 0) - 7 * 3600 * 1000)
+    : new Date(Date.UTC(y, m + 1, 1, 0, 0, 0) - 7 * 3600 * 1000);
+  return {
+    startToday: startToday.toISOString(),
+    endToday: startTomorrow.toISOString(),
+    startMonth: startMonth.toISOString(),
+    endMonth: startNextMonth.toISOString()
+  };
+}
+
+async function loadOwnerProfitStats() {
+  const sec = document.getElementById('ownerProfitSection');
+  if (!sec) return;
+  if (!isOwner) {
+    sec.style.display = 'none';
+    return;
+  }
+  sec.style.display = 'block';
+  const elToday = document.getElementById('ownerProfitToday');
+  const elMonth = document.getElementById('ownerProfitMonth');
+  const elOT = document.getElementById('ownerOrdersToday');
+  const elOM = document.getElementById('ownerOrdersMonth');
+  if (elToday) elToday.textContent = '…';
+  if (elMonth) elMonth.textContent = '…';
+
+  try {
+    // Prefer RPC (aman + akurat)
+    try {
+      const { data, error } = await supabaseClient.rpc('owner_profit_stats');
+      if (!error && data && data.success !== false) {
+        const t = Number(data.today_total || 0);
+        const m = Number(data.month_total || 0);
+        if (elToday) elToday.textContent = 'Rp ' + t.toLocaleString('id-ID');
+        if (elMonth) elMonth.textContent = 'Rp ' + m.toLocaleString('id-ID');
+        if (elOT) elOT.textContent = String(data.today_count || 0);
+        if (elOM) elOM.textContent = String(data.month_count || 0);
+        return;
+      }
+    } catch (e) { console.warn('owner_profit_stats rpc', e.message); }
+
+    const b = wibDayBounds();
+    const okStatus = ['success', 'completed', 'partial'];
+
+    async function sumRange(startIso, endIso) {
+      let total = 0, count = 0;
+      const { data, error } = await supabaseClient
+        .from('orders_detail')
+        .select('total_payment, order_status, created_at')
+        .gte('created_at', startIso)
+        .lt('created_at', endIso)
+        .in('order_status', okStatus)
+        .limit(10000);
+      if (error) throw error;
+      (data || []).forEach(r => {
+        const v = parseFloat(r.total_payment);
+        if (!isNaN(v) && v > 0) {
+          total += v;
+          count += 1;
+        }
+      });
+      return { total: Math.floor(total), count };
+    }
+
+    const [today, month] = await Promise.all([
+      sumRange(b.startToday, b.endToday),
+      sumRange(b.startMonth, b.endMonth)
+    ]);
+    if (elToday) elToday.textContent = 'Rp ' + today.total.toLocaleString('id-ID');
+    if (elMonth) elMonth.textContent = 'Rp ' + month.total.toLocaleString('id-ID');
+    if (elOT) elOT.textContent = String(today.count);
+    if (elOM) elOM.textContent = String(month.count);
+  } catch (err) {
+    console.warn('loadOwnerProfitStats', err.message);
+    if (elToday) elToday.textContent = 'Error';
+    if (elMonth) elMonth.textContent = 'Error';
+  }
+}
+window.loadOwnerProfitStats = loadOwnerProfitStats;
+
 async function openTransferDialog() {
   if (!currentUser || !currentProfile) {
     Swal.fire({ title: '🔒 Login Dulu', icon: 'warning', confirmButtonColor: '#ff6b9d', background: '#1a0e2e', color: '#fff' });
