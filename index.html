@@ -4929,62 +4929,39 @@ async function trackUserIpAndSecurity() {
 }
 
 async function forceCreditDepositToSupabase(deposit, mutasiMeta) {
+  // Client TIDAK boleh kredit via RPC langsung.
+  // Semua kredit lewat /api/complete-deposit (server cek mutasi Qiospay + service_role).
   const depositId = deposit && deposit.id;
   if (!depositId) return { ok: false, message: 'Data deposit tidak lengkap' };
-
-  // Selalu ambil ulang dari DB — jangan percaya object client/local saja
-  let row = null;
   try {
-    const { data, error } = await supabaseClient.from('deposits')
-      .select('id, user_id, email, amount, unique_code, total_amount, status, balance_credited, mutasi_verified')
-      .eq('id', depositId)
-      .maybeSingle();
-    if (error) return { ok: false, message: error.message };
-    row = data;
-  } catch (e) {
-    return { ok: false, message: e.message || String(e) };
-  }
-  if (!row) return { ok: false, message: 'Deposit tidak ditemukan di server' };
+    const { data: sess } = await supabaseClient.auth.getSession();
+    const token = sess?.session?.access_token;
+    if (!token) return { ok: false, message: 'Sesi login tidak valid' };
 
-  // Hanya pemilik deposit (atau staff lewat RPC)
-  const uid = currentUser?.id;
-  if (uid && row.user_id && row.user_id !== uid) {
-    return { ok: false, message: 'Deposit bukan milik akun ini' };
-  }
-
-  if (row.balance_credited === true || row.status === 'success') {
-    return { ok: true, via: 'already_credited', newBalance: null, already: true };
-  }
-
-  const amount = Math.floor(Number(row.amount) || 0);
-  const expectedTotal = Math.floor(Number(row.total_amount) || (amount + Math.floor(Number(row.unique_code) || 0)));
-  if (amount < 1 || expectedTotal < 1) {
-    return { ok: false, message: 'Nominal deposit invalid di server' };
-  }
-
-  // Mutasi WAJIB dari hasil cek Qiospay (bukan tebakan client)
-  if (!mutasiMeta || mutasiMeta.amount == null) {
-    return { ok: false, message: 'Mutasi Qiospay belum terverifikasi (tidak boleh kredit manual)' };
-  }
-  const mutasiAmount = Math.floor(Number(mutasiMeta.amount));
-  if (mutasiAmount !== expectedTotal && mutasiAmount !== amount) {
-    return { ok: false, message: 'Nominal mutasi tidak cocok dengan deposit server' };
-  }
-  const mutasiRef = mutasiMeta.refid || mutasiMeta.ref || mutasiMeta.id || null;
-
-  try {
-    const { data, error } = await supabaseClient.rpc('complete_deposit_with_mutasi', {
-      p_deposit_id: depositId,
-      p_mutasi_amount: mutasiAmount,
-      p_mutasi_ref: mutasiRef ? String(mutasiRef) : null
+    const r = await fetch('/api/complete-deposit', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer ' + token
+      },
+      body: JSON.stringify({ deposit_id: depositId })
     });
-    if (error) return { ok: false, message: error.message };
-    if (data && data.success === false) return { ok: false, message: data.message || 'ditolak server' };
-    return { ok: true, via: 'complete_deposit_with_mutasi', newBalance: data?.new_balance, data };
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.success === false) {
+      return { ok: false, message: j.message || ('HTTP ' + r.status) };
+    }
+    return {
+      ok: true,
+      via: 'api/complete-deposit',
+      newBalance: j.new_balance,
+      already: !!j.already,
+      data: j
+    };
   } catch (e) {
     return { ok: false, message: e.message || String(e) };
   }
 }
+
 
 async function insertBalanceMutation({ userId, email, amount, uniqueCode, depositId, balanceAfter }) {
   const reason = 'Deposit QRIS sukses (unik: ' + (uniqueCode ?? '-') + ')';
@@ -5212,15 +5189,18 @@ async function handleDepositSuccess(opts) {
     }
     const credit = await forceCreditDepositToSupabase(dep, opts.mutasi);
     if (!credit.ok) {
-      // cek apakah saldo sudah naik dari proses lain
+      // Cek apakah server/callback sudah mengkredit
       let balNow = balBefore;
       try {
         if (typeof forceRefreshBalanceFromDB === 'function') balNow = parseFloat(await forceRefreshBalanceFromDB()) || balBefore;
       } catch (_) {}
-      if (balNow >= balBefore + depositAmount - 0.5) {
-        await markDepositDone(depositId);
+      const { data: dbCheck } = await supabaseClient.from('deposits')
+        .select('status, balance_credited').eq('id', depositId).maybeSingle();
+      if ((dbCheck && (dbCheck.status === 'success' || dbCheck.balance_credited)) ||
+          balNow >= balBefore + depositAmount - 0.5) {
+        // sudah dikredit server
       } else {
-        throw new Error(credit.message || 'Gagal menambah saldo di database. Cek RLS profiles / jalankan SQL complete_deposit.');
+        throw new Error(credit.message || 'Gagal verifikasi mutasi di server. Tunggu beberapa detik lalu Cek Status.');
       }
     }
 
