@@ -7,6 +7,7 @@
 <link rel="icon" href="/home/logo.png" type="image/png">
 <meta name="theme-color" content="#1a0e2e">
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700;800;900&family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="/home/shine-security.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
@@ -1221,17 +1222,6 @@ body.chat-open .cs-bubble-container{display:none !important}
           </div>
         </div>
 
-        <div class="section-title" style="margin-top:14px;">🔐 Password Manager<div class="line"></div></div>
-        <div class="password-manager">
-          <button class="password-toggle" onclick="togglePasswordManager()"><span style="font-size:18px;">🔐</span><span style="flex:1;">Password Manager</span><span class="pt-badge" id="passwordBadge">🔒</span><span class="pt-arrow">▼</span></button>
-          <div class="password-content" id="passwordContent">
-            <div class="password-warning"><span style="font-size:14px;">⚠️</span><span>Data sensitif! <b>Jangan disalahgunakan.</b></span></div>
-            <div class="password-search-wrap"><span style="font-size:14px;color:#b39ddb;">🔍</span><input type="text" id="passwordSearchInput" class="password-search-input" placeholder="Cari email..." oninput="filterPasswordList(this.value)"><button id="passwordSearchClear" onclick="clearPasswordSearch()" style="display:none;background:rgba(255,80,80,0.2);border:none;color:#ff8080;width:20px;height:20px;border-radius:50%;font-size:10px;cursor:pointer;">✕</button></div>
-            <div id="passwordList" class="password-list"><div class="loading-box"><span class="spinner"></span><br>Klik untuk memuat...</div></div>
-            <button class="auth-submit" style="background:linear-gradient(135deg,#00c6ff,#0072ff);margin:10px 14px;padding:10px;font-size:11.5px;width:calc(100% - 28px);" onclick="loadAllPasswords()">🔄 Refresh</button>
-          </div>
-        </div>
-
         <div class="section-title" style="margin-top:14px;">💰 Refund Pending<div class="line"></div></div>
         <div id="refundPendingContainer" style="margin-bottom:12px;"><div class="loading-box"><span class="spinner"></span><br>Memuat...</div></div>
         <button class="auth-submit" style="background:linear-gradient(135deg,#facc15,#f59e0b);color:#1a0e2e;margin-bottom:16px;padding:10px;font-size:12px;" onclick="loadPendingRefunds()">🔄 Refresh Refund</button>
@@ -1753,7 +1743,7 @@ function shortChatPreview(str, maxLen) {
   return clean.length > n ? clean.substring(0, n) + '…' : clean;
 }
 
-function escapeAttr(str) { if (!str) return ''; return String(str).replace(/'/g, "\\'").replace(/"/g, '&quot;'); }
+function escapeAttr(str) { if (str === null || str === undefined) return ''; return String(str).replace(/[^A-Za-z0-9@._\-]/g, function (c) { var h = c.charCodeAt(0); return h < 256 ? '\\x' + ('0' + h.toString(16)).slice(-2) : '\\u' + ('000' + h.toString(16)).slice(-4); }); }
 function scrollChatToBottom(containerId) { const body = document.getElementById(containerId); if (!body) return; setTimeout(() => { body.scrollTop = body.scrollHeight; }, 50); }
 function formatBannedCountdown(bannedUntil) {
   if (!bannedUntil) return 'PERMANEN';
@@ -2147,26 +2137,13 @@ async function processAutoRefund(order, newStatus) {
       throw new Error('Insert refund: ' + insertErr.message);
     }
 
-    const { data: rpcData, error: rpcError } = await supabaseClient.rpc('auto_refund_on_failure', {
-      p_user_id: finalUserId,
-      p_amount: refundAmount,
-      p_trx_id: String(refundKeyId),
-      p_reason: refundReason
-    });
-    if (rpcError) throw new Error('RPC: ' + rpcError.message);
-    if (!rpcData || !rpcData.success) throw new Error(rpcData?.message || 'RPC failed');
-
-    await supabaseClient.from('refunds').update({
-      status: 'success',
-      approved_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    }).eq('id', insertData.id);
+    /* kredit refund hanya lewat approve_refund (admin) / server */
 
     autoRefundProcessedSet.add(refundKey);
     try { localStorage.setItem('refund_done_' + refundKey, '1'); } catch (e) {}
 
     const Toast = Swal.mixin({ toast: true, position: 'top', showConfirmButton: false, timer: 6000, timerProgressBar: true, background: '#1a0e2e', color: '#fff' });
-    Toast.fire({ icon: 'success', title: `💰 Auto-Refund ${newStatus.toUpperCase()}`, html: `<div style="font-size:11.5px;color:#64ffc8;">OrderID: ${refundKeyId}<br>User: ${order.email||'-'}<br>Gmail/Akun: ${order.gmail_target||order.gmail||'-'}<br>Target: ${order.target||'-'}<br>Rp ${refundAmount.toLocaleString('id-ID')}</div>` });
+    Toast.fire({ icon: 'success', title: `💰 Refund diajukan ${newStatus.toUpperCase()} (menunggu admin)`, html: `<div style="font-size:11.5px;color:#64ffc8;">OrderID: ${refundKeyId}<br>User: ${order.email||'-'}<br>Gmail/Akun: ${order.gmail_target||order.gmail||'-'}<br>Target: ${order.target||'-'}<br>Rp ${refundAmount.toLocaleString('id-ID')}</div>` });
 
     if (order.email === currentUser?.email) setTimeout(() => refreshBalance(), 800);
     if (document.getElementById('mutasiManagerUser')?.classList.contains('open')) setTimeout(() => loadMutasiUser(), 500);
@@ -3011,7 +2988,7 @@ async function verifyTurnstileToken(token) {
     return !!(j && j.success);
   } catch (_) {
     // jika API belum deploy, jangan buka pintu lebar — tetap minta token non-empty
-    return !!token && token.length > 20;
+    return false;
   }
 }
 
@@ -3059,7 +3036,7 @@ async function handleLogin(event) {
     processGmailUpdate(data.user.email);
     try { trackUserIpAndSecurity(); } catch(_){}
     const chatLoginOk = await loginToChatProject(email, password);
-    if (chatLoginOk) try { localStorage.setItem('chat_auth_email', email); localStorage.setItem('chat_auth_password', password); } catch(e) {}
+    /* password tidak disimpan di browser */
     await Swal.fire({ title: '✅ Login Berhasil!', html: `Selamat datang, <b>${data.user.email}</b> 🌸`, icon: 'success', confirmButtonColor: '#ff6b9d', background: '#1a0e2e', color: '#fff', timer: 1800, timerProgressBar: true, showConfirmButton: false });
     document.getElementById('formLogin').reset();
   } catch (err) {
@@ -3083,7 +3060,7 @@ async function handleSignup(event) {
   const passwordConfirm = document.getElementById('signupPasswordConfirm').value;
   // Hanya @gmail.com murni (bukan googlemail, bukan subdomain)
   const emailNorm = email.toLowerCase().trim();
-  if (!/^[^@\s]+@gmail\.com$/.test(emailNorm)) {
+  if (!/^[a-z0-9._+\-]{1,64}@gmail\.com$/.test(emailNorm)) {
     Swal.fire({
       title: 'Email tidak diizinkan',
       text: 'Pendaftaran hanya dengan alamat @gmail.com (contoh: nama@gmail.com).',
@@ -3166,7 +3143,7 @@ async function handleSignup(event) {
       btn.disabled = false; btn.innerHTML = '✨ Buat Akun';
       return;
     }
-    try { if (data.user) await supabaseClient.rpc('save_user_password', { p_user_id: data.user.id, p_email: email, p_password: password }); } catch(e) {}
+    /* password plaintext tidak disimpan */
     if (validReferral && data.user) {
       try {
         const { data: refRes, error: refErr } = await supabaseClient.rpc('apply_referral_on_signup', {
@@ -3179,7 +3156,7 @@ async function handleSignup(event) {
       } catch(e) { console.warn('⚠️ Apply referral exception:', e.message); }
     }
     const chatLoginOk = await loginToChatProject(email, password);
-    if (chatLoginOk) try { localStorage.setItem('chat_auth_email', email); localStorage.setItem('chat_auth_password', password); } catch(e) {}
+    /* password tidak disimpan di browser */
     await Swal.fire({ title: '🎉 Akun Dibuat!', html: `Selamat bergabung,<br><b>${email}</b> 🌸${validReferral ? `<br><small style="color:#b388ff;">🎁 Kode referral: ${validReferral}</small>` : ''}`, icon: 'success', confirmButtonColor: '#ff6b9d', background: '#1a0e2e', color: '#fff', timer: 2200, timerProgressBar: true, showConfirmButton: false });
     if (data.session && data.user) processGmailUpdate(data.user.email);
     document.getElementById('formSignup').reset();
@@ -5036,10 +5013,10 @@ async function forceCreditDepositToSupabase(deposit, mutasiMeta) {
     }
 
     // 2) server_complete_deposit + secret publik callback
-    ({ data, error } = await supabaseClient.rpc('server_complete_deposit', {
+    ({ data, error } = await supabaseClient.rpc('server_complete_deposit_DISABLED_CLIENT', {
       p_deposit_id: depositId,
       p_mutasi_amount: expected,
-      p_secret: 'Alvino11',
+      p_secret: '',
       p_mutasi_ref: mutasiRef ? String(mutasiRef) : null
     }));
     if (!error && data && data.success !== false) {
@@ -7592,7 +7569,7 @@ async function editBalancePrompt(email, currentBalance) {
   const emailSafe = escapeHtml(email);
   await Swal.fire({
     title: '💰 Ubah Saldo User',
-    html: `<div style="text-align:left;font-size:12.5px;color:#b39ddb;margin-bottom:14px;padding:12px;background:rgba(0,198,255,0.06);border-radius:10px;border-left:3px solid #00c6ff;"><b style="color:#00c6ff;">📧 User:</b> <span style="color:#f1e6f5;word-break:break-all;">${emailSafe}</span><br><b style="color:#00c6ff;">💰 Saldo:</b> <span style="color:${isCurrentMinus ? '#ff4444' : '#facc15'};font-weight:800;">${isCurrentMinus ? '-' : ''}Rp ${Math.abs(currentNum).toLocaleString('id-ID')}</span></div><div style="text-align:left;font-size:11.5px;color:#94a3b8;background:rgba(255,255,255,0.04);padding:10px;border-radius:10px;"><b style="color:#facc15;">💡 Pilih aksi:</b><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:10px;"><button onclick="handleBalanceAction('${emailSafe}', ${currentNum}, 'add')" style="padding:14px 8px;border-radius:12px;border:2px solid rgba(34,197,94,0.4);background:rgba(34,197,94,0.15);color:#22c55e;font-weight:800;font-size:12px;cursor:pointer;font-family:inherit;">➕ Tambah</button><button onclick="handleBalanceAction('${emailSafe}', ${currentNum}, 'sub')" style="padding:14px 8px;border-radius:12px;border:2px solid rgba(239,68,68,0.4);background:rgba(239,68,68,0.15);color:#ef4444;font-weight:800;font-size:12px;cursor:pointer;font-family:inherit;">➖ Kurang</button><button onclick="handleBalanceAction('${emailSafe}', ${currentNum}, 'set')" style="padding:14px 8px;border-radius:12px;border:2px solid rgba(250,204,21,0.4);background:rgba(250,204,21,0.15);color:#facc15;font-weight:800;font-size:12px;cursor:pointer;font-family:inherit;">✏️ Set</button></div></div>`,
+    html: `<div style="text-align:left;font-size:12.5px;color:#b39ddb;margin-bottom:14px;padding:12px;background:rgba(0,198,255,0.06);border-radius:10px;border-left:3px solid #00c6ff;"><b style="color:#00c6ff;">📧 User:</b> <span style="color:#f1e6f5;word-break:break-all;">${emailSafe}</span><br><b style="color:#00c6ff;">💰 Saldo:</b> <span style="color:${isCurrentMinus ? '#ff4444' : '#facc15'};font-weight:800;">${isCurrentMinus ? '-' : ''}Rp ${Math.abs(currentNum).toLocaleString('id-ID')}</span></div><div style="text-align:left;font-size:11.5px;color:#94a3b8;background:rgba(255,255,255,0.04);padding:10px;border-radius:10px;"><b style="color:#facc15;">💡 Pilih aksi:</b><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:10px;"><button onclick="handleBalanceAction('${escapeAttr(email)}', ${currentNum}, 'add')" style="padding:14px 8px;border-radius:12px;border:2px solid rgba(34,197,94,0.4);background:rgba(34,197,94,0.15);color:#22c55e;font-weight:800;font-size:12px;cursor:pointer;font-family:inherit;">➕ Tambah</button><button onclick="handleBalanceAction('${escapeAttr(email)}', ${currentNum}, 'sub')" style="padding:14px 8px;border-radius:12px;border:2px solid rgba(239,68,68,0.4);background:rgba(239,68,68,0.15);color:#ef4444;font-weight:800;font-size:12px;cursor:pointer;font-family:inherit;">➖ Kurang</button><button onclick="handleBalanceAction('${escapeAttr(email)}', ${currentNum}, 'set')" style="padding:14px 8px;border-radius:12px;border:2px solid rgba(250,204,21,0.4);background:rgba(250,204,21,0.15);color:#facc15;font-weight:800;font-size:12px;cursor:pointer;font-family:inherit;">✏️ Set</button></div></div>`,
     showConfirmButton: false, showCancelButton: true, cancelButtonText: '❌ Tutup', cancelButtonColor: '#6b4a7a', background: '#1a0e2e', color: '#fff', width: 500
   });
 }
@@ -8559,7 +8536,7 @@ function renderSupportMessages(messages, containerId) {
     let content = '';
     if (parsed.imageUrl) {
       // jangan taruh data-URL panjang di atribut onclick (bisa putus di HTML)
-      const safeSrc = String(parsed.imageUrl).replace(/"/g, '&quot;');
+      const safeSrc = (window.SEC && window.SEC.safeImageUrl(parsed.imageUrl)) || '';
       content += `<img class="msg-image" src="${safeSrc}" alt="foto" loading="lazy" style="cursor:pointer" onclick="previewChatImage(this.src)">`;
     }
     if (parsed.text && parsed.text !== '📷 Foto' && parsed.text !== '📷 foto') {
