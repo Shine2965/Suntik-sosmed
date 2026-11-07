@@ -4949,8 +4949,7 @@ async function trackUserIpAndSecurity() {
 }
 
 async function forceCreditDepositToSupabase(deposit, mutasiMeta) {
-  // ANTI MUTASI PALSU: kredit HANYA lewat /api/complete-deposit (server + service_role JWT)
-  // Client tidak boleh RPC complete_deposit*
+  // HANYA /api/complete-deposit — server verifikasi mutasi + service_role JWT
   const depositId = deposit && deposit.id;
   if (!depositId) return { ok: false, message: 'Data deposit tidak lengkap' };
   try {
@@ -4968,12 +4967,24 @@ async function forceCreditDepositToSupabase(deposit, mutasiMeta) {
       body: JSON.stringify({ deposit_id: depositId }),
       cache: 'no-store'
     });
-    const j = await r.json().catch(() => ({}));
-    if (j && j.pending) {
+
+    const raw = await r.text();
+    let j = {};
+    try { j = JSON.parse(raw); } catch (_) {
+      return {
+        ok: false,
+        message: 'API tidak merespon JSON (HTTP ' + r.status + '). Deploy api/complete-deposit.js & cek ' + location.origin + '/api/deposit-health — body: ' + String(raw).slice(0, 120)
+      };
+    }
+
+    if (j.pending) {
       return { ok: false, pending: true, message: j.message || 'Menunggu mutasi Qiospay', expected: j.expected };
     }
     if (!r.ok || j.success === false) {
-      return { ok: false, message: j.message || ('HTTP ' + r.status) };
+      return {
+        ok: false,
+        message: (j.message || 'Gagal') + ' (HTTP ' + r.status + '). Cek ' + location.origin + '/api/deposit-health'
+      };
     }
     return {
       ok: true,
@@ -4983,7 +4994,10 @@ async function forceCreditDepositToSupabase(deposit, mutasiMeta) {
       data: j
     };
   } catch (e) {
-    return { ok: false, message: e.message || String(e) };
+    return {
+      ok: false,
+      message: 'Fetch gagal: ' + (e.message || e) + ' — buka ' + location.origin + '/api/deposit-health'
+    };
   }
 }
 
@@ -5304,7 +5318,7 @@ async function handleDepositSuccess(opts) {
       title: '❌ Gagal menambah saldo',
       html: `<div style="text-align:left;color:#ddd;font-size:13px;">
         <p>${typeof escapeHtml === 'function' ? escapeHtml(err.message) : (err.message || '')}</p>
-        <p style="margin-top:8px;font-size:11.5px;color:#facc15;">Server memverifikasi mutasi Qiospay. Pastikan Vercel punya <b>SUPABASE_SERVICE_ROLE_KEY</b> (JWT eyJ...). Bayar exact nominal+kode unik.</p>
+        <p style="margin-top:8px;font-size:11.5px;color:#facc15;">Bayar <b>exact</b> nominal + kode unik. Tunggu 10–30 detik lalu Cek Status. Pastikan SQL deposit-fix-simple sudah dijalankan.</p>
       </div>`,
       icon: 'error',
       confirmButtonColor: '#ff4444',
