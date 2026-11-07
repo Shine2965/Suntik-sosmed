@@ -3081,8 +3081,17 @@ async function handleSignup(event) {
   const email = document.getElementById('signupEmail').value.trim().toLowerCase();
   const password = document.getElementById('signupPassword').value;
   const passwordConfirm = document.getElementById('signupPasswordConfirm').value;
-  if (!email.endsWith('@gmail.com')) {
-    Swal.fire({ title: 'Email tidak diizinkan', text: 'Pendaftaran hanya dengan @gmail.com', icon: 'warning', background: '#1a0e2e', color: '#fff', confirmButtonColor: '#ff6b9d' });
+  // Hanya @gmail.com murni (bukan googlemail, bukan subdomain)
+  const emailNorm = email.toLowerCase().trim();
+  if (!/^[^@\s]+@gmail\.com$/.test(emailNorm)) {
+    Swal.fire({
+      title: 'Email tidak diizinkan',
+      text: 'Pendaftaran hanya dengan alamat @gmail.com (contoh: nama@gmail.com).',
+      icon: 'warning',
+      background: '#1a0e2e',
+      color: '#fff',
+      confirmButtonColor: '#ff6b9d'
+    });
     return;
   }
   const signupCaptcha = (document.getElementById('signupCaptchaToken') || {}).value || '';
@@ -3935,19 +3944,21 @@ async function loadOwnerProfitStats() {
     } catch (e) { console.warn('owner_profit_stats rpc', e.message); }
 
     const b = wibDayBounds();
-    const okStatus = ['success', 'completed', 'partial'];
+    const badStatus = ['failed', 'error', 'canceled', 'cancelled', 'refunded'];
 
     async function sumRange(startIso, endIso) {
       let total = 0, count = 0;
+      // Ambil semua order di rentang, filter di client (status DB bisa beda-beda)
       const { data, error } = await supabaseClient
         .from('orders_detail')
-        .select('total_payment, order_status, created_at')
+        .select('total_payment, order_status, status, created_at')
         .gte('created_at', startIso)
         .lt('created_at', endIso)
-        .in('order_status', okStatus)
         .limit(10000);
       if (error) throw error;
       (data || []).forEach(r => {
+        const st = String(r.order_status || r.status || '').toLowerCase();
+        if (badStatus.includes(st)) return;
         const v = parseFloat(r.total_payment);
         if (!isNaN(v) && v > 0) {
           total += v;
@@ -4428,6 +4439,15 @@ function startDepositPolling(targetAmount) {
     if (depositSuccessProcessed || isProcessingDeposit || !currentDeposit) return;
     // 1) Cek DB dulu (callback mungkin sudah sukses)
     if (await checkDbStatus()) return;
+
+    // 2) Langsung minta server verifikasi mutasi + kredit (lebih andal)
+    try {
+      const credit = await forceCreditDepositToSupabase(currentDeposit, null);
+      if (credit && credit.ok) {
+        await handleDepositSuccess({ alreadyPaid: true });
+        return;
+      }
+    } catch (_) {}
 
     try {
       const res = await fetch(`/api/mutasi?amount=${encodeURIComponent(targetAmount)}&t=${Date.now()}`, {
@@ -4929,14 +4949,15 @@ async function trackUserIpAndSecurity() {
 }
 
 async function forceCreditDepositToSupabase(deposit, mutasiMeta) {
-  // Client TIDAK boleh kredit via RPC langsung.
-  // Semua kredit lewat /api/complete-deposit (server cek mutasi Qiospay + service_role).
+  // Kredit HANYA lewat /api/complete-deposit (server verifikasi mutasi).
   const depositId = deposit && deposit.id;
   if (!depositId) return { ok: false, message: 'Data deposit tidak lengkap' };
   try {
+    // Refresh session agar token tidak expired
+    try { await supabaseClient.auth.refreshSession(); } catch (_) {}
     const { data: sess } = await supabaseClient.auth.getSession();
     const token = sess?.session?.access_token;
-    if (!token) return { ok: false, message: 'Sesi login tidak valid' };
+    if (!token) return { ok: false, message: 'Sesi login tidak valid — login ulang' };
 
     const r = await fetch('/api/complete-deposit', {
       method: 'POST',
@@ -4944,9 +4965,14 @@ async function forceCreditDepositToSupabase(deposit, mutasiMeta) {
         'Content-Type': 'application/json',
         Authorization: 'Bearer ' + token
       },
-      body: JSON.stringify({ deposit_id: depositId })
+      body: JSON.stringify({ deposit_id: depositId }),
+      cache: 'no-store'
     });
     const j = await r.json().catch(() => ({}));
+    // pending mutasi belum masuk = bukan error fatal
+    if (j && j.pending) {
+      return { ok: false, pending: true, message: j.message || 'Menunggu mutasi', expected: j.expected };
+    }
     if (!r.ok || j.success === false) {
       return { ok: false, message: j.message || ('HTTP ' + r.status) };
     }
@@ -5187,9 +5213,8 @@ async function handleDepositSuccess(opts) {
     if (!opts || !opts.mutasi || opts.mutasi.amount == null) {
       throw new Error('Mutasi Qiospay belum terdeteksi. Tidak dapat menambah saldo.');
     }
-    const credit = await forceCreditDepositToSupabase(dep, opts.mutasi);
+    const credit = await forceCreditDepositToSupabase(dep, opts && opts.mutasi);
     if (!credit.ok) {
-      // Cek apakah server/callback sudah mengkredit
       let balNow = balBefore;
       try {
         if (typeof forceRefreshBalanceFromDB === 'function') balNow = parseFloat(await forceRefreshBalanceFromDB()) || balBefore;
@@ -5198,7 +5223,9 @@ async function handleDepositSuccess(opts) {
         .select('status, balance_credited').eq('id', depositId).maybeSingle();
       if ((dbCheck && (dbCheck.status === 'success' || dbCheck.balance_credited)) ||
           balNow >= balBefore + depositAmount - 0.5) {
-        // sudah dikredit server
+        // sudah dikredit server/callback
+      } else if (credit.pending) {
+        throw new Error(credit.message || 'Menunggu mutasi Qiospay. Pastikan nominal+kode unik exact, lalu Cek Status lagi.');
       } else {
         throw new Error(credit.message || 'Gagal verifikasi mutasi di server. Tunggu beberapa detik lalu Cek Status.');
       }
