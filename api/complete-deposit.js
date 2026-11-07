@@ -1,7 +1,7 @@
 // POST /api/complete-deposit
-// Body: { deposit_id: "uuid" }
-// Header: Authorization: Bearer <user access_token>
-// Server verifikasi mutasi Qiospay lalu kredit via service_role
+// Body: { deposit_id }
+// Server: JWT user → load deposit → mutasi Qiospay → kredit service_role
+// Lebih tahan gagal: retry mutasi, multi-match, fallback RPC/direct
 
 import { createClient } from '@supabase/supabase-js';
 
@@ -41,7 +41,7 @@ async function fetchQiospayMutasi() {
     `https://qiospay.id/api/mutasi/qris/${merchantCode}/${apiKey}`;
 
   const controller = new AbortController();
-  const t = setTimeout(() => controller.abort(), 15000);
+  const t = setTimeout(() => controller.abort(), 18000);
   try {
     const r = await fetch(url, {
       method: 'GET',
@@ -54,7 +54,7 @@ async function fetchQiospayMutasi() {
     });
     if (!r.ok) {
       const txt = await r.text().catch(() => '');
-      throw new Error('Qiospay HTTP ' + r.status + (txt ? ': ' + txt.slice(0, 120) : ''));
+      throw new Error('Qiospay HTTP ' + r.status + (txt ? ': ' + txt.slice(0, 100) : ''));
     }
     const data = await r.json();
     let list = [];
@@ -67,20 +67,22 @@ async function fetchQiospayMutasi() {
     return (list || [])
       .map((m) => {
         const amount = parseAmount(m?.amount ?? m?.nominal ?? m?.total ?? 0);
+        const type = String(m?.type || m?.status || 'CR').toUpperCase();
         return {
           amount,
           refid: m?.refid ?? m?.ref ?? m?.id ?? m?.trx_id ?? null,
-          type: String(m?.type || 'CR').toUpperCase()
+          type,
+          time: m?.time || m?.tanggal || m?.date || null
         };
       })
-      .filter((m) => m.amount > 0 && m.type !== 'DB' && m.type !== 'DEBIT');
+      .filter((m) => m.amount > 0 && m.type !== 'DB' && m.type !== 'DEBIT' && m.type !== 'OUT');
   } finally {
     clearTimeout(t);
   }
 }
 
 async function creditDepositAdmin(admin, dep, mutasiAmount, mutasiRef) {
-  // 1) Coba RPC
+  // RPC 1
   try {
     const { data, error } = await admin.rpc('complete_deposit_with_mutasi', {
       p_deposit_id: dep.id,
@@ -90,52 +92,62 @@ async function creditDepositAdmin(admin, dep, mutasiAmount, mutasiRef) {
     if (!error && data && data.success !== false) {
       return { ok: true, via: 'rpc_mutasi', data };
     }
-    // log but continue
-    console.warn('rpc mutasi fail', error?.message || data?.message);
+    console.warn('rpc mutasi', error?.message || data?.message);
   } catch (e) {
     console.warn('rpc mutasi ex', e.message);
   }
 
+  // RPC 2
   try {
     const { data, error } = await admin.rpc('complete_deposit', { p_deposit_id: dep.id });
     if (!error && data && data.success !== false) {
       return { ok: true, via: 'rpc_complete', data };
     }
-    console.warn('rpc complete fail', error?.message || data?.message);
+    console.warn('rpc complete', error?.message || data?.message);
   } catch (e) {
     console.warn('rpc complete ex', e.message);
   }
 
-  // 2) Fallback service_role direct (idempotent)
-  if (dep.balance_credited === true || dep.status === 'success') {
-    const { data: prof } = await admin.from('profiles').select('balance').eq('id', dep.user_id).maybeSingle();
+  // Direct service_role (idempotent)
+  const { data: fresh } = await admin.from('deposits').select('*').eq('id', dep.id).maybeSingle();
+  const row = fresh || dep;
+  if (row.balance_credited === true || row.status === 'success') {
+    const { data: prof } = await admin.from('profiles').select('balance').eq('id', row.user_id).maybeSingle();
     return {
       ok: true,
       via: 'already',
-      data: { success: true, already: true, new_balance: prof?.balance, amount: dep.amount }
+      data: { success: true, already: true, new_balance: prof?.balance, amount: row.amount }
     };
   }
 
-  const amount = Math.floor(Number(dep.amount) || 0);
+  const amount = Math.floor(Number(row.amount) || 0);
   if (amount < 1) return { ok: false, message: 'Nominal deposit invalid' };
 
   const { data: prof, error: pErr } = await admin
     .from('profiles')
     .select('balance')
-    .eq('id', dep.user_id)
+    .eq('id', row.user_id)
     .maybeSingle();
   if (pErr) return { ok: false, message: pErr.message };
-  if (!prof) return { ok: false, message: 'Profil user tidak ditemukan' };
+  if (!prof) return { ok: false, message: 'Profil tidak ditemukan' };
 
   const next = Math.floor(Number(prof.balance) || 0) + amount;
 
-  const { error: upBal } = await admin
-    .from('profiles')
-    .update({ balance: next })
-    .eq('id', dep.user_id);
+  // Re-check race
+  const { data: again } = await admin
+    .from('deposits')
+    .select('balance_credited, status')
+    .eq('id', row.id)
+    .maybeSingle();
+  if (again && (again.balance_credited || again.status === 'success')) {
+    const { data: p2 } = await admin.from('profiles').select('balance').eq('id', row.user_id).maybeSingle();
+    return { ok: true, via: 'race_already', data: { success: true, already: true, new_balance: p2?.balance } };
+  }
+
+  const { error: upBal } = await admin.from('profiles').update({ balance: next }).eq('id', row.user_id);
   if (upBal) return { ok: false, message: 'Update balance gagal: ' + upBal.message };
 
-  const { error: upDep } = await admin
+  await admin
     .from('deposits')
     .update({
       status: 'success',
@@ -145,16 +157,15 @@ async function creditDepositAdmin(admin, dep, mutasiAmount, mutasiRef) {
       paid_at: new Date().toISOString(),
       credited_at: new Date().toISOString()
     })
-    .eq('id', dep.id);
-  if (upDep) console.warn('update deposit', upDep.message);
+    .eq('id', row.id);
 
   try {
     await admin.from('balance_mutations').insert({
-      user_id: dep.user_id,
-      email: dep.email,
+      user_id: row.user_id,
+      email: row.email,
       amount,
       type: 'deposit',
-      reason: 'Deposit QRIS server #' + dep.id + ' ref:' + (mutasiRef || '-')
+      reason: 'Deposit QRIS #' + row.id + ' ref:' + (mutasiRef || '-')
     });
   } catch (_) {}
 
@@ -163,6 +174,12 @@ async function creditDepositAdmin(admin, dep, mutasiAmount, mutasiRef) {
     via: 'direct_service_role',
     data: { success: true, new_balance: next, amount }
   };
+}
+
+function expectedTotal(dep) {
+  const t = Math.floor(Number(dep.total_amount) || 0);
+  if (t > 0) return t;
+  return Math.floor(Number(dep.amount || 0) + Number(dep.unique_code || 0));
 }
 
 export default async function handler(req, res) {
@@ -175,7 +192,7 @@ export default async function handler(req, res) {
   try {
     const authHeader = req.headers.authorization || '';
     const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
-    if (!token) return res.status(401).json({ success: false, message: 'Token wajib (login dulu)' });
+    if (!token) return res.status(401).json({ success: false, message: 'Token wajib — login ulang' });
 
     const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
     const depositId = body.deposit_id || body.depositId;
@@ -188,18 +205,17 @@ export default async function handler(req, res) {
     if (!serviceKey) {
       return res.status(500).json({
         success: false,
-        message: 'Server misconfig: SUPABASE_SERVICE_ROLE_KEY belum di-set di Vercel'
+        message: 'Server: SUPABASE_SERVICE_ROLE_KEY belum di-set di Vercel'
       });
     }
 
-    // Verifikasi user
     const userClient = createClient(supabaseUrl, anon || serviceKey, {
       global: { headers: { Authorization: 'Bearer ' + token } },
       auth: { persistSession: false, autoRefreshToken: false }
     });
     const { data: userData, error: userErr } = await userClient.auth.getUser(token);
     if (userErr || !userData?.user) {
-      return res.status(401).json({ success: false, message: 'Sesi tidak valid / expired. Login ulang.' });
+      return res.status(401).json({ success: false, message: 'Sesi expired — login ulang' });
     }
     const userId = userData.user.id;
 
@@ -213,9 +229,7 @@ export default async function handler(req, res) {
       .eq('id', depositId)
       .maybeSingle();
 
-    if (depErr) {
-      return res.status(500).json({ success: false, message: 'DB deposit: ' + depErr.message });
-    }
+    if (depErr) return res.status(500).json({ success: false, message: 'DB: ' + depErr.message });
     if (!dep) return res.status(404).json({ success: false, message: 'Deposit tidak ditemukan' });
     if (dep.user_id !== userId) {
       return res.status(403).json({ success: false, message: 'Bukan deposit Anda' });
@@ -227,44 +241,61 @@ export default async function handler(req, res) {
         success: true,
         already: true,
         new_balance: prof?.balance,
-        message: 'Sudah dikredit sebelumnya'
+        message: 'Sudah dikredit'
       });
     }
 
     if (dep.status === 'expired') {
-      return res.status(400).json({ success: false, message: 'Deposit sudah expired' });
+      return res.status(400).json({ success: false, message: 'Deposit expired — buat deposit baru' });
     }
-    if (dep.expires_at && new Date(dep.expires_at).getTime() < Date.now()) {
+    if (dep.expires_at && new Date(dep.expires_at).getTime() < Date.now() - 60000) {
+      // grace 1 menit
       try {
         await admin.from('deposits').update({ status: 'expired' }).eq('id', depositId).eq('status', 'pending');
       } catch (_) {}
       return res.status(400).json({ success: false, message: 'Deposit kadaluarsa' });
     }
 
-    const expected = Math.floor(
-      Number(dep.total_amount) ||
-        Number(dep.amount || 0) + Number(dep.unique_code || 0)
-    );
+    const expected = expectedTotal(dep);
     if (expected < 1) {
-      return res.status(400).json({ success: false, message: 'Nominal deposit invalid di DB' });
+      return res.status(400).json({ success: false, message: 'Nominal deposit invalid' });
     }
 
-    // Cek mutasi Qiospay (server-side)
-    let mutasiList;
-    try {
-      mutasiList = await fetchQiospayMutasi();
-    } catch (e) {
+    // Ambil mutasi (1x + 1 retry)
+    let mutasiList = [];
+    let mutasiErr = null;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        mutasiList = await fetchQiospayMutasi();
+        mutasiErr = null;
+        break;
+      } catch (e) {
+        mutasiErr = e;
+        if (attempt === 0) await new Promise((r) => setTimeout(r, 800));
+      }
+    }
+    if (mutasiErr) {
       return res.status(502).json({
         success: false,
-        message: 'Gagal ambil mutasi Qiospay: ' + (e.message || e)
+        message: 'Gagal ambil mutasi Qiospay: ' + (mutasiErr.message || mutasiErr),
+        expected
       });
     }
 
-    const found = mutasiList.find((m) => m.amount === expected);
+    // Match exact total (unik). Juga coba amount saja jika unique 0.
+    let found = mutasiList.find((m) => m.amount === expected);
+    if (!found && Number(dep.unique_code) > 0) {
+      // kadang user transfer exact amount tanpa unik — jangan terima (aman)
+      found = null;
+    }
     if (!found) {
       return res.status(200).json({
         success: false,
-        message: 'Mutasi belum terdeteksi untuk Rp ' + expected.toLocaleString('id-ID') + '. Tunggu 10–30 detik lalu Cek Status.',
+        pending: true,
+        message:
+          'Belum terdeteksi transfer Rp ' +
+          expected.toLocaleString('id-ID') +
+          '. Pastikan nominal + kode unik exact. Coba Cek Status 10–20 detik lagi.',
         expected,
         mutasi_count: mutasiList.length
       });
@@ -274,16 +305,12 @@ export default async function handler(req, res) {
     if (!credit.ok) {
       return res.status(500).json({
         success: false,
-        message: credit.message || 'Gagal kredit saldo di server'
+        message: credit.message || 'Gagal kredit saldo'
       });
     }
 
-    try {
-      await admin.rpc('credit_unique_share', { p_deposit_id: depositId });
-    } catch (_) {}
-    try {
-      await admin.rpc('pay_referral_bonus_for_deposit', { p_deposit_id: depositId });
-    } catch (_) {}
+    try { await admin.rpc('credit_unique_share', { p_deposit_id: depositId }); } catch (_) {}
+    try { await admin.rpc('pay_referral_bonus_for_deposit', { p_deposit_id: depositId }); } catch (_) {}
 
     return res.status(200).json({
       success: true,
@@ -296,9 +323,6 @@ export default async function handler(req, res) {
     });
   } catch (e) {
     console.error('complete-deposit fatal', e);
-    return res.status(500).json({
-      success: false,
-      message: e.message || 'Server error'
-    });
+    return res.status(500).json({ success: false, message: e.message || 'Server error' });
   }
 }
