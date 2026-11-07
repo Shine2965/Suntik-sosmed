@@ -1,5 +1,4 @@
 // POST /api/complete-deposit
-
 import { createClient } from '@supabase/supabase-js';
 
 function parseAmount(val) {
