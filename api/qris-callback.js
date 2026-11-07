@@ -1,5 +1,3 @@
-// Callback Qiospay — TANPA SERVICE_ROLE_KEY
-// URL: 
 
 import { createClient } from '@supabase/supabase-js';
 
@@ -36,7 +34,7 @@ export default async function handler(req, res) {
 
   try {
     const providedSecret = String(extractSecret(req) || '');
-    const EXPECTED = process.env.CALLBACK_SECRET_KEY || process.env.DEPOSIT_SECRET || 'Alvino11';
+    const EXPECTED = process.env.CALLBACK_SECRET_KEY || 'Alvino11';
     if (providedSecret !== EXPECTED) {
       return res.status(401).json({ success: false, message: 'Unauthorized' });
     }
@@ -59,66 +57,81 @@ export default async function handler(req, res) {
     }
 
     const supabaseUrl = process.env.SUPABASE_URL || 'https://vvzgpbiesvupuhqqoxrg.supabase.co';
-    const anon =
-      process.env.SUPABASE_ANON_KEY ||
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ2emdwYmllc3Z1cHVocXFveHJnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIwNzE3MTUsImV4cCI6MjEwNzY0NzcxNX0.W3_Ck8B5Q-nEfNlsyeufJsLsTqbM8xPcAeHoAHfGRwY';
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!serviceKey || !String(serviceKey).startsWith('eyJ')) {
+      return res.status(500).json({
+        success: false,
+        message: 'ENV SUPABASE_SERVICE_ROLE_KEY harus JWT service_role (eyJ...)'
+      });
+    }
 
-    const supabase = createClient(supabaseUrl, anon, {
+    const supabase = createClient(supabaseUrl, serviceKey, {
       auth: { persistSession: false, autoRefreshToken: false }
     });
 
     const since = new Date(Date.now() - 45 * 60 * 1000).toISOString();
-
-    // Cari deposit pending (anon perlu policy SELECT — fallback RPC-only match via list if needed)
     let deposit = null;
-    const { data: rows, error } = await supabase
-      .from('deposits')
-      .select('*')
-      .eq('status', 'pending')
-      .eq('total_amount', callbackAmount)
-      .gte('created_at', since)
-      .order('created_at', { ascending: false })
-      .limit(5);
+    {
+      const { data } = await supabase
+        .from('deposits')
+        .select('*')
+        .eq('status', 'pending')
+        .eq('total_amount', callbackAmount)
+        .gte('created_at', since)
+        .order('created_at', { ascending: false })
+        .limit(1);
+      deposit = data?.[0] || null;
+    }
+    if (!deposit) {
+      const { data } = await supabase
+        .from('deposits')
+        .select('*')
+        .eq('total_amount', callbackAmount)
+        .or('balance_credited.eq.false,balance_credited.is.null')
+        .gte('created_at', since)
+        .order('created_at', { ascending: false })
+        .limit(1);
+      deposit = data?.[0] || null;
+    }
+    if (!deposit) {
+      return res.status(200).json({ success: true, message: 'No matching pending deposit', amount: callbackAmount });
+    }
+
+    const { data: done, error } = await supabase.rpc('complete_deposit_with_mutasi', {
+      p_deposit_id: deposit.id,
+      p_mutasi_amount: callbackAmount,
+      p_mutasi_ref: mutasiRef ? String(mutasiRef) : null
+    });
 
     if (error) {
-      // RLS mungkin blok select anon — coba pakai secret RPC helper kalau ada
-      console.warn('select deposits', error.message);
-    }
-    deposit = rows?.[0] || null;
-
-    let done, rpcErr;
-    if (!deposit) {
-      // RLS blok select → match by amount di dalam RPC SECURITY DEFINER
-      const r = await supabase.rpc('server_complete_deposit_by_amount', {
-        p_amount: callbackAmount,
-        p_secret: EXPECTED,
-        p_mutasi_ref: mutasiRef ? String(mutasiRef) : null
-      });
-      done = r.data;
-      rpcErr = r.error;
-    } else {
-      const r = await supabase.rpc('server_complete_deposit', {
+      const { data: forced, error: fe } = await supabase.rpc('force_credit_deposit_admin', {
         p_deposit_id: deposit.id,
-        p_mutasi_amount: callbackAmount,
-        p_secret: EXPECTED,
         p_mutasi_ref: mutasiRef ? String(mutasiRef) : null
       });
-      done = r.data;
-      rpcErr = r.error;
+      if (fe || !forced?.success) {
+        return res.status(500).json({ success: false, message: error.message });
+      }
+      return res.status(200).json({
+        success: true,
+        message: 'Deposit OK',
+        deposit_id: deposit.id,
+        new_balance: forced.new_balance,
+        via: 'force'
+      });
     }
 
-    if (rpcErr) {
-      return res.status(500).json({ success: false, message: rpcErr.message });
-    }
     if (!done || done.success === false) {
       return res.status(200).json({ success: false, message: done?.message || 'rejected', result: done });
     }
 
+    try { await supabase.rpc('credit_unique_share', { p_deposit_id: deposit.id }); } catch (_) {}
+    try { await supabase.rpc('pay_referral_bonus_for_deposit', { p_deposit_id: deposit.id }); } catch (_) {}
+
     return res.status(200).json({
       success: true,
-      message: done.already || done.already_credited ? 'Already credited' : (done.message || 'Deposit OK'),
-      deposit_id: done.deposit_id || (deposit && deposit.id) || null,
-      amount: done.amount || (deposit && deposit.amount) || null,
+      message: done.already || done.already_credited ? 'Already credited' : 'Deposit OK',
+      deposit_id: deposit.id,
+      amount: deposit.amount,
       new_balance: done.new_balance
     });
   } catch (e) {
