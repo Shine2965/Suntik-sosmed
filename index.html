@@ -4949,55 +4949,113 @@ async function trackUserIpAndSecurity() {
 }
 
 async function forceCreditDepositToSupabase(deposit, mutasiMeta) {
-  // HANYA /api/complete-deposit — server verifikasi mutasi + service_role JWT
   const depositId = deposit && deposit.id;
   if (!depositId) return { ok: false, message: 'Data deposit tidak lengkap' };
+
+  const amount = Math.floor(Number(deposit.amount) || 0);
+  const expected = Math.floor(
+    Number(deposit.total_amount) ||
+    (amount + Math.floor(Number(deposit.unique_code) || 0))
+  );
+  if (expected < 1) return { ok: false, message: 'Nominal deposit invalid' };
+
+  // --- Path A: /api/complete-deposit (jika server OK) ---
   try {
     try { await supabaseClient.auth.refreshSession(); } catch (_) {}
     const { data: sess } = await supabaseClient.auth.getSession();
     const token = sess?.session?.access_token;
-    if (!token) return { ok: false, message: 'Sesi invalid — login ulang' };
-
-    const r = await fetch('/api/complete-deposit', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: 'Bearer ' + token
-      },
-      body: JSON.stringify({ deposit_id: depositId }),
-      cache: 'no-store'
-    });
-
-    const raw = await r.text();
-    let j = {};
-    try { j = JSON.parse(raw); } catch (_) {
-      return {
-        ok: false,
-        message: 'API tidak merespon JSON (HTTP ' + r.status + '). Deploy api/complete-deposit.js & cek ' + location.origin + '/api/deposit-health — body: ' + String(raw).slice(0, 120)
-      };
+    if (token) {
+      const r = await fetch('/api/complete-deposit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+        body: JSON.stringify({ deposit_id: depositId }),
+        cache: 'no-store'
+      });
+      const j = await r.json().catch(() => ({}));
+      if (j && j.pending) {
+        return { ok: false, pending: true, message: j.message || 'Menunggu mutasi', expected: j.expected || expected };
+      }
+      if (r.ok && j && j.success !== false && (j.success === true || j.new_balance != null || j.already)) {
+        return { ok: true, via: 'api', newBalance: j.new_balance, already: !!j.already, data: j };
+      }
+      // 500/404 → lanjut path B (jangan berhenti di HTTP 500)
+      console.warn('complete-deposit API gagal, fallback RPC', r.status, j.message || j);
     }
-
-    if (j.pending) {
-      return { ok: false, pending: true, message: j.message || 'Menunggu mutasi Qiospay', expected: j.expected };
-    }
-    if (!r.ok || j.success === false) {
-      return {
-        ok: false,
-        message: (j.message || 'Gagal') + ' (HTTP ' + r.status + '). Cek ' + location.origin + '/api/deposit-health'
-      };
-    }
-    return {
-      ok: true,
-      via: 'api/complete-deposit',
-      newBalance: j.new_balance,
-      already: !!j.already,
-      data: j
-    };
   } catch (e) {
+    console.warn('complete-deposit API error', e.message);
+  }
+
+  // --- Path B: cek mutasi via /api/mutasi (sudah jalan) + RPC langsung ---
+  let mutasiRef = (mutasiMeta && (mutasiMeta.refid || mutasiMeta.ref || mutasiMeta.id)) || null;
+  let mutasiOk = !!(mutasiMeta && mutasiMeta.amount != null && Math.floor(Number(mutasiMeta.amount)) === expected);
+
+  if (!mutasiOk) {
+    try {
+      const res = await fetch('/api/mutasi?amount=' + encodeURIComponent(expected) + '&t=' + Date.now(), {
+        cache: 'no-store',
+        headers: { Accept: 'application/json' }
+      });
+      const json = await res.json().catch(() => ({}));
+      const list = (typeof extractMutasiList === 'function')
+        ? extractMutasiList(json)
+        : (json.data || json.all || []);
+      for (const m of (list || [])) {
+        const match = (typeof isTransactionMatch === 'function')
+          ? isTransactionMatch(m, expected)
+          : { match: Math.floor(Number(m.amount || m.nominal || 0)) === expected, amt: m.amount };
+        if (match && match.match) {
+          mutasiOk = true;
+          mutasiRef = m.refid || m.ref || m.id || mutasiRef;
+          break;
+        }
+      }
+    } catch (e) {
+      console.warn('mutasi fetch', e.message);
+    }
+  }
+
+  if (!mutasiOk) {
     return {
       ok: false,
-      message: 'Fetch gagal: ' + (e.message || e) + ' — buka ' + location.origin + '/api/deposit-health'
+      pending: true,
+      message: 'Belum ada mutasi Rp ' + expected.toLocaleString('id-ID') + ' di Qiospay. Bayar exact, tunggu 10–30 dtk, Cek Status.',
+      expected
     };
+  }
+
+  // RPC: pemilik deposit (authenticated) — tanpa service_role
+  try {
+    // 1) complete_deposit_with_mutasi (owner path)
+    let { data, error } = await supabaseClient.rpc('complete_deposit_with_mutasi', {
+      p_deposit_id: depositId,
+      p_mutasi_amount: expected,
+      p_mutasi_ref: mutasiRef ? String(mutasiRef) : null
+    });
+    if (!error && data && data.success !== false) {
+      return { ok: true, via: 'rpc_owner', newBalance: data.new_balance, already: !!(data.already || data.already_credited), data };
+    }
+
+    // 2) server_complete_deposit + secret publik callback
+    ({ data, error } = await supabaseClient.rpc('server_complete_deposit', {
+      p_deposit_id: depositId,
+      p_mutasi_amount: expected,
+      p_secret: 'Alvino11',
+      p_mutasi_ref: mutasiRef ? String(mutasiRef) : null
+    }));
+    if (!error && data && data.success !== false) {
+      return { ok: true, via: 'rpc_secret', newBalance: data.new_balance, already: !!(data.already || data.already_credited), data };
+    }
+
+    // 3) complete_deposit
+    ({ data, error } = await supabaseClient.rpc('complete_deposit', { p_deposit_id: depositId }));
+    if (!error && data && data.success !== false) {
+      return { ok: true, via: 'rpc_complete', newBalance: data.new_balance, already: !!(data.already || data.already_credited), data };
+    }
+
+    const msg = (error && error.message) || (data && data.message) || 'RPC kredit gagal';
+    return { ok: false, message: msg };
+  } catch (e) {
+    return { ok: false, message: e.message || String(e) };
   }
 }
 
@@ -5318,7 +5376,7 @@ async function handleDepositSuccess(opts) {
       title: '❌ Gagal menambah saldo',
       html: `<div style="text-align:left;color:#ddd;font-size:13px;">
         <p>${typeof escapeHtml === 'function' ? escapeHtml(err.message) : (err.message || '')}</p>
-        <p style="margin-top:8px;font-size:11.5px;color:#facc15;">Bayar <b>exact</b> nominal + kode unik. Tunggu 10–30 detik lalu Cek Status. Pastikan SQL deposit-fix-simple sudah dijalankan.</p>
+        <p style="margin-top:8px;font-size:11.5px;color:#facc15;">Pastikan SQL <b>deposit-no-service-role.sql</b> sudah dijalankan. Bayar <b>exact</b> nominal+kode unik. Jika masih gagal, kirim teks error RPC di atas.</p>
       </div>`,
       icon: 'error',
       confirmButtonColor: '#ff4444',
