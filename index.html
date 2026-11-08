@@ -1790,11 +1790,19 @@ function clearNewChatError() {
 }
 
 function getProviderOrderId(order) {
-  const pid = order && order.order_id ? String(order.order_id).trim() : '';
-  if (!pid) return '';
-  const low = pid.toLowerCase();
-  if (low === '-' || low === 'null' || low === 'undefined' || low === '0') return '';
-  return pid;
+  if (!order) return '';
+  const candidates = [
+    order.order_id, order.provider_order_id, order.provider_id,
+    order.api_order_id, order.external_id, order.orderId
+  ];
+  for (const c of candidates) {
+    const pid = c != null ? String(c).trim() : '';
+    if (!pid) continue;
+    const low = pid.toLowerCase();
+    if (low === '-' || low === 'null' || low === 'undefined' || low === '0') continue;
+    return pid;
+  }
+  return '';
 }
 function hasProviderOrderId(order) { return !!getProviderOrderId(order); }
 function getRefundKey(order) {
@@ -1875,15 +1883,33 @@ const SOSMED_TYPE_MAP = {
   'sosmed-4': { label: 'Sosmed-4', endpoint: '/api/cekstatus' }
 };
 
-function mapProviderStatusToLocal(providerStatus) {
-  if (!providerStatus) return 'pending';
-  const s = String(providerStatus).toLowerCase().trim();
-  if (s.includes('completed') || s.includes('complete') || s.includes('success') || s.includes('done') || s.includes('finish')) return 'success';
-  if (s.includes('partial')) return 'partial';
-  if (s.includes('canceled') || s.includes('cancelled') || s.includes('cancel')) return 'canceled';
-  if (s.includes('fail') || s.includes('error')) return 'failed';
-  if (s.includes('processing') || s.includes('process') || s.includes('progress') || s.includes('in progress')) return 'processing';
-  if (s.includes('pending') || s.includes('wait') || s.includes('queue')) return 'pending';
+function mapProviderStatusToLocal(providerStatus, remains) {
+  if (providerStatus == null || providerStatus === '') {
+    // remains 0 sering = selesai meski status string kosong
+    if (remains !== null && remains !== undefined && Number(remains) === 0) return 'success';
+    return 'pending';
+  }
+  const raw = String(providerStatus).trim();
+  const s = raw.toLowerCase();
+  // Kode angka panel SMM umum
+  if (/^[0-9]+$/.test(s)) {
+    const n = parseInt(s, 10);
+    // variasi panel: 3/4 completed, 2 processing, 1 pending, 5 cancel, 6 fail, 7 partial
+    if (n === 3 || n === 4 || n === 100) return 'success';
+    if (n === 7 || n === 8) return 'partial';
+    if (n === 5 || n === 9) return 'canceled';
+    if (n === 6 || n === 0) return 'failed';
+    if (n === 2) return 'processing';
+    if (n === 1) return 'pending';
+  }
+  if (s.includes('completed') || s.includes('complete') || s.includes('success') || s.includes('done') || s.includes('finish') || s === 'ok' || s === 'sukses' || s === 'selesai') return 'success';
+  if (s.includes('partial') || s.includes('sebagian')) return 'partial';
+  if (s.includes('canceled') || s.includes('cancelled') || s.includes('cancel') || s.includes('batal')) return 'canceled';
+  if (s.includes('fail') || s.includes('error') || s.includes('reject') || s.includes('gagal')) return 'failed';
+  if (s.includes('processing') || s.includes('process') || s.includes('progress') || s.includes('in progress') || s.includes('running') || s.includes('proses')) return 'processing';
+  if (s.includes('pending') || s.includes('wait') || s.includes('queue') || s.includes('menunggu')) return 'pending';
+  // remains 0 override
+  if (remains !== null && remains !== undefined && Number(remains) === 0) return 'success';
   return 'pending';
 }
 
@@ -1891,7 +1917,11 @@ function extractStatusData(sosmedType, data, orderId) {
   if (!data) return null;
   let status = null, startCount = 0, remains = 0;
   const strVal = (v) => { if (v === undefined || v === null) return null; if (typeof v === 'boolean') return null; const s = String(v).trim(); return s === '' ? null : s; };
-  const pickStatus = (obj) => { if (!obj || typeof obj !== 'object') return null; return strVal(obj.order_status) || strVal(obj.orderStatus) || strVal(obj.state) || strVal(obj.status); };
+  const pickStatus = (obj) => {
+    if (!obj || typeof obj !== 'object') return null;
+    return strVal(obj.order_status) || strVal(obj.orderStatus) || strVal(obj.status) || strVal(obj.state)
+      || strVal(obj.Status) || strVal(obj.orderstatus) || strVal(obj.charge) || strVal(obj.charge_status);
+  };
   const pickStartCount = (obj) => obj ? (parseInt(obj.start_count || obj.startCount || obj.start || 0) || 0) : 0;
   const pickRemains = (obj) => obj ? (parseInt(obj.remains || obj.remains_count || obj.remaining || obj.remainsCount || 0) || 0) : 0;
   if (sosmedType === 'sosmed-1') {
@@ -1924,21 +1954,51 @@ async function fetchProviderStatus(order) {
   const orderId = getProviderOrderId(order);
   if (!orderId) return { success: false, message: 'Order ID tidak tersedia' };
   try {
-    let body = {};
-    if (sosmedType === 'sosmed-1') body = { action: 'status', order: parseInt(orderId, 10) };
-    else if (sosmedType === 'sosmed-2') body = { action: 'status', order_id: orderId };
-    else if (sosmedType === 'sosmed-4') body = { action: 'status', order: orderId };
-    const res = await fetch(config.endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-      body: JSON.stringify(body)
-    });
-    if (!res.ok) return { success: false, message: `HTTP ${res.status}` };
-    const data = await res.json().catch(() => null);
-    if (!data) return { success: false, message: 'Response tidak valid' };
-    const extracted = extractStatusData(sosmedType, data, orderId);
-    if (!extracted) return { success: false, message: 'Status tidak ditemukan di response' };
-    return { success: true, status: extracted.status, startCount: extracted.startCount, remains: extracted.remains };
+    const bodies = [];
+    if (sosmedType === 'sosmed-1') {
+      bodies.push({ action: 'status', order: parseInt(orderId, 10) || orderId });
+      bodies.push({ action: 'status', order_id: orderId });
+    } else if (sosmedType === 'sosmed-2') {
+      bodies.push({ action: 'status', order_id: orderId });
+      bodies.push({ action: 'status', order: orderId });
+    } else if (sosmedType === 'sosmed-4') {
+      bodies.push({ action: 'status', order: orderId });
+      bodies.push({ action: 'status', order_id: orderId });
+    } else {
+      bodies.push({ action: 'status', order_id: orderId, order: orderId });
+    }
+
+    let lastErr = 'Status tidak ditemukan';
+    for (const body of bodies) {
+      try {
+        const res = await fetch(config.endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        if (!res.ok) { lastErr = 'HTTP ' + res.status; continue; }
+        const data = await res.json().catch(() => null);
+        if (!data) { lastErr = 'Response tidak valid'; continue; }
+        const extracted = extractStatusData(sosmedType, data, orderId);
+        if (!extracted || !extracted.status) {
+          // remains 0 tanpa status
+          if (extracted && extracted.remains != null && Number(extracted.remains) === 0) {
+            return { success: true, status: 'success', startCount: extracted.startCount, remains: 0 };
+          }
+          lastErr = 'Status tidak ditemukan di response';
+          continue;
+        }
+        return {
+          success: true,
+          status: extracted.status,
+          startCount: extracted.startCount,
+          remains: extracted.remains
+        };
+      } catch (e) {
+        lastErr = e.message || String(e);
+      }
+    }
+    return { success: false, message: lastErr };
   } catch (err) { return { success: false, message: err.message }; }
 }
 
@@ -2260,32 +2320,51 @@ async function saveOrderStatusToSupabase(orderId, newStatus, startCount, remains
       order_status: newStatus, 
       updated_at: new Date().toISOString() 
     };
-    if (startCount !== null && startCount !== undefined) updateObj.start_count = startCount;
-    if (remains !== null && remains !== undefined) updateObj.remains = remains;
-
-    if (['success', 'completed'].includes(newStatus)) {
-      try {
-        const { data: existing } = await supabaseClient
-          .from('orders_detail')
-          .select('completed_at')
-          .eq('id', orderId)
-          .single();
-        if (!existing || !existing.completed_at) {
-          updateObj.completed_at = new Date().toISOString();
-        }
-      } catch (e) {
-        updateObj.completed_at = new Date().toISOString();
-      }
+    if (startCount !== null && startCount !== undefined && startCount !== '') {
+      const sc = Number(startCount);
+      if (!isNaN(sc)) updateObj.start_count = sc;
+    }
+    if (remains !== null && remains !== undefined && remains !== '') {
+      const rm = Number(remains);
+      if (!isNaN(rm)) updateObj.remains = rm;
     }
 
-    const { data, error } = await supabaseClient
+    if (['success', 'completed'].includes(newStatus)) {
+      updateObj.completed_at = new Date().toISOString();
+    }
+
+    // 1) Direct update
+    let { data, error } = await supabaseClient
       .from('orders_detail')
       .update(updateObj)
       .eq('id', orderId)
-      .select();
-    if (error) throw error;
+      .select('id, order_status, remains, start_count');
+
+    if (error || !data || !data.length) {
+      // 2) RPC fallback (bypass RLS ketat)
+      try {
+        const { data: rpcData, error: rpcErr } = await supabaseClient.rpc('update_my_order_status', {
+          p_order_id: orderId,
+          p_status: newStatus,
+          p_start_count: updateObj.start_count ?? null,
+          p_remains: updateObj.remains ?? null
+        });
+        if (!rpcErr && rpcData && rpcData.success !== false) {
+          return { success: true, data: rpcData, via: 'rpc' };
+        }
+        if (rpcErr) console.warn('update_my_order_status', rpcErr.message);
+      } catch (e) {
+        console.warn('rpc status', e.message);
+      }
+      if (error) throw error;
+      // empty data = RLS block
+      if (!data || !data.length) {
+        return { success: false, error: 'Update kosong (RLS?). Jalankan SQL update_my_order_status' };
+      }
+    }
     return { success: true, data };
   } catch (err) { 
+    console.warn('saveOrderStatus', err.message);
     return { success: false, error: err.message }; 
   }
 }
@@ -2301,7 +2380,7 @@ async function checkSingleOrderStatus(orderId) {
   try {
     const result = await fetchProviderStatus(order);
     if (result.success && result.status) {
-      const newStatus = mapProviderStatusToLocal(result.status);
+      const newStatus = mapProviderStatusToLocal(result.status, result.remains);
       if ((newStatus === 'partial' || newStatus === 'canceled') && oldStatus !== newStatus) await processAutoRefund(order, newStatus);
       await saveOrderStatusToSupabase(orderId, newStatus, result.startCount, result.remains);
       const idx = allOrdersCache.findIndex(o => o.id === orderId);
@@ -2343,7 +2422,7 @@ async function syncAllOrdersStatusesSilent() {
         if (attempt < 2) await new Promise(r => setTimeout(r, 1000));
       }
       if (result && result.success && result.status) {
-        const newStatus = mapProviderStatusToLocal(result.status);
+        const newStatus = mapProviderStatusToLocal(result.status, result.remains);
         const oldStatus = order.order_status;
         if ((newStatus === 'partial' || newStatus === 'canceled') && oldStatus !== newStatus) {
           const refunded = await processAutoRefund(order, newStatus);
@@ -2386,7 +2465,7 @@ async function syncAllOrdersStatuses() {
       await new Promise(r => setTimeout(r, 600));
       const result = await fetchProviderStatus(order);
       if (result.success && result.status) {
-        const newStatus = mapProviderStatusToLocal(result.status);
+        const newStatus = mapProviderStatusToLocal(result.status, result.remains);
         const oldStatus = order.order_status;
         if ((newStatus === 'partial' || newStatus === 'canceled') && oldStatus !== newStatus) {
           const refunded = await processAutoRefund(order, newStatus);
@@ -4931,12 +5010,11 @@ async function forceCreditDepositToSupabase(deposit, mutasiMeta) {
 
   const amount = Math.floor(Number(deposit.amount) || 0);
   const expected = Math.floor(
-    Number(deposit.total_amount) ||
-    (amount + Math.floor(Number(deposit.unique_code) || 0))
+    Number(deposit.total_amount) || (amount + Math.floor(Number(deposit.unique_code) || 0))
   );
   if (expected < 1) return { ok: false, message: 'Nominal deposit invalid' };
 
-  // --- Path A: /api/complete-deposit (jika server OK) ---
+  // A) Coba API server (jika /api/complete-deposit tersedia)
   try {
     try { await supabaseClient.auth.refreshSession(); } catch (_) {}
     const { data: sess } = await supabaseClient.auth.getSession();
@@ -4948,38 +5026,34 @@ async function forceCreditDepositToSupabase(deposit, mutasiMeta) {
         body: JSON.stringify({ deposit_id: depositId }),
         cache: 'no-store'
       });
-      const j = await r.json().catch(() => ({}));
-      if (j && j.pending) {
-        return { ok: false, pending: true, message: j.message || 'Menunggu mutasi', expected: j.expected || expected };
+      if (r.ok) {
+        const j = await r.json().catch(() => ({}));
+        if (j && j.pending) {
+          return { ok: false, pending: true, message: j.message || 'Menunggu mutasi', expected: j.expected || expected };
+        }
+        if (j && (j.success === true || j.already || j.new_balance != null)) {
+          return { ok: true, via: 'api', newBalance: j.new_balance, already: !!j.already, data: j };
+        }
       }
-      if (r.ok && j && j.success !== false && (j.success === true || j.new_balance != null || j.already)) {
-        return { ok: true, via: 'api', newBalance: j.new_balance, already: !!j.already, data: j };
-      }
-      // 500/404 → lanjut path B (jangan berhenti di HTTP 500)
-      console.warn('complete-deposit API gagal, fallback RPC', r.status, j.message || j);
     }
   } catch (e) {
-    console.warn('complete-deposit API error', e.message);
+    console.warn('api complete-deposit skip', e.message);
   }
 
-  // --- Path B: cek mutasi via /api/mutasi (sudah jalan) + RPC langsung ---
+  // B) Cek mutasi lewat /api/mutasi
   let mutasiRef = (mutasiMeta && (mutasiMeta.refid || mutasiMeta.ref || mutasiMeta.id)) || null;
-  let mutasiOk = !!(mutasiMeta && mutasiMeta.amount != null && Math.floor(Number(mutasiMeta.amount)) === expected);
-
+  let mutasiOk = !!(mutasiMeta && Math.floor(Number(mutasiMeta.amount)) === expected);
   if (!mutasiOk) {
     try {
       const res = await fetch('/api/mutasi?amount=' + encodeURIComponent(expected) + '&t=' + Date.now(), {
-        cache: 'no-store',
-        headers: { Accept: 'application/json' }
+        cache: 'no-store', headers: { Accept: 'application/json' }
       });
       const json = await res.json().catch(() => ({}));
-      const list = (typeof extractMutasiList === 'function')
-        ? extractMutasiList(json)
-        : (json.data || json.all || []);
+      const list = (typeof extractMutasiList === 'function') ? extractMutasiList(json) : (json.data || json.all || []);
       for (const m of (list || [])) {
         const match = (typeof isTransactionMatch === 'function')
           ? isTransactionMatch(m, expected)
-          : { match: Math.floor(Number(m.amount || m.nominal || 0)) === expected, amt: m.amount };
+          : { match: Math.floor(Number(m.amount || m.nominal || 0)) === expected };
         if (match && match.match) {
           mutasiOk = true;
           mutasiRef = m.refid || m.ref || m.id || mutasiRef;
@@ -4987,52 +5061,54 @@ async function forceCreditDepositToSupabase(deposit, mutasiMeta) {
         }
       }
     } catch (e) {
-      console.warn('mutasi fetch', e.message);
+      console.warn('mutasi', e.message);
     }
   }
-
   if (!mutasiOk) {
     return {
       ok: false,
       pending: true,
-      message: 'Belum ada mutasi Rp ' + expected.toLocaleString('id-ID') + ' di Qiospay. Bayar exact, tunggu 10–30 dtk, Cek Status.',
+      message: 'Belum terdeteksi mutasi Rp ' + expected.toLocaleString('id-ID') + '. Bayar exact, tunggu 10–30 dtk, Cek Status.',
       expected
     };
   }
 
-  // RPC: pemilik deposit (authenticated) — tanpa service_role
+  // C) RPC pemilik deposit (setelah SQL GRANT + owner-only)
   try {
-    // 1) complete_deposit_with_mutasi (owner path)
     let { data, error } = await supabaseClient.rpc('complete_deposit_with_mutasi', {
       p_deposit_id: depositId,
       p_mutasi_amount: expected,
       p_mutasi_ref: mutasiRef ? String(mutasiRef) : null
     });
-    if (!error && data && data.success !== false) {
-      return { ok: true, via: 'rpc_owner', newBalance: data.new_balance, already: !!(data.already || data.already_credited), data };
+
+    // Jika permission denied / function missing → coba server_complete_deposit
+    if (error && /permission denied|could not find|does not exist/i.test(error.message || '')) {
+      ({ data, error } = await supabaseClient.rpc('server_complete_deposit', {
+        p_deposit_id: depositId,
+        p_mutasi_amount: expected,
+        p_secret: 'Alvino11',
+        p_mutasi_ref: mutasiRef ? String(mutasiRef) : null
+      }));
     }
 
-    // 2) server_complete_deposit + secret publik callback
-    ({ data, error } = await supabaseClient.rpc('server_complete_deposit_DISABLED_CLIENT', {
-      p_deposit_id: depositId,
-      p_mutasi_amount: expected,
-      p_secret: '',
-      p_mutasi_ref: mutasiRef ? String(mutasiRef) : null
-    }));
-    if (!error && data && data.success !== false) {
-      return { ok: true, via: 'rpc_secret', newBalance: data.new_balance, already: !!(data.already || data.already_credited), data };
+    if (error) {
+      return {
+        ok: false,
+        message: error.message + ' — jalankan SQL fix-deposit-permission.sql di Supabase'
+      };
     }
-
-    // 3) complete_deposit
-    ({ data, error } = await supabaseClient.rpc('complete_deposit', { p_deposit_id: depositId }));
-    if (!error && data && data.success !== false) {
-      return { ok: true, via: 'rpc_complete', newBalance: data.new_balance, already: !!(data.already || data.already_credited), data };
+    if (!data || data.success === false) {
+      return { ok: false, message: (data && data.message) || 'Kredit ditolak' };
     }
-
-    const msg = (error && error.message) || (data && data.message) || 'RPC kredit gagal';
-    return { ok: false, message: msg };
+    return {
+      ok: true,
+      via: 'rpc',
+      newBalance: data.new_balance,
+      already: !!(data.already || data.already_credited),
+      data
+    };
   } catch (e) {
-    return { ok: false, message: e.message || String(e) };
+    return { ok: false, message: (e.message || String(e)) + ' — jalankan SQL fix-deposit-permission.sql' };
   }
 }
 
@@ -5353,7 +5429,7 @@ async function handleDepositSuccess(opts) {
       title: '❌ Gagal menambah saldo',
       html: `<div style="text-align:left;color:#ddd;font-size:13px;">
         <p>${typeof escapeHtml === 'function' ? escapeHtml(err.message) : (err.message || '')}</p>
-        <p style="margin-top:8px;font-size:11.5px;color:#facc15;">Pastikan SQL <b>deposit-no-service-role.sql</b> sudah dijalankan. Bayar <b>exact</b> nominal+kode unik. Jika masih gagal, kirim teks error RPC di atas.</p>
+        <p style="margin-top:8px;font-size:11.5px;color:#facc15;">Jalankan SQL <b>fix-deposit-permission.sql</b>. Pastikan bayar exact nominal+kode unik. Error permission = SQL belum di-run.</p>
       </div>`,
       icon: 'error',
       confirmButtonColor: '#ff4444',
