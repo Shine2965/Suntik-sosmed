@@ -4582,12 +4582,18 @@ function startDepositPolling(targetAmount) {
     } catch (_) {}
 
     try {
-      const res = await fetch(`/api/mutasi?amount=${encodeURIComponent(targetAmount)}&t=${Date.now()}`, {
+      const api = await safeFetchJson(`/api/mutasi?amount=${encodeURIComponent(targetAmount)}&t=${Date.now()}`, {
         cache: 'no-store',
         headers: { Accept: 'application/json' }
       });
-      if (!res.ok) { consecutiveErrors++; return; }
-      const json = await res.json();
+      let json = api.json;
+      if (api.notJson || !json) {
+        // fallback direct
+        const direct = await fetchQiospayMutasiDirect(targetAmount);
+        json = { success: true, data: direct, all: direct };
+        if (!direct.length) { consecutiveErrors++; return; }
+      }
+      if (!api.ok && !json) { consecutiveErrors++; return; }
       consecutiveErrors = 0;
       if (!json || json.success === false) {
         // tetap coba all list jika ada
@@ -5080,6 +5086,58 @@ async function trackUserIpAndSecurity() {
   } catch (e) { console.warn('track ip', e.message); }
 }
 
+
+async function safeFetchJson(url, options) {
+  try {
+    const res = await fetch(url, options || {});
+    const text = await res.text();
+    let json = null;
+    try {
+      json = text ? JSON.parse(text) : null;
+    } catch (_) {
+      // HTML 404: "The page could not be found" dll
+      const snippet = String(text || '').replace(/\s+/g, ' ').slice(0, 80);
+      return {
+        ok: false,
+        status: res.status,
+        json: null,
+        notJson: true,
+        message: 'Endpoint tidak JSON (HTTP ' + res.status + '): ' + snippet
+      };
+    }
+    return { ok: res.ok, status: res.status, json: json, notJson: false, message: null };
+  } catch (e) {
+    return { ok: false, status: 0, json: null, notJson: true, message: e.message || String(e) };
+  }
+}
+
+async function fetchQiospayMutasiDirect(expectedAmount) {
+  // Fallback jika /api/mutasi 404 — coba langsung Qiospay (bisa kena CORS)
+  const apiKey = '3b44218e0fddd55b592fc57fa2773ae18982478f568eefcf1cd3f4104132fad8';
+  const merchant = 'QP052692';
+  const url = 'https://qiospay.id/api/mutasi/qris/' + merchant + '/' + apiKey;
+  try {
+    const r = await fetch(url, { method: 'GET', headers: { Accept: 'application/json' }, mode: 'cors', cache: 'no-store' });
+    const text = await r.text();
+    let data = null;
+    try { data = JSON.parse(text); } catch (_) { return []; }
+    let list = [];
+    if (Array.isArray(data?.data)) list = data.data;
+    else if (Array.isArray(data?.mutasi)) list = data.mutasi;
+    else if (Array.isArray(data?.result)) list = data.result;
+    else if (Array.isArray(data)) list = data;
+    return (list || []).map(m => ({
+      amount: Math.floor(parseFloat(String(m.amount ?? m.nominal ?? 0).replace(/[^\d.-]/g, '')) || 0),
+      refid: m.refid ?? m.ref ?? m.id ?? null,
+      type: String(m.type || 'CR').toUpperCase(),
+      ...m
+    })).filter(m => m.amount > 0);
+  } catch (e) {
+    console.warn('qiospay direct', e.message);
+    return [];
+  }
+}
+
 async function forceCreditDepositToSupabase(deposit, mutasiMeta) {
   const depositId = deposit && deposit.id;
   if (!depositId) return { ok: false, message: 'Data deposit tidak lengkap' };
@@ -5090,24 +5148,24 @@ async function forceCreditDepositToSupabase(deposit, mutasiMeta) {
   );
   if (expected < 1) return { ok: false, message: 'Nominal deposit invalid' };
 
-  // A) Coba API server (jika /api/complete-deposit tersedia)
+  // A) API complete-deposit (skip jika HTML 404)
   try {
     try { await supabaseClient.auth.refreshSession(); } catch (_) {}
     const { data: sess } = await supabaseClient.auth.getSession();
     const token = sess?.session?.access_token;
     if (token) {
-      const r = await fetch('/api/complete-deposit', {
+      const api = await safeFetchJson('/api/complete-deposit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
         body: JSON.stringify({ deposit_id: depositId }),
         cache: 'no-store'
       });
-      if (r.ok) {
-        const j = await r.json().catch(() => ({}));
-        if (j && j.pending) {
+      if (api.json && !api.notJson) {
+        const j = api.json;
+        if (j.pending) {
           return { ok: false, pending: true, message: j.message || 'Menunggu mutasi', expected: j.expected || expected };
         }
-        if (j && (j.success === true || j.already || j.new_balance != null)) {
+        if (api.ok && (j.success === true || j.already || j.new_balance != null)) {
           return { ok: true, via: 'api', newBalance: j.new_balance, already: !!j.already, data: j };
         }
       }
@@ -5116,28 +5174,36 @@ async function forceCreditDepositToSupabase(deposit, mutasiMeta) {
     console.warn('api complete-deposit skip', e.message);
   }
 
-  // B) Cek mutasi lewat /api/mutasi
+  // B) Cek mutasi: /api/mutasi → fallback Qiospay direct
   let mutasiRef = (mutasiMeta && (mutasiMeta.refid || mutasiMeta.ref || mutasiMeta.id)) || null;
   let mutasiOk = !!(mutasiMeta && Math.floor(Number(mutasiMeta.amount)) === expected);
   if (!mutasiOk) {
+    let list = [];
     try {
-      const res = await fetch('/api/mutasi?amount=' + encodeURIComponent(expected) + '&t=' + Date.now(), {
+      const api = await safeFetchJson('/api/mutasi?amount=' + encodeURIComponent(expected) + '&t=' + Date.now(), {
         cache: 'no-store', headers: { Accept: 'application/json' }
       });
-      const json = await res.json().catch(() => ({}));
-      const list = (typeof extractMutasiList === 'function') ? extractMutasiList(json) : (json.data || json.all || []);
-      for (const m of (list || [])) {
-        const match = (typeof isTransactionMatch === 'function')
-          ? isTransactionMatch(m, expected)
-          : { match: Math.floor(Number(m.amount || m.nominal || 0)) === expected };
-        if (match && match.match) {
-          mutasiOk = true;
-          mutasiRef = m.refid || m.ref || m.id || mutasiRef;
-          break;
-        }
+      if (api.json && !api.notJson) {
+        const json = api.json;
+        list = (typeof extractMutasiList === 'function') ? extractMutasiList(json) : (json.data || json.all || []);
       }
     } catch (e) {
-      console.warn('mutasi', e.message);
+      console.warn('mutasi api', e.message);
+    }
+    if (!list || !list.length) {
+      try {
+        list = await fetchQiospayMutasiDirect(expected);
+      } catch (_) {}
+    }
+    for (const m of (list || [])) {
+      const match = (typeof isTransactionMatch === 'function')
+        ? isTransactionMatch(m, expected)
+        : { match: Math.floor(Number(m.amount || m.nominal || 0)) === expected };
+      if (match && match.match) {
+        mutasiOk = true;
+        mutasiRef = m.refid || m.ref || m.id || mutasiRef;
+        break;
+      }
     }
   }
   if (!mutasiOk) {
@@ -5149,15 +5215,13 @@ async function forceCreditDepositToSupabase(deposit, mutasiMeta) {
     };
   }
 
-  // C) RPC pemilik deposit (setelah SQL GRANT + owner-only)
+  // C) RPC kredit (tidak bergantung /api)
   try {
     let { data, error } = await supabaseClient.rpc('complete_deposit_with_mutasi', {
       p_deposit_id: depositId,
       p_mutasi_amount: expected,
       p_mutasi_ref: mutasiRef ? String(mutasiRef) : null
     });
-
-    // Jika permission denied / function missing → coba server_complete_deposit
     if (error && /permission denied|could not find|does not exist/i.test(error.message || '')) {
       ({ data, error } = await supabaseClient.rpc('server_complete_deposit', {
         p_deposit_id: depositId,
@@ -5166,12 +5230,11 @@ async function forceCreditDepositToSupabase(deposit, mutasiMeta) {
         p_mutasi_ref: mutasiRef ? String(mutasiRef) : null
       }));
     }
-
+    if (error && /permission denied|could not find|does not exist/i.test(error.message || '')) {
+      ({ data, error } = await supabaseClient.rpc('complete_deposit', { p_deposit_id: depositId }));
+    }
     if (error) {
-      return {
-        ok: false,
-        message: error.message + ' — jalankan SQL fix-deposit-permission.sql di Supabase'
-      };
+      return { ok: false, message: error.message + ' — jalankan SQL fix-deposit-permission.sql' };
     }
     if (!data || data.success === false) {
       return { ok: false, message: (data && data.message) || 'Kredit ditolak' };
@@ -5184,7 +5247,7 @@ async function forceCreditDepositToSupabase(deposit, mutasiMeta) {
       data
     };
   } catch (e) {
-    return { ok: false, message: (e.message || String(e)) + ' — jalankan SQL fix-deposit-permission.sql' };
+    return { ok: false, message: (e.message || String(e)) };
   }
 }
 
