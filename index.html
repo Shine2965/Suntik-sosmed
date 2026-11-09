@@ -7010,10 +7010,26 @@ function formatMutasiReasonHtml(reason) {
   return html;
 }
 
+
+async function maybeCleanupMutations() {
+  try {
+    const key = 'bm_cleanup_at';
+    const last = parseInt(localStorage.getItem(key) || '0', 10) || 0;
+    if (Date.now() - last < 6 * 60 * 60 * 1000) return; // max 1x / 6 jam per browser
+    localStorage.setItem(key, String(Date.now()));
+    if (!supabaseClient) return;
+    // owner/admin atau user biasa: fungsi SECURITY DEFINER
+    await supabaseClient.rpc('cleanup_balance_mutations');
+  } catch (e) {
+    console.warn('cleanup mutasi', e.message || e);
+  }
+}
+
 async function loadMutasiUser() {
   const listEl = document.getElementById('mutasiListUser');
   if (!listEl) return;
   if (!currentUser) { listEl.innerHTML = `<div class="mutasi-empty">Login dulu</div>`; return; }
+  try { maybeCleanupMutations(); } catch (_) {}
   listEl.innerHTML = '<div class="loading-box"><span class="spinner"></span><br>Memuat...</div>';
   try {
     let allData = [];
@@ -7056,7 +7072,7 @@ function renderMutasiUserList(data) {
     const createdAt = m.created_at ? new Date(m.created_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', day: '2-digit', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' }) : '-';
     let typeStr = String(m.type || '').toLowerCase().trim();
     const reasonStr = String(m.reason || m.description || '').toLowerCase();
-    if (!typeStr && (reasonStr.includes('refund') || reasonStr.includes('pengembalian'))) typeStr = 'refund';
+    if (typeStr.includes('refund') || reasonStr.includes('refund') || reasonStr.includes('pengembalian') || reasonStr.includes('refund_id=')) typeStr = 'refund';
     const typeInfo = getMutasiTypeInfo(typeStr);
     html += `<div class="mutasi-item ${typeClass}"><div class="mutasi-icon">${icon}</div><div class="mutasi-info"><div class="mutasi-top"><div class="mutasi-email">${typeInfo.icon} ${escapeHtml(typeInfo.label)}</div><div class="mutasi-amount">${prefix}Rp ${amountFormatted}</div></div><div class="mutasi-reason">${formatMutasiReasonHtml(m.reason || m.description || '-')}</div><div class="mutasi-meta"><span class="mutasi-type-badge ${typeInfo.cls}">${typeInfo.icon} ${typeInfo.label}</span><span>🕐 ${createdAt} WIB</span></div></div></div>`;
   });
@@ -7069,6 +7085,7 @@ function toggleMutasiAdmin() {
   if (manager.classList.contains('open')) { if (allMutasiAdminCache.length === 0) loadMutasiAdmin(); }
 }
 async function loadMutasiAdmin() {
+  try { maybeCleanupMutations(); } catch (_) {}
   const listEl = document.getElementById('mutasiListAdmin');
   if (!listEl) return;
   if (!isAdminOrOwner) { listEl.innerHTML = `<div class="mutasi-empty">Hanya admin/owner</div>`; return; }
@@ -7175,6 +7192,9 @@ async function approveRefund(refundId, btnElement) {
     if (!data.success) throw new Error(data.message);
     Swal.fire({ title: '✅ Refund Berhasil!', text: `Rp ${parseFloat(data.amount).toLocaleString('id-ID')}`, icon: 'success', confirmButtonColor: '#22c55e', background: '#0a0e1a', color: '#fff', timer: 3000, timerProgressBar: true });
     await loadPendingRefunds();
+    try { if (typeof loadMutasiUser === 'function') await loadMutasiUser(); } catch (_) {}
+    try { if (typeof loadMutasiAdmin === 'function') await loadMutasiAdmin(); } catch (_) {}
+    try { if (typeof refreshBalance === 'function') await refreshBalance(); } catch (_) {}
     if (allMembersCache.length > 0) loadMemberList();
   } catch (err) { Swal.fire({ title: '❌ Gagal', text: err.message, icon: 'error', confirmButtonColor: '#ef4444', background: '#0a0e1a', color: '#fff' }); if (btnElement) { btnElement.disabled = false; btnElement.innerHTML = '✅ Konfirmasi'; } }
 }
