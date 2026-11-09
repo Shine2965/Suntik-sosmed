@@ -1874,6 +1874,7 @@ async function checkPaymentStatus() {
       statusEl.textContent = `✅ Pembayaran Rp ${totalBayar.toLocaleString('id-ID')} terverifikasi!`;
       
       savePaymentState({ verified: true, orderSent: false, verifiedAt: new Date().toISOString(), totalBayar, trx, method: 'qris' });
+      try { if (appliedVoucher) await redeemVoucherAfterPay(appliedVoucher, originalTotal, trx); } catch(_) {}
       
       try {
         if (ordersData && ordersData.length > 0 && userProfileId) {
@@ -2034,34 +2035,104 @@ async function loadVoucher(){
   }catch{return []}
 }
 
+
+async function applyVoucherFromSupabase(code) {
+  code = String(code || '').trim().toUpperCase();
+  if (!code) throw new Error('Isi kode voucher');
+  if (!supabaseClient) throw new Error('Database belum siap');
+  const { data: sess } = await supabaseClient.auth.getSession();
+  const uid = sess?.session?.user?.id || null;
+  const email = sess?.session?.user?.email || (typeof getStoredGmail === 'function' ? getStoredGmail() : null);
+  const { data, error } = await supabaseClient.rpc('validate_voucher', {
+    p_code: code,
+    p_total: Number(originalTotal) || 0,
+    p_sosmed_type: typeof SOSMED_TYPE !== 'undefined' ? SOSMED_TYPE : null,
+    p_user_id: uid,
+    p_email: email
+  });
+  if (error) throw error;
+  if (!data || data.success === false) throw new Error((data && data.message) || 'Voucher tidak valid');
+  return {
+    code: data.code || code,
+    discount: Math.floor(Number(data.discount) || 0),
+    type: data.type,
+    value: data.value
+  };
+}
+
+async function redeemVoucherAfterPay(code, total, trxId) {
+  try {
+    if (!code || !supabaseClient) return;
+    await supabaseClient.rpc('redeem_voucher', {
+      p_code: code,
+      p_total: Number(total) || 0,
+      p_sosmed_type: typeof SOSMED_TYPE !== 'undefined' ? SOSMED_TYPE : null,
+      p_trx_id: trxId || null
+    });
+  } catch (e) {
+    console.warn('redeem voucher', e.message || e);
+  }
+}
+
+
 document.getElementById('applyVoucher').onclick = async function() {
-  if (IS_GMAIL_BLOCKED || IS_URL_PARAMS_INVALID) return;
+  if (typeof IS_GMAIL_BLOCKED !== 'undefined' && IS_GMAIL_BLOCKED) return;
+  if (typeof IS_URL_PARAMS_INVALID !== 'undefined' && IS_URL_PARAMS_INVALID) return;
   const code = document.getElementById('voucherInput').value.trim().toUpperCase();
-  if(!code) return Swal.fire("Isi kode voucher","","warning");
-  if (isVoucherUsed(code)) return Swal.fire({ title: "❌ Voucher Sudah Dipakai", text: `Kode voucher "${code}" sudah digunakan untuk transaksi ini.`, icon: "error", confirmButtonColor: "#22c55e" });
-  const list = await loadVoucher();
-  if(!list || list.length === 0) return Swal.fire("Error", "Gagal memuat data voucher", "error");
-  const v = list.find(x => x.code && x.code.toUpperCase() === code);
-  if(!v) return Swal.fire("❌ Voucher tidak valid","","error");
-  const minPurchase = v.min_purchase || 0;
-  if (originalTotal < minPurchase) return Swal.fire({ title: "❌ Minimal Pembelian", text: `Minimal pembelian untuk voucher ini adalah Rp ${minPurchase.toLocaleString("id-ID")}`, icon: "warning", confirmButtonColor: "#22c55e" });
-  let discount = 0;
-  if (v.type === "percent") { discount = originalTotal * (v.value / 100); if (v.max_discount) discount = Math.min(discount, v.max_discount); }
-  else if (v.type === "fixed") { discount = v.value; }
-  else return Swal.fire("❌ Tipe voucher tidak valid","","error");
-  discount = Math.ceil(Math.max(0, discount));
-  finalTotal = Math.max(normalizeTotal(originalTotal) - discount, 0);
-  appliedVoucher = v.code; appliedDiscount = discount;
-  markVoucherUsed(v.code);
-  let discountText = `Rp ${discount.toLocaleString("id-ID")}`;
-  if (v.type === "percent") discountText += ` (${v.value}% dari total)`;
-  document.getElementById('voucherStatus').innerHTML = `<span class="active">✅ Voucher ${v.code} berhasil! Diskon: ${discountText}</span>`;
-  document.getElementById('voucherInput').disabled = true;
-  document.getElementById('voucherInput').style.opacity = '0.4';
-  this.disabled = true;
-  this.style.opacity = '0.4';
-  updateDisplay();
-  Swal.fire({ title: "✅ Berhasil!", html: `Voucher <b>${v.code}</b> berhasil digunakan!<br>Diskon: <b>${discountText}</b>`, icon: "success", confirmButtonColor: "#22c55e" });
+  if (!code) return Swal.fire("Isi kode voucher","","warning");
+  if (typeof isVoucherUsed === 'function' && isVoucherUsed(code)) {
+    return Swal.fire({ title: "❌ Voucher Sudah Dipakai", text: 'Kode "' + code + '" sudah dipakai.', icon: "error" });
+  }
+
+  // 1) Supabase (owner Shine Shop)
+  try {
+    const v = await applyVoucherFromSupabase(code);
+    const discount = Math.ceil(Math.max(0, Number(v.discount) || 0));
+    finalTotal = Math.max((typeof normalizeTotal === 'function' ? normalizeTotal(originalTotal) : Math.ceil(Number(originalTotal)||0)) - discount, 0);
+    appliedVoucher = v.code;
+    appliedDiscount = discount;
+    if (typeof markVoucherUsed === 'function') markVoucherUsed(v.code);
+    document.getElementById('voucherStatus').innerHTML = '<span class="active">✅ Voucher ' + v.code + ' · Diskon Rp ' + discount.toLocaleString('id-ID') + '</span>';
+    document.getElementById('voucherInput').disabled = true;
+    this.disabled = true;
+    updateDisplay();
+    Swal.fire({ title: "✅ Berhasil!", html: 'Voucher <b>' + v.code + '</b><br>Diskon: <b>Rp ' + discount.toLocaleString('id-ID') + '</b>', icon: "success", confirmButtonColor: "#22c55e" });
+    return;
+  } catch (errSupa) {
+    console.warn('voucher supabase', errSupa.message || errSupa);
+  }
+
+  // 2) Fallback voucher.json
+  try {
+    const list = await loadVoucher();
+    if (!list || !list.length) {
+      return Swal.fire("Error", "Voucher tidak valid", "error");
+    }
+    const v = list.find(x => x.code && x.code.toUpperCase() === code);
+    if (!v) return Swal.fire("❌ Voucher tidak valid","","error");
+    if (originalTotal < (v.min_purchase || 0)) {
+      return Swal.fire({ title: "❌ Minimal Pembelian", text: "Minimal Rp " + (v.min_purchase||0).toLocaleString("id-ID"), icon: "warning" });
+    }
+    let discount = 0;
+    if (v.type === "percent") {
+      discount = originalTotal * (v.value / 100);
+      if (v.max_discount) discount = Math.min(discount, v.max_discount);
+    } else if (v.type === "fixed") {
+      discount = v.value;
+    } else return Swal.fire("❌ Tipe voucher tidak valid","","error");
+    discount = Math.ceil(Math.max(0, discount));
+    finalTotal = Math.max((typeof normalizeTotal === 'function' ? normalizeTotal(originalTotal) : Math.ceil(originalTotal)) - discount, 0);
+    appliedVoucher = v.code;
+    appliedDiscount = discount;
+    if (typeof markVoucherUsed === 'function') markVoucherUsed(v.code);
+    document.getElementById('voucherStatus').innerHTML = '<span class="active">✅ Voucher ' + v.code + ' · Diskon Rp ' + discount.toLocaleString('id-ID') + '</span>';
+    document.getElementById('voucherInput').disabled = true;
+    this.disabled = true;
+    updateDisplay();
+    Swal.fire({ title: "✅ Berhasil!", html: 'Voucher <b>' + v.code + '</b><br>Diskon: <b>Rp ' + discount.toLocaleString('id-ID') + '</b>', icon: "success", confirmButtonColor: "#22c55e" });
+  } catch (err) {
+    Swal.fire("Error", err.message || String(err), "error");
+  }
 };
 
 document.getElementById('confirmBtn').onclick = function() {
