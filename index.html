@@ -885,6 +885,10 @@ body.chat-open .cs-bubble-container{display:none !important}
 .maint-card p{font-size:13px;color:#e2e8f0;line-height:1.55;margin-bottom:12px}
 .maint-card .maint-meta{font-size:11px;color:#94a3b8}
 
+
+.captcha-first-box{background:rgba(0,198,255,0.08);border:1.5px solid rgba(0,198,255,0.35);border-radius:14px;padding:12px 10px 8px;margin-bottom:14px;text-align:center}
+.captcha-first-label{font-size:11px;font-weight:800;color:#00c6ff;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:8px}
+.cf-turnstile{min-height:65px}
 </style>
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer onload="window.__turnstileReady=true;try{if(typeof initShineTurnstile==='function')initShineTurnstile();}catch(e){}"></script>
 </head>
@@ -1338,10 +1342,26 @@ body.chat-open .cs-bubble-container{display:none !important}
     </div>
     <div class="auth-stats-note" id="authStatsNote">Ringkasan publik Shine Shop (realtime): total member, order bulan ini, dan omzet. Update otomatis saat ada perubahan.</div>
     <div class="auth-tabs"><button class="auth-tab active" id="tabLogin" onclick="switchAuthTab('login')">🔑 Masuk</button><button class="auth-tab" id="tabSignup" onclick="switchAuthTab('signup')">✨ Daftar</button></div>
-    <form class="auth-form active" id="formLogin" onsubmit="handleLogin(event)"><div class="auth-field"><label>Email</label><input type="email" id="loginEmail" placeholder="email@gmail.com" required></div><div class="auth-field"><label>Password</label><input type="password" id="loginPassword" placeholder="••••••••" required minlength="6"></div><div id="loginTurnstile" class="cf-turnstile" style="margin:8px 0;display:flex;justify-content:center;"></div>
-      <input type="hidden" id="loginCaptchaToken" value="">
-      <button type="submit" class="auth-submit" id="btnLoginSubmit">🔑 Masuk Sekarang</button><div class="auth-footer">Belum punya akun? <a onclick="switchAuthTab('signup')">Daftar</a></div></form>
-    <form class="auth-form" id="formSignup" onsubmit="handleSignup(event)">
+    <form class="auth-form active captcha-locked" id="formLogin" onsubmit="handleLogin(event)">
+      <div class="captcha-first-box">
+        <div class="captcha-first-label" id="loginCaptchaLabel">🛡️ Selesaikan captcha dulu</div>
+        <div id="loginTurnstile" class="cf-turnstile" style="margin:6px 0;display:flex;justify-content:center;min-height:65px;"></div>
+        <input type="hidden" id="loginCaptchaToken" value="">
+      </div>
+      <div class="auth-fields-gated">
+      <div class="auth-field"><label>Email</label><input type="email" id="loginEmail" placeholder="email@gmail.com" required></div>
+      <div class="auth-field"><label>Password</label><input type="password" id="loginPassword" placeholder="••••••••" required minlength="6"></div>
+      <button type="submit" class="auth-submit" id="btnLoginSubmit">🔑 Masuk Sekarang</button>
+      <div class="auth-footer">Belum punya akun? <a onclick="switchAuthTab('signup')">Daftar</a></div>
+          </div>
+    </form>
+    <form class="auth-form captcha-locked" id="formSignup" onsubmit="handleSignup(event)">
+      <div class="captcha-first-box">
+        <div class="captcha-first-label" id="signupCaptchaLabel">🛡️ Selesaikan captcha dulu</div>
+        <div id="signupTurnstile" class="cf-turnstile" style="margin:6px 0;display:flex;justify-content:center;min-height:65px;"></div>
+        <input type="hidden" id="signupCaptchaToken" value="">
+      </div>
+      <div class="auth-fields-gated">
       <div class="auth-field"><label>Email</label><input type="email" id="signupEmail" placeholder="email@gmail.com" required></div>
       <div class="auth-field"><label>Password</label><input type="password" id="signupPassword" placeholder="Minimal 6 karakter" required minlength="6"></div>
       <div class="auth-field"><label>Konfirmasi</label><input type="password" id="signupPasswordConfirm" placeholder="Ulangi" required minlength="6"></div>
@@ -1354,10 +1374,9 @@ body.chat-open .cs-bubble-container{display:none !important}
         <input type="checkbox" id="signupAgreeTerms" name="agree_terms">
         <span class="auth-terms-text">Saya menyetujui semua <a href="https://shinedomain.my.id/rules" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()">Syarat &amp; Ketentuan</a> yang berlaku.</span>
       </label>
-      <div id="signupTurnstile" class="cf-turnstile" style="margin:8px 0;display:flex;justify-content:center;"></div>
-      <input type="hidden" id="signupCaptchaToken" value="">
-      <button type="submit" class="auth-submit" id="btnSignupSubmit">✨ Buat Akun</button>
+<button type="submit" class="auth-submit" id="btnSignupSubmit">✨ Buat Akun</button>
       <div class="auth-footer">Sudah punya akun? <a onclick="switchAuthTab('login')">Masuk</a></div>
+          </div>
     </form>
   </div>
 </div>
@@ -2933,6 +2952,7 @@ function switchAuthTab(tab) {
     formLogin.classList.remove('active');
     formSignup.classList.add('active');
     try { renderTurnstileWidgets(true); } catch (_) {}
+    setTimeout(function(){ try { renderTurnstileWidgets(true); } catch(_){} }, 200);
     try {
       const ref = document.getElementById('signupReferralCode');
       if (ref && !ref.value) {
@@ -2955,6 +2975,7 @@ function switchAuthTab(tab) {
     formSignup.classList.remove('active');
     formLogin.classList.add('active');
     try { renderTurnstileWidgets(true); } catch (_) {}
+    setTimeout(function(){ try { renderTurnstileWidgets(true); } catch(_){} }, 200);
     try {
       setTimeout(() => {
         const email = document.getElementById('loginEmail');
@@ -2979,6 +3000,24 @@ async function loadTurnstileSiteKey() {
   } catch (_) {}
 }
 
+
+function setAuthCaptchaUnlocked(formId, unlocked) {
+  const form = document.getElementById(formId);
+  if (!form) return;
+  if (unlocked) {
+    form.classList.remove('captcha-locked');
+    form.classList.add('captcha-ready');
+  } else {
+    form.classList.add('captcha-locked');
+    form.classList.remove('captcha-ready');
+  }
+  const labelId = formId === 'formLogin' ? 'loginCaptchaLabel' : 'signupCaptchaLabel';
+  const label = document.getElementById(labelId);
+  if (label) {
+    label.textContent = unlocked ? '✅ Verifikasi berhasil — lanjut isi form' : '🛡️ Selesaikan captcha dulu';
+  }
+}
+
 function renderTurnstileWidgets(force) {
   if (typeof turnstile === 'undefined') {
     setTimeout(function(){ renderTurnstileWidgets(force); }, 300);
@@ -2990,6 +3029,9 @@ function renderTurnstileWidgets(force) {
       if (force || loginTurnstileWidgetId == null) {
         try { if (loginTurnstileWidgetId != null) turnstile.remove(loginTurnstileWidgetId); } catch (_) {}
         loginEl.innerHTML = '';
+        setAuthCaptchaUnlocked('formLogin', false);
+        var lt = document.getElementById('loginCaptchaToken');
+        if (lt) lt.value = '';
         loginTurnstileWidgetId = turnstile.render(loginEl, {
           sitekey: TURNSTILE_SITE_KEY,
           theme: 'dark',
@@ -2997,13 +3039,16 @@ function renderTurnstileWidgets(force) {
           callback: function(token) {
             var i = document.getElementById('loginCaptchaToken');
             if (i) i.value = token || '';
+            setAuthCaptchaUnlocked('formLogin', !!(token && token.length > 10));
           },
           'expired-callback': function() {
             var i = document.getElementById('loginCaptchaToken');
             if (i) i.value = '';
+            setAuthCaptchaUnlocked('formLogin', false);
           },
           'error-callback': function() {
             console.warn('turnstile login error');
+            setAuthCaptchaUnlocked('formLogin', false);
           }
         });
       }
@@ -3015,6 +3060,9 @@ function renderTurnstileWidgets(force) {
       if (force || signupTurnstileWidgetId == null) {
         try { if (signupTurnstileWidgetId != null) turnstile.remove(signupTurnstileWidgetId); } catch (_) {}
         signupEl.innerHTML = '';
+        setAuthCaptchaUnlocked('formSignup', false);
+        var st = document.getElementById('signupCaptchaToken');
+        if (st) st.value = '';
         signupTurnstileWidgetId = turnstile.render(signupEl, {
           sitekey: TURNSTILE_SITE_KEY,
           theme: 'dark',
@@ -3022,10 +3070,16 @@ function renderTurnstileWidgets(force) {
           callback: function(token) {
             var i = document.getElementById('signupCaptchaToken');
             if (i) i.value = token || '';
+            setAuthCaptchaUnlocked('formSignup', !!(token && token.length > 10));
           },
           'expired-callback': function() {
             var i = document.getElementById('signupCaptchaToken');
             if (i) i.value = '';
+            setAuthCaptchaUnlocked('formSignup', false);
+          },
+          'error-callback': function() {
+            console.warn('turnstile signup error');
+            setAuthCaptchaUnlocked('formSignup', false);
           }
         });
       }
@@ -3033,26 +3087,48 @@ function renderTurnstileWidgets(force) {
   } catch (e) { console.warn('signup turnstile', e && e.message); }
 }
 
-async function initShineTurnstile() {
-  if (turnstileInitStarted) {
-    renderTurnstileWidgets(false);
-    return;
-  }
+async function initShineTurnstile(force) {
+  try {
+    if (typeof loadTurnstileSiteKey === 'function') {
+      await loadTurnstileSiteKey();
+    }
+  } catch (_) {}
   turnstileInitStarted = true;
-  await loadTurnstileSiteKey();
-  renderTurnstileWidgets(true);
+  renderTurnstileWidgets(!!force || true);
 }
 window.initShineTurnstile = initShineTurnstile;
+window.setAuthCaptchaUnlocked = setAuthCaptchaUnlocked;
+window.renderTurnstileWidgets = renderTurnstileWidgets;
 
-document.addEventListener('DOMContentLoaded', function() {
-  try { initShineTurnstile(); } catch (e) { console.warn('turnstile init', e); }
-});
-// fallback jika DOM sudah ready
-if (document.readyState !== 'loading') {
-  try { initShineTurnstile(); } catch (e) {}
+function bootTurnstileCaptcha() {
+  // Prioritas: render captcha SEBELUM user isi form
+  try {
+    setAuthCaptchaUnlocked('formLogin', false);
+    setAuthCaptchaUnlocked('formSignup', false);
+  } catch (_) {}
+  try {
+    if (typeof initShineTurnstile === 'function') initShineTurnstile(true);
+    else renderTurnstileWidgets(true);
+  } catch (e) { console.warn('turnstile init', e); }
+  var tries = 0;
+  var t = setInterval(function() {
+    tries++;
+    try {
+      if (typeof turnstile !== 'undefined') {
+        renderTurnstileWidgets(tries <= 3);
+        var loginEl = document.getElementById('loginTurnstile');
+        var hasWidget = loginEl && loginEl.querySelector('iframe, .cf-turnstile-response, input, [name="cf-turnstile-response"]');
+        if (hasWidget || tries > 25) clearInterval(t);
+      }
+    } catch (_) {}
+    if (tries > 30) clearInterval(t);
+  }, 350);
 }
-setTimeout(function(){ try { initShineTurnstile(); } catch(e){} }, 800);
-setTimeout(function(){ try { renderTurnstileWidgets(false); } catch(e){} }, 2000);
+
+document.addEventListener('DOMContentLoaded', bootTurnstileCaptcha);
+if (document.readyState !== 'loading') bootTurnstileCaptcha();
+setTimeout(bootTurnstileCaptcha, 600);
+setTimeout(function(){ try { renderTurnstileWidgets(true); } catch(e){} }, 1500);
 
 
 async function verifyTurnstileToken(token) {
