@@ -951,6 +951,7 @@ body.chat-open .cs-bubble-container{display:none !important}
           <button class="balance-btn refresh" style="flex:0.5" type="button" onclick="resetVoucherForm()">Reset</button>
         </div>
       </div>
+      <div style="font-size:11px;font-weight:800;color:#b39ddb;text-transform:uppercase;letter-spacing:1px;margin:14px 0 8px;">📋 Kode voucher yang sudah dibuat</div>
       <div id="voucherAdminList"><div class="loading-box">Daftar voucher</div></div>
     </div>
   </div>
@@ -9982,58 +9983,93 @@ window.clearMaintenanceSchedule = clearMaintenanceSchedule;
   try { loadMaintenanceState(); subscribeMaintenance(); } catch(e) {}
 
 /* ========== VOUCHER ADMIN ========== */
+
 async function loadVouchersAdmin() {
   const el = document.getElementById('voucherAdminList');
   if (!el || !supabaseClient) return;
-  if (!isOwner && !isAdminOrOwner) {
-    el.innerHTML = '<div style="color:#f87171;font-size:12px;">Hanya owner/admin</div>';
+  if (!(isOwner || isAdminOrOwner)) {
+    el.innerHTML = '<div style="color:#f87171;font-size:12px;padding:12px;">🔒 Hanya owner/admin yang bisa melihat voucher</div>';
     return;
   }
-  el.innerHTML = '<div class="loading-box"><span class="spinner"></span></div>';
+  el.innerHTML = '<div class="loading-box"><span class="spinner"></span><br>Memuat voucher...</div>';
   try {
-    const { data, error } = await supabaseClient.from('vouchers').select('*').order('created_at', { ascending: false }).limit(100);
+    const { data, error } = await supabaseClient
+      .from('vouchers')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(200);
     if (error) throw error;
-    if (!data || !data.length) {
-      el.innerHTML = '<div class="mutasi-empty">Belum ada voucher</div>';
-      return;
-    }
-    let html = '';
-    data.forEach(v => {
-      const emails = (v.allowed_emails || []).join(', ') || 'SEMUA MEMBER';
-      const sos = (v.sosmed_types || []).join(', ');
-      html += `<div class="order-card" style="margin-bottom:10px;">
-        <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;">
-          <div>
-            <div style="font-weight:900;color:#facc15;font-size:14px;">${escapeHtml(v.code)} ${v.active ? '✅' : '🚫'}</div>
-            <div style="font-size:11px;color:#b39ddb;">${v.type === 'percent' ? v.value + '%' : 'Rp ' + Number(v.value).toLocaleString('id-ID')}
-              · min Rp ${Number(v.min_purchase||0).toLocaleString('id-ID')}
-              · pakai ${v.used_count||0}${v.max_uses!=null?'/'+v.max_uses:''}
-            </div>
-            <div style="font-size:10px;color:#94a3b8;margin-top:4px;">Sosmed: ${escapeHtml(sos)}</div>
-            <div style="font-size:10px;color:#64ffc8;margin-top:2px;">Member: ${escapeHtml(emails)}</div>
-            ${v.note ? '<div style="font-size:10px;color:#94a3b8;">'+escapeHtml(v.note)+'</div>' : ''}
-          </div>
-          <div style="display:flex;flex-direction:column;gap:6px;">
-            <button class="mc-action-btn" onclick='editVoucherAdmin(${JSON.stringify(v).replace(/'/g,"&#39;")})'>✏️</button>
-            <button class="mc-action-btn delete" onclick="deleteVoucherAdmin('${v.id}')">🗑️</button>
-          </div>
-        </div>
-      </div>`;
-    });
-    el.innerHTML = html;
+    window._vouchersCache = data || [];
+    renderVoucherAdminList(window._vouchersCache);
   } catch (e) {
-    el.innerHTML = '<div style="color:#f87171;font-size:12px;">' + escapeHtml(e.message) + ' — jalankan SQL vouchers-system.sql</div>';
+    el.innerHTML = '<div style="color:#f87171;font-size:12px;padding:12px;">' +
+      escapeHtml(e.message || String(e)) +
+      '<br><span style="color:#94a3b8">Jalankan SQL vouchers-system.sql di Supabase</span></div>';
   }
 }
 
-function resetVoucherForm() {
-  ['voucherEditId','vCode','vValue','vMaxDisc','vMin','vEmails','vNote','vExpires'].forEach(id => {
-    const el = document.getElementById(id); if (el) el.value = '';
+function renderVoucherAdminList(data) {
+  const el = document.getElementById('voucherAdminList');
+  if (!el) return;
+  if (!data || !data.length) {
+    el.innerHTML = '<div class="mutasi-empty"><span style="font-size:28px;opacity:.5;display:block;margin-bottom:6px;">🎟️</span>Belum ada kode voucher</div>';
+    return;
+  }
+  let html = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">' +
+    '<div style="font-size:11px;font-weight:800;color:#b39ddb;text-transform:uppercase;letter-spacing:1px;">Daftar Voucher (' + data.length + ')</div>' +
+    '<button type="button" class="balance-btn refresh" style="flex:none;padding:8px 12px;font-size:11px;" onclick="loadVouchersAdmin()">🔄 Refresh</button></div>';
+
+  data.forEach((v, idx) => {
+    const emails = Array.isArray(v.allowed_emails) && v.allowed_emails.length
+      ? v.allowed_emails.join(', ')
+      : 'SEMUA MEMBER';
+    const sos = Array.isArray(v.sosmed_types) ? v.sosmed_types.join(', ') : '-';
+    const nilai = v.type === 'percent'
+      ? (Number(v.value) + '%')
+      : ('Rp ' + Number(v.value || 0).toLocaleString('id-ID'));
+    const maxD = v.max_discount != null ? ('Rp ' + Number(v.max_discount).toLocaleString('id-ID')) : '-';
+    const uses = (v.used_count || 0) + (v.max_uses != null ? (' / ' + v.max_uses) : ' / ∞');
+    const exp = v.expires_at
+      ? new Date(v.expires_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) + ' WIB'
+      : 'Tidak ada';
+    const created = v.created_at
+      ? new Date(v.created_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })
+      : '-';
+    const activeBadge = v.active
+      ? '<span style="background:rgba(34,197,94,.2);color:#22c55e;border:1px solid rgba(34,197,94,.4);padding:2px 8px;border-radius:20px;font-size:10px;font-weight:800;">AKTIF</span>'
+      : '<span style="background:rgba(239,68,68,.2);color:#ef4444;border:1px solid rgba(239,68,68,.4);padding:2px 8px;border-radius:20px;font-size:10px;font-weight:800;">NONAKTIF</span>';
+
+    html += '<div class="order-card" style="margin-bottom:12px;border:1.5px solid rgba(250,204,21,0.25);">' +
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;margin-bottom:8px;">' +
+        '<div>' +
+          '<div style="font-size:16px;font-weight:900;color:#facc15;letter-spacing:1px;font-family:monospace;">' + escapeHtml(v.code || '-') + '</div>' +
+          '<div style="margin-top:4px;">' + activeBadge + '</div>' +
+        '</div>' +
+        '<div style="display:flex;gap:6px;">' +
+          '<button type="button" class="mc-action-btn" onclick="editVoucherByIndex(' + idx + ')">✏️ Edit</button>' +
+          '<button type="button" class="mc-action-btn delete" onclick="deleteVoucherAdmin(\'' + String(v.id).replace(/'/g, '') + '\')">🗑️</button>' +
+        '</div>' +
+      '</div>' +
+      '<div style="font-size:11.5px;line-height:1.65;color:#e2e8f0;background:rgba(0,0,0,0.2);padding:10px 12px;border-radius:10px;">' +
+        '<div><b style="color:#94a3b8;">Nilai:</b> ' + escapeHtml(nilai) + ' <span style="color:#64748b;">(' + escapeHtml(v.type || '-') + ')</span></div>' +
+        '<div><b style="color:#94a3b8;">Max diskon:</b> ' + escapeHtml(maxD) + '</div>' +
+        '<div><b style="color:#94a3b8;">Min belanja:</b> Rp ' + Number(v.min_purchase || 0).toLocaleString('id-ID') + '</div>' +
+        '<div><b style="color:#94a3b8;">Pemakaian:</b> ' + escapeHtml(String(uses)) + ' · limit/user: ' + (v.per_user_limit != null ? v.per_user_limit : 1) + '</div>' +
+        '<div><b style="color:#94a3b8;">Sosmed:</b> ' + escapeHtml(sos) + '</div>' +
+        '<div><b style="color:#94a3b8;">Member:</b> <span style="color:#64ffc8;">' + escapeHtml(emails) + '</span></div>' +
+        '<div><b style="color:#94a3b8;">Expired:</b> ' + escapeHtml(exp) + '</div>' +
+        '<div><b style="color:#94a3b8;">Dibuat:</b> ' + escapeHtml(created) + '</div>' +
+        (v.note ? '<div><b style="color:#94a3b8;">Catatan:</b> ' + escapeHtml(v.note) + '</div>' : '') +
+        '<div style="font-size:10px;color:#64748b;margin-top:4px;font-family:monospace;">ID: ' + escapeHtml(String(v.id || '')) + '</div>' +
+      '</div></div>';
   });
-  const t = document.getElementById('vType'); if (t) t.value = 'fixed';
-  const s = document.getElementById('vSosmed'); if (s) s.value = 'sosmed-1,sosmed-2,sosmed-4';
-  const p = document.getElementById('vPerUser'); if (p) p.value = '1';
-  const m = document.getElementById('vMaxUses'); if (m) m.value = '';
+  el.innerHTML = html;
+}
+
+function editVoucherByIndex(idx) {
+  const v = (window._vouchersCache || [])[idx];
+  if (!v) return;
+  editVoucherAdmin(v);
 }
 
 function editVoucherAdmin(v) {
