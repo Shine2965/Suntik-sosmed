@@ -915,7 +915,47 @@ body.chat-open .cs-bubble-container{display:none !important}
   </div>
 
   <div class="app-body">
-    <div class="page active" id="page-home">
+    
+  <div class="page" id="page-vouchers">
+    <div class="section">
+      <div class="section-title">🎟️ Voucher <span class="line"></span></div>
+      <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:16px;padding:14px;margin-bottom:14px;">
+        <div style="font-size:11px;color:#b39ddb;margin-bottom:8px;font-weight:700;">BUAT / EDIT VOUCHER (Owner)</div>
+        <input type="hidden" id="voucherEditId" value="">
+        <div class="auth-field"><label>Kode</label><input id="vCode" placeholder="SHINE50" style="text-transform:uppercase"></div>
+        <div style="display:flex;gap:8px;">
+          <div class="auth-field" style="flex:1"><label>Tipe</label>
+            <select id="vType" style="width:100%;padding:10px;border-radius:10px;background:#1a0e2e;color:#fff;border:1px solid rgba(255,255,255,0.15)">
+              <option value="fixed">Fixed (Rp)</option>
+              <option value="percent">Percent (%)</option>
+            </select>
+          </div>
+          <div class="auth-field" style="flex:1"><label>Nilai</label><input id="vValue" type="number" placeholder="5000 atau 10"></div>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <div class="auth-field" style="flex:1"><label>Max diskon (%, opsional)</label><input id="vMaxDisc" type="number" placeholder="opsional"></div>
+          <div class="auth-field" style="flex:1"><label>Min belanja</label><input id="vMin" type="number" placeholder="0"></div>
+        </div>
+        <div class="auth-field"><label>Sosmed (pisah koma)</label><input id="vSosmed" value="sosmed-1,sosmed-2,sosmed-4" placeholder="sosmed-1,sosmed-2"></div>
+        <div class="auth-field"><label>Member boleh pakai (email, pisah koma/baris). KOSONG = semua member</label>
+          <textarea id="vEmails" rows="3" placeholder="user1@gmail.com" style="width:100%;padding:10px;border-radius:10px;background:rgba(0,0,0,0.25);color:#fff;border:1px solid rgba(255,255,255,0.15);font-family:inherit"></textarea>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <div class="auth-field" style="flex:1"><label>Max total pakai</label><input id="vMaxUses" type="number" placeholder="unlimited"></div>
+          <div class="auth-field" style="flex:1"><label>Limit / user</label><input id="vPerUser" type="number" value="1"></div>
+        </div>
+        <div class="auth-field"><label>Expired (opsional)</label><input id="vExpires" type="datetime-local"></div>
+        <div class="auth-field"><label>Catatan</label><input id="vNote" placeholder="opsional"></div>
+        <div style="display:flex;gap:8px;margin-top:10px;">
+          <button class="balance-btn deposit" style="flex:1" type="button" onclick="saveVoucherAdmin()">💾 Simpan</button>
+          <button class="balance-btn refresh" style="flex:0.5" type="button" onclick="resetVoucherForm()">Reset</button>
+        </div>
+      </div>
+      <div id="voucherAdminList"><div class="loading-box">Daftar voucher</div></div>
+    </div>
+  </div>
+
+<div class="page active" id="page-home">
       <div class="profile-card" style="margin-bottom:16px;">
         <div class="profile-avatar-wrapper"><div class="profile-avatar" id="homeAvatar">U</div></div>
         <div class="profile-info"><div class="profile-name" id="homeName">User</div><div class="profile-email" id="homeEmail">-</div><div class="profile-role user" id="homeRole">👤 User</div></div>
@@ -947,7 +987,15 @@ body.chat-open .cs-bubble-container{display:none !important}
       <div class="section">
         <div class="section-title">🛍️ Layanan<div class="line"></div></div>
         <div class="menu-grid">
-          <div class="menu-item primary" onclick="handleButtonClick('global')"><div class="icon">🛒</div><div><div class="label">Belanja Sosmed</div><div class="sub">Follower, Like, View</div></div><div class="arrow">→</div></div>
+          
+          <div class="menu-item gold" onclick="switchPage('vouchers')" style="display:none" id="menuVouchers">
+            <div class="icon">🎟️</div>
+            <div class="label">Voucher</div>
+            <div class="sub">Buat & kelola kode voucher</div>
+            <span class="arrow">→</span>
+          </div>
+
+        <div class="menu-item primary" onclick="handleButtonClick('global')"><div class="icon">🛒</div><div><div class="label">Belanja Sosmed</div><div class="sub">Follower, Like, View</div></div><div class="arrow">→</div></div>
           <div class="menu-item blue" onclick="handleButtonClick('jualbeli')"><div class="icon">🏪</div><div><div class="label">Jual Beli Akun</div><div class="sub">Marketplace akun</div></div><div class="arrow">→</div></div>
           <div class="menu-item purple" onclick="handleButtonClick('sewaweb')"><div class="icon">🌐</div><div><div class="label">Sewa Website</div><div class="sub">Website premium</div></div><div class="arrow">→</div></div>
           <div class="menu-item green" onclick="handleButtonClick('tutorial')"><div class="icon">📕</div><div><div class="label">Tutorial</div><div class="sub">Cara order</div></div><div class="arrow">→</div></div>
@@ -1837,6 +1885,8 @@ function switchPage(pageName) {
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   const page = document.getElementById('page-' + pageName);
   if (page) page.classList.add('active');
+  if (pageName === 'vouchers') { try { loadVouchersAdmin(); } catch(e) {} }
+  const mv = document.getElementById('menuVouchers'); if (mv) mv.style.display = (isAdminOrOwner || isOwner) ? '' : 'none';
   const navBtn = document.querySelector(`.nav-item[data-page="${pageName}"]`);
   if (navBtn) navBtn.classList.add('active');
   const body = document.querySelector('.app-body');
@@ -9930,6 +9980,137 @@ window.saveMaintenanceSettings = saveMaintenanceSettings;
 window.clearMaintenanceSchedule = clearMaintenanceSchedule;
 
   try { loadMaintenanceState(); subscribeMaintenance(); } catch(e) {}
+
+/* ========== VOUCHER ADMIN ========== */
+async function loadVouchersAdmin() {
+  const el = document.getElementById('voucherAdminList');
+  if (!el || !supabaseClient) return;
+  if (!isOwner && !isAdminOrOwner) {
+    el.innerHTML = '<div style="color:#f87171;font-size:12px;">Hanya owner/admin</div>';
+    return;
+  }
+  el.innerHTML = '<div class="loading-box"><span class="spinner"></span></div>';
+  try {
+    const { data, error } = await supabaseClient.from('vouchers').select('*').order('created_at', { ascending: false }).limit(100);
+    if (error) throw error;
+    if (!data || !data.length) {
+      el.innerHTML = '<div class="mutasi-empty">Belum ada voucher</div>';
+      return;
+    }
+    let html = '';
+    data.forEach(v => {
+      const emails = (v.allowed_emails || []).join(', ') || 'SEMUA MEMBER';
+      const sos = (v.sosmed_types || []).join(', ');
+      html += `<div class="order-card" style="margin-bottom:10px;">
+        <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+          <div>
+            <div style="font-weight:900;color:#facc15;font-size:14px;">${escapeHtml(v.code)} ${v.active ? '✅' : '🚫'}</div>
+            <div style="font-size:11px;color:#b39ddb;">${v.type === 'percent' ? v.value + '%' : 'Rp ' + Number(v.value).toLocaleString('id-ID')}
+              · min Rp ${Number(v.min_purchase||0).toLocaleString('id-ID')}
+              · pakai ${v.used_count||0}${v.max_uses!=null?'/'+v.max_uses:''}
+            </div>
+            <div style="font-size:10px;color:#94a3b8;margin-top:4px;">Sosmed: ${escapeHtml(sos)}</div>
+            <div style="font-size:10px;color:#64ffc8;margin-top:2px;">Member: ${escapeHtml(emails)}</div>
+            ${v.note ? '<div style="font-size:10px;color:#94a3b8;">'+escapeHtml(v.note)+'</div>' : ''}
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            <button class="mc-action-btn" onclick='editVoucherAdmin(${JSON.stringify(v).replace(/'/g,"&#39;")})'>✏️</button>
+            <button class="mc-action-btn delete" onclick="deleteVoucherAdmin('${v.id}')">🗑️</button>
+          </div>
+        </div>
+      </div>`;
+    });
+    el.innerHTML = html;
+  } catch (e) {
+    el.innerHTML = '<div style="color:#f87171;font-size:12px;">' + escapeHtml(e.message) + ' — jalankan SQL vouchers-system.sql</div>';
+  }
+}
+
+function resetVoucherForm() {
+  ['voucherEditId','vCode','vValue','vMaxDisc','vMin','vEmails','vNote','vExpires'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
+  const t = document.getElementById('vType'); if (t) t.value = 'fixed';
+  const s = document.getElementById('vSosmed'); if (s) s.value = 'sosmed-1,sosmed-2,sosmed-4';
+  const p = document.getElementById('vPerUser'); if (p) p.value = '1';
+  const m = document.getElementById('vMaxUses'); if (m) m.value = '';
+}
+
+function editVoucherAdmin(v) {
+  if (typeof v === 'string') { try { v = JSON.parse(v); } catch(_){ return; } }
+  document.getElementById('voucherEditId').value = v.id || '';
+  document.getElementById('vCode').value = v.code || '';
+  document.getElementById('vType').value = v.type || 'fixed';
+  document.getElementById('vValue').value = v.value || '';
+  document.getElementById('vMaxDisc').value = v.max_discount || '';
+  document.getElementById('vMin').value = v.min_purchase || 0;
+  document.getElementById('vSosmed').value = (v.sosmed_types || []).join(',');
+  document.getElementById('vEmails').value = (v.allowed_emails || []).join('\n');
+  document.getElementById('vMaxUses').value = v.max_uses != null ? v.max_uses : '';
+  document.getElementById('vPerUser').value = v.per_user_limit != null ? v.per_user_limit : 1;
+  document.getElementById('vNote').value = v.note || '';
+  if (v.expires_at) {
+    try {
+      const d = new Date(v.expires_at);
+      const pad = n => String(n).padStart(2,'0');
+      document.getElementById('vExpires').value = d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'T'+pad(d.getHours())+':'+pad(d.getMinutes());
+    } catch(_){}
+  }
+  switchPage('vouchers');
+}
+
+async function saveVoucherAdmin() {
+  if (!isAdminOrOwner) return Swal.fire({title:'Akses ditolak',icon:'error',background:'#1a0e2e',color:'#fff'});
+  const code = (document.getElementById('vCode').value || '').trim();
+  const type = document.getElementById('vType').value;
+  const value = parseFloat(document.getElementById('vValue').value || '0');
+  const maxDisc = document.getElementById('vMaxDisc').value ? parseFloat(document.getElementById('vMaxDisc').value) : null;
+  const minP = parseFloat(document.getElementById('vMin').value || '0');
+  const sosmed = (document.getElementById('vSosmed').value || '').split(/[,\s]+/).map(x=>x.trim()).filter(Boolean);
+  const emailsRaw = (document.getElementById('vEmails').value || '').split(/[\n,;]+/).map(x=>x.trim().toLowerCase()).filter(x=>x.includes('@'));
+  const maxUses = document.getElementById('vMaxUses').value ? parseInt(document.getElementById('vMaxUses').value,10) : null;
+  const perUser = parseInt(document.getElementById('vPerUser').value || '1', 10);
+  const note = document.getElementById('vNote').value || null;
+  const expVal = document.getElementById('vExpires').value;
+  const expires = expVal ? new Date(expVal).toISOString() : null;
+  const id = document.getElementById('voucherEditId').value || null;
+  const { data, error } = await supabaseClient.rpc('admin_upsert_voucher', {
+    p_code: code,
+    p_type: type,
+    p_value: value,
+    p_max_discount: maxDisc,
+    p_min_purchase: minP,
+    p_sosmed_types: sosmed.length ? sosmed : null,
+    p_allowed_emails: emailsRaw.length ? emailsRaw : null,
+    p_max_uses: maxUses,
+    p_per_user_limit: perUser,
+    p_active: true,
+    p_expires_at: expires,
+    p_note: note,
+    p_id: id || null
+  });
+  if (error) return Swal.fire({title:'Gagal',text:error.message,icon:'error',background:'#1a0e2e',color:'#fff'});
+  if (data && data.success === false) return Swal.fire({title:'Gagal',text:data.message,icon:'error',background:'#1a0e2e',color:'#fff'});
+  Swal.fire({title:'Tersimpan',icon:'success',background:'#1a0e2e',color:'#fff',timer:1500});
+  resetVoucherForm();
+  loadVouchersAdmin();
+}
+
+async function deleteVoucherAdmin(id) {
+  const conf = await Swal.fire({title:'Hapus voucher?',icon:'warning',showCancelButton:true,confirmButtonColor:'#ef4444',background:'#1a0e2e',color:'#fff'});
+  if (!conf.isConfirmed) return;
+  const { data, error } = await supabaseClient.rpc('admin_delete_voucher', { p_id: id });
+  if (error) return Swal.fire({title:'Gagal',text:error.message,icon:'error',background:'#1a0e2e',color:'#fff'});
+  loadVouchersAdmin();
+}
+
+window.loadVouchersAdmin = loadVouchersAdmin;
+window.saveVoucherAdmin = saveVoucherAdmin;
+window.deleteVoucherAdmin = deleteVoucherAdmin;
+window.editVoucherAdmin = editVoucherAdmin;
+window.resetVoucherForm = resetVoucherForm;
+
+try { const mv=document.getElementById('menuVouchers'); if(mv) mv.style.display=(isAdminOrOwner||isOwner)?'':'none'; } catch(e){}
 console.log('🌸 Shine Shop ready!');
 });
 
