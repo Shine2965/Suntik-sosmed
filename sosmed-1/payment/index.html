@@ -1788,6 +1788,7 @@ async function checkPaymentStatus() {
       statusEl.textContent = `✅ Pembayaran Rp ${totalBayar.toLocaleString('id-ID')} terverifikasi!`;
       
       savePaymentState({ verified: true, orderSent: false, verifiedAt: new Date().toISOString(), totalBayar, trx, method: 'qris' });
+      try { if (appliedVoucher) await redeemVoucherAfterPay(appliedVoucher, originalTotal, trx); } catch(_) {}
       
       try {
         if (ordersData && ordersData.length > 0 && userProfileId) {
@@ -1942,31 +1943,104 @@ async function loadVoucher(){
   }catch{return []}
 }
 
-document.getElementById('applyVoucher').onclick = async function() {
-  if (IS_GMAIL_BLOCKED || IS_URL_PARAMS_INVALID) return;
-  const code = document.getElementById('voucherInput').value.trim().toUpperCase();
-  if(!code) return Swal.fire("Isi kode voucher","","warning");
-  if (isVoucherUsed(code)) return Swal.fire({ title: "❌ Voucher Sudah Dipakai", text: `Kode voucher "${code}" sudah digunakan.`, icon: "error" });
-  const list = await loadVoucher();
-  if(!list || list.length === 0) return Swal.fire("Error", "Gagal memuat data voucher", "error");
-  const v = list.find(x => x.code && x.code.toUpperCase() === code);
-  if(!v) return Swal.fire("❌ Voucher tidak valid","","error");
-  if (originalTotal < (v.min_purchase || 0)) {
-    return Swal.fire({ title: "❌ Minimal Pembelian", text: `Minimal Rp ${(v.min_purchase||0).toLocaleString("id-ID")}`, icon: "warning" });
+/**
+ * Ganti logika apply voucher di payment sosmed-* dengan ini.
+ * Butuh: supabaseClient, originalTotal, finalTotal, appliedVoucher,
+ * appliedDiscount, updateDisplay(), SOSMED_TYPE, trx
+ */
+async function applyVoucherFromSupabase(code) {
+  code = String(code || '').trim().toUpperCase();
+  if (!code) throw new Error('Isi kode voucher');
+  if (!supabaseClient) throw new Error('Database belum siap');
+
+  const { data: sess } = await supabaseClient.auth.getSession();
+  const uid = sess?.session?.user?.id || null;
+  const email = sess?.session?.user?.email || (typeof getStoredGmail === 'function' ? getStoredGmail() : null);
+
+  const { data, error } = await supabaseClient.rpc('validate_voucher', {
+    p_code: code,
+    p_total: Number(originalTotal) || 0,
+    p_sosmed_type: typeof SOSMED_TYPE !== 'undefined' ? SOSMED_TYPE : null,
+    p_user_id: uid,
+    p_email: email
+  });
+  if (error) throw error;
+  if (!data || data.success === false) throw new Error((data && data.message) || 'Voucher tidak valid');
+
+  return {
+    code: data.code || code,
+    discount: Math.floor(Number(data.discount) || 0),
+    type: data.type,
+    value: data.value
+  };
+}
+
+/** Panggil setelah pembayaran sukses agar kuota terpakai */
+async function redeemVoucherAfterPay(code, total, trxId) {
+  try {
+    if (!code || !supabaseClient) return;
+    await supabaseClient.rpc('redeem_voucher', {
+      p_code: code,
+      p_total: Number(total) || 0,
+      p_sosmed_type: typeof SOSMED_TYPE !== 'undefined' ? SOSMED_TYPE : null,
+      p_trx_id: trxId || null
+    });
+  } catch (e) {
+    console.warn('redeem voucher', e.message || e);
   }
-  let discount = 0;
-  if (v.type === "percent") { discount = originalTotal * (v.value / 100); if (v.max_discount) discount = Math.min(discount, v.max_discount); }
-  else if (v.type === "fixed") { discount = v.value; }
-  else return Swal.fire("❌ Tipe voucher tidak valid","","error");
-  discount = Math.ceil(Math.max(0, discount));
-  finalTotal = Math.max(normalizeTotal(originalTotal) - discount, 0);
-  appliedVoucher = v.code; appliedDiscount = discount;
-  markVoucherUsed(v.code);
-  document.getElementById('voucherStatus').innerHTML = `<span class="active">✅ Voucher ${v.code} berhasil! Diskon: Rp ${discount.toLocaleString('id-ID')}</span>`;
-  document.getElementById('voucherInput').disabled = true;
-  this.disabled = true;
-  updateDisplay();
-  Swal.fire({ title: "✅ Berhasil!", html: `Voucher <b>${v.code}</b> digunakan!<br>Diskon: <b>Rp ${discount.toLocaleString('id-ID')}</b>`, icon: "success", confirmButtonColor: "#22c55e" });
+}
+
+
+document.getElementById('applyVoucher').onclick = async function() {
+  if (typeof IS_GMAIL_BLOCKED !== 'undefined' && IS_GMAIL_BLOCKED) return;
+  if (typeof IS_URL_PARAMS_INVALID !== 'undefined' && IS_URL_PARAMS_INVALID) return;
+  const code = document.getElementById('voucherInput').value.trim().toUpperCase();
+  if (!code) return Swal.fire("Isi kode voucher","","warning");
+  if (typeof isVoucherUsed === 'function' && isVoucherUsed(code)) {
+    return Swal.fire({ title: "❌ Voucher Sudah Dipakai", text: 'Kode "' + code + '" sudah dipakai.', icon: "error" });
+  }
+  try {
+    const v = await applyVoucherFromSupabase(code);
+    const discount = Math.ceil(Math.max(0, Number(v.discount) || 0));
+    finalTotal = Math.max((typeof normalizeTotal === 'function' ? normalizeTotal(originalTotal) : Math.ceil(Number(originalTotal)||0)) - discount, 0);
+    appliedVoucher = v.code;
+    appliedDiscount = discount;
+    if (typeof markVoucherUsed === 'function') markVoucherUsed(v.code);
+    document.getElementById('voucherStatus').innerHTML = '<span class="active">✅ Voucher ' + v.code + ' · Diskon Rp ' + discount.toLocaleString('id-ID') + '</span>';
+    document.getElementById('voucherInput').disabled = true;
+    this.disabled = true;
+    updateDisplay();
+    Swal.fire({ title: "✅ Berhasil!", html: 'Voucher <b>' + v.code + '</b><br>Diskon: <b>Rp ' + discount.toLocaleString('id-ID') + '</b>', icon: "success", confirmButtonColor: "#22c55e" });
+    return;
+  } catch (errSupa) {
+    console.warn('voucher supabase', errSupa.message || errSupa);
+  }
+  try {
+    const list = await loadVoucher();
+    if (!list || !list.length) return Swal.fire("Error", "Voucher tidak valid", "error");
+    const v = list.find(x => x.code && x.code.toUpperCase() === code);
+    if (!v) return Swal.fire("❌ Voucher tidak valid","","error");
+    if (originalTotal < (v.min_purchase || 0)) {
+      return Swal.fire({ title: "❌ Minimal Pembelian", text: "Minimal Rp " + (v.min_purchase||0).toLocaleString("id-ID"), icon: "warning" });
+    }
+    let discount = 0;
+    if (v.type === "percent") {
+      discount = originalTotal * (v.value / 100);
+      if (v.max_discount) discount = Math.min(discount, v.max_discount);
+    } else if (v.type === "fixed") discount = v.value;
+    else return Swal.fire("❌ Tipe voucher tidak valid","","error");
+    discount = Math.ceil(Math.max(0, discount));
+    finalTotal = Math.max((typeof normalizeTotal === 'function' ? normalizeTotal(originalTotal) : Math.ceil(originalTotal)) - discount, 0);
+    appliedVoucher = v.code; appliedDiscount = discount;
+    if (typeof markVoucherUsed === 'function') markVoucherUsed(v.code);
+    document.getElementById('voucherStatus').innerHTML = '<span class="active">✅ Voucher ' + v.code + ' · Diskon Rp ' + discount.toLocaleString('id-ID') + '</span>';
+    document.getElementById('voucherInput').disabled = true;
+    this.disabled = true;
+    updateDisplay();
+    Swal.fire({ title: "✅ Berhasil!", html: 'Voucher <b>' + v.code + '</b><br>Diskon: <b>Rp ' + discount.toLocaleString('id-ID') + '</b>', icon: "success", confirmButtonColor: "#22c55e" });
+  } catch (err) {
+    Swal.fire("Error", err.message || String(err), "error");
+  }
 };
 
 document.getElementById('confirmBtn').onclick = function() {
@@ -2041,10 +2115,10 @@ window.showRefundHistory = showRefundHistory;
 
 (async function() {
   try { await initMaintenanceGate(); } catch (e) { console.warn("maint", e); }
-
+  
   await fetchConfigFromEnv();
   configLoaded = true;
-
+  
   // 🚀 AMBIL DATA TRANSAKSI (orders, total, mass) DARI SUPABASE DENGAN ID TRX
   ordersData = await loadOrdersFromSupabase();
 
@@ -2052,4 +2126,96 @@ window.showRefundHistory = showRefundHistory;
   if (!paramsValid) return;
   
   const gmailValid = checkGmailAndRedirect();
-  if (!gm
+  if (!gmailValid) return;
+  
+  const isBanned = await checkAndHandleBan();
+  if (isBanned) return;
+  
+  await loadUserBalance();
+  
+  const gmailNow = getStoredGmail();
+  if (!gmailNow || !validateEmail(gmailNow)) { checkGmailAndRedirect(); return; }
+  
+  const savedState = getPaymentState();
+  if (savedState && savedState.verified === true && savedState.verifiedAt) {
+    const diffMinutes = (Date.now() - new Date(savedState.verifiedAt).getTime()) / 1000 / 60;
+    if (diffMinutes < 60) {
+      isPaymentVerified = true; transactionLocked = true;
+      if (savedState.method === 'balance') {
+        paymentMethod = 'balance';
+        document.getElementById('btnMethodQris').classList.remove('active', 'qris');
+        document.getElementById('btnMethodSaldo').classList.add('active', 'saldo');
+        document.getElementById('qrisSection').classList.add('hide');
+        document.getElementById('saldoInfo').classList.add('show');
+        document.getElementById('btnPaySaldo').disabled = true;
+        document.getElementById('btnPaySaldo').innerHTML = '✅ Sudah Dibayar';
+      } else {
+        document.getElementById('confirmBtn').disabled = true;
+        document.getElementById('confirmBtn').textContent = '✅ Pembayaran Terverifikasi';
+      }
+      document.getElementById('paymentStatus').className = 'payment-status success';
+      document.getElementById('paymentStatus').textContent = '✅ Pembayaran sudah terverifikasi!';
+      document.getElementById('paymentStatus').style.display = 'block';
+      if (savedState.orderSent === false && ordersData.length > 0) {
+        await sendOrdersToLollipop();
+        savedState.orderSent = true;
+        savePaymentState(savedState);
+      }
+      displayStoredOrderIds();
+      return;
+    } else { clearPaymentState(); }
+  }
+  
+  if (checkTransactionLockLocal()) {
+    transactionLocked = true; isPaymentVerified = true;
+    document.getElementById('confirmBtn').disabled = true;
+    document.getElementById('confirmBtn').textContent = '✅ Transaksi Sudah Dikonfirmasi';
+    document.getElementById('paymentStatus').className = 'payment-status success';
+    document.getElementById('paymentStatus').textContent = '✅ Pembayaran sudah terverifikasi!';
+    document.getElementById('paymentStatus').style.display = 'block';
+    displayStoredOrderIds();
+    return;
+  }
+  
+  const usedVouchers = getUsedVouchers();
+  if (usedVouchers.length > 0) {
+    const lastUsed = usedVouchers[usedVouchers.length - 1];
+    document.getElementById('voucherStatus').innerHTML = `<span class="used">⚠️ Voucher ${lastUsed} sudah digunakan</span>`;
+    document.getElementById('voucherInput').disabled = true;
+    document.getElementById('voucherInput').style.opacity = '0.4';
+    document.getElementById('applyVoucher').disabled = true;
+    document.getElementById('applyVoucher').style.opacity = '0.4';
+  }
+  
+  updateDisplay();
+  displayStoredOrderIds();
+  startQrisTimer();
+  
+  setTimeout(() => {
+    if (paymentMethod === 'qris') {
+      checkPaymentStatus();
+      verificationInterval = setInterval(checkPaymentStatus, 10000);
+    }
+  }, 3000);
+  
+  window.addEventListener('beforeunload', function() {
+    if (isPaymentVerified) {
+      savePaymentState({ verified: true, orderSent: isOrderAlreadySent(), verifiedAt: new Date().toISOString(), method: paymentMethod });
+    }
+  });
+})();
+
+document.addEventListener("keydown", function(e){
+  if(e.key === "F12") e.preventDefault();
+  if(e.ctrlKey && e.shiftKey && ["I","J"].includes(e.key)) e.preventDefault();
+  if(e.ctrlKey && e.key === "u") e.preventDefault();
+});
+
+console.log(`💳 Payment sosmed-1 ready!`);
+console.log(`📦 Data transaksi dimuat dari Supabase (pending_transactions)`);
+console.log(`💰 Mutasi purchase reference: ORDER ID PROVIDER`);
+console.log(`🔄 Auto-refund on provider failure: enabled`);
+console.log(`🚨 Auto-refund on invalid transaction data: enabled`);
+</script>
+</body>
+</html>
