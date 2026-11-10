@@ -141,6 +141,23 @@ p.alert-text{color:#fca5a5;font-size:13px;line-height:1.7;margin-top:16px;margin
 .maint-card p{font-size:13px;color:#e2e8f0;line-height:1.55;margin-bottom:12px}
 .maint-card .maint-meta{font-size:11px;color:#94a3b8}
 
+
+.voucher-picker{margin:12px 0;padding:14px;border-radius:16px;background:rgba(34,197,94,0.06);border:1px solid rgba(34,197,94,0.25)}
+.voucher-picker .vp-title{font-size:11px;font-weight:800;color:#22c55e;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px}
+.voucher-picker .vp-list{display:flex;flex-direction:column;gap:8px;max-height:220px;overflow-y:auto}
+.voucher-picker .vp-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;background:rgba(255,255,255,0.04);border:1.5px solid rgba(255,255,255,0.08);cursor:pointer;transition:.2s;text-align:left}
+.voucher-picker .vp-item:hover{border-color:rgba(34,197,94,0.4);background:rgba(34,197,94,0.08)}
+.voucher-picker .vp-item.selected{border-color:#22c55e;background:rgba(34,197,94,0.15);box-shadow:0 0 0 2px rgba(34,197,94,0.2)}
+.voucher-picker .vp-code{font-weight:900;color:#facc15;font-family:monospace;font-size:13px}
+.voucher-picker .vp-disc{font-weight:800;color:#22c55e;font-size:13px;margin-left:auto;white-space:nowrap}
+.voucher-picker .vp-meta{font-size:10px;color:#94a3b8;margin-top:2px}
+.voucher-picker .vp-empty{font-size:12px;color:#94a3b8;text-align:center;padding:8px}
+.voucher-picker .vp-actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.voucher-picker .vp-btn{flex:1;min-width:120px;padding:10px 12px;border-radius:999px;border:none;font-weight:700;font-size:12px;cursor:pointer;font-family:inherit}
+.voucher-picker .vp-btn.apply{background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff}
+.voucher-picker .vp-btn.auto{background:linear-gradient(135deg,#00c6ff,#0072ff);color:#fff}
+.voucher-picker .vp-btn.clear{background:rgba(255,255,255,0.06);color:#94a3b8;border:1px solid rgba(255,255,255,0.1)}
+
 </style>
 </head>
 <body>
@@ -240,6 +257,19 @@ p.alert-text{color:#fca5a5;font-size:13px;line-height:1.7;margin-top:16px;margin
   
   <div class="details" id="orderDetails"></div>
   
+
+  <div class="voucher-picker" id="voucherPicker">
+    <div class="vp-title">🎟️ Voucher tersedia</div>
+    <div class="vp-list" id="voucherPickerList">
+      <div class="vp-empty">Memuat voucher...</div>
+    </div>
+    <div class="vp-actions">
+      <button type="button" class="vp-btn auto" id="btnAutoVoucher" onclick="autoApplyBestVoucher()">⚡ Auto pakai terbaik</button>
+      <button type="button" class="vp-btn apply" id="btnApplySelectedVoucher" onclick="applySelectedVoucher()">✅ Pakai dipilih</button>
+      <button type="button" class="vp-btn clear" id="btnClearVoucher" onclick="clearAppliedVoucher()">Hapus</button>
+    </div>
+  </div>
+
   <input type="text" id="voucherInput" placeholder="Kode Voucher (opsional)">
   <button id="applyVoucher" class="btn">🎫 Gunakan Voucher</button>
   <div class="voucher-status" id="voucherStatus"></div>
@@ -1934,9 +1964,7 @@ function updateDisplay(){
   updateSaldoDisplay();
 }
 
-async function loadVoucher(){
-  try{
-    const r = await fetch("/sosmed-1/payment/voucher.json",{cache:"no-store"});
+async function loadVoucher(){ return []; /* voucher.json disabled — pakai Supabase */ });
     if(!r.ok) return [];
     const data = await r.json();
     return Array.isArray(data) ? data : [];
@@ -1948,6 +1976,150 @@ async function loadVoucher(){
  * Butuh: supabaseClient, originalTotal, finalTotal, appliedVoucher,
  * appliedDiscount, updateDisplay(), SOSMED_TYPE, trx
  */
+
+let availableVouchers = [];
+let selectedVoucherCode = null;
+
+async function loadAvailableVouchers(autoApply) {
+  const listEl = document.getElementById('voucherPickerList');
+  if (!listEl) return;
+  if (!supabaseClient) {
+    listEl.innerHTML = '<div class="vp-empty">Login dulu untuk lihat voucher</div>';
+    return;
+  }
+  try {
+    const { data: sess } = await supabaseClient.auth.getSession();
+    const email = sess?.session?.user?.email || (typeof getStoredGmail === 'function' ? getStoredGmail() : null);
+    const total = typeof originalTotal !== 'undefined' ? Number(originalTotal) || 0 : 0;
+    const sosmed = typeof SOSMED_TYPE !== 'undefined' ? SOSMED_TYPE : null;
+    const { data, error } = await supabaseClient.rpc('list_available_vouchers', {
+      p_total: total,
+      p_sosmed_type: sosmed,
+      p_email: email
+    });
+    if (error) throw error;
+    availableVouchers = (data && data.vouchers) ? data.vouchers : [];
+    renderAvailableVouchers();
+    if (autoApply && availableVouchers.length && !appliedVoucher) {
+      await autoApplyBestVoucher(true);
+    }
+  } catch (e) {
+    console.warn('load vouchers', e.message || e);
+    listEl.innerHTML = '<div class="vp-empty">Tidak ada voucher / ' + (e.message || '') + '</div>';
+    availableVouchers = [];
+  }
+}
+
+function renderAvailableVouchers() {
+  const listEl = document.getElementById('voucherPickerList');
+  if (!listEl) return;
+  if (!availableVouchers.length) {
+    listEl.innerHTML = '<div class="vp-empty">Tidak ada voucher tersedia untuk transaksi ini</div>';
+    return;
+  }
+  let html = '';
+  availableVouchers.forEach((v, i) => {
+    const sel = (selectedVoucherCode && selectedVoucherCode === v.code) || (appliedVoucher && appliedVoucher === v.code);
+    const disc = Number(v.discount || 0).toLocaleString('id-ID');
+    const meta = (v.type === 'percent' ? (v.value + '%') : ('Rp ' + Number(v.value).toLocaleString('id-ID')))
+      + (v.note ? ' · ' + v.note : '');
+    html += '<div class="vp-item' + (sel ? ' selected' : '') + '" onclick="selectVoucherItem(' + i + ')">'
+      + '<div><div class="vp-code">' + String(v.code || '').replace(/</g,'') + '</div>'
+      + '<div class="vp-meta">' + String(meta).replace(/</g,'') + '</div></div>'
+      + '<div class="vp-disc">-Rp ' + disc + '</div></div>';
+  });
+  listEl.innerHTML = html;
+}
+
+function selectVoucherItem(idx) {
+  const v = availableVouchers[idx];
+  if (!v) return;
+  selectedVoucherCode = v.code;
+  const input = document.getElementById('voucherInput');
+  if (input) input.value = v.code;
+  renderAvailableVouchers();
+}
+
+async function applySelectedVoucher() {
+  const code = selectedVoucherCode || (document.getElementById('voucherInput') || {}).value || '';
+  if (!code) return Swal.fire('Pilih voucher dulu', '', 'info');
+  const input = document.getElementById('voucherInput');
+  if (input) input.value = code;
+  // reuse apply button logic
+  const btn = document.getElementById('applyVoucher');
+  if (btn) btn.click();
+  else await applyVoucherCodeDirect(code);
+}
+
+async function applyVoucherCodeDirect(code) {
+  code = String(code || '').trim().toUpperCase();
+  if (!code) return;
+  try {
+    const v = await applyVoucherFromSupabase(code);
+    const discount = Math.ceil(Math.max(0, Number(v.discount) || 0));
+    finalTotal = Math.max((typeof normalizeTotal === 'function' ? normalizeTotal(originalTotal) : Math.ceil(Number(originalTotal)||0)) - discount, 0);
+    appliedVoucher = v.code;
+    appliedDiscount = discount;
+    selectedVoucherCode = v.code;
+    if (typeof markVoucherUsed === 'function') markVoucherUsed(v.code);
+    const st = document.getElementById('voucherStatus');
+    if (st) st.innerHTML = '<span class="active">✅ Voucher ' + v.code + ' · Diskon Rp ' + discount.toLocaleString('id-ID') + '</span>';
+    const input = document.getElementById('voucherInput');
+    if (input) { input.value = v.code; input.disabled = true; }
+    const ab = document.getElementById('applyVoucher');
+    if (ab) ab.disabled = true;
+    if (typeof updateDisplay === 'function') updateDisplay();
+    renderAvailableVouchers();
+  } catch (e) {
+    Swal.fire('Gagal', e.message || String(e), 'error');
+  }
+}
+
+async function autoApplyBestVoucher(silent) {
+  if (!availableVouchers.length) {
+    await loadAvailableVouchers(false);
+  }
+  if (!availableVouchers.length) {
+    if (!silent) Swal.fire('Info', 'Tidak ada voucher tersedia', 'info');
+    return;
+  }
+  // sudah sorted by discount desc from SQL
+  const best = availableVouchers[0];
+  selectedVoucherCode = best.code;
+  await applyVoucherCodeDirect(best.code);
+  if (!silent) {
+    Swal.fire({
+      title: '⚡ Auto voucher',
+      html: 'Dipakai: <b>' + best.code + '</b><br>Diskon: <b>Rp ' + Number(best.discount||0).toLocaleString('id-ID') + '</b>',
+      icon: 'success',
+      timer: 2000,
+      showConfirmButton: false
+    });
+  }
+}
+
+function clearAppliedVoucher() {
+  appliedVoucher = null;
+  appliedDiscount = 0;
+  selectedVoucherCode = null;
+  finalTotal = typeof normalizeTotal === 'function' ? normalizeTotal(originalTotal) : Math.ceil(Number(originalTotal)||0);
+  const input = document.getElementById('voucherInput');
+  if (input) { input.disabled = false; input.value = ''; }
+  const ab = document.getElementById('applyVoucher');
+  if (ab) ab.disabled = false;
+  const st = document.getElementById('voucherStatus');
+  if (st) st.innerHTML = '';
+  if (typeof updateDisplay === 'function') updateDisplay();
+  renderAvailableVouchers();
+}
+
+window.loadAvailableVouchers = loadAvailableVouchers;
+window.selectVoucherItem = selectVoucherItem;
+window.applySelectedVoucher = applySelectedVoucher;
+window.autoApplyBestVoucher = autoApplyBestVoucher;
+window.clearAppliedVoucher = clearAppliedVoucher;
+window.applyVoucherCodeDirect = applyVoucherCodeDirect;
+
 async function applyVoucherFromSupabase(code) {
   code = String(code || '').trim().toUpperCase();
   if (!code) throw new Error('Isi kode voucher');
