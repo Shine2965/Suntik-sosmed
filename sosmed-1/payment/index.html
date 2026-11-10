@@ -1906,6 +1906,8 @@ function buildQR(a){
 }
 
 function updateDisplay(){
+  try { if (typeof loadAvailableVouchers === "function" && !appliedVoucher) { /* totals may change */ } } catch(_){}
+
   uniqueCode = generateUniqueCode();
   document.getElementById('uniqueCode').textContent = uniqueCode;
   finalTotal = normalizeTotal(finalTotal);
@@ -1975,6 +1977,7 @@ async function loadVoucher(){ return []; /* voucher.json disabled — pakai Supa
 let availableVouchers = [];
 let selectedVoucherCode = null;
 
+
 async function loadAvailableVouchers(autoApply) {
   const listEl = document.getElementById('voucherPickerList');
   if (!listEl) return;
@@ -1982,25 +1985,87 @@ async function loadAvailableVouchers(autoApply) {
     listEl.innerHTML = '<div class="vp-empty">Login dulu untuk lihat voucher</div>';
     return;
   }
+  listEl.innerHTML = '<div class="vp-empty">Memuat voucher...</div>';
   try {
     const { data: sess } = await supabaseClient.auth.getSession();
-    const email = sess?.session?.user?.email || (typeof getStoredGmail === 'function' ? getStoredGmail() : null);
-    const total = typeof originalTotal !== 'undefined' ? Number(originalTotal) || 0 : 0;
-    const sosmed = typeof SOSMED_TYPE !== 'undefined' ? SOSMED_TYPE : null;
-    const { data, error } = await supabaseClient.rpc('list_available_vouchers', {
-      p_total: total,
-      p_sosmed_type: sosmed,
-      p_email: email
-    });
-    if (error) throw error;
-    availableVouchers = (data && data.vouchers) ? data.vouchers : [];
+    const email = (sess?.session?.user?.email) || (typeof getStoredGmail === 'function' ? getStoredGmail() : null) || (typeof userEmail !== 'undefined' ? userEmail : null);
+    let total = 0;
+    try {
+      if (typeof originalTotal !== 'undefined' && originalTotal != null) total = Number(originalTotal) || 0;
+      if (!total && typeof finalTotal !== 'undefined') total = Number(finalTotal) || 0;
+    } catch (_) {}
+    const sosmed = (typeof SOSMED_TYPE !== 'undefined' && SOSMED_TYPE) ? String(SOSMED_TYPE) : null;
+
+    let vouchers = [];
+    // 1) RPC
+    try {
+      const { data, error } = await supabaseClient.rpc('list_available_vouchers', {
+        p_total: total,
+        p_sosmed_type: sosmed,
+        p_email: email
+      });
+      if (error) throw error;
+      if (data && Array.isArray(data.vouchers)) vouchers = data.vouchers;
+      else if (Array.isArray(data)) vouchers = data;
+    } catch (rpcErr) {
+      console.warn('list_available_vouchers rpc', rpcErr.message || rpcErr);
+      // 2) Fallback direct table
+      const { data: rows, error: qErr } = await supabaseClient
+        .from('vouchers')
+        .select('*')
+        .eq('active', true)
+        .order('created_at', { ascending: false })
+        .limit(50);
+      if (qErr) throw rpcErr;
+      const em = String(email || '').toLowerCase().trim();
+      vouchers = (rows || []).filter(v => {
+        if (v.expires_at && new Date(v.expires_at) < new Date()) return false;
+        if (v.max_uses != null && Number(v.used_count || 0) >= Number(v.max_uses)) return false;
+        if (sosmed && Array.isArray(v.sosmed_types) && v.sosmed_types.length) {
+          const ok = v.sosmed_types.some(t => String(t).toLowerCase().trim() === sosmed.toLowerCase());
+          if (!ok) return false;
+        }
+        if (Array.isArray(v.allowed_emails) && v.allowed_emails.length) {
+          if (!em) return false;
+          if (!v.allowed_emails.some(e => String(e).toLowerCase().trim() === em)) return false;
+        }
+        return true;
+      }).map(v => {
+        let disc = 0;
+        if (v.type === 'percent') {
+          disc = total > 0 ? Math.floor(total * (Number(v.value) / 100)) : Math.floor(Number(v.value) || 0);
+          if (v.max_discount != null) disc = Math.min(disc, Math.floor(Number(v.max_discount)));
+        } else {
+          disc = Math.floor(Number(v.value) || 0);
+        }
+        if (total > 0) disc = Math.min(disc, Math.floor(total));
+        return {
+          id: v.id,
+          code: v.code,
+          type: v.type,
+          value: v.value,
+          discount: disc,
+          min_purchase: v.min_purchase || 0,
+          eligible: total >= Number(v.min_purchase || 0),
+          note: v.note
+        };
+      });
+    }
+
+    // sort diskon terbesar
+    vouchers.sort((a, b) => Number(b.discount || 0) - Number(a.discount || 0));
+    availableVouchers = vouchers;
     renderAvailableVouchers();
     if (autoApply && availableVouchers.length && !appliedVoucher) {
-      await autoApplyBestVoucher(true);
+      const best = availableVouchers.find(v => v.eligible !== false) || availableVouchers[0];
+      if (best && best.eligible !== false) {
+        selectedVoucherCode = best.code;
+        await applyVoucherCodeDirect(best.code);
+      }
     }
   } catch (e) {
     console.warn('load vouchers', e.message || e);
-    listEl.innerHTML = '<div class="vp-empty">Tidak ada voucher / ' + (e.message || '') + '</div>';
+    listEl.innerHTML = '<div class="vp-empty">Gagal muat voucher: ' + String(e.message || e).replace(/</g,'') + '</div>';
     availableVouchers = [];
   }
 }
@@ -2009,16 +2074,19 @@ function renderAvailableVouchers() {
   const listEl = document.getElementById('voucherPickerList');
   if (!listEl) return;
   if (!availableVouchers.length) {
-    listEl.innerHTML = '<div class="vp-empty">Tidak ada voucher tersedia untuk transaksi ini</div>';
+    listEl.innerHTML = '<div class="vp-empty">Tidak ada voucher tersedia untuk akun/transaksi ini</div>';
     return;
   }
   let html = '';
   availableVouchers.forEach((v, i) => {
     const sel = (selectedVoucherCode && selectedVoucherCode === v.code) || (appliedVoucher && appliedVoucher === v.code);
     const disc = Number(v.discount || 0).toLocaleString('id-ID');
+    const eligible = v.eligible !== false;
     const meta = (v.type === 'percent' ? (v.value + '%') : ('Rp ' + Number(v.value).toLocaleString('id-ID')))
-      + (v.note ? ' · ' + v.note : '');
-    html += '<div class="vp-item' + (sel ? ' selected' : '') + '" onclick="selectVoucherItem(' + i + ')">'
+      + (v.min_purchase ? (' · min Rp ' + Number(v.min_purchase).toLocaleString('id-ID')) : '')
+      + (v.note ? ' · ' + v.note : '')
+      + (!eligible ? ' · belum memenuhi min belanja' : '');
+    html += '<div class="vp-item' + (sel ? ' selected' : '') + (!eligible ? ' disabled' : '') + '" onclick="selectVoucherItem(' + i + ')" style="' + (!eligible ? 'opacity:.55;' : '') + '">'
       + '<div><div class="vp-code">' + String(v.code || '').replace(/</g,'') + '</div>'
       + '<div class="vp-meta">' + String(meta).replace(/</g,'') + '</div></div>'
       + '<div class="vp-disc">-Rp ' + disc + '</div></div>';
@@ -2288,6 +2356,7 @@ window.showRefundHistory = showRefundHistory;
   
   // 🚀 AMBIL DATA TRANSAKSI (orders, total, mass) DARI SUPABASE DENGAN ID TRX
   ordersData = await loadOrdersFromSupabase();
+  try { await loadAvailableVouchers(false); } catch (e) { console.warn(e); }
 
   const paramsValid = await checkUrlParamsAndAutoRefund();
   if (!paramsValid) return;
