@@ -2120,30 +2120,58 @@ async function createPendingRefundNoProvider(order, newStatus) {
       (order.target ? ' | Target: ' + order.target : '') +
       ' · Rp ' + totalPayment.toLocaleString('id-ID') +
       ' · menunggu persetujuan admin/owner';
-    const { error: insertErr } = await supabaseClient.from('refunds').insert({
-      user_id: finalUserId,
-      email: order.email || '-',
-      gmail_target: order.gmail_target || order.gmail || null,
-      target: order.target || null,
-      service_name: order.service_name || null,
-      service_id: order.service_id || null,
-      sosmed_type: order.sosmed_type || null,
-      order_id: refundKeyId,
-      trx_id: order.trx_id || refundKeyId,
-      amount: totalPayment,
-      reason,
-      source_method: order.payment_method || order.source_method || 'saldo',
-      status: 'pending',
-      created_at: new Date().toISOString()
-    });
-    if (insertErr) {
-      const msg = String(insertErr.message || '').toLowerCase();
-      if (insertErr.code === '23505' || msg.includes('duplicate') || msg.includes('unique')) {
-        autoRefundProcessedSet.add(refundKey);
+    let insertErr = null;
+    try {
+      const rpc = await supabaseClient.rpc('request_refund', {
+        p_user_id: finalUserId,
+        p_email: order.email || '-',
+        p_amount: totalPayment,
+        p_reason: reason,
+        p_order_id: refundKeyId,
+        p_trx_id: order.trx_id || refundKeyId,
+        p_source_method: order.payment_method || order.source_method || 'saldo',
+        p_status: 'pending',
+        p_gmail_target: order.gmail_target || order.gmail || null,
+        p_target: order.target || null,
+        p_service_name: order.service_name || null,
+        p_service_id: order.service_id ? String(order.service_id) : null,
+        p_sosmed_type: order.sosmed_type || null
+      });
+      if (rpc.error) throw rpc.error;
+      if (rpc.data && (rpc.data.duplicate || rpc.data.success === false)) {
+        if (rpc.data.duplicate) {
+          autoRefundProcessedSet.add(refundKey);
+          return false;
+        }
+        throw new Error(rpc.data.message || 'request_refund gagal');
+      }
+    } catch (e) {
+      const ins = await supabaseClient.from('refunds').insert({
+        user_id: finalUserId,
+        email: order.email || '-',
+        gmail_target: order.gmail_target || order.gmail || null,
+        target: order.target || null,
+        service_name: order.service_name || null,
+        service_id: order.service_id || null,
+        sosmed_type: order.sosmed_type || null,
+        order_id: refundKeyId,
+        trx_id: order.trx_id || refundKeyId,
+        amount: totalPayment,
+        reason,
+        source_method: order.payment_method || order.source_method || 'saldo',
+        status: 'pending',
+        created_at: new Date().toISOString()
+      });
+      insertErr = ins.error;
+      if (insertErr) {
+        const msg = String(insertErr.message || '').toLowerCase();
+        if (insertErr.code === '23505' || msg.includes('duplicate') || msg.includes('unique')) {
+          autoRefundProcessedSet.add(refundKey);
+          return false;
+        }
+        console.warn('pending refund insert', insertErr.message);
         return false;
       }
-      console.warn('pending refund insert', insertErr.message);
-      return false;
     }
     autoRefundProcessedSet.add(refundKey);
     try { localStorage.setItem('refund_pending_' + refundKey, '1'); } catch (_) {}
@@ -2231,40 +2259,74 @@ async function processAutoRefund(order, newStatus) {
   if (!finalUserId) { console.error('❌ Auto-refund GAGAL: user_id tidak ditemukan', order); return false; }
 
   try {
-    const { data: insertData, error: insertErr } = await supabaseClient
-      .from('refunds')
-      .insert({
-        user_id: finalUserId,
-        email: order.email || order.user_email || '-',
-        gmail_target: order.gmail_target || order.gmail || null,
-        target: order.target || null,
-        service_name: order.service_name || null,
-        service_id: order.service_id || null,
-        sosmed_type: order.sosmed_type || null,
-        order_id: String(refundKeyId),
-        trx_id: String(refundKeyId),
-        amount: refundAmount,
-        reason: refundReason +
-          (order.gmail_target || order.gmail ? ' | Gmail: ' + (order.gmail_target || order.gmail) : '') +
-          (order.target ? ' | Target: ' + order.target : '') +
-          (order.service_name ? ' | Layanan: ' + order.service_name : ''),
-        source_method: order.payment_method || order.source_method || 'saldo',
-        status: 'pending',
-        created_at: new Date().toISOString()
-      })
-      .select()
-      .single();
+    const reasonFull = refundReason +
+      (order.gmail_target || order.gmail ? ' | Gmail: ' + (order.gmail_target || order.gmail) : '') +
+      (order.target ? ' | Target: ' + order.target : '') +
+      (order.service_name ? ' | Layanan: ' + order.service_name : '');
 
-    if (insertErr) {
-      const errMsg = String(insertErr.message || '').toLowerCase();
-      const isDup = insertErr.code === '23505' || errMsg.includes('duplicate') || errMsg.includes('unique') || errMsg.includes('conflict');
-      if (isDup) {
-        console.log('🛑 Ditolak DB (unique) — refund dobel untuk order_id:', refundKeyId);
+    let insertData = null;
+    let insertErr = null;
+    // 1) RPC SECURITY DEFINER (hindari permission denied)
+    try {
+      const rpc = await supabaseClient.rpc('request_refund', {
+        p_user_id: finalUserId,
+        p_email: order.email || order.user_email || '-',
+        p_amount: refundAmount,
+        p_reason: reasonFull,
+        p_order_id: String(refundKeyId),
+        p_trx_id: String(refundKeyId),
+        p_source_method: order.payment_method || order.source_method || 'saldo',
+        p_status: 'pending',
+        p_gmail_target: order.gmail_target || order.gmail || null,
+        p_target: order.target || null,
+        p_service_name: order.service_name || null,
+        p_service_id: order.service_id ? String(order.service_id) : null,
+        p_sosmed_type: order.sosmed_type || null
+      });
+      if (rpc.error) throw rpc.error;
+      if (rpc.data && rpc.data.duplicate) {
         autoRefundProcessedSet.add(refundKey);
         try { localStorage.setItem('refund_done_' + refundKey, '1'); } catch (e) {}
         return false;
       }
-      throw new Error('Insert refund: ' + insertErr.message);
+      if (rpc.data && rpc.data.success === false) {
+        throw new Error(rpc.data.message || 'request_refund gagal');
+      }
+      insertData = rpc.data;
+    } catch (rpcErr) {
+      // 2) Fallback direct insert
+      const ins = await supabaseClient
+        .from('refunds')
+        .insert({
+          user_id: finalUserId,
+          email: order.email || order.user_email || '-',
+          gmail_target: order.gmail_target || order.gmail || null,
+          target: order.target || null,
+          service_name: order.service_name || null,
+          service_id: order.service_id || null,
+          sosmed_type: order.sosmed_type || null,
+          order_id: String(refundKeyId),
+          trx_id: String(refundKeyId),
+          amount: refundAmount,
+          reason: reasonFull,
+          source_method: order.payment_method || order.source_method || 'saldo',
+          status: 'pending',
+          created_at: new Date().toISOString()
+        })
+        .select()
+        .single();
+      insertErr = ins.error;
+      insertData = ins.data;
+      if (insertErr) {
+        const errMsg = String(insertErr.message || '').toLowerCase();
+        const isDup = insertErr.code === '23505' || errMsg.includes('duplicate') || errMsg.includes('unique') || errMsg.includes('conflict');
+        if (isDup) {
+          autoRefundProcessedSet.add(refundKey);
+          try { localStorage.setItem('refund_done_' + refundKey, '1'); } catch (e) {}
+          return false;
+        }
+        throw new Error('Insert refund: ' + insertErr.message + ' — jalankan SQL fix-refunds-permission.sql');
+      }
     }
 
     /* kredit refund hanya lewat approve_refund (admin) / server */
@@ -9993,12 +10055,19 @@ async function loadVouchersAdmin() {
   }
   el.innerHTML = '<div class="loading-box"><span class="spinner"></span><br>Memuat voucher...</div>';
   try {
-    const { data, error } = await supabaseClient
+    let data = null, error = null;
+    ({ data, error } = await supabaseClient
       .from('vouchers')
       .select('*')
       .order('created_at', { ascending: false })
-      .limit(200);
-    if (error) throw error;
+      .limit(200));
+    if (error) {
+      // fallback RPC SECURITY DEFINER
+      const rpc = await supabaseClient.rpc('list_vouchers_admin');
+      if (rpc.error) throw error;
+      data = rpc.data;
+      error = null;
+    }
     window._vouchersCache = data || [];
     renderVoucherAdminList(window._vouchersCache);
   } catch (e) {
