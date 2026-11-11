@@ -919,39 +919,121 @@ body.chat-open .cs-bubble-container{display:none !important}
   <div class="page" id="page-vouchers">
     <div class="section">
       <div class="section-title">🎟️ Voucher <span class="line"></span></div>
-      <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:16px;padding:14px;margin-bottom:14px;">
-        <div style="font-size:11px;color:#b39ddb;margin-bottom:8px;font-weight:700;">BUAT / EDIT VOUCHER (Owner)</div>
-        <input type="hidden" id="voucherEditId" value="">
-        <div class="auth-field"><label>Kode</label><input id="vCode" placeholder="SHINE50" style="text-transform:uppercase"></div>
-        <div style="display:flex;gap:8px;">
-          <div class="auth-field" style="flex:1"><label>Tipe</label>
-            <select id="vType" style="width:100%;padding:10px;border-radius:10px;background:#1a0e2e;color:#fff;border:1px solid rgba(255,255,255,0.15)">
-              <option value="fixed">Fixed (Rp)</option>
-              <option value="percent">Percent (%)</option>
-            </select>
+      
+      <div class="voucher-form-card" style="background:linear-gradient(145deg,rgba(139,92,246,0.08),rgba(6,182,212,0.05));border:1.5px solid rgba(139,92,246,0.25);border-radius:18px;padding:16px;margin-bottom:16px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+          <div>
+            <div style="font-size:13px;font-weight:900;color:#e9d5ff;">✨ Buat / Edit Voucher</div>
+            <div style="font-size:11px;color:#94a3b8;margin-top:2px;">Owner & admin · tampil di halaman payment</div>
           </div>
-          <div class="auth-field" style="flex:1"><label>Nilai</label><input id="vValue" type="number" placeholder="5000 atau 10"></div>
+          <span id="vFormModeBadge" style="font-size:10px;font-weight:800;padding:4px 10px;border-radius:20px;background:rgba(34,197,94,0.15);color:#22c55e;border:1px solid rgba(34,197,94,0.35);">MODE: BARU</span>
         </div>
-        <div style="display:flex;gap:8px;">
-          <div class="auth-field" style="flex:1"><label>Max diskon (%, opsional)</label><input id="vMaxDisc" type="number" placeholder="opsional"></div>
-          <div class="auth-field" style="flex:1"><label>Min belanja</label><input id="vMin" type="number" placeholder="0"></div>
+
+        <input type="hidden" id="voucherEditId" value="">
+
+        <div class="auth-field">
+          <label>Kode voucher</label>
+          <input id="vCode" placeholder="Contoh: SHINE50 / DISKON10" style="text-transform:uppercase;font-weight:800;letter-spacing:1px;font-size:15px;">
+          <div style="font-size:10px;color:#64748b;margin-top:4px;">Huruf & angka, tanpa spasi. User akan melihat kode ini di payment.</div>
         </div>
-        <div class="auth-field"><label>Sosmed (pisah koma)</label><input id="vSosmed" value="sosmed-1,sosmed-2,sosmed-4" placeholder="sosmed-1,sosmed-2"></div>
-        <div class="auth-field"><label>Member boleh pakai (email, pisah koma/baris). KOSONG = semua member</label>
-          <textarea id="vEmails" rows="3" placeholder="user1@gmail.com" style="width:100%;padding:10px;border-radius:10px;background:rgba(0,0,0,0.25);color:#fff;border:1px solid rgba(255,255,255,0.15);font-family:inherit"></textarea>
+
+        <div style="margin-top:12px;">
+          <div style="font-size:11px;font-weight:800;color:#b39ddb;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:8px;">Jenis potongan</div>
+          <div style="display:flex;gap:8px;">
+            <button type="button" id="vTypeFixedBtn" class="v-type-btn active" onclick="setVoucherTypeUI('fixed')" style="flex:1;padding:12px 10px;border-radius:14px;border:2px solid #22c55e;background:rgba(34,197,94,0.15);color:#fff;font-weight:800;font-size:12px;cursor:pointer;font-family:inherit;">
+              💰 Potong nominal<br><span style="font-size:10px;font-weight:600;color:#86efac;">Fixed · contoh Rp 5.000</span>
+            </button>
+            <button type="button" id="vTypePercentBtn" class="v-type-btn" onclick="setVoucherTypeUI('percent')" style="flex:1;padding:12px 10px;border-radius:14px;border:2px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.04);color:#94a3b8;font-weight:800;font-size:12px;cursor:pointer;font-family:inherit;">
+              📊 Potong persen<br><span style="font-size:10px;font-weight:600;opacity:.85;">Percent · contoh 10%</span>
+            </button>
+          </div>
+          <input type="hidden" id="vType" value="fixed">
         </div>
-        <div style="display:flex;gap:8px;">
-          <div class="auth-field" style="flex:1"><label>Max total pakai</label><input id="vMaxUses" type="number" placeholder="unlimited"></div>
-          <div class="auth-field" style="flex:1"><label>Limit / user</label><input id="vPerUser" type="number" value="1"></div>
+
+        <div id="vFixedFields" style="margin-top:12px;">
+          <div class="auth-field">
+            <label>Nominal diskon (Rp)</label>
+            <input id="vValueFixed" type="number" min="1" step="1" placeholder="Contoh: 5000">
+            <div style="font-size:10px;color:#64748b;margin-top:4px;">User dapat potongan tetap, mis. Rp 5.000 dari total bayar.</div>
+          </div>
         </div>
-        <div class="auth-field"><label>Expired (opsional)</label><input id="vExpires" type="datetime-local"></div>
-        <div class="auth-field"><label>Catatan</label><input id="vNote" placeholder="opsional"></div>
-        <div style="display:flex;gap:8px;margin-top:10px;">
-          <button class="balance-btn deposit" style="flex:1" type="button" onclick="saveVoucherAdmin()">💾 Simpan</button>
-          <button class="balance-btn refresh" style="flex:0.5" type="button" onclick="resetVoucherForm()">Reset</button>
+
+        <div id="vPercentFields" style="margin-top:12px;display:none;">
+          <div style="display:flex;gap:8px;">
+            <div class="auth-field" style="flex:1">
+              <label>Persen diskon (%)</label>
+              <input id="vValuePercent" type="number" min="1" max="100" step="0.1" placeholder="Contoh: 10">
+            </div>
+            <div class="auth-field" style="flex:1">
+              <label>Batas max diskon (Rp)</label>
+              <input id="vMaxDisc" type="number" min="0" step="1" placeholder="Opsional, mis. 20000">
+            </div>
+          </div>
+          <div style="font-size:10px;color:#64748b;margin-top:4px;">Contoh: 10% dengan max Rp 20.000 → belanja Rp 300.000 hanya potong Rp 20.000.</div>
+        </div>
+
+        <!-- nilai gabungan untuk save -->
+        <input type="hidden" id="vValue" value="">
+
+        <div class="auth-field" style="margin-top:12px;">
+          <label>Minimal belanja (Rp)</label>
+          <input id="vMin" type="number" min="0" step="1" placeholder="0 = tanpa minimal" value="0">
+        </div>
+
+        <div style="margin-top:12px;">
+          <div style="font-size:11px;font-weight:800;color:#b39ddb;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:8px;">Berlaku di</div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;">
+            <label style="display:flex;align-items:center;gap:6px;font-size:12px;background:rgba(0,0,0,0.2);padding:8px 12px;border-radius:10px;cursor:pointer;"><input type="checkbox" class="v-sosmed-cb" value="sosmed-1" checked> Sosmed 1</label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:12px;background:rgba(0,0,0,0.2);padding:8px 12px;border-radius:10px;cursor:pointer;"><input type="checkbox" class="v-sosmed-cb" value="sosmed-2" checked> Sosmed 2</label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:12px;background:rgba(0,0,0,0.2);padding:8px 12px;border-radius:10px;cursor:pointer;"><input type="checkbox" class="v-sosmed-cb" value="sosmed-4" checked> Sosmed 4</label>
+          </div>
+          <input type="hidden" id="vSosmed" value="sosmed-1,sosmed-2,sosmed-4">
+        </div>
+
+        <div class="auth-field" style="margin-top:12px;">
+          <label>Siapa yang boleh pakai?</label>
+          <div style="display:flex;gap:8px;margin-bottom:8px;">
+            <button type="button" id="vAudienceAll" onclick="setVoucherAudience('all')" style="flex:1;padding:10px;border-radius:12px;border:2px solid #00c6ff;background:rgba(0,198,255,0.12);color:#fff;font-weight:800;font-size:11px;cursor:pointer;font-family:inherit;">🌍 Semua member</button>
+            <button type="button" id="vAudienceSome" onclick="setVoucherAudience('some')" style="flex:1;padding:10px;border-radius:12px;border:2px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.04);color:#94a3b8;font-weight:800;font-size:11px;cursor:pointer;font-family:inherit;">👤 Member tertentu</button>
+          </div>
+          <div id="vEmailsWrap" style="display:none;">
+            <textarea id="vEmails" rows="3" placeholder="satu email per baris&#10;user1@gmail.com&#10;user2@gmail.com" style="width:100%;padding:10px;border-radius:10px;background:rgba(0,0,0,0.25);color:#fff;border:1px solid rgba(255,255,255,0.15);font-family:inherit;font-size:12px;"></textarea>
+            <div style="font-size:10px;color:#64748b;margin-top:4px;">Hanya email terdaftar di list ini yang bisa memakai kode.</div>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:8px;margin-top:12px;">
+          <div class="auth-field" style="flex:1">
+            <label>Kuota total pakai</label>
+            <input id="vMaxUses" type="number" min="1" placeholder="Kosong = tak terbatas">
+          </div>
+          <div class="auth-field" style="flex:1">
+            <label>Max pakai / user</label>
+            <input id="vPerUser" type="number" min="1" value="1">
+          </div>
+        </div>
+
+        <div class="auth-field">
+          <label>Tanggal expired (opsional)</label>
+          <input id="vExpires" type="datetime-local">
+        </div>
+        <div class="auth-field">
+          <label>Catatan internal</label>
+          <input id="vNote" placeholder="Mis: promo ramadan, giveaway IG">
+        </div>
+
+        <div id="vPreviewBox" style="margin-top:12px;padding:12px 14px;border-radius:14px;background:rgba(250,204,21,0.08);border:1px dashed rgba(250,204,21,0.35);font-size:12px;line-height:1.55;color:#e2e8f0;">
+          <div style="font-weight:800;color:#facc15;margin-bottom:4px;">👁️ Preview</div>
+          <div id="vPreviewText">Isi form untuk melihat ringkasan voucher.</div>
+        </div>
+
+        <div style="display:flex;gap:8px;margin-top:14px;">
+          <button class="balance-btn deposit" style="flex:1" type="button" onclick="saveVoucherAdmin()">💾 Simpan voucher</button>
+          <button class="balance-btn refresh" style="flex:0.45" type="button" onclick="resetVoucherForm()">Reset</button>
         </div>
       </div>
-      <div style="font-size:11px;font-weight:800;color:#b39ddb;text-transform:uppercase;letter-spacing:1px;margin:14px 0 8px;">📋 Kode voucher yang sudah dibuat</div>
+
+<div style="font-size:11px;font-weight:800;color:#b39ddb;text-transform:uppercase;letter-spacing:1px;margin:14px 0 8px;">📋 Kode voucher yang sudah dibuat</div>
       <div id="voucherAdminList"><div class="loading-box">Daftar voucher</div></div>
     </div>
   </div>
@@ -1886,7 +1968,7 @@ function switchPage(pageName) {
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   const page = document.getElementById('page-' + pageName);
   if (page) page.classList.add('active');
-  if (pageName === 'vouchers') { try { loadVouchersAdmin(); } catch(e) {} }
+  if (pageName === 'vouchers') { try { loadVouchersAdmin(); } catch(e) {} try { setVoucherTypeUI(document.getElementById('vType')?.value||'fixed'); updateVoucherPreview(); ['vCode','vValueFixed','vValuePercent','vMaxDisc','vMin','vEmails','vMaxUses','vPerUser','vNote'].forEach(id=>{ const el=document.getElementById(id); if(el && !el._vp){ el.addEventListener('input', updateVoucherPreview); el._vp=1; } }); document.querySelectorAll('.v-sosmed-cb').forEach(c=>{ if(!c._vp){ c.addEventListener('change', updateVoucherPreview); c._vp=1; } }); } catch(e) {} }
   const mv = document.getElementById('menuVouchers'); if (mv) mv.style.display = (isAdminOrOwner || isOwner) ? '' : 'none';
   const navBtn = document.querySelector(`.nav-item[data-page="${pageName}"]`);
   if (navBtn) navBtn.classList.add('active');
@@ -10046,6 +10128,108 @@ window.clearMaintenanceSchedule = clearMaintenanceSchedule;
 
 /* ========== VOUCHER ADMIN ========== */
 
+
+function setVoucherTypeUI(type) {
+  const t = type === 'percent' ? 'percent' : 'fixed';
+  document.getElementById('vType').value = t;
+  const fixedBtn = document.getElementById('vTypeFixedBtn');
+  const pctBtn = document.getElementById('vTypePercentBtn');
+  const fixedF = document.getElementById('vFixedFields');
+  const pctF = document.getElementById('vPercentFields');
+  if (fixedBtn && pctBtn) {
+    if (t === 'fixed') {
+      fixedBtn.style.borderColor = '#22c55e';
+      fixedBtn.style.background = 'rgba(34,197,94,0.15)';
+      fixedBtn.style.color = '#fff';
+      pctBtn.style.borderColor = 'rgba(255,255,255,0.12)';
+      pctBtn.style.background = 'rgba(255,255,255,0.04)';
+      pctBtn.style.color = '#94a3b8';
+      if (fixedF) fixedF.style.display = '';
+      if (pctF) pctF.style.display = 'none';
+    } else {
+      pctBtn.style.borderColor = '#a78bfa';
+      pctBtn.style.background = 'rgba(167,139,250,0.18)';
+      pctBtn.style.color = '#fff';
+      fixedBtn.style.borderColor = 'rgba(255,255,255,0.12)';
+      fixedBtn.style.background = 'rgba(255,255,255,0.04)';
+      fixedBtn.style.color = '#94a3b8';
+      if (fixedF) fixedF.style.display = 'none';
+      if (pctF) pctF.style.display = '';
+    }
+  }
+  updateVoucherPreview();
+}
+
+function setVoucherAudience(mode) {
+  const allBtn = document.getElementById('vAudienceAll');
+  const someBtn = document.getElementById('vAudienceSome');
+  const wrap = document.getElementById('vEmailsWrap');
+  if (mode === 'some') {
+    if (wrap) wrap.style.display = '';
+    if (someBtn) { someBtn.style.borderColor = '#facc15'; someBtn.style.background = 'rgba(250,204,21,0.12)'; someBtn.style.color = '#fff'; }
+    if (allBtn) { allBtn.style.borderColor = 'rgba(255,255,255,0.12)'; allBtn.style.background = 'rgba(255,255,255,0.04)'; allBtn.style.color = '#94a3b8'; }
+  } else {
+    if (wrap) wrap.style.display = 'none';
+    if (allBtn) { allBtn.style.borderColor = '#00c6ff'; allBtn.style.background = 'rgba(0,198,255,0.12)'; allBtn.style.color = '#fff'; }
+    if (someBtn) { someBtn.style.borderColor = 'rgba(255,255,255,0.12)'; someBtn.style.background = 'rgba(255,255,255,0.04)'; someBtn.style.color = '#94a3b8'; }
+    const em = document.getElementById('vEmails');
+    if (em && mode === 'all') em.value = '';
+  }
+  updateVoucherPreview();
+}
+
+function syncVoucherSosmedHidden() {
+  const cbs = document.querySelectorAll('.v-sosmed-cb:checked');
+  const vals = Array.from(cbs).map(c => c.value);
+  const h = document.getElementById('vSosmed');
+  if (h) h.value = vals.join(',');
+  return vals;
+}
+
+function updateVoucherPreview() {
+  const el = document.getElementById('vPreviewText');
+  if (!el) return;
+  const code = (document.getElementById('vCode')?.value || 'KODE').trim().toUpperCase() || 'KODE';
+  const type = document.getElementById('vType')?.value || 'fixed';
+  let valueText = '';
+  if (type === 'percent') {
+    const pct = document.getElementById('vValuePercent')?.value || '?';
+    const maxd = document.getElementById('vMaxDisc')?.value;
+    valueText = pct + '% potongan' + (maxd ? (' (max Rp ' + Number(maxd).toLocaleString('id-ID') + ')') : '');
+  } else {
+    const nom = document.getElementById('vValueFixed')?.value || '0';
+    valueText = 'potongan tetap Rp ' + Number(nom || 0).toLocaleString('id-ID');
+  }
+  const min = Number(document.getElementById('vMin')?.value || 0);
+  const sos = syncVoucherSosmedHidden();
+  const emails = (document.getElementById('vEmails')?.value || '').trim();
+  const who = emails ? 'member tertentu' : 'semua member';
+  const maxUses = document.getElementById('vMaxUses')?.value;
+  const perUser = document.getElementById('vPerUser')?.value || '1';
+  el.innerHTML = '<b style="color:#facc15">' + code + '</b> → ' + valueText +
+    '<br>Min belanja: <b>Rp ' + min.toLocaleString('id-ID') + '</b> · Untuk: <b>' + who + '</b>' +
+    '<br>Sosmed: <b>' + (sos.join(', ') || '-') + '</b>' +
+    '<br>Kuota: <b>' + (maxUses || '∞') + '</b> total · <b>' + perUser + '</b>x / user';
+}
+
+function collectVoucherValueForSave() {
+  const type = document.getElementById('vType')?.value || 'fixed';
+  if (type === 'percent') {
+    const v = parseFloat(document.getElementById('vValuePercent')?.value || '0');
+    document.getElementById('vValue').value = v;
+    return v;
+  }
+  const v = parseFloat(document.getElementById('vValueFixed')?.value || '0');
+  document.getElementById('vValue').value = v;
+  return v;
+}
+
+window.setVoucherTypeUI = setVoucherTypeUI;
+window.setVoucherAudience = setVoucherAudience;
+window.updateVoucherPreview = updateVoucherPreview;
+window.syncVoucherSosmedHidden = syncVoucherSosmedHidden;
+window.collectVoucherValueForSave = collectVoucherValueForSave;
+
 async function loadVouchersAdmin() {
   const el = document.getElementById('voucherAdminList');
   if (!el || !supabaseClient) return;
@@ -10145,12 +10329,25 @@ function editVoucherAdmin(v) {
   if (typeof v === 'string') { try { v = JSON.parse(v); } catch(_){ return; } }
   document.getElementById('voucherEditId').value = v.id || '';
   document.getElementById('vCode').value = v.code || '';
-  document.getElementById('vType').value = v.type || 'fixed';
+  const type = v.type || 'fixed';
+  document.getElementById('vType').value = type;
+  try { setVoucherTypeUI(type); } catch(_) {}
   document.getElementById('vValue').value = v.value || '';
+  if (type === 'percent') {
+    const vp = document.getElementById('vValuePercent'); if (vp) vp.value = v.value || '';
+    const vf = document.getElementById('vValueFixed'); if (vf) vf.value = '';
+  } else {
+    const vf = document.getElementById('vValueFixed'); if (vf) vf.value = v.value || '';
+    const vp = document.getElementById('vValuePercent'); if (vp) vp.value = '';
+  }
   document.getElementById('vMaxDisc').value = v.max_discount || '';
   document.getElementById('vMin').value = v.min_purchase || 0;
-  document.getElementById('vSosmed').value = (v.sosmed_types || []).join(',');
-  document.getElementById('vEmails').value = (v.allowed_emails || []).join('\n');
+  const sos = v.sosmed_types || [];
+  document.querySelectorAll('.v-sosmed-cb').forEach(c => { c.checked = !sos.length || sos.includes(c.value); });
+  document.getElementById('vSosmed').value = sos.join(',');
+  const emails = v.allowed_emails || [];
+  document.getElementById('vEmails').value = emails.join('\n');
+  try { setVoucherAudience(emails.length ? 'some' : 'all'); } catch(_) {}
   document.getElementById('vMaxUses').value = v.max_uses != null ? v.max_uses : '';
   document.getElementById('vPerUser').value = v.per_user_limit != null ? v.per_user_limit : 1;
   document.getElementById('vNote').value = v.note || '';
@@ -10160,15 +10357,40 @@ function editVoucherAdmin(v) {
       const pad = n => String(n).padStart(2,'0');
       document.getElementById('vExpires').value = d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'T'+pad(d.getHours())+':'+pad(d.getMinutes());
     } catch(_){}
+  } else {
+    const ex = document.getElementById('vExpires'); if (ex) ex.value = '';
   }
+  const badge = document.getElementById('vFormModeBadge');
+  if (badge) { badge.textContent = 'MODE: EDIT'; badge.style.color = '#facc15'; }
+  try { updateVoucherPreview(); } catch(_) {}
   switchPage('vouchers');
+  try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch(_) {}
 }
+
+
+function resetVoucherForm() {
+  ['voucherEditId','vCode','vValue','vValueFixed','vValuePercent','vMaxDisc','vMin','vEmails','vNote','vExpires'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = (id === 'vMin' ? '0' : '');
+  });
+  const t = document.getElementById('vType'); if (t) t.value = 'fixed';
+  try { setVoucherTypeUI('fixed'); } catch(_) {}
+  try { setVoucherAudience('all'); } catch(_) {}
+  document.querySelectorAll('.v-sosmed-cb').forEach(c => { c.checked = true; });
+  const hs = document.getElementById('vSosmed'); if (hs) hs.value = 'sosmed-1,sosmed-2,sosmed-4';
+  const pu = document.getElementById('vPerUser'); if (pu) pu.value = '1';
+  const m = document.getElementById('vMaxUses'); if (m) m.value = '';
+  const badge = document.getElementById('vFormModeBadge');
+  if (badge) { badge.textContent = 'MODE: BARU'; badge.style.color = '#22c55e'; }
+  try { updateVoucherPreview(); } catch(_) {}
+}
+window.resetVoucherForm = resetVoucherForm;
 
 async function saveVoucherAdmin() {
   if (!isAdminOrOwner) return Swal.fire({title:'Akses ditolak',icon:'error',background:'#1a0e2e',color:'#fff'});
   const code = (document.getElementById('vCode').value || '').trim();
   const type = document.getElementById('vType').value;
-  const value = parseFloat(document.getElementById('vValue').value || '0');
+  const value = (typeof collectVoucherValueForSave === 'function' ? collectVoucherValueForSave() : parseFloat(document.getElementById('vValue').value || '0'));
+  if (typeof syncVoucherSosmedHidden === 'function') syncVoucherSosmedHidden();
   const maxDisc = document.getElementById('vMaxDisc').value ? parseFloat(document.getElementById('vMaxDisc').value) : null;
   const minP = parseFloat(document.getElementById('vMin').value || '0');
   const sosmed = (document.getElementById('vSosmed').value || '').split(/[,\s]+/).map(x=>x.trim()).filter(Boolean);
