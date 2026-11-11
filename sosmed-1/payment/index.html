@@ -2057,10 +2057,20 @@ async function loadAvailableVouchers(autoApply) {
     availableVouchers = vouchers;
     renderAvailableVouchers();
     if (autoApply && availableVouchers.length && !appliedVoucher) {
-      const best = availableVouchers.find(v => v.eligible !== false) || availableVouchers[0];
-      if (best && best.eligible !== false) {
+      // pilih diskon terbesar yang eligible
+      const sorted = availableVouchers.slice().sort((a,b) => Number(b.discount||0) - Number(a.discount||0));
+      const best = sorted.find(v => v.eligible !== false && Number(v.discount||0) > 0) || sorted.find(v => v.eligible !== false) || sorted[0];
+      if (best && best.code && best.eligible !== false) {
         selectedVoucherCode = best.code;
-        await applyVoucherCodeDirect(best.code);
+        try {
+          await applyVoucherCodeDirect(best.code);
+          const st = document.getElementById('voucherStatus');
+          if (st && appliedVoucher) {
+            st.innerHTML = '<span class="active">⚡ Auto: ' + appliedVoucher + ' · -Rp ' + Number(appliedDiscount||0).toLocaleString('id-ID') + '</span>';
+          }
+        } catch (e) {
+          console.warn('auto apply voucher', e.message || e);
+        }
       }
     }
   } catch (e) {
@@ -2146,8 +2156,12 @@ async function autoApplyBestVoucher(silent) {
     if (!silent) Swal.fire('Info', 'Tidak ada voucher tersedia', 'info');
     return;
   }
-  // sudah sorted by discount desc from SQL
-  const best = availableVouchers[0];
+  const sorted = availableVouchers.slice().sort((a,b) => Number(b.discount||0) - Number(a.discount||0));
+  const best = sorted.find(v => v.eligible !== false && Number(v.discount||0) > 0) || sorted.find(v => v.eligible !== false) || sorted[0];
+  if (!best || !best.code) {
+    if (!silent) Swal.fire('Info', 'Tidak ada voucher yang bisa dipakai', 'info');
+    return;
+  }
   selectedVoucherCode = best.code;
   await applyVoucherCodeDirect(best.code);
   if (!silent) {
@@ -2356,7 +2370,7 @@ window.showRefundHistory = showRefundHistory;
   
   // 🚀 AMBIL DATA TRANSAKSI (orders, total, mass) DARI SUPABASE DENGAN ID TRX
   ordersData = await loadOrdersFromSupabase();
-  try { await loadAvailableVouchers(false); } catch (e) { console.warn(e); }
+  try { await loadAvailableVouchers(true); } catch (e) { console.warn(e); }
 
   const paramsValid = await checkUrlParamsAndAutoRefund();
   if (!paramsValid) return;
