@@ -10319,54 +10319,122 @@ function renderVoucherAdminList(data) {
   el.innerHTML = html;
 }
 
+
 function editVoucherByIndex(idx) {
-  const v = (window._vouchersCache || [])[idx];
-  if (!v) return;
-  editVoucherAdmin(v);
+  try {
+    const list = window._vouchersCache || [];
+    const v = list[Number(idx)];
+    if (!v) {
+      console.warn('edit voucher: index not found', idx, list.length);
+      if (typeof Swal !== 'undefined') Swal.fire({ title: 'Voucher tidak ditemukan', text: 'Refresh daftar dulu', icon: 'warning', background: '#1a0e2e', color: '#fff' });
+      return;
+    }
+    editVoucherAdmin(v);
+  } catch (e) {
+    console.error(e);
+    if (typeof Swal !== 'undefined') Swal.fire({ title: 'Gagal edit', text: e.message || String(e), icon: 'error', background: '#1a0e2e', color: '#fff' });
+  }
+}
+
+function safeSetVal(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.value = val == null ? '' : val;
 }
 
 function editVoucherAdmin(v) {
-  if (typeof v === 'string') { try { v = JSON.parse(v); } catch(_){ return; } }
-  document.getElementById('voucherEditId').value = v.id || '';
-  document.getElementById('vCode').value = v.code || '';
-  const type = v.type || 'fixed';
-  document.getElementById('vType').value = type;
-  try { setVoucherTypeUI(type); } catch(_) {}
-  document.getElementById('vValue').value = v.value || '';
-  if (type === 'percent') {
-    const vp = document.getElementById('vValuePercent'); if (vp) vp.value = v.value || '';
-    const vf = document.getElementById('vValueFixed'); if (vf) vf.value = '';
-  } else {
-    const vf = document.getElementById('vValueFixed'); if (vf) vf.value = v.value || '';
-    const vp = document.getElementById('vValuePercent'); if (vp) vp.value = '';
+  if (!v) return;
+  if (typeof v === 'string') {
+    try { v = JSON.parse(v); } catch (_) { return; }
   }
-  document.getElementById('vMaxDisc').value = v.max_discount || '';
-  document.getElementById('vMin').value = v.min_purchase || 0;
-  const sos = v.sosmed_types || [];
-  document.querySelectorAll('.v-sosmed-cb').forEach(c => { c.checked = !sos.length || sos.includes(c.value); });
-  document.getElementById('vSosmed').value = sos.join(',');
-  const emails = v.allowed_emails || [];
-  document.getElementById('vEmails').value = emails.join('\n');
-  try { setVoucherAudience(emails.length ? 'some' : 'all'); } catch(_) {}
-  document.getElementById('vMaxUses').value = v.max_uses != null ? v.max_uses : '';
-  document.getElementById('vPerUser').value = v.per_user_limit != null ? v.per_user_limit : 1;
-  document.getElementById('vNote').value = v.note || '';
-  if (v.expires_at) {
+
+  // buka halaman dulu biar elemen form ada di DOM
+  try { switchPage('vouchers'); } catch (_) {}
+
+  const fill = () => {
+    safeSetVal('voucherEditId', v.id || '');
+    safeSetVal('vCode', v.code || '');
+
+    let type = String(v.type || 'fixed').toLowerCase();
+    if (type !== 'percent') type = 'fixed';
+    safeSetVal('vType', type);
+    try { setVoucherTypeUI(type); } catch (_) {}
+
+    const numVal = v.value != null ? Number(v.value) : '';
+    safeSetVal('vValue', numVal);
+    if (type === 'percent') {
+      safeSetVal('vValuePercent', numVal);
+      safeSetVal('vValueFixed', '');
+    } else {
+      safeSetVal('vValueFixed', numVal);
+      safeSetVal('vValuePercent', '');
+    }
+
+    safeSetVal('vMaxDisc', v.max_discount != null ? Number(v.max_discount) : '');
+    safeSetVal('vMin', v.min_purchase != null ? Number(v.min_purchase) : 0);
+
+    // sosmed_types bisa array / json string
+    let sos = v.sosmed_types || [];
+    if (typeof sos === 'string') {
+      try { sos = JSON.parse(sos); } catch (_) { sos = sos.split(/[,\s]+/).filter(Boolean); }
+    }
+    if (!Array.isArray(sos)) sos = [];
+    document.querySelectorAll('.v-sosmed-cb').forEach(c => {
+      c.checked = sos.length === 0 ? true : sos.map(String).includes(c.value);
+    });
+    try { syncVoucherSosmedHidden(); } catch (_) {
+      safeSetVal('vSosmed', sos.join(','));
+    }
+
+    let emails = v.allowed_emails || [];
+    if (typeof emails === 'string') {
+      try { emails = JSON.parse(emails); } catch (_) { emails = emails.split(/[\n,;]+/); }
+    }
+    if (!Array.isArray(emails)) emails = [];
+    emails = emails.map(e => String(e).trim()).filter(Boolean);
+    safeSetVal('vEmails', emails.join('\n'));
+    try { setVoucherAudience(emails.length ? 'some' : 'all'); } catch (_) {}
+
+    safeSetVal('vMaxUses', v.max_uses != null ? v.max_uses : '');
+    safeSetVal('vPerUser', v.per_user_limit != null ? v.per_user_limit : 1);
+    safeSetVal('vNote', v.note || '');
+
+    if (v.expires_at) {
+      try {
+        const d = new Date(v.expires_at);
+        if (!isNaN(d.getTime())) {
+          const pad = n => String(n).padStart(2, '0');
+          // datetime-local pakai local time
+          safeSetVal('vExpires', d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes()));
+        }
+      } catch (_) { safeSetVal('vExpires', ''); }
+    } else {
+      safeSetVal('vExpires', '');
+    }
+
+    const badge = document.getElementById('vFormModeBadge');
+    if (badge) {
+      badge.textContent = 'MODE: EDIT · ' + (v.code || '');
+      badge.style.color = '#facc15';
+      badge.style.borderColor = 'rgba(250,204,21,0.4)';
+      badge.style.background = 'rgba(250,204,21,0.12)';
+    }
+
+    try { updateVoucherPreview(); } catch (_) {}
+
+    // scroll ke form
     try {
-      const d = new Date(v.expires_at);
-      const pad = n => String(n).padStart(2,'0');
-      document.getElementById('vExpires').value = d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'T'+pad(d.getHours())+':'+pad(d.getMinutes());
-    } catch(_){}
-  } else {
-    const ex = document.getElementById('vExpires'); if (ex) ex.value = '';
-  }
-  const badge = document.getElementById('vFormModeBadge');
-  if (badge) { badge.textContent = 'MODE: EDIT'; badge.style.color = '#facc15'; }
-  try { updateVoucherPreview(); } catch(_) {}
-  switchPage('vouchers');
-  try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch(_) {}
+      const card = document.querySelector('.voucher-form-card') || document.getElementById('vCode');
+      if (card) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } catch (_) {}
+  };
+
+  // delay sedikit agar page-vouchers sudah active
+  setTimeout(fill, 50);
+  setTimeout(fill, 200);
 }
 
+window.editVoucherByIndex = editVoucherByIndex;
+window.editVoucherAdmin = editVoucherAdmin;
 
 function resetVoucherForm() {
   ['voucherEditId','vCode','vValue','vValueFixed','vValuePercent','vMaxDisc','vMin','vEmails','vNote','vExpires'].forEach(id => {
@@ -10400,7 +10468,11 @@ async function saveVoucherAdmin() {
   const note = document.getElementById('vNote').value || null;
   const expVal = document.getElementById('vExpires').value;
   const expires = expVal ? new Date(expVal).toISOString() : null;
-  const id = document.getElementById('voucherEditId').value || null;
+  let id = (document.getElementById('voucherEditId') || {}).value || null;
+  if (id === '' || id === 'null' || id === 'undefined') id = null;
+  if (!code) return Swal.fire({title:'Kode wajib',icon:'warning',background:'#1a0e2e',color:'#fff'});
+  if (!value || value <= 0) return Swal.fire({title:'Nilai diskon wajib',text: type==='percent' ? 'Isi persen (1-100)' : 'Isi nominal Rp',icon:'warning',background:'#1a0e2e',color:'#fff'});
+
   const { data, error } = await supabaseClient.rpc('admin_upsert_voucher', {
     p_code: code,
     p_type: type,
@@ -10418,7 +10490,7 @@ async function saveVoucherAdmin() {
   });
   if (error) return Swal.fire({title:'Gagal',text:error.message,icon:'error',background:'#1a0e2e',color:'#fff'});
   if (data && data.success === false) return Swal.fire({title:'Gagal',text:data.message,icon:'error',background:'#1a0e2e',color:'#fff'});
-  Swal.fire({title:'Tersimpan',icon:'success',background:'#1a0e2e',color:'#fff',timer:1500});
+  Swal.fire({title: id ? 'Voucher diupdate' : 'Voucher dibuat', icon:'success',background:'#1a0e2e',color:'#fff',timer:1500});
   resetVoucherForm();
   loadVouchersAdmin();
 }
