@@ -60,6 +60,15 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
 .profile-role.admin{background:linear-gradient(135deg,#b388ff,#8b5cf6);color:#fff}
 .profile-role.cs{background:linear-gradient(135deg,#00c6ff,#0072ff);color:#fff}
 .profile-role.user{background:rgba(100,255,200,0.15);color:#64ffc8;border:1px solid rgba(100,255,200,0.3)}
+
+.profile-role.seller_trusted{background:linear-gradient(135deg,#1d9bf0,#0ea5e9);color:#fff;border:1px solid rgba(29,155,240,0.5)}
+.member-role-tag.seller_trusted{background:linear-gradient(135deg,#1d9bf0,#0ea5e9);color:#fff}
+.member-card-full .mc-role-tag.seller_trusted{background:linear-gradient(135deg,#1d9bf0,#0ea5e9);color:#fff}
+.password-item-role.seller_trusted{background:linear-gradient(135deg,#1d9bf0,#0ea5e9);color:#fff}
+.msg-role-tag.seller_trusted{background:linear-gradient(135deg,#1d9bf0,#0ea5e9);color:#fff}
+.verified-tick{display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:50%;background:#1d9bf0;color:#fff;font-size:9px;font-weight:900;margin-left:4px;vertical-align:middle;line-height:1;box-shadow:0 0 0 2px rgba(29,155,240,0.25)}
+.verified-name{display:inline-flex;align-items:center;gap:4px;flex-wrap:wrap}
+
 .status-indicator{position:absolute;bottom:2px;right:2px;width:14px;height:14px;border-radius:50%;border:2.5px solid #1a0e2e;transition:all 0.3s ease;z-index:2}
 .status-indicator.online{background:#00ff88;box-shadow:0 0 8px #00ff88, 0 0 16px rgba(0,255,136,0.5);animation:onlinePulse 2s ease-in-out infinite}
 .status-indicator.offline{background:#6b4a7a}
@@ -1370,7 +1379,7 @@ body.chat-open .cs-bubble-container{display:none !important}
             <div class="broadcast-form">
               <div class="bf-label">📝 Judul</div><input type="text" id="bfTitle" class="bf-input" placeholder="Judul broadcast..." maxlength="100"><div class="bf-char-count" id="bfTitleCount">0/100</div>
               <div class="bf-label">💬 Pesan</div><textarea id="bfMessage" class="bf-textarea" placeholder="Tulis pesan..." maxlength="500"></textarea><div class="bf-char-count" id="bfMessageCount">0/500</div>
-              <div class="bf-label">👥 Target</div><select id="bfTargetRole" class="bf-select"><option value="all">🌐 Semua User</option><option value="user">👤 User</option><option value="cs">💼 CS</option><option value="admin">🛡️ Admin</option><option value="owner">👑 Owner</option></select>
+              <div class="bf-label">👥 Target</div><select id="bfTargetRole" class="bf-select"><option value="all">🌐 Semua User</option><option value="user">👤 User</option><option value="seller_trusted">✅ Seller Trusted</option><option value="cs">💼 CS</option><option value="admin">🛡️ Admin</option><option value="owner">👑 Owner</option></select>
               <div class="bf-label">⚡ Prioritas</div>
               <div class="bf-priority-grid"><button type="button" class="bf-priority-btn active" data-priority="normal" onclick="selectPriority('normal', this)"><span>💬</span><span style="font-size:10px;">Normal</span></button><button type="button" class="bf-priority-btn high" data-priority="high" onclick="selectPriority('high', this)"><span>⚡</span><span style="font-size:10px;">High</span></button><button type="button" class="bf-priority-btn urgent" data-priority="urgent" onclick="selectPriority('urgent', this)"><span>🚨</span><span style="font-size:10px;">Urgent</span></button></div>
               <div class="bf-label">⏰ Durasi aktif broadcast (jam)</div><input type="number" id="bfExpiresHours" class="bf-input" value="24" min="1" max="720">
@@ -3981,8 +3990,25 @@ async function updateAuthUI(user) {
     ['homeAvatar', 'profileAvatar'].forEach(id => { const el = document.getElementById(id); if (el) { el.textContent = initial; el.className = 'profile-avatar ' + (role === 'owner' ? 'owner' : role === 'admin' ? 'admin' : role === 'cs' ? 'cs' : ''); } });
     ['homeName', 'profileName'].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = displayName; });
     ['homeEmail', 'profileEmail'].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = email; });
-    const roleHTML = role === 'owner' ? '👑 Owner' : role === 'admin' ? '🛡️ Admin' : role === 'cs' ? '💼 Customer Service' : '👤 User';
-    ['homeRole', 'profileRole'].forEach(id => { const el = document.getElementById(id); if (el) { el.className = 'profile-role ' + role; el.textContent = roleHTML; } });
+    const roleHTML = (typeof getRoleLabel === 'function' ? getRoleLabel(role) : role) + (typeof verifiedTickHtml === 'function' ? verifiedTickHtml(role) : (role === 'seller_trusted' ? ' ✓' : ''));
+    ['homeRole', 'profileRole'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) {
+        el.className = 'profile-role ' + (role || 'user');
+        el.innerHTML = roleHTML;
+      }
+    });
+    // blue tick di samping nama jika Seller Trusted
+    ['homeName', 'profileName'].forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const base = (displayName || '').replace(/\s*✓\s*$/,'').trim() || displayName;
+      if (typeof isSellerTrusted === 'function' && isSellerTrusted(role)) {
+        el.innerHTML = escapeHtml(base) + '<span class="verified-tick" title="Seller Trusted · Verified">✓</span>';
+      } else {
+        el.textContent = base;
+      }
+    });
     updateBalanceDisplay(profile?.balance || 0);
     startBalanceRealtime();
     isCS = (role === 'cs');
@@ -5887,7 +5913,7 @@ async function changeRolePrompt(email, currentRole, userId) {
     return;
   }
   const isOwnerRole = currentProfile.role === 'owner';
-  const roleOptions = { 'user': '👤 User', 'cs': '💼 Customer Service', 'admin': '🛡️ Admin' };
+  const roleOptions = { 'user': '👤 User', 'seller_trusted': '✅ Seller Trusted (Blue Tick)', 'cs': '💼 Customer Service', 'admin': '🛡️ Admin' };
   if (isOwnerRole) roleOptions['owner'] = '👑 Owner';
   const { value: newRole } = await Swal.fire({
     title: '🎭 Ubah Role User',
@@ -5944,9 +5970,20 @@ async function changeRolePrompt(email, currentRole, userId) {
   } catch (err) { Swal.fire({ title: '❌ Gagal', text: err.message, icon: 'error', confirmButtonColor: '#ff4444', background: '#1a0e2e', color: '#fff' }); }
 }
 
-function getRoleLabel(role) { const map = { 'owner': '👑 Owner', 'admin': '🛡️ Admin', 'cs': '💼 CS', 'user': '👤 User' }; return map[role] || role; }
-function getRoleBgColor(role) { const map = { 'owner': 'linear-gradient(135deg,#ffd700,#ffed4e)', 'admin': 'linear-gradient(135deg,#b388ff,#8b5cf6)', 'cs': 'linear-gradient(135deg,#00c6ff,#0072ff)', 'user': 'rgba(100,255,200,0.2)' }; return map[role] || 'rgba(255,255,255,0.1)'; }
-function getRoleTextColor(role) { const map = { 'owner': '#1a0e2e', 'admin': '#fff', 'cs': '#fff', 'user': '#64ffc8' }; return map[role] || '#fff'; }
+function isSellerTrusted(role) {
+  const r = String(role || '').toLowerCase();
+  return r === 'seller_trusted' || r === 'seller-trusted' || r === 'trusted_seller';
+}
+function verifiedTickHtml(role) {
+  return isSellerTrusted(role) ? '<span class="verified-tick" title="Seller Trusted · Verified">✓</span>' : '';
+}
+function displayNameWithVerified(name, role) {
+  const n = escapeHtml(name || '-');
+  return isSellerTrusted(role) ? ('<span class="verified-name">' + n + verifiedTickHtml(role) + '</span>') : n;
+}
+function getRoleLabel(role) { const map = { 'owner': '👑 Owner', 'admin': '🛡️ Admin', 'cs': '💼 CS', 'seller_trusted': '✅ Seller Trusted', 'user': '👤 User' }; return map[role] || role; }
+function getRoleBgColor(role) { const map = { 'owner': 'linear-gradient(135deg,#ffd700,#ffed4e)', 'admin': 'linear-gradient(135deg,#b388ff,#8b5cf6)', 'cs': 'linear-gradient(135deg,#00c6ff,#0072ff)', 'seller_trusted': 'linear-gradient(135deg,#1d9bf0,#0ea5e9)', 'user': 'rgba(100,255,200,0.2)' }; return map[role] || 'rgba(255,255,255,0.1)'; }
+function getRoleTextColor(role) { const map = { 'owner': '#1a0e2e', 'admin': '#fff', 'cs': '#fff', 'seller_trusted': '#fff', 'user': '#64ffc8' }; return map[role] || '#fff'; }
 
 // ============================================================
 // REFERRAL: USER SET KODE + ADMIN ATUR PERSENTASE
@@ -8841,7 +8878,7 @@ function renderGlobalMessages(messages) {
     const isMine = msg.user_id === myId;
     const roleClass = msg.role === 'owner' ? 'owner' : (msg.role === 'admin' ? 'admin' : (msg.role === 'cs' ? 'cs' : ''));
     const canManage = isAdminOrOwner || isMine;
-    const roleTag = msg.role === 'owner' ? '<span class="msg-role-tag owner">Owner</span>' : (msg.role === 'admin' ? '<span class="msg-role-tag admin">Admin</span>' : (msg.role === 'cs' ? '<span class="msg-role-tag cs">CS</span>' : ''));
+    const roleTag = msg.role === 'owner' ? '<span class="msg-role-tag owner">Owner</span>' : (msg.role === 'admin' ? '<span class="msg-role-tag admin">Admin</span>' : (msg.role === 'cs' ? '<span class="msg-role-tag cs">CS</span>' : (msg.role === 'seller_trusted' ? '<span class="msg-role-tag seller_trusted">Seller Trusted ✓</span>' : '')));
     const pinTag = msg.pinned ? '<span class="msg-pin-tag">📌</span>' : '';
     const canPin = isAdminOrOwner;
     const canMute = isAdminOrOwner && !isMine;
@@ -9024,7 +9061,7 @@ function renderSupportMessages(messages, containerId) {
     if (containerId === 'supportChatBodyAdmin' && staffRoles.includes(msg.sender_role)) isMine = true;
 
     const roleClass = msg.sender_role === 'owner' ? 'owner' : (msg.sender_role === 'admin' ? 'admin' : (msg.sender_role === 'cs' ? 'cs' : ''));
-    const roleTag = msg.sender_role === 'owner' ? '<span class="msg-role-tag owner">Owner</span>' : (msg.sender_role === 'admin' ? '<span class="msg-role-tag admin">Admin</span>' : (msg.sender_role === 'cs' ? '<span class="msg-role-tag cs">CS</span>' : ''));
+    const roleTag = msg.sender_role === 'owner' ? '<span class="msg-role-tag owner">Owner</span>' : (msg.sender_role === 'admin' ? '<span class="msg-role-tag admin">Admin</span>' : (msg.sender_role === 'cs' ? '<span class="msg-role-tag cs">CS</span>' : (msg.sender_role === 'seller_trusted' ? '<span class="msg-role-tag seller_trusted">Seller Trusted ✓</span>' : '')));
     const parsed = extractSupportImage(msg);
     let content = '';
     if (parsed.imageUrl) {
@@ -9660,12 +9697,18 @@ function renderMemberList(data) {
   data.forEach(m => {
     const initial = (m.email || '?').charAt(0).toUpperCase();
     const avatarClass = m.role === 'owner' ? 'owner' : (m.role === 'admin' ? 'admin' : (m.role === 'cs' ? 'cs' : ''));
-    const roleTag = m.role === 'owner' ? '<span class="member-role-tag owner">Owner</span>' : (m.role === 'admin' ? '<span class="member-role-tag admin">Admin</span>' : (m.role === 'cs' ? '<span class="member-role-tag cs">CS</span>' : '<span class="member-role-tag user">User</span>'));
+    let roleTag = '<span class="member-role-tag user">User</span>';
+    if (m.role === 'owner') roleTag = '<span class="member-role-tag owner">Owner</span>';
+    else if (m.role === 'admin') roleTag = '<span class="member-role-tag admin">Admin</span>';
+    else if (m.role === 'cs') roleTag = '<span class="member-role-tag cs">CS</span>';
+    else if (m.role === 'seller_trusted') roleTag = '<span class="member-role-tag seller_trusted">Seller Trusted</span>';
+    const blueTick = (m.role === 'seller_trusted') ? '<span class="verified-tick" title="Verified Seller Trusted">✓</span>' : '';
     const bannedTag = m.banned ? '<span class="member-role-tag banned">BANNED</span>' : '';
     const balanceNum = parseFloat(m.balance) || 0;
     const isMinus = balanceNum < 0;
     const balanceDisplay = (isMinus ? '-Rp ' : 'Rp ') + Math.abs(balanceNum).toLocaleString('id-ID');
-    html += `<div class="member-item ${m.banned ? 'banned' : ''}" data-user-id="${m.id}"><div class="member-avatar ${avatarClass}">${initial}</div><div class="member-info"><div class="member-email">${escapeHtml(m.email || '-')} ${roleTag} ${bannedTag}</div><div class="member-meta">💰 <span class="${isMinus ? 'minus-balance' : ''}">${balanceDisplay}</span></div></div></div>`;
+    const avatarClass2 = m.role === 'owner' ? 'owner' : (m.role === 'admin' ? 'admin' : (m.role === 'cs' ? 'cs' : (m.role === 'seller_trusted' ? 'seller_trusted' : '')));
+    html += '<div class="member-item ' + (m.banned ? 'banned' : '') + '" data-user-id="' + m.id + '"><div class="member-avatar ' + avatarClass2 + '">' + initial + '</div><div class="member-info"><div class="member-email">' + escapeHtml(m.email || '-') + ' ' + blueTick + ' ' + roleTag + ' ' + bannedTag + '</div><div class="member-meta">💰 <span class="' + (isMinus ? 'minus-balance' : '') + '">' + balanceDisplay + '</span></div></div></div>';
   });
   listEl.innerHTML = html;
 }
