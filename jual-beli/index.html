@@ -230,6 +230,13 @@ body{font-family:'Quicksand',sans-serif;background:#0f0818;color:#f1e6f5;min-hei
 .shop-settings-card{background:rgba(29,155,240,0.08);border:1px solid rgba(29,155,240,0.25);border-radius:16px;padding:12px;margin-bottom:12px}
 .shop-settings-card h3{font-size:13px;font-weight:900;margin-bottom:8px;color:#38bdf8}
 
+
+.shop-profile-head{text-align:center;padding:8px 4px 12px}
+.shop-profile-head .name{font-size:17px;font-weight:900;font-family:Poppins,sans-serif}
+.shop-profile-head .meta{font-size:11px;color:#94a3b8;margin-top:6px;line-height:1.5}
+.shop-profile-head .rating{color:#ffd700;font-weight:800;margin-top:8px}
+.shop-profile-products{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:10px}
+
 </style>
 </head>
 <body>
@@ -302,6 +309,30 @@ body{font-family:'Quicksand',sans-serif;background:#0f0818;color:#f1e6f5;min-hei
         <div style="margin-top:10px;font-size:12px;color:#94a3b8">Saldo</div>
         <div style="font-size:20px;font-weight:900;color:#ffd700;font-family:Poppins,sans-serif" id="profileBalance">Rp 0</div>
       </div>
+
+      <div class="shop-settings-card" id="shopSettingsCard">
+        <h3>🏪 Edit Profil Toko</h3>
+        <div style="font-size:11px;color:#94a3b8;margin-bottom:8px">Nama & deskripsi toko tampil di produk. WhatsApp: <b>gratis 1×</b>, ganti berikutnya <b style="color:#facc15">Rp30.000</b>.</div>
+        <div class="field"><label>Nama toko</label><input id="shopNameInput" maxlength="40" placeholder="Contoh: Shine Store Official"></div>
+        <div class="field"><label>Deskripsi toko</label><textarea id="shopDescInput" maxlength="300" placeholder="Tentang toko kamu..."></textarea></div>
+        <div class="field"><label>Nomor WhatsApp</label><input id="shopWaInput" placeholder="08xxxxxxxxxx">
+          <div style="font-size:10px;color:#94a3b8;margin-top:4px" id="shopWaHint">Status WA: —</div>
+        </div>
+        <button type="button" class="btn btn-primary" onclick="saveShopProfile()">💾 Simpan Profil Toko</button>
+        <div id="shopTrustedNote" style="font-size:11px;color:#1d9bf0;margin-top:8px;display:none">✅ Role Anda: <b>Seller Trusted</b></div>
+        <button type="button" class="btn btn-secondary" style="margin-top:8px" onclick="viewShopProfile(currentUser?.id)">👁️ Lihat Profil Toko Saya</button>
+      </div>
+
+      <div class="card" id="ownerRecoCard" style="display:none;margin-top:12px">
+        <div class="section-title">⭐ Rekomendasi Seller (Owner/Admin)<span class="line"></span></div>
+        <div style="font-size:11px;color:#94a3b8;margin-bottom:8px">Seller yang ditandai muncul di widget <b>Toko Rekomendasi</b> di beranda market.</div>
+        <div class="field"><label>Email seller</label><input id="recoSellerEmail" placeholder="seller@gmail.com"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button type="button" class="btn btn-gold" style="flex:1;min-width:140px" onclick="ownerSetRecommended(true)">⭐ Jadikan Rekomendasi</button>
+          <button type="button" class="btn btn-secondary" style="flex:1;min-width:120px" onclick="ownerSetRecommended(false)">Hapus Rekomendasi</button>
+        </div>
+        <button type="button" class="btn btn-secondary" style="margin-top:8px" onclick="loadRecommendedSellers()">🔄 Refresh Widget Toko</button>
+      </div>
       <div class="section-title" id="adminProductsTitle" style="display:none">🛡️ Semua Produk (Admin) <div class="line"></div></div>
       <div id="adminProductsList" style="display:none"></div>
       <div class="section-title" id="adminPendingTitle" style="display:none">🛡️ Pending (Admin) <div class="line"></div></div>
@@ -360,12 +391,14 @@ body{font-family:'Quicksand',sans-serif;background:#0f0818;color:#f1e6f5;min-hei
     </div>
 
   
-<div class="card" id="ownerRecoCard" style="display:none;margin-top:10px">
-  <div class="section-title">⭐ Rekomendasi Seller <span class="line"></span></div>
-  <div class="field"><label>Email seller</label><input id="recoSellerEmail" placeholder="seller@gmail.com"></div>
-  <div style="display:flex;gap:8px">
-    <button type="button" class="btn btn-gold" style="flex:1" onclick="ownerSetRecommended(true)">⭐ Jadikan Rekomendasi</button>
-    <button type="button" class="btn btn-secondary" style="flex:1" onclick="ownerSetRecommended(false)">Hapus</button>
+
+<div class="modal-back" id="shopProfileModal">
+  <div class="modal-sheet" style="max-height:90vh">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <h3 style="margin:0">🏪 Profil Toko</h3>
+      <button type="button" class="btn btn-secondary" style="width:auto;padding:8px 12px" onclick="closeShopProfile()">✕</button>
+    </div>
+    <div id="shopProfileBody"><div class="loading">Memuat...</div></div>
   </div>
 </div>
 
@@ -487,17 +520,6 @@ body{font-family:'Quicksand',sans-serif;background:#0f0818;color:#f1e6f5;min-hei
 <div class="img-lightbox" id="imgLightbox" onclick="if(event.target===this)closeImagePreview()">
   <button type="button" class="lb-close" onclick="closeImagePreview()" title="Tutup">✕</button>
   <img id="imgLightboxImg" src="" alt="Preview">
-  
-<div class="shop-settings-card" id="shopSettingsCard">
-  <h3>🏪 Profil Toko</h3>
-  <div class="field"><label>Nama toko (tampil di produk)</label><input id="shopNameInput" maxlength="40" placeholder="Contoh: Shine Store Official"></div>
-  <div class="field"><label>Deskripsi toko</label><textarea id="shopDescInput" maxlength="300" placeholder="Tentang toko kamu..."></textarea></div>
-  <div class="field"><label>WhatsApp (opsional)</label><input id="shopWaInput" placeholder="08xxxxxxxxxx">
-    <div style="font-size:10px;color:#94a3b8;margin-top:4px">Set pertama <b>gratis</b>. Ganti nomor berikutnya dikenakan <b style="color:#facc15">Rp30.000</b> (debit saldo).</div>
-  </div>
-  <button type="button" class="btn btn-secondary" onclick="saveShopProfile()">💾 Simpan Profil Toko</button>
-  <div id="shopTrustedNote" style="font-size:11px;color:#1d9bf0;margin-top:8px;display:none">✅ Akun Anda: <b>Seller Trusted</b></div>
-</div>
 <div class="lb-nav" id="imgLightboxNav" style="display:none">
     <button type="button" onclick="event.stopPropagation();lightboxPrev()">‹ Prev</button>
     <button type="button" onclick="event.stopPropagation();lightboxNext()">Next ›</button>
@@ -745,7 +767,7 @@ function switchPage(name){
   if(name==='market') loadMarket();
   if(name==='sell'){ loadMyProducts(); loadPending(); loadSlotInfo(); }
   if(name==='mc'){try{loadMcRooms()}catch(e){}}if(name==='orders') loadOrders();
-  if(name==='profile'){ refreshBalance(); if(isStaff){ loadAdminPending(); loadAdminProducts(); } }
+  if(name==='profile'){ refreshBalance(); try{loadShopSettings()}catch(_){}; if(isStaff){ loadAdminPending(); loadAdminProducts(); } }
 }
 
 /* ========== SLOTS ========== */
@@ -943,6 +965,7 @@ async function openDetail(id){
       ${(shopCache[p.seller_id]&&shopCache[p.seller_id].shop_description)?`<div class="note-box" style="margin-top:8px">${escapeHtml(shopCache[p.seller_id].shop_description)}</div>`:''}
     </div>
     ${sellerRatingHtml}
+    <button type="button" class="btn btn-secondary" style="margin:8px 0" onclick="event.stopPropagation();viewShopProfile('${p.seller_id}')">🏪 Lihat Profil Toko</button>
     <div style="font-size:13px;line-height:1.55;white-space:pre-wrap;margin:10px 0 12px">${escapeHtml(p.description||'')}</div>
     ${actionBtn}
     ${p.seller_id!==currentUser?.id ? `<button type="button" class="btn btn-secondary" style="margin-top:8px;position:relative;z-index:5" onclick="event.preventDefault();event.stopPropagation();startChatWithSeller('${p.seller_id}','${p.id}')">💬 Chat Penjual</button>` : ''}
@@ -3324,7 +3347,7 @@ function renderMarket(){
       ${imgTag}
       <div class="sp-body">
         <div class="sp-title">${escapeHtml(p.title||'-')}</div>
-        <div class="sp-shop">🏪 ${shop}${tick}</div>
+        <div class="sp-shop" onclick="event.stopPropagation();viewShopProfile('${p.seller_id}')">🏪 ${shop}${tick}</div>
         <div class="sp-price">${priceLabel}</div>
         <div class="sp-foot"><span class="stars" style="font-size:10px">${stars}</span><span class="sp-stock">${badge}</span></div>
       </div>
@@ -3336,19 +3359,32 @@ async function loadShopSettings(){
   if(!currentUser) return;
   try {
     const { data } = await sb.from('seller_shops').select('*').eq('seller_id', currentUser.id).maybeSingle();
+    const n = document.getElementById('shopNameInput');
+    const d = document.getElementById('shopDescInput');
+    const w = document.getElementById('shopWaInput');
+    const hint = document.getElementById('shopWaHint');
     if(data){
-      const n = document.getElementById('shopNameInput');
-      const d = document.getElementById('shopDescInput');
-      const w = document.getElementById('shopWaInput');
       if(n) n.value = data.shop_name || '';
       if(d) d.value = data.shop_description || '';
       if(w) w.value = data.whatsapp || '';
       shopCache[currentUser.id] = data;
+      if(hint){
+        hint.innerHTML = data.whatsapp
+          ? ('WA terpasang. Ganti nomor berikutnya dikenakan <b style="color:#facc15">Rp30.000</b>.')
+          : 'Belum set WA — pengisian pertama <b style="color:#22c55e">gratis</b>.';
+      }
+    } else if(hint){
+      hint.innerHTML = 'Belum set WA — pengisian pertama <b style="color:#22c55e">gratis</b>.';
     }
     const note = document.getElementById('shopTrustedNote');
-    if(note && isSellerTrustedRole(currentProfile?.role)) note.style.display = 'block';
+    if(note){
+      note.style.display = isSellerTrustedRole(currentProfile?.role) ? 'block' : 'none';
+    }
     const oc = document.getElementById('ownerRecoCard');
-    if(oc && (isStaff || currentProfile?.role === 'owner')) oc.style.display = 'block';
+    if(oc){
+      const staff = !!(isStaff || currentProfile?.role === 'owner' || currentProfile?.role === 'admin');
+      oc.style.display = staff ? 'block' : 'none';
+    }
   } catch(_){}
 }
 
@@ -3383,6 +3419,70 @@ async function ownerSetRecommended(flag){
 }
 
 window.openDetail = openDetail;
+
+async function viewShopProfile(sellerId){
+  if(!sellerId) return;
+  const modal = document.getElementById('shopProfileModal');
+  const body = document.getElementById('shopProfileBody');
+  if(!modal || !body) return;
+  modal.classList.add('show');
+  body.innerHTML = '<div class="loading">Memuat profil toko...</div>';
+  try {
+    await resolveEmails([sellerId]);
+    try { await hydrateShops([sellerId]); } catch(_){}
+    let role = 'user', email = emailOf(sellerId), sellerRating = 5, sellerCount = 0;
+    try {
+      const { data: pr } = await sb.from('profiles').select('email, role, seller_rating, seller_review_count').eq('id', sellerId).maybeSingle();
+      if(pr){
+        email = pr.email || email;
+        role = pr.role || 'user';
+        sellerRating = Number(pr.seller_rating ?? 5);
+        sellerCount = Number(pr.seller_review_count ?? 0);
+        profileRoleCache[sellerId] = pr;
+      }
+    } catch(_){}
+    const shop = shopCache[sellerId] || {};
+    const name = shop.shop_name || (email ? String(email).split('@')[0] : 'Toko');
+    const desc = shop.shop_description || 'Belum ada deskripsi toko.';
+    const wa = shop.whatsapp || '';
+    const rd = (typeof ratingDisplay === 'function') ? ratingDisplay(sellerRating, sellerCount) : { stars: '★★★★★', num: '5.0' };
+    const tick = (typeof verifiedTick === 'function') ? verifiedTick(role) : '';
+    const trusted = (String(role).toLowerCase() === 'seller_trusted') ? '<span class="badge" style="background:rgba(29,155,240,0.2);color:#38bdf8;border:1px solid rgba(29,155,240,0.4)">Seller Trusted</span>' : '';
+    const reco = shop.is_recommended ? '<span class="badge" style="background:rgba(250,204,21,0.15);color:#facc15;border:1px solid rgba(250,204,21,0.35)">⭐ Rekomendasi</span>' : '';
+
+    const { data: products } = await sb.from('marketplace_products')
+      .select('id, title, price, images, stock_remaining, avg_rating, review_count, is_auction, auction_status, current_bid, auction_start_price')
+      .eq('seller_id', sellerId).eq('status', 'active').order('created_at', { ascending: false }).limit(40);
+
+    const prodHtml = (products && products.length) ? ('<div class="shop-profile-products">' + products.map(p => {
+      const img = (p.images && p.images[0]) ? `<img class="sp-img" src="${escapeHtml(p.images[0])}" alt="" style="border-radius:10px">` : '<div class="sp-img" style="display:flex;align-items:center;justify-content:center;border-radius:10px">🛒</div>';
+      const price = p.is_auction ? formatRp(p.current_bid || p.auction_start_price || p.price) : formatRp(p.price);
+      return `<div class="store-product" onclick="closeShopProfile();openDetail('${p.id}')">${img}<div class="sp-body"><div class="sp-title">${escapeHtml(p.title||'-')}</div><div class="sp-price">${price}</div></div></div>`;
+    }).join('') + '</div>') : '<div class="empty">Toko ini belum punya produk aktif</div>';
+
+    body.innerHTML = `
+      <div class="shop-profile-head">
+        <div class="name">${escapeHtml(name)}${tick}</div>
+        <div style="margin-top:6px;display:flex;gap:6px;justify-content:center;flex-wrap:wrap">${trusted}${reco}</div>
+        <div class="rating">${rd.stars} ${rd.num} · ${sellerCount} ulasan toko</div>
+        <div class="meta">Email: ${escapeHtml(email||'-')}</div>
+        ${wa ? `<div style="margin-top:8px"><a class="btn btn-secondary" style="width:auto;display:inline-flex" href="https://wa.me/${String(wa).replace(/^0/,'62')}" target="_blank" rel="noopener">💬 Chat WhatsApp</a></div>` : ''}
+        <div class="note-box" style="text-align:left;margin-top:12px">${escapeHtml(desc)}</div>
+      </div>
+      <div class="section-title">Produk toko<span class="line"></span></div>
+      ${prodHtml}
+    `;
+  } catch(e){
+    body.innerHTML = `<div class="empty">${escapeHtml(e.message||String(e))}</div>`;
+  }
+}
+function closeShopProfile(){
+  const modal = document.getElementById('shopProfileModal');
+  if(modal) modal.classList.remove('show');
+}
+window.viewShopProfile = viewShopProfile;
+window.closeShopProfile = closeShopProfile;
+
 window.loadRecommendedSellers = loadRecommendedSellers;
 window.saveShopProfile = saveShopProfile;
 window.ownerSetRecommended = ownerSetRecommended;
