@@ -202,6 +202,34 @@ body{font-family:'Quicksand',sans-serif;background:#0f0818;color:#f1e6f5;min-hei
 .mc-card .mc-c-code{font-weight:900;color:#facc15;letter-spacing:1px}
 .mc-card .mc-c-meta{font-size:11px;color:#94a3b8;margin-top:4px}
 
+
+/* ===== Store UI + Seller Trusted ===== */
+.verified-tick{display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:50%;background:#1d9bf0;color:#fff;font-size:9px;font-weight:900;margin-left:4px;box-shadow:0 0 0 2px rgba(29,155,240,0.25)}
+.store-hero{background:linear-gradient(135deg,rgba(255,107,157,0.12),rgba(0,198,255,0.08));border:1px solid rgba(255,255,255,0.1);border-radius:18px;padding:14px;margin-bottom:12px}
+.store-hero h2{font-size:15px;font-weight:900;margin-bottom:4px;font-family:Poppins,sans-serif}
+.store-hero p{font-size:11px;color:#94a3b8;line-height:1.45}
+.reco-wrap{margin-bottom:14px}
+.reco-title{font-size:12px;font-weight:900;color:#facc15;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.reco-scroll{display:flex;gap:10px;overflow-x:auto;padding-bottom:6px;scroll-snap-type:x mandatory}
+.reco-card{flex:0 0 148px;scroll-snap-align:start;background:rgba(255,255,255,0.05);border:1px solid rgba(255,215,0,0.25);border-radius:14px;padding:10px;cursor:pointer}
+.reco-card:hover{border-color:rgba(255,215,0,0.5);background:rgba(255,215,0,0.08)}
+.reco-card .rc-name{font-size:12px;font-weight:900;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.reco-card .rc-meta{font-size:10px;color:#94a3b8;margin-top:4px}
+.reco-card .rc-badge{display:inline-flex;align-items:center;gap:3px;font-size:9px;font-weight:800;color:#1d9bf0;margin-top:6px}
+.store-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+@media(min-width:420px){.store-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.store-product{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:16px;overflow:hidden;cursor:pointer;display:flex;flex-direction:column;transition:.2s;position:relative}
+.store-product:hover{border-color:rgba(255,107,157,0.4);transform:translateY(-2px);box-shadow:0 10px 24px rgba(0,0,0,0.25)}
+.store-product .sp-img{width:100%;aspect-ratio:1;object-fit:cover;background:#221236;display:block}
+.store-product .sp-body{padding:10px;display:flex;flex-direction:column;gap:4px;flex:1}
+.store-product .sp-title{font-size:12px;font-weight:800;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:32px}
+.store-product .sp-shop{font-size:10px;color:#94a3b8;display:flex;align-items:center;gap:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.store-product .sp-price{font-size:13px;font-weight:900;color:#ffd700;font-family:Poppins,sans-serif;margin-top:auto}
+.store-product .sp-foot{display:flex;justify-content:space-between;align-items:center;gap:4px;margin-top:4px}
+.store-product .sp-stock{font-size:9px;font-weight:800}
+.shop-settings-card{background:rgba(29,155,240,0.08);border:1px solid rgba(29,155,240,0.25);border-radius:16px;padding:12px;margin-bottom:12px}
+.shop-settings-card h3{font-size:13px;font-weight:900;margin-bottom:8px;color:#38bdf8}
+
 </style>
 </head>
 <body>
@@ -230,7 +258,16 @@ body{font-family:'Quicksand',sans-serif;background:#0f0818;color:#f1e6f5;min-hei
         <button class="chip" data-f="top" onclick="setFilter('top',this)">Rating Tinggi</button>
         <button class="chip" data-f="auction" onclick="setFilter('auction',this)">🔨 Lelang</button>
       </div>
-      <div id="marketList" class="loading">Memuat produk...</div>
+      
+<div class="store-hero">
+  <h2>🛍️ Shine Account Market</h2>
+  <p>Jual-beli akun terpercaya. Cari toko rekomendasi & Seller Trusted bercentang biru.</p>
+</div>
+<div class="reco-wrap" id="recoSellerWrap">
+  <div class="reco-title">⭐ Toko / Seller Rekomendasi</div>
+  <div class="reco-scroll" id="recoSellerList"><div class="loading">Memuat toko...</div></div>
+</div>
+<div id="marketList" class="store-grid"><div class="loading">Memuat produk...</div></div>
     </div>
 
     <!-- SELL -->
@@ -322,7 +359,17 @@ body{font-family:'Quicksand',sans-serif;background:#0f0818;color:#f1e6f5;min-hei
       </div>
     </div>
 
-  <div class="bottom-nav">
+  
+<div class="card" id="ownerRecoCard" style="display:none;margin-top:10px">
+  <div class="section-title">⭐ Rekomendasi Seller <span class="line"></span></div>
+  <div class="field"><label>Email seller</label><input id="recoSellerEmail" placeholder="seller@gmail.com"></div>
+  <div style="display:flex;gap:8px">
+    <button type="button" class="btn btn-gold" style="flex:1" onclick="ownerSetRecommended(true)">⭐ Jadikan Rekomendasi</button>
+    <button type="button" class="btn btn-secondary" style="flex:1" onclick="ownerSetRecommended(false)">Hapus</button>
+  </div>
+</div>
+
+<div class="bottom-nav">
     <button class="nav-item active" onclick="switchPage('market')"><span class="ico">🏪</span>Market</button>
     <button class="nav-item" onclick="switchPage('sell')"><span class="ico">📤</span>Jual</button>
     <button class="nav-item" onclick="switchPage('mc')"><span class="ico">🤝</span>MC</button>
@@ -440,7 +487,18 @@ body{font-family:'Quicksand',sans-serif;background:#0f0818;color:#f1e6f5;min-hei
 <div class="img-lightbox" id="imgLightbox" onclick="if(event.target===this)closeImagePreview()">
   <button type="button" class="lb-close" onclick="closeImagePreview()" title="Tutup">✕</button>
   <img id="imgLightboxImg" src="" alt="Preview">
-  <div class="lb-nav" id="imgLightboxNav" style="display:none">
+  
+<div class="shop-settings-card" id="shopSettingsCard">
+  <h3>🏪 Profil Toko</h3>
+  <div class="field"><label>Nama toko (tampil di produk)</label><input id="shopNameInput" maxlength="40" placeholder="Contoh: Shine Store Official"></div>
+  <div class="field"><label>Deskripsi toko</label><textarea id="shopDescInput" maxlength="300" placeholder="Tentang toko kamu..."></textarea></div>
+  <div class="field"><label>WhatsApp (opsional)</label><input id="shopWaInput" placeholder="08xxxxxxxxxx">
+    <div style="font-size:10px;color:#94a3b8;margin-top:4px">Set pertama <b>gratis</b>. Ganti nomor berikutnya dikenakan <b style="color:#facc15">Rp30.000</b> (debit saldo).</div>
+  </div>
+  <button type="button" class="btn btn-secondary" onclick="saveShopProfile()">💾 Simpan Profil Toko</button>
+  <div id="shopTrustedNote" style="font-size:11px;color:#1d9bf0;margin-top:8px;display:none">✅ Akun Anda: <b>Seller Trusted</b></div>
+</div>
+<div class="lb-nav" id="imgLightboxNav" style="display:none">
     <button type="button" onclick="event.stopPropagation();lightboxPrev()">‹ Prev</button>
     <button type="button" onclick="event.stopPropagation();lightboxNext()">Next ›</button>
   </div>
@@ -739,7 +797,10 @@ async function loadMarket(){
   if(error){ box.innerHTML = `<div class="empty"><span class="big">⚠️</span>${escapeHtml(error.message)}<br><small>Jalankan SQL marketplace dulu</small></div>`; return; }
   marketCache = data || [];
   await resolveEmails(marketCache.map(p => p.seller_id));
+  try { await hydrateShops(marketCache.map(p => p.seller_id)); } catch(_){}
   renderMarket();
+  try { loadRecommendedSellers(); } catch(_){}
+  try { loadShopSettings(); } catch(_){}
 }
 
 function setFilter(f, btn){
@@ -751,40 +812,8 @@ function setFilter(f, btn){
 
 function filterMarket(){ renderMarket(); }
 
-function renderMarket(){
-  let list = [...marketCache];
-  const q = ($('searchInput').value||'').trim().toLowerCase();
-  if(q) list = list.filter(p => (p.title||'').toLowerCase().includes(q) || (p.description||'').toLowerCase().includes(q));
-  if(marketFilter==='available') list = list.filter(p => (p.stock_remaining||0) > 0 || (p.is_auction && p.auction_status==='active'));
-  if(marketFilter==='auction') list = list.filter(p => !!p.is_auction);
-  if(marketFilter==='cheap') list.sort((a,b)=> (a.price||0)-(b.price||0));
-  if(marketFilter==='top') list.sort((a,b)=> (b.avg_rating||0)-(a.avg_rating||0));
-  const box = $('marketList');
-  if(!list.length){ box.innerHTML = '<div class="empty"><span class="big">📭</span>Belum ada produk</div>'; return; }
-  box.innerHTML = list.map(p => {
-    const img = (p.images && p.images[0]) ? p.images[0] : '';
-    const stock = p.stock_remaining||0;
-    const isAuc = !!p.is_auction;
-    const high = Number(p.current_bid||0) > 0 ? p.current_bid : (p.auction_start_price || p.price);
-    const priceLabel = isAuc
-      ? (Number(p.current_bid||0) > 0 ? 'Tawaran: ' + formatRp(high) : 'Start: ' + formatRp(high))
-      : formatRp(p.price);
-    const badge = isAuc
-      ? `<span class="badge auction">🔨 Lelang</span>`
-      : `<span class="badge ${stock>0?'stock':'soldout'}">${stock>0?stock+' stok':'Habis'}</span>`;
-    return `<div class="card product-card" onclick="openDetail('${p.id}')">
-      ${img?`<img class="product-thumb" src="${escapeHtml(img)}" alt="" onclick="event.stopPropagation();openImagePreview(this.src)">`:`<div class="product-thumb" style="display:flex;align-items:center;justify-content:center;font-size:28px">${isAuc?'🔨':'🎮'}</div>`}
-      <div class="product-info">
-        <div class="product-title">${escapeHtml(p.title)}</div>
-        <div class="product-meta">
-          <span class="stars">${ratingDisplay(p.avg_rating, p.review_count).stars} (${ratingDisplay(p.avg_rating, p.review_count).num})</span>
-          ${badge}
-        </div>
-        <div class="product-price">${priceLabel}</div>
-      </div>
-    </div>`;
-  }).join('');
-}
+/* renderMarket diganti store UI di bawah */
+
 
 /* ========== DETAIL + BUY ========== */
 async function openDetail(id){
@@ -793,6 +822,7 @@ async function openDetail(id){
     .eq('id', id).maybeSingle();
   if(error||!p) return Swal.fire({title:'Error',text:error?.message||'Tidak ditemukan',icon:'error',background:'#1a0e2e',color:'#fff'});
   await resolveEmails([p.seller_id]);
+  try { await hydrateShops([p.seller_id]); } catch(_){}
   const imgList = (p.images || []).filter(Boolean);
   window._detailImages = imgList;
   const imgs = imgList.map((u, i) =>
@@ -906,7 +936,12 @@ async function openDetail(id){
       <span class="stars">${ratingDisplay(p.avg_rating, p.review_count).stars} ${ratingDisplay(p.avg_rating, p.review_count).num} (${p.review_count||0} ulasan)</span>
       ${!isAuc ? `<span class="badge ${stock>0?'stock':'soldout'}">${stock>0?stock+' stok':'Habis'}</span>` : ''}
     </div>
-    <div style="font-size:11px;color:#94a3b8;margin-bottom:4px">Seller: ${escapeHtml(emailOf(p.seller_id))}</div>
+    <div style="font-size:12px;color:#e2e8f0;margin-bottom:6px;line-height:1.5">
+      <div>🏪 <b>${escapeHtml(typeof shopNameOf==='function'?shopNameOf(p.seller_id):(emailOf(p.seller_id)||'').split('@')[0])}</b>${typeof verifiedTick==='function'?verifiedTick(typeof shopRoleOf==='function'?shopRoleOf(p.seller_id):''):''}</div>
+      <div style="color:#94a3b8;font-size:11px">Seller: ${escapeHtml(emailOf(p.seller_id))}</div>
+      ${(shopCache[p.seller_id]&&shopCache[p.seller_id].whatsapp)?`<div style="margin-top:4px"><a href="https://wa.me/${String(shopCache[p.seller_id].whatsapp).replace(/^0/,'62')}" target="_blank" rel="noopener" style="color:#25d366;font-weight:800">💬 WhatsApp ${escapeHtml(shopCache[p.seller_id].whatsapp)}</a></div>`:''}
+      ${(shopCache[p.seller_id]&&shopCache[p.seller_id].shop_description)?`<div class="note-box" style="margin-top:8px">${escapeHtml(shopCache[p.seller_id].shop_description)}</div>`:''}
+    </div>
     ${sellerRatingHtml}
     <div style="font-size:13px;line-height:1.55;white-space:pre-wrap;margin:10px 0 12px">${escapeHtml(p.description||'')}</div>
     ${actionBtn}
@@ -3175,6 +3210,185 @@ window.mcOnImage = mcOnImage;
 window.mcChangeAmount = mcChangeAmount;
 window.mcConfirm = mcConfirm;
 window.mcCancel = mcCancel;
+
+
+
+/* ===== Seller shop + store UI ===== */
+const shopCache = {}; // seller_id -> shop row
+const profileRoleCache = {};
+
+function isSellerTrustedRole(role){
+  return String(role||'').toLowerCase() === 'seller_trusted';
+}
+function verifiedTick(role){
+  return isSellerTrustedRole(role) ? '<span class="verified-tick" title="Seller Trusted">✓</span>' : '';
+}
+
+async function hydrateShops(sellerIds){
+  const ids = [...new Set((sellerIds||[]).filter(Boolean))];
+  const need = ids.filter(id => !shopCache[id]);
+  if(!need.length) return;
+  try {
+    const { data } = await sb.from('seller_shops').select('*').in('seller_id', need);
+    (data||[]).forEach(r => { shopCache[r.seller_id] = r; });
+    need.forEach(id => { if(!shopCache[id]) shopCache[id] = { seller_id: id }; });
+  } catch(_) {}
+  try {
+    const missingRoles = ids.filter(id => profileRoleCache[id] === undefined);
+    if(missingRoles.length){
+      const { data: roles } = await sb.from('profiles').select('id, role, email').in('id', missingRoles);
+      (roles||[]).forEach(r => { profileRoleCache[r.id] = r; });
+    }
+  } catch(_) {}
+}
+
+function shopNameOf(sellerId){
+  const sh = shopCache[sellerId];
+  if(sh && sh.shop_name) return sh.shop_name;
+  const em = (typeof emailOf === 'function' ? emailOf(sellerId) : '') || (profileRoleCache[sellerId]?.email) || '';
+  return em ? String(em).split('@')[0] : 'Toko';
+}
+function shopRoleOf(sellerId){
+  return profileRoleCache[sellerId]?.role || '';
+}
+
+async function loadRecommendedSellers(){
+  const box = document.getElementById('recoSellerList');
+  if(!box) return;
+  try {
+    const { data, error } = await sb.rpc('list_recommended_shops');
+    if(error) throw error;
+    const rows = (data && data.data) ? data.data : [];
+    if(!rows.length){
+      box.innerHTML = '<div style="font-size:11px;color:#6b4a7a;padding:8px">Belum ada toko rekomendasi</div>';
+      return;
+    }
+    box.innerHTML = rows.map(r => {
+      const trusted = isSellerTrustedRole(r.role) ? verifiedTick(r.role) : '';
+      return `<div class="reco-card" onclick="filterByShop('${r.seller_id}')">
+        <div class="rc-name">${escapeHtml(r.shop_name||'Toko')}${trusted}</div>
+        <div class="rc-meta">${Number(r.product_count||0)} produk</div>
+        <div class="rc-badge">⭐ Rekomendasi Admin</div>
+      </div>`;
+    }).join('');
+  } catch(e){
+    box.innerHTML = '<div style="font-size:11px;color:#6b4a7a;padding:8px">Widget toko belum siap</div>';
+  }
+}
+
+function filterByShop(sellerId){
+  marketFilter = 'shop:' + sellerId;
+  document.querySelectorAll('.filter-row .chip').forEach(c=>c.classList.remove('active'));
+  renderMarket();
+  try { window.scrollTo({ top: document.getElementById('marketList')?.offsetTop || 0, behavior: 'smooth' }); } catch(_){}
+}
+
+// override renderMarket with store grid UI
+function renderMarket(){
+  let list = [...(marketCache||[])];
+  const q = (($('searchInput')||{}).value||'').trim().toLowerCase();
+  if(q) list = list.filter(p => (p.title||'').toLowerCase().includes(q) || (p.description||'').toLowerCase().includes(q) || shopNameOf(p.seller_id).toLowerCase().includes(q));
+  if(marketFilter==='available') list = list.filter(p => (p.stock_remaining||0) > 0 || (p.is_auction && p.auction_status==='active'));
+  if(marketFilter==='auction') list = list.filter(p => !!p.is_auction);
+  if(marketFilter==='cheap') list.sort((a,b)=> (a.price||0)-(b.price||0));
+  if(marketFilter==='top') list.sort((a,b)=> (b.avg_rating||0)-(a.avg_rating||0));
+  if(String(marketFilter).startsWith('shop:')){
+    const sid = String(marketFilter).slice(5);
+    list = list.filter(p => p.seller_id === sid);
+  }
+  const box = $('marketList');
+  if(!box) return;
+  if(!list.length){ box.innerHTML = '<div class="empty"><span class="big">📭</span>Belum ada produk</div>'; return; }
+  box.className = 'store-grid';
+  box.innerHTML = list.map(p => {
+    const img = (p.images && p.images[0]) ? p.images[0] : '';
+    const stock = p.stock_remaining||0;
+    const isAuc = !!p.is_auction;
+    const high = Number(p.current_bid||0) > 0 ? p.current_bid : (p.auction_start_price || p.price);
+    const priceLabel = isAuc
+      ? (Number(p.current_bid||0) > 0 ? formatRp(high) : 'Start ' + formatRp(high))
+      : formatRp(p.price);
+    const role = shopRoleOf(p.seller_id);
+    const tick = verifiedTick(role);
+    const shop = escapeHtml(shopNameOf(p.seller_id));
+    const badge = isAuc
+      ? '<span class="badge auction">LELANG</span>'
+      : (stock > 0 ? '<span class="badge stock">Stok '+stock+'</span>' : '<span class="badge soldout">Habis</span>');
+    const stars = (Number(p.avg_rating||0) > 0)
+      ? ('★ ' + Number(p.avg_rating).toFixed(1))
+      : '★ 5.0';
+    const imgTag = img
+      ? `<img class="sp-img" src="${escapeHtml(img)}" alt="" loading="lazy" onerror="this.style.opacity=.3">`
+      : `<div class="sp-img" style="display:flex;align-items:center;justify-content:center;font-size:28px;opacity:.4">🛒</div>`;
+    return `<div class="store-product" onclick="openDetail('${p.id}')">
+      ${imgTag}
+      <div class="sp-body">
+        <div class="sp-title">${escapeHtml(p.title||'-')}</div>
+        <div class="sp-shop">🏪 ${shop}${tick}</div>
+        <div class="sp-price">${priceLabel}</div>
+        <div class="sp-foot"><span class="stars" style="font-size:10px">${stars}</span><span class="sp-stock">${badge}</span></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function loadShopSettings(){
+  if(!currentUser) return;
+  try {
+    const { data } = await sb.from('seller_shops').select('*').eq('seller_id', currentUser.id).maybeSingle();
+    if(data){
+      const n = document.getElementById('shopNameInput');
+      const d = document.getElementById('shopDescInput');
+      const w = document.getElementById('shopWaInput');
+      if(n) n.value = data.shop_name || '';
+      if(d) d.value = data.shop_description || '';
+      if(w) w.value = data.whatsapp || '';
+      shopCache[currentUser.id] = data;
+    }
+    const note = document.getElementById('shopTrustedNote');
+    if(note && isSellerTrustedRole(currentProfile?.role)) note.style.display = 'block';
+    const oc = document.getElementById('ownerRecoCard');
+    if(oc && (isStaff || currentProfile?.role === 'owner')) oc.style.display = 'block';
+  } catch(_){}
+}
+
+async function saveShopProfile(){
+  if(!currentUser) return Swal.fire({title:'Login dulu',icon:'info',background:'#1a0e2e',color:'#fff'});
+  const name = (document.getElementById('shopNameInput')?.value||'').trim();
+  const desc = (document.getElementById('shopDescInput')?.value||'').trim();
+  const wa = (document.getElementById('shopWaInput')?.value||'').trim();
+  const { data, error } = await sb.rpc('upsert_seller_shop', {
+    p_shop_name: name || null,
+    p_shop_description: desc || null,
+    p_whatsapp: wa || null
+  });
+  if(error) return Swal.fire({title:'Gagal',text:error.message,icon:'error',background:'#1a0e2e',color:'#fff'});
+  if(data && data.success === false) return Swal.fire({title:'Gagal',text:data.message,icon:'error',background:'#1a0e2e',color:'#fff'});
+  let msg = 'Profil toko disimpan';
+  if(data && data.wa_charged) msg += ' · Debit Rp30.000 (ganti WA)';
+  Swal.fire({title:'Berhasil',text:msg,icon:'success',background:'#1a0e2e',color:'#fff'});
+  try { if(typeof refreshBalance==='function') refreshBalance(); } catch(_){}
+  loadShopSettings();
+}
+
+async function ownerSetRecommended(flag){
+  if(!(isStaff || currentProfile?.role==='owner')) return;
+  const email = (document.getElementById('recoSellerEmail')?.value||'').trim();
+  if(!email) return Swal.fire({title:'Isi email seller',icon:'warning',background:'#1a0e2e',color:'#fff'});
+  const { data, error } = await sb.rpc('set_seller_recommended', { p_seller_email: email, p_recommended: !!flag });
+  if(error) return Swal.fire({title:'Gagal',text:error.message,icon:'error',background:'#1a0e2e',color:'#fff'});
+  if(data && data.success === false) return Swal.fire({title:'Gagal',text:data.message,icon:'error',background:'#1a0e2e',color:'#fff'});
+  Swal.fire({title: flag ? 'Ditandai rekomendasi' : 'Dihapus dari rekomendasi', icon:'success', background:'#1a0e2e', color:'#fff'});
+  loadRecommendedSellers();
+}
+
+window.openDetail = openDetail;
+window.loadRecommendedSellers = loadRecommendedSellers;
+window.saveShopProfile = saveShopProfile;
+window.ownerSetRecommended = ownerSetRecommended;
+window.filterByShop = filterByShop;
+window.loadShopSettings = loadShopSettings;
+
 
 </script>
 </body>
