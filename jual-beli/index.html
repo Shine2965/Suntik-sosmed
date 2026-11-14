@@ -313,7 +313,7 @@ body{font-family:'Quicksand',sans-serif;background:#0f0818;color:#f1e6f5;min-hei
       <div class="shop-settings-card" id="shopSettingsCard">
         <h3>🏪 Edit Profil Toko</h3>
         <div style="font-size:11px;color:#94a3b8;margin-bottom:8px">Nama & deskripsi toko tampil di produk. WhatsApp: <b>gratis 1×</b>, ganti berikutnya <b style="color:#facc15">Rp30.000</b>.</div>
-        <div class="field"><label>Nama toko</label><input id="shopNameInput" maxlength="40" placeholder="Contoh: Shine Store Official"></div>
+        <div class="field"><label>Nama toko (unik)</label><input id="shopNameInput" maxlength="40" placeholder="Contoh: Shine Store Official"><div style="font-size:10px;color:#94a3b8;margin-top:4px">Nama toko tidak boleh sama dengan toko lain.</div></div>
         <div class="field"><label>Deskripsi toko</label><textarea id="shopDescInput" maxlength="300" placeholder="Tentang toko kamu..."></textarea></div>
         <div class="field"><label>Nomor WhatsApp</label><input id="shopWaInput" placeholder="08xxxxxxxxxx">
           <div style="font-size:10px;color:#94a3b8;margin-top:4px" id="shopWaHint">Status WA: —</div>
@@ -3368,10 +3368,21 @@ async function loadShopSettings(){
       if(d) d.value = data.shop_description || '';
       if(w) w.value = data.whatsapp || '';
       shopCache[currentUser.id] = data;
+      if(w){
+        if(data.whatsapp){
+          w.readOnly = true;
+          w.style.opacity = '0.85';
+          w.title = 'Terkunci. Klik "Buka ganti WA (Rp30.000)" untuk mengubah';
+        } else {
+          w.readOnly = false;
+          w.style.opacity = '1';
+          w.title = '';
+        }
+      }
       if(hint){
         hint.innerHTML = data.whatsapp
-          ? ('WA terpasang. Ganti nomor berikutnya dikenakan <b style="color:#facc15">Rp30.000</b>.')
-          : 'Belum set WA — pengisian pertama <b style="color:#22c55e">gratis</b>.';
+          ? ('🔒 WA terkunci: <b>' + escapeHtml(data.whatsapp) + '</b>. Ganti = <b style="color:#facc15">Rp30.000</b>. <a href="#" onclick="event.preventDefault();unlockWaEdit()" style="color:#38bdf8;font-weight:800">Buka edit (bayar saat simpan)</a>')
+          : 'Belum set WA — pengisian pertama <b style="color:#22c55e">gratis</b>, setelah simpan terkunci.';
       }
     } else if(hint){
       hint.innerHTML = 'Belum set WA — pengisian pertama <b style="color:#22c55e">gratis</b>.';
@@ -3388,20 +3399,46 @@ async function loadShopSettings(){
   } catch(_){}
 }
 
-async function saveShopProfile(){
+async function saveShopProfile(confirmWaPay){
   if(!currentUser) return Swal.fire({title:'Login dulu',icon:'info',background:'#1a0e2e',color:'#fff'});
   const name = (document.getElementById('shopNameInput')?.value||'').trim();
   const desc = (document.getElementById('shopDescInput')?.value||'').trim();
-  const wa = (document.getElementById('shopWaInput')?.value||'').trim();
-  const { data, error } = await sb.rpc('upsert_seller_shop', {
+  const waEl = document.getElementById('shopWaInput');
+  const wa = (waEl?.value||'').trim();
+  if(!name){
+    return Swal.fire({title:'Nama toko wajib',text:'Isi nama toko dulu.',icon:'warning',background:'#1a0e2e',color:'#fff'});
+  }
+  const payload = {
     p_shop_name: name || null,
     p_shop_description: desc || null,
-    p_whatsapp: wa || null
-  });
+    p_whatsapp: wa || null,
+    p_confirm_wa_change: !!confirmWaPay
+  };
+  const { data, error } = await sb.rpc('upsert_seller_shop', payload);
   if(error) return Swal.fire({title:'Gagal',text:error.message,icon:'error',background:'#1a0e2e',color:'#fff'});
-  if(data && data.success === false) return Swal.fire({title:'Gagal',text:data.message,icon:'error',background:'#1a0e2e',color:'#fff'});
-  let msg = 'Profil toko disimpan';
-  if(data && data.wa_charged) msg += ' · Debit Rp30.000 (ganti WA)';
+  if(data && data.need_wa_payment){
+    const c = await Swal.fire({
+      title: 'Ganti WhatsApp?',
+      html: 'Nomor sudah <b>terkunci</b>. Ganti dikenakan <b style="color:#facc15">Rp30.000</b>.<br>WA sekarang: <b>' + escapeHtml(data.current_wa||'-') + '</b>',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Bayar Rp30.000 & Ganti',
+      cancelButtonText: 'Batal',
+      background: '#1a0e2e',
+      color: '#fff',
+      confirmButtonColor: '#f59e0b'
+    });
+    if(c.isConfirmed) return saveShopProfile(true);
+    // batalkan: kembalikan WA lama di input
+    try { await loadShopSettings(); } catch(_){}
+    return;
+  }
+  if(data && data.success === false){
+    return Swal.fire({title:'Gagal',text:data.message||'Gagal simpan',icon:'error',background:'#1a0e2e',color:'#fff'});
+  }
+  let msg = 'Profil toko disimpan.';
+  if(data && data.wa_charged) msg += ' Debit Rp30.000 untuk ganti WA.';
+  if(data && data.wa_locked) msg += ' Nomor WhatsApp terkunci.';
   Swal.fire({title:'Berhasil',text:msg,icon:'success',background:'#1a0e2e',color:'#fff'});
   try { if(typeof refreshBalance==='function') refreshBalance(); } catch(_){}
   loadShopSettings();
@@ -3484,6 +3521,16 @@ window.viewShopProfile = viewShopProfile;
 window.closeShopProfile = closeShopProfile;
 
 window.loadRecommendedSellers = loadRecommendedSellers;
+function unlockWaEdit(){
+  const w = document.getElementById('shopWaInput');
+  if(!w) return;
+  w.readOnly = false;
+  w.style.opacity = '1';
+  w.focus();
+  const hint = document.getElementById('shopWaHint');
+  if(hint) hint.innerHTML = 'Mode ganti WA aktif. Simpan = konfirmasi bayar <b style="color:#facc15">Rp30.000</b> (jika nomor beda).';
+}
+window.unlockWaEdit = unlockWaEdit;
 window.saveShopProfile = saveShopProfile;
 window.ownerSetRecommended = ownerSetRecommended;
 window.filterByShop = filterByShop;
