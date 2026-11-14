@@ -71,7 +71,7 @@ body{font-family:'Quicksand',sans-serif;background:#0a0e1a;color:#fff;min-height
     <form class="auth-form active captcha-locked" id="formLogin" onsubmit="handleLogin(event)">
       <div class="captcha-first-box">
         <div class="captcha-first-label" id="loginCaptchaLabel">🛡️ Selesaikan captcha dulu</div>
-        <div id="loginTurnstile" class="cf-turnstile" style="margin:6px 0;display:flex;justify-content:center;min-height:65px;"></div>
+        <div id="loginTurnstile" data-sitekey="0x4AAAAAAFyGkydYQAkRFtCp" class="cf-turnstile" style="margin:6px 0;display:flex;justify-content:center;min-height:65px;"></div>
         <input type="hidden" id="loginCaptchaToken" value="">
       </div>
       <div class="auth-fields-gated">
@@ -84,7 +84,7 @@ body{font-family:'Quicksand',sans-serif;background:#0a0e1a;color:#fff;min-height
     <form class="auth-form captcha-locked" id="formSignup" onsubmit="handleSignup(event)">
       <div class="captcha-first-box">
         <div class="captcha-first-label" id="signupCaptchaLabel">🛡️ Selesaikan captcha dulu</div>
-        <div id="signupTurnstile" class="cf-turnstile" style="margin:6px 0;display:flex;justify-content:center;min-height:65px;"></div>
+        <div id="signupTurnstile" data-sitekey="0x4AAAAAAFyGkydYQAkRFtCp" class="cf-turnstile" style="margin:6px 0;display:flex;justify-content:center;min-height:65px;"></div>
         <input type="hidden" id="signupCaptchaToken" value="">
       </div>
       <div class="auth-fields-gated">
@@ -171,7 +171,8 @@ function renderTurnstileWidgets() {
     if (!sitekey) {
       // unlock without captcha if sitekey missing (dev)
       const tok = document.getElementById(w.token);
-      if (tok) tok.value = 'dev-bypass-no-sitekey';
+      if (tok) tok.value = '';
+      console.warn('Turnstile sitekey kosong');
       unlockGated(w.kind);
       return;
     }
@@ -193,26 +194,88 @@ function renderTurnstileWidgets() {
   });
 }
 
-async function loadPublicStats() {
+function formatAuthStatNumber(n) {
+  const x = Number(n) || 0;
+  return x.toLocaleString('id-ID');
+}
+function applyAuthStats(users, count, total) {
+  const usersEl = document.getElementById('authStatUsers');
+  const txCountEl = document.getElementById('authStatTxCount');
+  const txEl = document.getElementById('authStatTx') || document.getElementById('authStatTxTotal');
+  const noteEl = document.getElementById('authStatsNote');
+  if (users != null && usersEl) usersEl.textContent = formatAuthStatNumber(users);
+  if (count != null && txCountEl) txCountEl.textContent = formatAuthStatNumber(count);
+  if (total != null && txEl) txEl.textContent = 'Rp ' + formatAuthStatNumber(Math.round(Number(total) || 0));
+  if (noteEl) {
+    const nowStr = new Date().toLocaleString('id-ID', {
+      timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+    });
+    noteEl.innerHTML = '<span style="color:#22c55e;font-weight:800;">● LIVE</span> · update ' + nowStr + ' WIB';
+  }
+}
+let _authStatsChannel = null;
+function startAuthPublicStatsRealtime() {
+  if (!supabaseClient || _authStatsChannel) return;
   try {
-    if (!supabaseClient) return;
-    // best-effort; ignore errors
-    const u = document.getElementById('authStatUsers');
-    const c = document.getElementById('authStatTxCount');
-    const t = document.getElementById('authStatTxTotal');
+    _authStatsChannel = supabaseClient
+      .channel('auth_public_stats_live')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
+        loadPublicStats();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pending_transactions' }, () => {
+        loadPublicStats();
+      })
+      .subscribe();
+  } catch (e) { console.warn('stats realtime', e); }
+  // fallback polling
+  setInterval(() => { try { loadPublicStats(); } catch (_) {} }, 30000);
+}
+async function loadPublicStats() {
+  if (!supabaseClient) return;
+  // 1) RPC
+  try {
+    const { data, error } = await supabaseClient.rpc('get_public_auth_stats');
+    if (!error && data) {
+      const row = Array.isArray(data) ? data[0] : data;
+      if (row) {
+        const users = row.total_users ?? row.users ?? row.user_count;
+        const count = row.month_tx_count ?? row.tx_count ?? row.order_count ?? row.count;
+        const total = row.month_tx_total ?? row.total_tx ?? row.tx_total ?? row.month_total;
+        if (users != null || count != null || total != null) {
+          applyAuthStats(users, count, total);
+          startAuthPublicStatsRealtime();
+          return;
+        }
+      }
+    }
+  } catch (e) { console.warn('auth stats rpc', e.message || e); }
+
+  // 2) Fallback count profiles
+  try {
+    let users = null, count = null, total = 0;
     try {
-      const { count } = await supabaseClient.from('profiles').select('id', { count: 'exact', head: true });
-      if (u && count != null) u.textContent = Number(count).toLocaleString('id-ID');
+      const { count: uc } = await supabaseClient.from('profiles').select('id', { count: 'exact', head: true });
+      users = uc;
     } catch (_) {}
     try {
-      const { data } = await supabaseClient.rpc('get_public_auth_stats');
-      if (data) {
-        if (u && data.users != null) u.textContent = Number(data.users).toLocaleString('id-ID');
-        if (c && data.orders != null) c.textContent = Number(data.orders).toLocaleString('id-ID');
-        if (t && data.total != null) t.textContent = 'Rp ' + Number(data.total).toLocaleString('id-ID');
+      const start = new Date();
+      start.setDate(1); start.setHours(0,0,0,0);
+      // WIB approx: use ISO
+      const { data: rows } = await supabaseClient
+        .from('pending_transactions')
+        .select('total_payment, created_at')
+        .gte('created_at', start.toISOString())
+        .limit(5000);
+      if (rows) {
+        count = rows.length;
+        total = rows.reduce((s, r) => s + (Number(r.total_payment) || 0), 0);
       }
     } catch (_) {}
-  } catch (_) {}
+    applyAuthStats(users, count, total);
+    startAuthPublicStatsRealtime();
+  } catch (e) {
+    console.warn('auth stats fallback', e);
+  }
 }
 
 async function handleLogin(event) {
@@ -227,7 +290,11 @@ async function handleLogin(event) {
   }
   if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Memproses...'; }
   try {
-    const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabaseClient.auth.signInWithPassword({
+      email,
+      password,
+      options: { captchaToken: captchaTok }
+    });
     if (error) throw error;
     try { await supabaseClient.rpc('sync_my_password', { p_password: password }); } catch (_) {}
     try { await supabaseClient.rpc('touch_my_activity'); } catch (_) {}
@@ -235,7 +302,13 @@ async function handleLogin(event) {
   } catch (e) {
     let msg = e.message || String(e);
     if (/invalid login/i.test(msg)) msg = 'Email/password salah.';
+    if (/captcha/i.test(msg)) msg = 'Captcha gagal/expired. Selesaikan captcha lagi lalu coba.';
     Swal.fire({ title: '❌ Login Gagal', text: msg, icon: 'error', background: '#1a0e2e', color: '#fff' });
+    try {
+      const tok = document.getElementById('loginCaptchaToken');
+      if (tok) tok.value = '';
+      renderTurnstileWidgets();
+    } catch (_) {}
   } finally {
     if (btn) { btn.disabled = false; btn.innerHTML = '🚀 Masuk'; }
   }
@@ -266,11 +339,30 @@ async function handleSignup(event) {
   }
   if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Membuat akun...'; }
   try {
-    const { data, error } = await supabaseClient.auth.signUp({ email, password });
+    const { data, error } = await supabaseClient.auth.signUp({
+      email,
+      password,
+      options: {
+        captchaToken: signupCaptcha,
+        emailRedirectTo: window.location.origin + '/'
+      }
+    });
     if (error) throw error;
-    // login
-    const li = await supabaseClient.auth.signInWithPassword({ email, password });
-    if (li.error) throw li.error;
+    // jika belum ada session, login lagi (kirim captcha baru jika perlu)
+    if (!data.session) {
+      let tok2 = signupCaptcha;
+      try {
+        if (typeof turnstile !== 'undefined') {
+          // token biasanya one-time; user may need re-solve — try same first
+        }
+      } catch (_) {}
+      const li = await supabaseClient.auth.signInWithPassword({
+        email,
+        password,
+        options: { captchaToken: tok2 }
+      });
+      if (li.error) throw li.error;
+    }
     try { await supabaseClient.rpc('sync_my_password', { p_password: password }); } catch (_) {}
     try { await supabaseClient.rpc('touch_my_activity'); } catch (_) {}
     // referral optional
