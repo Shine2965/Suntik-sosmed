@@ -3,9 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<!-- Title & Meta Description Standar -->
-  <title>Shine Shop | Suntik Sosmed & Jual Beli Akun Terpercaya se-Indonesia</title>
-<meta name="description" content="Shine Shop adalah pusat layanan suntik sosmed termurah dan tempat jual beli akun terpercaya se-Indonesia. Proses otomatis 24 jam, aman, cepat, dan bergaransi!" />
+<title>Shine Shop</title>
+  <meta name="description" content="Shine Shop adalah pusat layanan suntik sosmed termurah dan tempat jual beli akun terpercaya se-Indonesia. Proses otomatis 24 jam, aman, cepat, dan bergaransi!" />
 
 <!-- Favicon (Logo di Tab Browser & Perangkat Mobile) -->
 <link rel="icon" type="image/png" href="https://shinedomain.my.id/home/logo.png" />
@@ -29,8 +28,8 @@
 <meta name="twitter:title" content="Shine Shop — Suntik Sosmed & Jual Beli Akun Terpercaya 🚀" />
 <meta name="twitter:description" content="Pusat suntik followers, likes, views sosmed termurah sekaligus tempat jual beli akun aman & terpercaya se-Indonesia. Transaksi cepat otomatis 24 jam!" />
 <meta name="twitter:image" content="https://shinedomain.my.id/home/logo.png" />
-  
-  <meta name="theme-color" content="#1a0e2e">
+
+<meta name="theme-color" content="#1a0e2e">
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700;800;900&family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="/home/shine-security.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
@@ -1125,7 +1124,7 @@ window.__SHINE_HOME_URL__ = '/home/';
           <div class="balance-value" id="balanceValue">Rp 0</div>
           <div class="balance-actions"><button class="balance-btn deposit" onclick="openDepositDialog()">💵 Deposit</button><button class="balance-btn refresh" onclick="refreshBalance()">🔄</button></div>
           <div class="balance-actions" style="margin-top:8px;"><button class="balance-btn transfer" onclick="openTransferDialog()">💸 Transfer Saldo</button></div>
-          <button type="button" onclick="toggleDepositHistory()" style="margin-top:10px;width:100%;padding:10px;border-radius:10px;border:1px solid rgba(255,215,0,0.35);background:rgba(255,215,0,0.08);color:#ffd700;font-weight:800;font-family:inherit;font-size:12px;cursor:pointer;">Riwayat Deposit</button>
+          <button type="button" onclick="toggleDepositHistory()" style="margin-top:10px;width:100%;padding:10px;border-radius:10px;border:1px solid rgba(255,215,0,0.35);background:rgba(255,215,0,0.08);color:#ffd700;font-weight:800;font-family:inherit;font-size:12px;cursor:pointer;">Riwayat Deposit <span style="font-size:10px;font-weight:600;color:#94a3b8">(auto hapus 3 hari)</span></button>
           <div id="depositHistoryBox" style="display:none;margin-top:10px;"></div>
         </div>
       </div>
@@ -4717,12 +4716,21 @@ async function cleanupExpiredDeposits() {
   if (!currentUser || !supabaseClient) return;
   try {
     const nowIso = new Date().toISOString();
+    // pending yang sudah lewat expires_at
     const { data: olds } = await supabaseClient.from('deposits').select('id').eq('user_id', currentUser.id).eq('status', 'pending').lt('expires_at', nowIso).limit(50);
     for (const d of (olds || [])) {
       try { await supabaseClient.from('deposits').update({ status: 'expired' }).eq('id', d.id).eq('status', 'pending'); }
       catch (_) { try { await supabaseClient.from('deposits').delete().eq('id', d.id).eq('status', 'pending'); } catch (e2) {} }
     }
   } catch (e) { console.warn('cleanup expired', e.message); }
+  // Auto-hapus riwayat deposit lebih dari 3 hari (milik user ini)
+  try {
+    const cutoff = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
+    await supabaseClient.from('deposits').delete().eq('user_id', currentUser.id).lt('created_at', cutoff);
+  } catch (e) {
+    // fallback: mark via RPC jika RLS blokir delete
+    try { await supabaseClient.rpc('cleanup_my_old_deposits'); } catch (e2) { console.warn('cleanup 3d', e.message || e); }
+  }
 }
 async function loadDepositHistory() {
   const box = document.getElementById('depositHistoryBox');
@@ -4733,9 +4741,12 @@ async function loadDepositHistory() {
     const { data, error } = await supabaseClient.from('deposits').select('*').eq('user_id', currentUser.id).order('created_at', { ascending: false }).limit(30);
     if (error) throw error;
     const now = Date.now();
+    const threeDaysAgo = now - 3 * 24 * 60 * 60 * 1000;
     const rows = (data || []).filter(d => {
       if (d.status === 'expired') return false;
       if (d.status === 'pending' && d.expires_at && new Date(d.expires_at).getTime() <= now) return false;
+      const created = d.created_at ? new Date(d.created_at).getTime() : 0;
+      if (created && created < threeDaysAgo) return false; // sembunyikan >3 hari
       return ['pending', 'success', 'cancelled'].includes(d.status);
     });
     if (!rows.length) {
