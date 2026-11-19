@@ -8,6 +8,61 @@
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+// ===== AUTH GUARD: wajib login (session index.html / shine-shop) =====
+(function () {
+  const SUPABASE_URL = 'https://vvzgpbiesvupuhqqoxrg.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ2emdwYmllc3Z1cHVocXFveHJnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIwNzE3MTUsImV4cCI6MjEwNzY0NzcxNX0.W3_Ck8B5Q-nEfNlsyeufJsLsTqbM8xPcAeHoAHfGRwY';
+  const LOGIN_URL = '/';
+  window.__SHINE_SUPABASE__ = null;
+  window.__SHINE_SESSION_USER__ = null;
+
+  try {
+    window.__SHINE_SUPABASE__ = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+        storage: window.localStorage,
+        storageKey: 'shine-shop-auth'
+      }
+    });
+  } catch (e) {
+    console.error('supabase init', e);
+  }
+
+  window.__shineRequireLogin = async function () {
+    try {
+      const sb = window.__SHINE_SUPABASE__;
+      if (!sb) {
+        window.location.replace(LOGIN_URL);
+        return null;
+      }
+      const { data, error } = await sb.auth.getSession();
+      if (error || !data || !data.session || !data.session.user) {
+        window.location.replace(LOGIN_URL);
+        return null;
+      }
+      window.__SHINE_SESSION_USER__ = data.session.user;
+      // Sync gmail dari akun login
+      try {
+        const em = (data.session.user.email || '').trim().toLowerCase();
+        if (em && em.includes('@')) {
+          localStorage.setItem('user_gmail', em);
+        }
+      } catch (_) {}
+      return data.session.user;
+    } catch (e) {
+      console.error('auth guard', e);
+      window.location.replace(LOGIN_URL);
+      return null;
+    }
+  };
+})();
+</script>
+
+
     <style>
     *{
         box-sizing: border-box;
@@ -515,6 +570,25 @@
 
 </head>
 <body>
+
+<div id="authGateSplash" style="position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;background:#0a0712;color:#fff;font-family:Poppins,sans-serif">
+  <div style="font-size:22px">⏳</div>
+  <div style="font-weight:600;font-size:14px">Shine Shop</div>
+  <div style="font-size:12px;opacity:0.6">Memeriksa sesi login...</div>
+</div>
+<script>
+(async function(){
+  try {
+    const u = await window.__shineRequireLogin();
+    const sp = document.getElementById('authGateSplash');
+    if (!u) return;
+    if (sp) sp.remove();
+  } catch (e) {
+    window.location.replace('/');
+  }
+})();
+</script>
+
 
     <!-- ===== BANNED PAGE ===== -->
     <div class="banned-page" id="bannedPage">
@@ -1540,12 +1614,41 @@
     // 🔥 INIT
     // ============================================================
     window.addEventListener('load', async function() {
+        // Wajib login dulu (session sama dengan index.html)
+        const user = await window.__shineRequireLogin();
+        if (!user) return; // redirect ke /
+
         forceDisableAllProviderButtons();
         bindNavButtons();
 
-        document.getElementById('changeGmailBtn').addEventListener('click', changeGmailWithPassword);
+        const changeBtn = document.getElementById('changeGmailBtn');
+        if (changeBtn) {
+          // Gmail mengikuti akun login — ubah lewat profile shop, bukan local saja
+          changeBtn.addEventListener('click', async function () {
+            const u = window.__SHINE_SESSION_USER__;
+            if (u && u.email) {
+              Swal.fire({
+                title: 'Gmail akun login',
+                html: 'Gmail terhubung: <b style="color:#4fc3f7">' + String(u.email).replace(/</g,'') + '</b><br><small>Untuk ganti akun, logout di Shine Shop lalu login dengan Gmail lain.</small>',
+                icon: 'info',
+                confirmButtonColor: '#4fc3f7',
+                background: '#1a0e2e',
+                color: '#fff'
+              });
+            } else {
+              changeGmailWithPassword();
+            }
+          });
+        }
 
-        const gmail = getStoredGmail();
+        // Pastikan gmail display = email session
+        try {
+          if (user.email) {
+            localStorage.setItem(GMAIL_KEY, String(user.email).trim().toLowerCase());
+          }
+        } catch (_) {}
+
+        const gmail = getStoredGmail() || (user.email || null);
 
         if (gmail && validateEmail(gmail)) {
             const bannedData = await checkGmailBanned(gmail);
@@ -1565,6 +1668,17 @@
         }, 300);
 
         setInterval(checkAllProviders, 60000);
+
+        // Jika session hilang di tengah (logout di tab lain) → tendang ke login
+        try {
+          if (window.__SHINE_SUPABASE__) {
+            window.__SHINE_SUPABASE__.auth.onAuthStateChange((event, session) => {
+              if (event === 'SIGNED_OUT' || !session) {
+                window.location.replace('/');
+              }
+            });
+          }
+        } catch (_) {}
     });
 
     </script>
