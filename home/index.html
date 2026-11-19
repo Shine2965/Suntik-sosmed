@@ -29,6 +29,8 @@
 <meta name="twitter:title" content="Shine Shop — Suntik Sosmed & Jual Beli Akun Terpercaya 🚀" />
 <meta name="twitter:description" content="Pusat suntik followers, likes, views sosmed termurah sekaligus tempat jual beli akun aman & terpercaya se-Indonesia. Transaksi cepat otomatis 24 jam!" />
 <meta name="twitter:image" content="https://shinedomain.my.id/home/logo.png" />
+
+<link rel="icon" href="/home/logo.png" type="image/png">
 <meta name="theme-color" content="#1a0e2e">
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700;800;900&family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="/home/shine-security.js"></script>
@@ -1204,6 +1206,60 @@ input:focus,textarea:focus,select:focus{
   box-shadow:0 0 0 2px rgba(59,130,246,0.2)!important;
 }
 
+
+/* ===== Onboarding Tour ===== */
+#onboardOverlay{
+  position:fixed;inset:0;z-index:100000;
+  background:rgba(5,3,12,0.72);
+  backdrop-filter:blur(2px);
+  display:none;
+}
+#onboardOverlay.show{display:block}
+#onboardSpotlight{
+  position:fixed;z-index:100001;
+  border-radius:14px;
+  box-shadow:0 0 0 9999px rgba(5,3,12,0.72), 0 0 0 3px #a78bfa, 0 8px 28px rgba(167,139,250,0.35);
+  pointer-events:none;
+  transition:all .28s ease;
+}
+#onboardCard{
+  position:fixed;z-index:100002;
+  width:min(320px, calc(100vw - 28px));
+  background:linear-gradient(165deg,#1a1228,#120c1c);
+  border:1px solid rgba(167,139,250,0.35);
+  border-radius:16px;
+  padding:16px 16px 14px;
+  color:#f4f0f8;
+  font-family:Inter,Quicksand,Poppins,system-ui,sans-serif;
+  box-shadow:0 16px 40px rgba(0,0,0,0.45);
+}
+#onboardCard .ob-step{
+  font-size:10px;font-weight:700;color:#a78bfa;letter-spacing:.4px;text-transform:uppercase;margin-bottom:6px;
+}
+#onboardCard .ob-title{
+  font-size:15px;font-weight:800;margin-bottom:6px;letter-spacing:-.2px;
+}
+#onboardCard .ob-desc{
+  font-size:12.5px;line-height:1.55;color:#c4b5d8;margin-bottom:14px;
+}
+#onboardCard .ob-actions{
+  display:flex;gap:8px;align-items:center;justify-content:space-between;
+}
+#onboardCard .ob-actions button{
+  font-family:inherit;font-weight:700;font-size:12px;border-radius:10px;padding:9px 12px;cursor:pointer;border:none;
+}
+#onboardCard .ob-skip{
+  background:transparent;color:#9b8fb0;border:1px solid rgba(255,255,255,0.1)!important;
+}
+#onboardCard .ob-next{
+  background:linear-gradient(135deg,#a78bfa,#818cf8);color:#0b0712;flex:1;
+}
+#onboardCard .ob-dots{display:flex;gap:5px;justify-content:center;margin-bottom:12px}
+#onboardCard .ob-dots span{
+  width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,0.15);
+}
+#onboardCard .ob-dots span.on{background:#a78bfa}
+
 </style>
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer onload="window.__turnstileReady=true;try{if(typeof initShineTurnstile==='function')initShineTurnstile();}catch(e){}"></script>
 </head>
@@ -1232,6 +1288,20 @@ window.__SHINE_HOME_URL__ = '/home/';
   <div class="splash-title">Shine Shop</div>
   <div class="splash-sub">Memuat...</div>
   <div class="spinner"></div>
+</div>
+
+
+<div id="onboardOverlay" aria-hidden="true"></div>
+<div id="onboardSpotlight" style="display:none"></div>
+<div id="onboardCard" style="display:none" role="dialog" aria-modal="true">
+  <div class="ob-dots" id="onboardDots"></div>
+  <div class="ob-step" id="onboardStepLabel">Langkah 1</div>
+  <div class="ob-title" id="onboardTitle">Selamat datang</div>
+  <div class="ob-desc" id="onboardDesc"></div>
+  <div class="ob-actions">
+    <button type="button" class="ob-skip" id="onboardSkip">Lewati</button>
+    <button type="button" class="ob-next" id="onboardNext">Lanjut</button>
+  </div>
 </div>
 
 <div class="app">
@@ -2788,7 +2858,18 @@ function renderOrderList(orders) {
     const statusClass = getOrderStatusClass(order.order_status);
     const statusLabel = getOrderStatusLabel(order.order_status);
     const createdAt = order.created_at ? new Date(order.created_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) : '-';
-    const price = parseFloat(order.total_payment || 0).toLocaleString('id-ID');
+    const _qty = parseInt(order.quantity || 0, 10) || 0;
+    let _pay = parseFloat(order.total_payment || order.amount || 0);
+    // Jika total kosong, hitung dari harga satuan x qty (hindari tampilan 0 / rata-rata palsu)
+    if (!(_pay > 0)) {
+      const unit = parseFloat(order.price || order.harga || order.rate || 0);
+      if (unit > 0 && _qty > 0) {
+        _pay = (unit < 100 && _qty >= 1000) ? (unit / 1000) * _qty : unit * _qty;
+      }
+    }
+    _pay = Math.floor(Number(_pay) || 0);
+    const price = _pay.toLocaleString('id-ID');
+    // Tampilkan total bayar order ini (bukan harga satuan / rata-rata massal)
     const sosmedLabel = SOSMED_TYPE_MAP[order.sosmed_type]?.label || order.sosmed_type || '-';
     const canRefresh = !['success', 'failed', 'refunded', 'canceled', 'completed', 'partial'].includes(order.order_status);
     const gmailTarget = order.gmail_target || '-';
@@ -2829,6 +2910,7 @@ function renderOrderList(orders) {
       <div class="oc-meta"><span>📧 ${escapeHtml(emailUser)}</span><span>🔗 ${escapeHtml(gmailTarget)}</span></div>
       <div class="oc-target">🎯 Target: ${escapeHtml(target)}</div>
       <div class="oc-meta" style="margin-bottom:0;"><span>🔢 Qty: ${quantity.toLocaleString('id-ID')}</span><span>🏷️ ${sosmedLabel}</span></div>
+      <div class="oc-meta" style="margin-top:4px;margin-bottom:0;"><span style="color:#94a3b8;font-size:11px">💳 Total bayar order ini (bukan rata-rata massal)</span></div>
       ${progressHtml}
       ${completedHtml}
       <div class="oc-footer"><span>📅 ${createdAt} WIB</span><span class="oc-price">💰 Rp ${price}</span>${canRefresh && hasId ? `<button class="oc-refresh-btn" onclick="checkSingleOrderStatus('${order.id}')">🔄 Cek</button>` : ''}</div>
@@ -4265,7 +4347,7 @@ async function updateAuthUI(user) {
   const authScreen = document.getElementById('authScreen');
   const adminSection = document.getElementById('adminSection');
   if (user) {
-    try { const sp = document.getElementById('homeSessionSplash'); if (sp) sp.classList.add('hide'); setTimeout(()=>{ try{sp.remove()}catch(_){} }, 400); } catch(_) {}
+    try { const sp = document.getElementById('homeSessionSplash'); if (sp) sp.classList.add('hide'); try { setTimeout(function(){ if (typeof startOnboardingTour==='function') startOnboardingTour(false); }, 1000); } catch(_ob) {}  setTimeout(()=>{ try{sp.remove()}catch(_){} }, 400); } catch(_) {}
     currentUser = user;
     const profile = await fetchProfile(user.id);
     currentProfile = profile;
@@ -11018,6 +11100,180 @@ document.addEventListener('keydown', function(e) {
   if (e.ctrlKey && e.shiftKey && ['I','C','J'].includes(e.key)) e.preventDefault();
   if (e.ctrlKey && e.key === 'u') e.preventDefault();
 });
+
+
+/* ===== Interactive Onboarding Tour ===== */
+const ONBOARD_KEY = 'shine_onboard_v1_done';
+const ONBOARD_STEPS = [
+  {
+    title: 'Selamat datang di Shine Shop ✨',
+    desc: 'Ini panel akun Anda. Di sini ada saldo, mutasi, dan menu layanan. Ikuti tur singkat agar lebih mudah memakai fitur penting.',
+    selector: null,
+    placement: 'center'
+  },
+  {
+    title: 'Live Chat Customer Service',
+    desc: 'Butuh bantuan? Hubungi Customer Service lewat Live Chat CS. Ketuk ikon 💬 di pojok kanan atas (atau buka menu Chat) untuk chat langsung dengan CS yang tersedia.',
+    selector: '.app-icon-btn[onclick*="openChatHub"], .app-icon-btn[title="Chat"]',
+    placement: 'bottom',
+    highlight: true
+  },
+  {
+    title: 'Cara menghubungi CS',
+    desc: 'Di Live Chat, pilih ruang/global chat atau hubungi CS yang online. Sampaikan Order ID / Gmail Anda agar CS lebih cepat membantu refund, status order, atau kendala lain.',
+    selector: '.app-icon-btn[onclick*="openChatHub"], .app-icon-btn[title="Chat"]',
+    placement: 'bottom',
+    highlight: true
+  },
+  {
+    title: 'Siap digunakan',
+    desc: 'Tur selesai. Kapan pun butuh bantuan, buka Live Chat CS dari ikon 💬. Selamat berbelanja di Shine Shop!',
+    selector: null,
+    placement: 'center'
+  }
+];
+
+let onboardIdx = 0;
+let onboardActive = false;
+
+function onboardDone() {
+  try { localStorage.setItem(ONBOARD_KEY, '1'); } catch (_) {}
+  onboardActive = false;
+  const ov = document.getElementById('onboardOverlay');
+  const sp = document.getElementById('onboardSpotlight');
+  const card = document.getElementById('onboardCard');
+  if (ov) { ov.classList.remove('show'); ov.style.display = 'none'; }
+  if (sp) sp.style.display = 'none';
+  if (card) card.style.display = 'none';
+}
+
+function onboardPlaceCard(rect, placement) {
+  const card = document.getElementById('onboardCard');
+  if (!card) return;
+  const pad = 12;
+  const cw = card.offsetWidth || 300;
+  const ch = card.offsetHeight || 180;
+  let top, left;
+  if (!rect || placement === 'center') {
+    top = Math.max(pad, (window.innerHeight - ch) / 2);
+    left = Math.max(pad, (window.innerWidth - cw) / 2);
+  } else if (placement === 'bottom') {
+    top = Math.min(window.innerHeight - ch - pad, rect.bottom + 12);
+    left = Math.min(window.innerWidth - cw - pad, Math.max(pad, rect.left + rect.width / 2 - cw / 2));
+  } else {
+    top = Math.max(pad, rect.top - ch - 12);
+    left = Math.min(window.innerWidth - cw - pad, Math.max(pad, rect.left + rect.width / 2 - cw / 2));
+  }
+  card.style.top = top + 'px';
+  card.style.left = left + 'px';
+}
+
+function onboardShowStep(i) {
+  const steps = ONBOARD_STEPS;
+  if (i < 0 || i >= steps.length) { onboardDone(); return; }
+  onboardIdx = i;
+  const step = steps[i];
+  const ov = document.getElementById('onboardOverlay');
+  const sp = document.getElementById('onboardSpotlight');
+  const card = document.getElementById('onboardCard');
+  const title = document.getElementById('onboardTitle');
+  const desc = document.getElementById('onboardDesc');
+  const label = document.getElementById('onboardStepLabel');
+  const next = document.getElementById('onboardNext');
+  const dots = document.getElementById('onboardDots');
+  if (!card || !title || !desc) return;
+
+  if (ov) { ov.style.display = 'block'; ov.classList.add('show'); }
+  title.textContent = step.title;
+  desc.textContent = step.desc;
+  if (label) label.textContent = 'Langkah ' + (i + 1) + ' / ' + steps.length;
+  if (next) next.textContent = (i === steps.length - 1) ? 'Selesai' : 'Lanjut';
+  if (dots) {
+    dots.innerHTML = steps.map((_, di) => '<span class="' + (di === i ? 'on' : '') + '"></span>').join('');
+  }
+
+  let rect = null;
+  if (step.selector) {
+    const el = document.querySelector(step.selector);
+    if (el) {
+      rect = el.getBoundingClientRect();
+      if (sp && step.highlight) {
+        const pad = 6;
+        sp.style.display = 'block';
+        sp.style.top = (rect.top - pad) + 'px';
+        sp.style.left = (rect.left - pad) + 'px';
+        sp.style.width = (rect.width + pad * 2) + 'px';
+        sp.style.height = (rect.height + pad * 2) + 'px';
+      }
+    } else if (sp) {
+      sp.style.display = 'none';
+    }
+  } else if (sp) {
+    sp.style.display = 'none';
+  }
+
+  card.style.display = 'block';
+  // measure then place
+  requestAnimationFrame(() => onboardPlaceCard(rect, step.placement || 'center'));
+}
+
+function startOnboardingTour(force) {
+  try {
+    if (!force && localStorage.getItem(ONBOARD_KEY) === '1') return;
+  } catch (_) {}
+  // jangan tampilkan jika belum login / splash masih ada
+  if (document.getElementById('homeSessionSplash') && !document.getElementById('homeSessionSplash').classList.contains('hide')) {
+    setTimeout(() => startOnboardingTour(force), 600);
+    return;
+  }
+  if (!document.querySelector('.app')) return;
+  onboardActive = true;
+  onboardShowStep(0);
+}
+
+function bindOnboardingControls() {
+  const next = document.getElementById('onboardNext');
+  const skip = document.getElementById('onboardSkip');
+  if (next && !next.dataset.bound) {
+    next.dataset.bound = '1';
+    next.addEventListener('click', () => {
+      if (onboardIdx >= ONBOARD_STEPS.length - 1) onboardDone();
+      else onboardShowStep(onboardIdx + 1);
+    });
+  }
+  if (skip && !skip.dataset.bound) {
+    skip.dataset.bound = '1';
+    skip.addEventListener('click', () => onboardDone());
+  }
+  window.addEventListener('resize', () => {
+    if (onboardActive) onboardShowStep(onboardIdx);
+  });
+}
+
+window.startOnboardingTour = startOnboardingTour;
+window.resetOnboardingTour = function () {
+  try { localStorage.removeItem(ONBOARD_KEY); } catch (_) {}
+  startOnboardingTour(true);
+};
+
+// auto start setelah auth UI siap
+(function scheduleOnboard() {
+  bindOnboardingControls();
+  const tryStart = () => {
+    try {
+      if (localStorage.getItem(ONBOARD_KEY) === '1') return;
+    } catch (_) {}
+    // tunggu currentUser jika ada
+    if (typeof currentUser !== 'undefined' && currentUser) {
+      setTimeout(() => startOnboardingTour(false), 900);
+      return;
+    }
+    setTimeout(tryStart, 500);
+  };
+  if (document.readyState === 'complete') setTimeout(tryStart, 400);
+  else window.addEventListener('load', () => setTimeout(tryStart, 400));
+})();
+
 </script>
 </body>
 </html>
