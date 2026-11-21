@@ -27,7 +27,7 @@
 <meta name="twitter:title" content="Shine Shop — Suntik Sosmed & Jual Beli Akun Terpercaya 🚀" />
 <meta name="twitter:description" content="Pusat suntik followers, likes, views sosmed termurah sekaligus tempat jual beli akun aman & terpercaya se-Indonesia. Transaksi cepat otomatis 24 jam!" />
 <meta name="twitter:image" content="https://shinedomain.my.id/home/logo.png" />
-<link rel="icon" href="/home/logo.png" type="image/png">
+<link rel="icon" href="https://shinedomain.my.id/home/logo.png" type="image/png">
 <meta name="theme-color" content="#1a0e2e">
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700;800;900&family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="/home/shine-security.js"></script>
@@ -1259,15 +1259,23 @@ input:focus,textarea:focus,select:focus{
 
 
 #onboardOverlay.show{pointer-events:auto}
-body.onboard-required .app{
-  pointer-events:none!important;
-  user-select:none!important;
-  filter:brightness(0.72);
+body.onboard-required .app{filter:brightness(0.72);}
+body.onboard-required .app *{pointer-events:none!important;}
+body.onboard-required .app .app-icon-btn[title="Chat"],
+body.onboard-required .app .app-icon-btn[onclick*="openChatHub"],
+body.onboard-required .app .app-icon-btn[title="Chat"] *,
+body.onboard-required .app .app-icon-btn[onclick*="openChatHub"] *{pointer-events:auto!important;}
+body.onboard-required .app-bar{pointer-events:auto!important;z-index:100040!important;position:relative}
+body.onboard-required .app-bar .app-actions{pointer-events:auto!important}
+body.onboard-required .app-bar .app-actions *{pointer-events:auto!important}
+
+body.onboard-required #onboardCard{
+  pointer-events:auto!important;
+  filter:none!important;
 }
-body.onboard-required #onboardCard,
 body.onboard-required #onboardSpotlight,
 body.onboard-required #onboardOverlay{
-  pointer-events:auto!important;
+  pointer-events:none!important;
   filter:none!important;
 }
 body.onboard-required #onboardCard button{pointer-events:auto!important}
@@ -11284,8 +11292,16 @@ function onboardBindPractice(step) {
   }
   try {
     btn.style.pointerEvents = 'auto';
-    btn.style.zIndex = '100003';
-    if (!btn.style.position || btn.style.position === 'static') btn.style.position = 'relative';
+    btn.style.zIndex = '100010';
+    btn.style.position = 'relative';
+    btn.removeAttribute('disabled');
+    btn.style.filter = 'none';
+    // clone-safe: ensure parent chain allows clicks
+    let p = btn.parentElement;
+    for (let i = 0; i < 5 && p; i++) {
+      p.style.pointerEvents = 'auto';
+      p = p.parentElement;
+    }
   } catch (_) {}
 
   const handler = function () {
@@ -11322,7 +11338,7 @@ function onboardShowStep(i) {
   try { document.body.classList.add('onboard-required'); } catch (_) {}
   if (ov) { ov.style.display = 'block'; ov.classList.add('show'); }
   // biarkan klik tembus ke tombol chat saat praktik
-  ov.style.pointerEvents = step.action ? 'none' : 'auto';
+  ov.style.pointerEvents = 'none'; // jangan blok tombol chat
 
   title.textContent = step.title;
   desc.style.whiteSpace = 'pre-line';
@@ -11338,7 +11354,7 @@ function onboardShowStep(i) {
       if (sp && step.highlight) {
         const pad = 6;
         sp.style.display = 'block';
-        sp.style.pointerEvents = 'none';
+        sp.style.pointerEvents = 'none'; sp.style.zIndex = '100001';
         sp.style.top = (rect.top - pad) + 'px';
         sp.style.left = (rect.left - pad) + 'px';
         sp.style.width = (rect.width + pad * 2) + 'px';
@@ -11441,16 +11457,22 @@ window.resetOnboardingTour = function () {
   }
 
   // Blok klik di app SAJA; izinkan semua di kartu tour
+  function isChatBtn(el) {
+    if (!el || !el.closest) return false;
+    const b = el.closest('.app-icon-btn');
+    if (!b) return false;
+    if (b.getAttribute('title') === 'Chat') return true;
+    const oc = b.getAttribute('onclick') || '';
+    return oc.indexOf('openChatHub') >= 0;
+  }
+
   document.addEventListener('click', function (e) {
     if (isDone()) return;
     const t = e.target;
-    if (isTourUi(t)) return; // JANGAN blok tombol Lanjut
+    if (isTourUi(t)) return;
+    if (isChatBtn(t)) return; // WAJIB: izinkan tekan 💬
 
     if (typeof onboardActive !== 'undefined' && onboardActive) {
-      // izinkan praktik klik tombol chat
-      if (t && t.closest && (t.closest('.app-icon-btn[title="Chat"]') || (t.closest('.app-icon-btn') && String(t.closest('.app-icon-btn').getAttribute('onclick')||'').includes('openChatHub')))) {
-        return;
-      }
       if (t && t.closest && t.closest('.app')) {
         e.preventDefault();
         e.stopPropagation();
@@ -11459,6 +11481,20 @@ window.resetOnboardingTour = function () {
       }
     }
   }, true);
+
+  // pointerdown/touch juga jangan diblok untuk chat
+  ['pointerdown', 'touchstart', 'mousedown'].forEach(function (evt) {
+    document.addEventListener(evt, function (e) {
+      if (isDone()) return;
+      if (isChatBtn(e.target) || isTourUi(e.target)) return;
+      if (typeof onboardActive !== 'undefined' && onboardActive) {
+        if (e.target && e.target.closest && e.target.closest('.app')) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+      }
+    }, true);
+  });
 
   const _sp = window.switchPage;
   if (typeof _sp === 'function' && !window.__onboardSwitchWrapped) {
