@@ -1274,6 +1274,47 @@ body.onboard-required #onboardCard button{pointer-events:auto!important}
 #onboardCard .ob-actions{justify-content:stretch}
 #onboardCard .ob-next{width:100%}
 
+
+#onboardCard{
+  z-index:100002!important;
+  pointer-events:auto!important;
+}
+#onboardCard button,
+#onboardNext{
+  pointer-events:auto!important;
+  cursor:pointer!important;
+  position:relative;
+  z-index:100003!important;
+}
+#onboardOverlay{
+  pointer-events:none!important; /* overlay jangan makan klik tombol */
+}
+#onboardOverlay.show{
+  pointer-events:none!important;
+}
+body.onboard-required #onboardCard,
+body.onboard-required #onboardCard *{
+  pointer-events:auto!important;
+}
+
+
+body.onboard-required .app{pointer-events:none!important;filter:brightness(0.72)}
+body.onboard-required .app .app-icon-btn[onclick*="openChatHub"],
+body.onboard-required .app .app-icon-btn[title="Chat"]{
+  pointer-events:auto!important;
+  filter:none!important;
+  z-index:100003!important;
+  position:relative;
+  box-shadow:0 0 0 3px #a78bfa, 0 0 20px rgba(167,139,250,0.5)!important;
+  animation: onboardPulse 1.2s ease-in-out infinite;
+}
+@keyframes onboardPulse{
+  0%,100%{transform:scale(1)}
+  50%{transform:scale(1.08)}
+}
+body.onboard-required #onboardCard{pointer-events:auto!important;filter:none!important;z-index:100002}
+body.onboard-required #onboardNext{pointer-events:auto!important}
+
 </style>
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer onload="window.__turnstileReady=true;try{if(typeof initShineTurnstile==='function')initShineTurnstile();}catch(e){}"></script>
 </head>
@@ -11115,50 +11156,72 @@ document.addEventListener('keydown', function(e) {
 });
 
 
-/* ===== Interactive Onboarding Tour ===== */
-const ONBOARD_KEY = 'shine_onboard_v4_wajib';
-const ONBOARD_STEPS = [
-  {
-    title: 'Selamat datang di Shine Shop ✨',
-    desc: 'Ini panel akun Anda. Di sini ada saldo, mutasi, dan menu layanan. Tur ini wajib diselesaikan agar Anda memahami cara menghubungi CS (termasuk kirim foto).',
-    selector: null,
-    placement: 'center'
-  },
-  {
-    title: 'Live Chat Customer Service',
-    desc: 'Butuh bantuan? Hubungi Customer Service lewat Live Chat CS. Ketuk ikon 💬 di pojok kanan atas (atau buka menu Chat) untuk chat langsung dengan CS yang tersedia.',
-    selector: '.app-icon-btn[onclick*="openChatHub"], .app-icon-btn[title="Chat"]',
-    placement: 'bottom',
-    highlight: true
-  },
-  {
-    title: 'Cara menghubungi CS',
-    desc: 'Di Live Chat, pilih ruang/global chat atau hubungi CS yang online. Sampaikan Order ID / Gmail Anda agar CS lebih cepat membantu refund, status order, atau kendala lain.',
-    selector: '.app-icon-btn[onclick*="openChatHub"], .app-icon-btn[title="Chat"]',
-    placement: 'bottom',
-    highlight: true
-  },
-  {
-    title: 'Cara kirim foto ke CS',
-    desc: 'Di jendela chat CS, ketuk ikon 📎 / lampiran (atau tombol gambar) di samping kotak pesan. Pilih foto dari galeri/kamera, lalu kirim. Sertakan keterangan singkat (Order ID, kendala) agar CS lebih mudah menindaklanjuti.',
-    selector: '.app-icon-btn[onclick*="openChatHub"], .app-icon-btn[title="Chat"]',
-    placement: 'bottom',
-    highlight: true
-  },
-  {
-    title: 'Siap digunakan',
-    desc: 'Tur selesai. Kapan pun butuh bantuan, buka Live Chat CS dari ikon 💬 — bisa chat teks maupun kirim foto bukti. Selamat berbelanja di Shine Shop!',
-    selector: null,
-    placement: 'center'
-  }
-];
-
+/* ===== Interactive Onboarding Tour (PRAKTIK WAJIB) ===== */
+const ONBOARD_KEY = 'shine_onboard_v5_praktik';
 let onboardIdx = 0;
 let onboardActive = false;
+let onboardPracticeOk = false;
+let onboardUnbindPractice = null;
+
+const ONBOARD_STEPS = [
+  {
+    id: 'welcome',
+    title: 'Selamat datang di Shine Shop ✨',
+    desc: 'Tur ini wajib. Setiap langkah minta Anda praktik langsung, bukan hanya membaca. Tekan Mulai.',
+    selector: null,
+    placement: 'center',
+    action: null,
+    nextLabel: 'Mulai'
+  },
+  {
+    id: 'open_chat',
+    title: 'Praktik: Buka Live Chat CS',
+    desc: 'Ketuk ikon 💬 di pojok kanan atas (yang menyala) untuk membuka Live Chat Customer Service.\n\nLangkah ini hanya lanjut setelah Anda benar-benar menekan ikon 💬.',
+    selector: '.app-icon-btn[onclick*="openChatHub"], .app-icon-btn[title="Chat"]',
+    placement: 'bottom',
+    highlight: true,
+    action: 'click_chat',
+    nextLabel: 'Menunggu Anda menekan 💬…'
+  },
+  {
+    id: 'explain_cs',
+    title: 'Menghubungi CS',
+    desc: 'Di Live Chat, pilih CS / ruang chat yang tersedia. Sertakan Order ID dan Gmail agar CS cepat membantu refund atau kendala order.',
+    selector: null,
+    placement: 'center',
+    action: null,
+    nextLabel: 'Lanjut'
+  },
+  {
+    id: 'send_photo',
+    title: 'Praktik: Cara kirim foto ke CS',
+    desc: '1) Ketuk 💬 untuk buka chat CS.\n2) Di chat, ketuk ikon 📎 / gambar di samping kotak pesan.\n3) Pilih foto, lalu kirim + tulis Order ID.\n\nPraktik: tekan 💬 dulu. Setelah itu tombol konfirmasi aktif.',
+    selector: '.app-icon-btn[onclick*="openChatHub"], .app-icon-btn[title="Chat"]',
+    placement: 'bottom',
+    highlight: true,
+    action: 'click_chat_then_confirm',
+    nextLabel: 'Buka chat dulu (ketuk 💬)',
+    confirmLabel: 'Sudah paham cara kirim foto'
+  },
+  {
+    id: 'done',
+    title: 'Siap digunakan',
+    desc: 'Selesai. Bantuan CS lewat Live Chat 💬 dan bisa kirim foto bukti. Selamat memakai Shine Shop!',
+    selector: null,
+    placement: 'center',
+    action: null,
+    nextLabel: 'Selesai'
+  }
+];
 
 function onboardDone() {
   try { localStorage.setItem(ONBOARD_KEY, '1'); } catch (_) {}
   onboardActive = false;
+  onboardPracticeOk = false;
+  if (typeof onboardUnbindPractice === 'function') {
+    try { onboardUnbindPractice(); } catch (_) {}
+    onboardUnbindPractice = null;
+  }
   try { document.body.classList.remove('onboard-required'); } catch (_) {}
   const ov = document.getElementById('onboardOverlay');
   const sp = document.getElementById('onboardSpotlight');
@@ -11178,15 +11241,68 @@ function onboardPlaceCard(rect, placement) {
   if (!rect || placement === 'center') {
     top = Math.max(pad, (window.innerHeight - ch) / 2);
     left = Math.max(pad, (window.innerWidth - cw) / 2);
-  } else if (placement === 'bottom') {
-    top = Math.min(window.innerHeight - ch - pad, rect.bottom + 12);
-    left = Math.min(window.innerWidth - cw - pad, Math.max(pad, rect.left + rect.width / 2 - cw / 2));
   } else {
-    top = Math.max(pad, rect.top - ch - 12);
-    left = Math.min(window.innerWidth - cw - pad, Math.max(pad, rect.left + rect.width / 2 - cw / 2));
+    top = Math.min(window.innerHeight - ch - pad, (rect.bottom || 0) + 12);
+    left = Math.min(window.innerWidth - cw - pad, Math.max(pad, (rect.left || 0) + (rect.width || 0) / 2 - cw / 2));
   }
   card.style.top = top + 'px';
   card.style.left = left + 'px';
+}
+
+function onboardGetChatBtn() {
+  return document.querySelector('.app-icon-btn[onclick*="openChatHub"], .app-icon-btn[title="Chat"]');
+}
+
+function onboardSetNextState(enabled, label) {
+  const next = document.getElementById('onboardNext');
+  if (!next) return;
+  next.disabled = !enabled;
+  next.style.opacity = enabled ? '1' : '0.55';
+  next.style.pointerEvents = enabled ? 'auto' : 'none';
+  if (label) next.textContent = label;
+}
+
+function onboardBindPractice(step) {
+  if (typeof onboardUnbindPractice === 'function') {
+    try { onboardUnbindPractice(); } catch (_) {}
+    onboardUnbindPractice = null;
+  }
+  onboardPracticeOk = false;
+
+  if (!step.action) {
+    onboardPracticeOk = true;
+    onboardSetNextState(true, step.nextLabel || 'Lanjut');
+    return;
+  }
+
+  onboardSetNextState(false, step.nextLabel || 'Menunggu praktik…');
+  const btn = onboardGetChatBtn();
+  if (!btn) {
+    onboardPracticeOk = true;
+    onboardSetNextState(true, step.confirmLabel || 'Lanjut');
+    return;
+  }
+  try {
+    btn.style.pointerEvents = 'auto';
+    btn.style.zIndex = '100003';
+    if (!btn.style.position || btn.style.position === 'static') btn.style.position = 'relative';
+  } catch (_) {}
+
+  const handler = function () {
+    onboardPracticeOk = true;
+    if (step.action === 'click_chat') {
+      onboardSetNextState(true, 'Bagus ✓ Lanjut');
+      setTimeout(function () {
+        if (onboardActive && onboardIdx < ONBOARD_STEPS.length - 1) onboardShowStep(onboardIdx + 1);
+      }, 650);
+    } else {
+      onboardSetNextState(true, step.confirmLabel || 'Sudah paham, lanjut');
+    }
+  };
+  btn.addEventListener('click', handler, true);
+  onboardUnbindPractice = function () {
+    try { btn.removeEventListener('click', handler, true); } catch (_) {}
+  };
 }
 
 function onboardShowStep(i) {
@@ -11200,18 +11316,19 @@ function onboardShowStep(i) {
   const title = document.getElementById('onboardTitle');
   const desc = document.getElementById('onboardDesc');
   const label = document.getElementById('onboardStepLabel');
-  const next = document.getElementById('onboardNext');
   const dots = document.getElementById('onboardDots');
   if (!card || !title || !desc) return;
 
+  try { document.body.classList.add('onboard-required'); } catch (_) {}
   if (ov) { ov.style.display = 'block'; ov.classList.add('show'); }
+  // biarkan klik tembus ke tombol chat saat praktik
+  ov.style.pointerEvents = step.action ? 'none' : 'auto';
+
   title.textContent = step.title;
+  desc.style.whiteSpace = 'pre-line';
   desc.textContent = step.desc;
-  if (label) label.textContent = 'Langkah ' + (i + 1) + ' / ' + steps.length;
-  if (next) next.textContent = (i === steps.length - 1) ? 'Selesai' : 'Lanjut';
-  if (dots) {
-    dots.innerHTML = steps.map((_, di) => '<span class="' + (di === i ? 'on' : '') + '"></span>').join('');
-  }
+  if (label) label.textContent = 'Langkah ' + (i + 1) + ' / ' + steps.length + (step.action ? ' · Praktik' : '');
+  if (dots) dots.innerHTML = steps.map((_, di) => '<span class="' + (di === i ? 'on' : '') + '"></span>').join('');
 
   let rect = null;
   if (step.selector) {
@@ -11221,34 +11338,29 @@ function onboardShowStep(i) {
       if (sp && step.highlight) {
         const pad = 6;
         sp.style.display = 'block';
+        sp.style.pointerEvents = 'none';
         sp.style.top = (rect.top - pad) + 'px';
         sp.style.left = (rect.left - pad) + 'px';
         sp.style.width = (rect.width + pad * 2) + 'px';
         sp.style.height = (rect.height + pad * 2) + 'px';
       }
-    } else if (sp) {
-      sp.style.display = 'none';
-    }
-  } else if (sp) {
-    sp.style.display = 'none';
-  }
+    } else if (sp) sp.style.display = 'none';
+  } else if (sp) sp.style.display = 'none';
 
   card.style.display = 'block';
-  // measure then place
   requestAnimationFrame(() => onboardPlaceCard(rect, step.placement || 'center'));
+  onboardBindPractice(step);
 }
 
 function startOnboardingTour(force) {
   try {
     if (!force && localStorage.getItem(ONBOARD_KEY) === '1') return;
   } catch (_) {}
-  // jangan tampilkan jika belum login / splash masih ada
   if (document.getElementById('homeSessionSplash') && !document.getElementById('homeSessionSplash').classList.contains('hide')) {
     setTimeout(() => startOnboardingTour(force), 600);
     return;
   }
   if (!document.querySelector('.app')) return;
-  // Wajib: kunci UI sampai selesai
   try { document.body.classList.add('onboard-required'); } catch (_) {}
   onboardActive = true;
   bindOnboardingControls();
@@ -11262,30 +11374,31 @@ function bindOnboardingControls() {
   if (next && !next.dataset.bound) {
     next.dataset.bound = '1';
     next.addEventListener('click', () => {
+      const step = ONBOARD_STEPS[onboardIdx];
+      if (step && step.action && !onboardPracticeOk) {
+        try {
+          if (window.Swal) {
+            Swal.fire({
+              title: 'Praktik dulu',
+              text: 'Ikuti petunjuk — lakukan aksinya (mis. ketuk 💬), baru bisa lanjut.',
+              icon: 'info',
+              confirmButtonColor: '#a78bfa',
+              background: '#1a0e2e',
+              color: '#fff'
+            });
+          }
+        } catch (_) {}
+        return;
+      }
       if (onboardIdx >= ONBOARD_STEPS.length - 1) onboardDone();
       else onboardShowStep(onboardIdx + 1);
     });
   }
-  // Wajib: blok Esc / klik overlay untuk nutup
-  document.addEventListener('keydown', function(e) {
+  document.addEventListener('keydown', function (e) {
     if (!onboardActive) return;
-    if (e.key === 'Escape' || e.key === 'Esc') {
-      e.preventDefault();
-      e.stopPropagation();
-    }
+    if (e.key === 'Escape' || e.key === 'Esc') { e.preventDefault(); e.stopPropagation(); }
   }, true);
-  const ov = document.getElementById('onboardOverlay');
-  if (ov && !ov.dataset.bound) {
-    ov.dataset.bound = '1';
-    ov.addEventListener('click', function(e) {
-      if (!onboardActive) return;
-      e.preventDefault();
-      e.stopPropagation();
-    });
-  }
-  window.addEventListener('resize', () => {
-    if (onboardActive) onboardShowStep(onboardIdx);
-  });
+  window.addEventListener('resize', () => { if (onboardActive) onboardShowStep(onboardIdx); });
 }
 
 window.startOnboardingTour = startOnboardingTour;
@@ -11294,14 +11407,10 @@ window.resetOnboardingTour = function () {
   startOnboardingTour(true);
 };
 
-// auto start setelah auth UI siap
 (function scheduleOnboard() {
   bindOnboardingControls();
   const tryStart = () => {
-    try {
-      if (localStorage.getItem(ONBOARD_KEY) === '1') return;
-    } catch (_) {}
-    // tunggu currentUser jika ada
+    try { if (localStorage.getItem(ONBOARD_KEY) === '1') return; } catch (_) {}
     if (typeof currentUser !== 'undefined' && currentUser) {
       setTimeout(() => startOnboardingTour(false), 900);
       return;
@@ -11312,34 +11421,37 @@ window.resetOnboardingTour = function () {
   else window.addEventListener('load', () => setTimeout(tryStart, 400));
 })();
 
-
-
-/* ===== Mandatory onboard hard lock ===== */
+/* ===== Mandatory onboard hard lock (tombol Lanjut harus bisa diklik) ===== */
 (function hardenOnboard() {
-  const KEY = (typeof ONBOARD_KEY !== 'undefined') ? ONBOARD_KEY : 'shine_onboard_v3_mandatory';
+  const KEY = (typeof ONBOARD_KEY !== 'undefined') ? ONBOARD_KEY : 'shine_onboard_v5_praktik';
 
   function isDone() {
     try { return localStorage.getItem(KEY) === '1'; } catch (_) { return false; }
   }
 
-  function mustBlock() {
-    if (isDone()) return false;
-    return !!(typeof onboardActive !== 'undefined' && onboardActive) || !isDone();
+  function isTourUi(el) {
+    if (!el || !el.closest) return false;
+    return !!(
+      el.closest('#onboardCard') ||
+      el.closest('#onboardSpotlight') ||
+      el.id === 'onboardNext' ||
+      el.id === 'onboardSkip' ||
+      el.id === 'onboardOverlay'
+    );
   }
 
-  // Blok semua klik di .app selama belum selesai tutorial
+  // Blok klik di app SAJA; izinkan semua di kartu tour
   document.addEventListener('click', function (e) {
     if (isDone()) return;
-    if (typeof onboardActive !== 'undefined' && !onboardActive) {
-      // jika belum selesai tapi tour belum jalan, paksa start
-      try { if (typeof startOnboardingTour === 'function') startOnboardingTour(true); } catch (_) {}
-    }
     const t = e.target;
-    if (!t) return;
-    // izinkan hanya kontrol tour
-    if (t.closest && (t.closest('#onboardCard') || t.closest('#onboardOverlay') || t.id === 'onboardNext')) return;
+    if (isTourUi(t)) return; // JANGAN blok tombol Lanjut
+
     if (typeof onboardActive !== 'undefined' && onboardActive) {
-      if (t.closest && t.closest('.app')) {
+      // izinkan praktik klik tombol chat
+      if (t && t.closest && (t.closest('.app-icon-btn[title="Chat"]') || (t.closest('.app-icon-btn') && String(t.closest('.app-icon-btn').getAttribute('onclick')||'').includes('openChatHub')))) {
+        return;
+      }
+      if (t && t.closest && t.closest('.app')) {
         e.preventDefault();
         e.stopPropagation();
         e.stopImmediatePropagation();
@@ -11348,7 +11460,6 @@ window.resetOnboardingTour = function () {
     }
   }, true);
 
-  // Blok bottom nav / switch page
   const _sp = window.switchPage;
   if (typeof _sp === 'function' && !window.__onboardSwitchWrapped) {
     window.__onboardSwitchWrapped = true;
@@ -11361,7 +11472,6 @@ window.resetOnboardingTour = function () {
     };
   }
 
-  // Pastikan tour jalan setelah login
   const boot = setInterval(function () {
     if (isDone()) { clearInterval(boot); return; }
     try {
@@ -11373,6 +11483,7 @@ window.resetOnboardingTour = function () {
   }, 700);
   setTimeout(function () { try { clearInterval(boot); } catch (_) {} }, 20000);
 })();
+
 
 </script>
 </body>
