@@ -5,6 +5,28 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Shine Shop</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<!-- Favicon (Logo di Tab Browser & Perangkat Mobile) -->
+<link rel="icon" type="image/png" href="https://shinedomain.my.id/home/logo.png" />
+<link rel="shortcut icon" type="image/png" href="https://shinedomain.my.id/home/logo.png" />
+<link rel="apple-touch-icon" href="https://shinedomain.my.id/home/logo.png" />
+
+<!-- Open Graph / Facebook / WhatsApp / Telegram -->
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="Shine Shop" />
+<meta property="og:url" content="https://shinedomain.my.id" />
+<meta property="og:title" content="Shine Shop — Suntik Sosmed & Jual Beli Akun Terpercaya 🚀" />
+<meta property="og:description" content="Pusat suntik followers, likes, views sosmed termurah sekaligus tempat jual beli akun aman & terpercaya se-Indonesia. Transaksi cepat otomatis 24 jam!" />
+<meta property="og:image" content="https://shinedomain.my.id/home/logo.png" />
+<meta property="og:image:type" content="image/png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+
+<!-- Twitter / X Card -->
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:url" content="https://shinedomain.my.id" />
+<meta name="twitter:title" content="Shine Shop — Suntik Sosmed & Jual Beli Akun Terpercaya 🚀" />
+<meta name="twitter:description" content="Pusat suntik followers, likes, views sosmed termurah sekaligus tempat jual beli akun aman & terpercaya se-Indonesia. Transaksi cepat otomatis 24 jam!" />
+<meta name="twitter:image" content="https://shinedomain.my.id/home/logo.png" />
 <link rel="icon" href="/home/logo.png" type="image/png">
 <meta name="theme-color" content="#1a0e2e">
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700;800;900&family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -1235,6 +1257,23 @@ input:focus,textarea:focus,select:focus{
 }
 #onboardCard .ob-dots span.on{background:#a78bfa}
 
+
+#onboardOverlay.show{pointer-events:auto}
+body.onboard-required .app{
+  pointer-events:none!important;
+  user-select:none!important;
+  filter:brightness(0.72);
+}
+body.onboard-required #onboardCard,
+body.onboard-required #onboardSpotlight,
+body.onboard-required #onboardOverlay{
+  pointer-events:auto!important;
+  filter:none!important;
+}
+body.onboard-required #onboardCard button{pointer-events:auto!important}
+#onboardCard .ob-actions{justify-content:stretch}
+#onboardCard .ob-next{width:100%}
+
 </style>
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer onload="window.__turnstileReady=true;try{if(typeof initShineTurnstile==='function')initShineTurnstile();}catch(e){}"></script>
 </head>
@@ -1274,8 +1313,7 @@ window.__SHINE_HOME_URL__ = '/home/';
   <div class="ob-title" id="onboardTitle">Selamat datang</div>
   <div class="ob-desc" id="onboardDesc"></div>
   <div class="ob-actions">
-    <button type="button" class="ob-skip" id="onboardSkip">Lewati</button>
-    <button type="button" class="ob-next" id="onboardNext">Lanjut</button>
+    <button type="button" class="ob-next" id="onboardNext" style="width:100%">Lanjut</button>
   </div>
 </div>
 
@@ -11078,11 +11116,11 @@ document.addEventListener('keydown', function(e) {
 
 
 /* ===== Interactive Onboarding Tour ===== */
-const ONBOARD_KEY = 'shine_onboard_v2_done';
+const ONBOARD_KEY = 'shine_onboard_v3_mandatory';
 const ONBOARD_STEPS = [
   {
     title: 'Selamat datang di Shine Shop ✨',
-    desc: 'Ini panel akun Anda. Di sini ada saldo, mutasi, dan menu layanan. Ikuti tur singkat agar lebih mudah memakai fitur penting.',
+    desc: 'Ini panel akun Anda. Di sini ada saldo, mutasi, dan menu layanan. Tur ini wajib diselesaikan agar Anda memahami cara menghubungi CS (termasuk kirim foto).',
     selector: null,
     placement: 'center'
   },
@@ -11121,6 +11159,7 @@ let onboardActive = false;
 function onboardDone() {
   try { localStorage.setItem(ONBOARD_KEY, '1'); } catch (_) {}
   onboardActive = false;
+  try { document.body.classList.remove('onboard-required'); } catch (_) {}
   const ov = document.getElementById('onboardOverlay');
   const sp = document.getElementById('onboardSpotlight');
   const card = document.getElementById('onboardCard');
@@ -11209,13 +11248,17 @@ function startOnboardingTour(force) {
     return;
   }
   if (!document.querySelector('.app')) return;
+  // Wajib: kunci UI sampai selesai
+  try { document.body.classList.add('onboard-required'); } catch (_) {}
   onboardActive = true;
+  bindOnboardingControls();
   onboardShowStep(0);
 }
 
 function bindOnboardingControls() {
   const next = document.getElementById('onboardNext');
   const skip = document.getElementById('onboardSkip');
+  if (skip) skip.style.display = 'none';
   if (next && !next.dataset.bound) {
     next.dataset.bound = '1';
     next.addEventListener('click', () => {
@@ -11223,9 +11266,22 @@ function bindOnboardingControls() {
       else onboardShowStep(onboardIdx + 1);
     });
   }
-  if (skip && !skip.dataset.bound) {
-    skip.dataset.bound = '1';
-    skip.addEventListener('click', () => onboardDone());
+  // Wajib: blok Esc / klik overlay untuk nutup
+  document.addEventListener('keydown', function(e) {
+    if (!onboardActive) return;
+    if (e.key === 'Escape' || e.key === 'Esc') {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  }, true);
+  const ov = document.getElementById('onboardOverlay');
+  if (ov && !ov.dataset.bound) {
+    ov.dataset.bound = '1';
+    ov.addEventListener('click', function(e) {
+      if (!onboardActive) return;
+      e.preventDefault();
+      e.stopPropagation();
+    });
   }
   window.addEventListener('resize', () => {
     if (onboardActive) onboardShowStep(onboardIdx);
