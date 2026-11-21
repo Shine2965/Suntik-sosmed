@@ -11116,7 +11116,7 @@ document.addEventListener('keydown', function(e) {
 
 
 /* ===== Interactive Onboarding Tour ===== */
-const ONBOARD_KEY = 'shine_onboard_v3_mandatory';
+const ONBOARD_KEY = 'shine_onboard_v4_wajib';
 const ONBOARD_STEPS = [
   {
     title: 'Selamat datang di Shine Shop ✨',
@@ -11310,6 +11310,68 @@ window.resetOnboardingTour = function () {
   };
   if (document.readyState === 'complete') setTimeout(tryStart, 400);
   else window.addEventListener('load', () => setTimeout(tryStart, 400));
+})();
+
+
+
+/* ===== Mandatory onboard hard lock ===== */
+(function hardenOnboard() {
+  const KEY = (typeof ONBOARD_KEY !== 'undefined') ? ONBOARD_KEY : 'shine_onboard_v3_mandatory';
+
+  function isDone() {
+    try { return localStorage.getItem(KEY) === '1'; } catch (_) { return false; }
+  }
+
+  function mustBlock() {
+    if (isDone()) return false;
+    return !!(typeof onboardActive !== 'undefined' && onboardActive) || !isDone();
+  }
+
+  // Blok semua klik di .app selama belum selesai tutorial
+  document.addEventListener('click', function (e) {
+    if (isDone()) return;
+    if (typeof onboardActive !== 'undefined' && !onboardActive) {
+      // jika belum selesai tapi tour belum jalan, paksa start
+      try { if (typeof startOnboardingTour === 'function') startOnboardingTour(true); } catch (_) {}
+    }
+    const t = e.target;
+    if (!t) return;
+    // izinkan hanya kontrol tour
+    if (t.closest && (t.closest('#onboardCard') || t.closest('#onboardOverlay') || t.id === 'onboardNext')) return;
+    if (typeof onboardActive !== 'undefined' && onboardActive) {
+      if (t.closest && t.closest('.app')) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        return false;
+      }
+    }
+  }, true);
+
+  // Blok bottom nav / switch page
+  const _sp = window.switchPage;
+  if (typeof _sp === 'function' && !window.__onboardSwitchWrapped) {
+    window.__onboardSwitchWrapped = true;
+    window.switchPage = function () {
+      if (!isDone()) {
+        try { startOnboardingTour(true); } catch (_) {}
+        return;
+      }
+      return _sp.apply(this, arguments);
+    };
+  }
+
+  // Pastikan tour jalan setelah login
+  const boot = setInterval(function () {
+    if (isDone()) { clearInterval(boot); return; }
+    try {
+      if (typeof currentUser !== 'undefined' && currentUser && typeof startOnboardingTour === 'function') {
+        startOnboardingTour(false);
+        clearInterval(boot);
+      }
+    } catch (_) {}
+  }, 700);
+  setTimeout(function () { try { clearInterval(boot); } catch (_) {} }, 20000);
 })();
 
 </script>
