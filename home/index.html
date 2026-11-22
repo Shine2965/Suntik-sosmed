@@ -562,7 +562,7 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
 .support-users-list{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:8px}
 .support-user-item{display:flex;align-items:center;gap:10px;padding:12px 14px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.06);border-radius:14px;cursor:pointer;position:relative}
 .support-user-item.unread{background:linear-gradient(135deg,rgba(255,107,157,0.15),rgba(0,198,255,0.1));border-color:rgba(255,107,157,0.4)}
-.support-user-avatar{position:relative;width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#00c6ff,#0072ff);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;color:#fff;flex-shrink:0;position:relative}
+.support-user-avatar{width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#00c6ff,#0072ff);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;color:#fff;flex-shrink:0;position:relative}
 .support-user-info{flex:1;min-width:0}
 .support-user-email{font-size:12px;font-weight:700;color:#f1e6f5;word-break:break-all;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .support-user-preview{font-size:11px;color:#b39ddb;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -9297,7 +9297,7 @@ async function initChat() {
   startSupportChatAutoCleanup();
   try { startChatBadgePolling(); } catch (_) {}
 }
-async async function getChatUserId() {
+async function getChatUserId() {
   if (chatClient) {
     const { data: { session } } = await chatClient.auth.getSession();
     if (session?.user?.id) { cachedChatUserId = session.user.id; return session.user.id; }
@@ -9313,8 +9313,6 @@ async async function getChatUserId() {
   return currentUser?.id || null;
 }
 function openChatHub(tab) {
-  try { if (typeof initPresence === 'function') initPresence(); updateOnlineCounter(); } catch(_) {}
-
   if (!currentUser) return;
   document.getElementById('chatHubModal').classList.add('show');
   document.body.classList.add('chat-open');
@@ -9328,8 +9326,6 @@ function openChatHub(tab) {
 }
 function closeChatHub() { document.getElementById('chatHubModal').classList.remove('show'); document.body.classList.remove('chat-open'); chatHubOpen = false; toggleBubbleVisibility(); }
 function switchChatTab(tab) {
-  try { updateOnlineCounter(); } catch(_) {}
-
   currentChatTab = tab;
   const tabGlobal = document.getElementById('tabChatGlobal');
   const tabSupport = document.getElementById('tabChatSupport');
@@ -9875,7 +9871,7 @@ async function sendSupportReply() {
   }
 }
 
-async async function loadSupportUsers() {
+async function loadSupportUsers() {
   if (!chatClient) return;
   const listEl = document.getElementById('supportUsersList');
   try { await cleanupExpiredSupportChats(true); } catch(e) {}
@@ -10051,16 +10047,11 @@ async function startNewChat() {
   }
 }
 
-async async function openSupportChatWith(userId, email) {
-  window.__activeSupportUserId = userId;
+async function openSupportChatWith(userId, email) {
   currentSupportTarget = { user_id: userId, email };
   document.getElementById('supportUsersView').style.display = 'none';
   document.getElementById('supportChatViewAdmin').style.display = 'flex';
-  const emailEl = document.getElementById('supportAdminTargetEmail');
-  if (emailEl) {
-    const st = computePresenceStatus(userId);
-    emailEl.innerHTML = escapeHtml(email || '') + ' <span id="supportChatHeaderStatus" class="chat-header-status"><span class="status-indicator ' + (st === 'online' ? 'online' : 'offline') + '" style="position:static;display:inline-block;vertical-align:middle;margin:0 4px"></span>' + (st === 'online' ? 'Online' : 'Offline') + '</span>';
-  }
+  document.getElementById('supportAdminTargetEmail').textContent = email;
   document.getElementById('chatHubTitle').textContent = `Chat - ${email}`;
   await loadSupportChatForAdmin(userId);
   subscribeUserSupportChat(userId);
@@ -10147,27 +10138,9 @@ function startCSPolling() {
 }
 function stopCSPolling() { if (csPollingInterval) { clearInterval(csPollingInterval); csPollingInterval = null; } }
 
-async async function upsertLastSeen() {
+async function upsertLastSeen() {
   if (!chatClient || !currentUser) return;
-  try {
-    const chatUserId = await getChatUserId();
-    if (!chatUserId) return;
-    onlineUsersMap[chatUserId] = true;
-    onlineUsersMap[currentUser.id] = true;
-    presenceUsersCache[chatUserId] = {
-      user_id: chatUserId,
-      email: currentUser.email,
-      role: currentProfile?.role || 'user',
-      is_online: true,
-      last_seen: new Date().toISOString()
-    };
-    await chatClient.from('user_last_seen').upsert({
-      user_id: chatUserId,
-      email: currentUser.email,
-      role: currentProfile?.role || 'user',
-      last_seen: new Date().toISOString()
-    }, { onConflict: 'user_id' });
-  } catch (e) { console.warn('upsertLastSeen', e); }
+  try { const chatUserId = await getChatUserId(); if (!chatUserId) return; await chatClient.from('user_last_seen').upsert({ user_id: chatUserId, email: currentUser.email, role: currentProfile?.role || 'user', last_seen: new Date().toISOString() }, { onConflict: 'user_id' }); } catch(e) {}
 }
 function initRealtimePresence() {
   if (!chatClient || !currentUser) return;
@@ -10177,7 +10150,7 @@ function initRealtimePresence() {
     .on('presence', { event: 'sync' }, () => updateOnlineUsersFromPresence(presenceChannelRealtime.presenceState()))
     .on('presence', { event: 'join' }, ({ key, newPresences }) => { newPresences.forEach(p => { onlineUsersMap[p.user_id || key] = true; presenceUsersCache[p.user_id || key] = { ...(presenceUsersCache[p.user_id || key] || {}), user_id: p.user_id || key, email: p.email, role: p.role, is_online: true, last_seen: p.joined_at || new Date().toISOString() }; }); refreshPresenceUI(); updateOnlineCounter(); })
     .on('presence', { event: 'leave' }, ({ key, leftPresences }) => { leftPresences.forEach(p => { const uid = p.user_id || key; delete onlineUsersMap[uid]; if (presenceUsersCache[uid]) { presenceUsersCache[uid].is_online = false; presenceUsersCache[uid].last_seen = new Date().toISOString(); } }); refreshPresenceUI(); updateOnlineCounter(); })
-    .subscribe(async (status) => { if (status === 'SUBSCRIBED') onlineUsersMap[currentUser.id] = true; presenceUsersCache[currentUser.id] = { user_id: currentUser.id, email: currentUser.email, role: currentProfile?.role || 'user', is_online: true, last_seen: new Date().toISOString() }; updateOnlineCounter(); await presenceChannelRealtime.track({ user_id: currentUser.id, email: currentUser.email, role: currentProfile?.role || 'user', joined_at: new Date().toISOString() }); else if (['CHANNEL_ERROR','TIMED_OUT','CLOSED'].includes(status)) setTimeout(initRealtimePresence, 3000); });
+    .subscribe(async (status) => { if (status === 'SUBSCRIBED') await presenceChannelRealtime.track({ user_id: currentUser.id, email: currentUser.email, role: currentProfile?.role || 'user', joined_at: new Date().toISOString() }); else if (['CHANNEL_ERROR','TIMED_OUT','CLOSED'].includes(status)) setTimeout(initRealtimePresence, 3000); });
 }
 function updateOnlineUsersFromPresence(state) {
   onlineUsersMap = {};
@@ -10189,89 +10162,24 @@ async function fetchLastSeenMap(userIds) {
   if (!chatClient || !userIds || userIds.length === 0) return {};
   try { const { data, error } = await chatClient.from('user_last_seen').select('*').in('user_id', userIds); if (error) { if (error.code === '42P01') return {}; throw error; } const map = {}; (data || []).forEach(p => { if (!onlineUsersMap[p.user_id]) presenceUsersCache[p.user_id] = { user_id: p.user_id, email: p.email, role: p.role, is_online: false, last_seen: p.last_seen }; map[p.user_id] = p; }); return map; } catch(e) { return {}; }
 }
-function computePresenceStatus(userId) {
-  if (!userId) return 'offline';
-  if (onlineUsersMap[userId]) return 'online';
-  const cached = presenceUsersCache[userId];
-  if (cached && cached.last_seen) {
-    const age = Date.now() - new Date(cached.last_seen).getTime();
-    if (age >= 0 && age < 120000) return 'online'; // 2 menit
-  }
-  return 'offline';
-}
-function updateOnlineCounter() {
-  const ids = new Set(Object.keys(onlineUsersMap || {}));
-  Object.keys(presenceUsersCache || {}).forEach(uid => {
-    if (computePresenceStatus(uid) === 'online') ids.add(uid);
-  });
-  const n = ids.size;
-  const el = document.getElementById('onlineCounterText');
-  if (el) el.textContent = n + ' Online';
-  // info di subtitle global chat
-  const sub = document.getElementById('chatHubSubText');
-  if (sub && currentChatTab === 'global') {
-    sub.textContent = n + ' pengguna online';
-  }
-  // update titik online di list CS tanpa reload penuh
-  document.querySelectorAll('.support-user-item[data-user-id]').forEach(row => {
-    const uid = row.getAttribute('data-user-id');
-    const av = row.querySelector('.support-user-avatar');
-    if (!av) return;
-    const st = computePresenceStatus(uid);
-    let ind = av.querySelector('.status-indicator');
-    if (!ind) {
-      ind = document.createElement('span');
-      ind.className = 'status-indicator';
-      av.appendChild(ind);
-    }
-    ind.className = 'status-indicator ' + (st === 'online' ? 'online' : 'offline');
-  });
-  // header chat CS yang sedang dibuka
-  const hdr = document.getElementById('supportChatHeaderStatus');
-  if (hdr && window.__activeSupportUserId) {
-    const st = computePresenceStatus(window.__activeSupportUserId);
-    hdr.innerHTML = '<span class="status-indicator ' + (st === 'online' ? 'online' : 'offline') + '" style="position:static;display:inline-block;vertical-align:middle;margin-right:6px"></span>' + (st === 'online' ? 'Online' : 'Offline');
-  }
-}
+function computePresenceStatus(userId) { if (!userId) return 'offline'; return onlineUsersMap[userId] ? 'online' : 'offline'; }
+function updateOnlineCounter() { const el = document.getElementById('onlineCounterText'); if (el) el.textContent = `${Object.keys(onlineUsersMap).length} Online`; }
 function getStatusIndicatorHTML(presence) { if (!presence) return `<span class="status-indicator offline"></span>`; const status = computePresenceStatus(presence.user_id || presence); return `<span class="status-indicator ${status === 'online' ? 'online' : 'offline'}"></span>`; }
 function refreshPresenceUI() {
-  if (currentUser) {
-    onlineUsersMap[currentUser.id] = true;
-    presenceUsersCache[currentUser.id] = {
-      user_id: currentUser.id,
-      email: currentUser.email,
-      role: currentProfile?.role || 'user',
-      is_online: true,
-      last_seen: new Date().toISOString()
-    };
-  }
   updateOnlineCounter();
   if (currentUser) {
     const presence = { user_id: currentUser.id, is_online: true, last_seen: new Date().toISOString() };
-    ['homeAvatar', 'profileAvatar'].forEach(id => {
-      const el = document.getElementById(id);
-      if (el && el.parentElement) {
-        const wrapper = el.parentElement;
-        if (!wrapper.classList.contains('profile-avatar-wrapper')) wrapper.classList.add('profile-avatar-wrapper');
-        const old = wrapper.querySelector('.status-indicator');
-        if (old) old.remove();
-        const tmp = document.createElement('div');
-        tmp.innerHTML = getStatusIndicatorHTML(presence);
-        const ind = tmp.firstChild;
-        if (ind) wrapper.appendChild(ind);
-      }
-    });
+    ['homeAvatar', 'profileAvatar'].forEach(id => { const el = document.getElementById(id); if (el && el.parentElement) { const wrapper = el.parentElement; if (!wrapper.classList.contains('profile-avatar-wrapper')) wrapper.classList.add('profile-avatar-wrapper'); const old = wrapper.querySelector('.status-indicator'); if (old) old.remove(); const tmp = document.createElement('div'); tmp.innerHTML = getStatusIndicatorHTML(presence); const ind = tmp.firstChild; if (ind) wrapper.appendChild(ind); } });
   }
 }
 async function initPresence() {
   if (!chatClient || !currentUser) return;
   initRealtimePresence();
   if (lastSeenInterval) clearInterval(lastSeenInterval);
-  await upsertLastSeen();
-  lastSeenInterval = setInterval(() => { upsertLastSeen(); }, 30000);
+  upsertLastSeen();
+  lastSeenInterval = setInterval(upsertLastSeen, 60000);
   if (presenceRefreshInterval) clearInterval(presenceRefreshInterval);
-  presenceRefreshInterval = setInterval(() => { refreshPresenceUI(); updateOnlineCounter(); }, 4000);
-  refreshPresenceUI();
+  presenceRefreshInterval = setInterval(() => { refreshPresenceUI(); updateOnlineCounter(); }, 5000);
 }
 function cleanupPresence() {
   if (presenceChannelRealtime) { try { presenceChannelRealtime.untrack(); } catch(e) {} try { presenceChannelRealtime.unsubscribe(); } catch(e) {} presenceChannelRealtime = null; }
