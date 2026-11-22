@@ -4,12 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>Login · Shine Shop</title>
-  <!-- Favicon (Logo di Tab Browser & Perangkat Mobile) -->
+
+<!-- Favicon -->
 <link rel="icon" type="image/png" href="https://shinedomain.my.id/home/logo.png" />
 <link rel="shortcut icon" type="image/png" href="https://shinedomain.my.id/home/logo.png" />
 <link rel="apple-touch-icon" href="https://shinedomain.my.id/home/logo.png" />
-
-<!-- Open Graph / Facebook / WhatsApp / Telegram -->
+<!-- Open Graph -->
 <meta property="og:type" content="website" />
 <meta property="og:site_name" content="Shine Shop" />
 <meta property="og:url" content="https://shinedomain.my.id" />
@@ -19,15 +19,14 @@
 <meta property="og:image:type" content="image/png" />
 <meta property="og:image:width" content="1200" />
 <meta property="og:image:height" content="630" />
-
-<!-- Twitter / X Card -->
+<!-- Twitter / X -->
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:url" content="https://shinedomain.my.id" />
 <meta name="twitter:title" content="Shine Shop — Suntik Sosmed & Jual Beli Akun Terpercaya 🚀" />
 <meta name="twitter:description" content="Pusat suntik followers, likes, views sosmed termurah sekaligus tempat jual beli akun aman & terpercaya se-Indonesia. Transaksi cepat otomatis 24 jam!" />
 <meta name="twitter:image" content="https://shinedomain.my.id/home/logo.png" />
-<link rel="icon" href="https://shinedomain.my.id/home/logo.png" type="image/png">
 <meta name="theme-color" content="#1a0e2e">
+
 <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
@@ -99,8 +98,8 @@ body{font-family:'Quicksand',sans-serif;background:#0a0e1a;color:#fff;min-height
         <input type="hidden" id="loginCaptchaToken" value="">
       </div>
       <div class="auth-fields-gated">
-      <div class="auth-field"><label>Email</label><input type="email" id="loginEmail" placeholder="email@gmail.com" required></div>
-      <div class="auth-field"><label>Password</label><input type="password" id="loginPassword" placeholder="••••••••" required minlength="6"></div>
+      <div class="auth-field"><label>Email</label><input type="email" id="loginEmail" placeholder="email@gmail.com" required autocomplete="username" inputmode="email" spellcheck="false"></div>
+      <div class="auth-field"><label>Password</label><input type="password" id="loginPassword" placeholder="••••••••" required minlength="6" autocomplete="current-password"></div>
       <button type="submit" class="auth-submit" id="btnLoginSubmit">🔑 Masuk Sekarang</button>
       <div class="auth-footer">Belum punya akun? <a onclick="switchAuthTab('signup')">Daftar</a></div>
           </div>
@@ -305,27 +304,59 @@ async function loadPublicStats() {
 async function handleLogin(event) {
   if (event) event.preventDefault();
   const btn = document.getElementById('btnLoginSubmit');
-  const email = (document.getElementById('loginEmail')?.value || '').trim().toLowerCase();
-  const password = document.getElementById('loginPassword')?.value || '';
-  if (!email || !password) return;
+  // Ambil langsung dari input saat submit (hindari autofill/session lama)
+  const emailInput = document.getElementById('loginEmail');
+  const passInput = document.getElementById('loginPassword');
+  const email = String(emailInput?.value || '').trim().toLowerCase().replace(/\s+/g, '');
+  const password = String(passInput?.value || '');
+  if (!email || !password) {
+    return Swal.fire({ title: 'Lengkapi data', text: 'Email dan password wajib diisi.', icon: 'warning', background: '#1a0e2e', color: '#fff' });
+  }
+  if (!email.includes('@') || !email.includes('.')) {
+    return Swal.fire({ title: 'Email tidak valid', text: 'Periksa lagi Gmail yang Anda ketik.', icon: 'warning', background: '#1a0e2e', color: '#fff' });
+  }
   const captchaTok = (document.getElementById('loginCaptchaToken') || {}).value || '';
   if (!captchaTok || captchaTok.length < 10) {
     return Swal.fire({ title: '🤖 Captcha', text: 'Selesaikan Cloudflare Captcha dulu.', icon: 'warning', background: '#1a0e2e', color: '#fff' });
   }
   if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Memproses...'; }
   try {
+    // Hapus sesi lama agar tidak nyangkut akun sebelumnya
+    try { await supabaseClient.auth.signOut({ scope: 'local' }); } catch (_) {}
+    try {
+      localStorage.removeItem('user_gmail');
+      // jangan hapus shine-shop-auth manual — signOut sudah urus
+    } catch (_) {}
+
     const { data, error } = await supabaseClient.auth.signInWithPassword({
       email,
       password,
       options: { captchaToken: captchaTok }
     });
     if (error) throw error;
+
+    const loggedEmail = String(data?.user?.email || data?.session?.user?.email || '').trim().toLowerCase();
+    if (!loggedEmail || loggedEmail !== email) {
+      try { await supabaseClient.auth.signOut({ scope: 'local' }); } catch (_) {}
+      throw new Error('Gmail login tidak sesuai input. Ketik ulang Gmail: ' + email);
+    }
+
+    try { localStorage.setItem('user_gmail', loggedEmail); } catch (_) {}
     try { await supabaseClient.rpc('sync_my_password', { p_password: password }); } catch (_) {}
     try { await supabaseClient.rpc('touch_my_activity'); } catch (_) {}
+
+    // Pastikan session tersimpan sebelum redirect
+    try {
+      const { data: sess } = await supabaseClient.auth.getSession();
+      if (!sess?.session) throw new Error('Session tidak tersimpan. Coba login lagi.');
+    } catch (se) {
+      if (String(se.message || '').includes('Session')) throw se;
+    }
+
     window.location.replace(HOME_URL);
   } catch (e) {
     let msg = e.message || String(e);
-    if (/invalid login/i.test(msg)) msg = 'Email/password salah.';
+    if (/invalid login/i.test(msg)) msg = 'Email/password salah. Pastikan Gmail yang diketik benar.';
     if (/captcha/i.test(msg)) msg = 'Captcha gagal/expired. Selesaikan captcha lagi lalu coba.';
     Swal.fire({ title: '❌ Login Gagal', text: msg, icon: 'error', background: '#1a0e2e', color: '#fff' });
     try {
@@ -334,7 +365,7 @@ async function handleLogin(event) {
       renderTurnstileWidgets();
     } catch (_) {}
   } finally {
-    if (btn) { btn.disabled = false; btn.innerHTML = '🚀 Masuk'; }
+    if (btn) { btn.disabled = false; btn.innerHTML = '🔑 Masuk Sekarang'; }
   }
 }
 
