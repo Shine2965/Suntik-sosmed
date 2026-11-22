@@ -2609,14 +2609,49 @@ async function cleanupOldMutations() {
 }
 
 async function fetchProfile(userId) {
+  if (!userId || !supabaseClient) return null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const { data, error } = await supabaseClient
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle();
+      if (error) throw error;
+      if (data) return data;
+      // kadang row belum ready setelah signup
+      await new Promise(r => setTimeout(r, 400 * (attempt + 1)));
+    } catch (e) {
+      if (attempt === 2) {
+        console.warn('fetchProfile fail', e);
+        return null;
+      }
+      await new Promise(r => setTimeout(r, 400 * (attempt + 1)));
+    }
+  }
+  return null;
+}
+
+async function refreshSessionUser() {
+  if (!supabaseClient) return null;
   try {
-    const { data, error } = await supabaseClient.from('profiles').select('*').eq('id', userId).maybeSingle();
+    const { data, error } = await supabaseClient.auth.getSession();
     if (error) throw error;
-    return data;
+    return data?.session?.user || null;
   } catch (e) {
-    return null;
+    try {
+      const { data, error } = await supabaseClient.auth.getUser();
+      if (error) throw error;
+      return data?.user || null;
+    } catch (e2) {
+      return null;
+    }
   }
 }
+
+let _updateAuthSeq = 0;
+let _updateAuthRunning = false;
+
 
 // ============================================================
 // ORDER SYSTEM + AUTO-REFUND + AUTO COMPLETED_AT
@@ -4568,11 +4603,134 @@ function hideHomeSplash() {
   } catch (_) {}
 }
 
+
+/** Terapkan data user login ke seluruh UI pusat home — sumber: session + profiles */
+async function syncHomeUserData(user, opts) {
+  opts = opts || {};
+  if (!user || !user.id) return null;
+  const email = String(user.email || '').trim().toLowerCase();
+  const uid = user.id;
+
+  // Guard: jangan apply jika user sudah berganti
+  if (currentUser && currentUser.id && currentUser.id !== uid) return null;
+
+  let profile = opts.profile || null;
+  if (!profile || opts.forceFetch) {
+    try {
+      profile = await fetchProfile(uid);
+    } catch (_) {
+      profile = null;
+    }
+  }
+  if (!profile) {
+    profile = {
+      id: uid,
+      email: email,
+      role: (currentProfile && currentProfile.id === uid && currentProfile.role) || 'user',
+      balance: (currentProfile && currentProfile.id === uid) ? (currentProfile.balance || 0) : 0
+    };
+  }
+  if (profile.id && profile.id !== uid) {
+    profile = { id: uid, email: email, role: 'user', balance: 0 };
+  }
+  // Email UI selalu dari session login
+  profile = Object.assign({}, profile, { email: email || profile.email });
+
+  if (currentUser && currentUser.id !== uid) return null;
+  currentUser = user;
+  currentProfile = profile;
+
+  const role = profile.role || 'user';
+  const displayName = (user.user_metadata && user.user_metadata.full_name)
+    || (email ? email.split('@')[0] : 'User');
+  const initial = (email || 'U').charAt(0).toUpperCase();
+
+  try {
+    ['homeEmail', 'profileEmail', 'accountEmail'].forEach(function (id) {
+      const el = document.getElementById(id);
+      if (el && email) el.textContent = email;
+    });
+    document.querySelectorAll('[data-session-email]').forEach(function (el) {
+      if (email) el.textContent = email;
+    });
+  } catch (_) {}
+
+  try {
+    if (email) {
+      localStorage.setItem('user_gmail', email);
+      localStorage.setItem('shine_last_login_email', email);
+      localStorage.setItem('shine_last_login_uid', uid);
+    }
+  } catch (_) {}
+
+  try {
+    ['homeAvatar', 'profileAvatar'].forEach(function (id) {
+      const el = document.getElementById(id);
+      if (el) {
+        el.textContent = initial;
+        el.className = 'profile-avatar ' + (role === 'owner' ? 'owner' : role === 'admin' ? 'admin' : role === 'cs' ? 'cs' : '');
+      }
+    });
+  } catch (_) {}
+
+  try {
+    const roleHTML = (typeof getRoleLabel === 'function' ? getRoleLabel(role) : role)
+      + (typeof verifiedTickHtml === 'function' ? verifiedTickHtml(role) : (role === 'seller_trusted' ? ' ✓' : ''));
+    ['homeRole', 'profileRole'].forEach(function (id) {
+      const el = document.getElementById(id);
+      if (el) {
+        el.className = 'profile-role ' + (role || 'user');
+        el.innerHTML = roleHTML;
+      }
+    });
+  } catch (_) {}
+
+  try {
+    ['homeName', 'profileName'].forEach(function (id) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const base = String(displayName || '').replace(/\s*✓\s*$/, '').trim() || displayName;
+      if (typeof isSellerTrusted === 'function' && isSellerTrusted(role)) {
+        el.innerHTML = (typeof escapeHtml === 'function' ? escapeHtml(base) : base)
+          + '<span class="verified-tick" title="Seller Trusted · Verified">✓</span>';
+      } else {
+        el.textContent = base;
+      }
+    });
+  } catch (_) {}
+
+  try {
+    updateBalanceDisplay(profile.balance != null ? profile.balance : 0);
+  } catch (_) {}
+
+  try {
+    isCS = (role === 'cs');
+    isAdminOrOwner = (role === 'admin' || role === 'owner');
+    isOwner = (role === 'owner');
+    isStaff = isAdminOrOwner || isCS || role === 'seller_trusted';
+  } catch (_) {}
+
+  return profile;
+}
+
+window.syncHomeUserData = syncHomeUserData;
+window.reloadHomeUserData = async function () {
+  try {
+    const u = await refreshSessionUser();
+    if (!u) return null;
+    return await syncHomeUserData(u, { forceFetch: true });
+  } catch (_) {
+    return null;
+  }
+};
+
 async function updateAuthUI(user) {
   const authScreen = document.getElementById('authScreen');
   const adminSection = document.getElementById('adminSection');
   // Auth UI ada di /index.html — selalu sembunyikan di /home/
   try { if (authScreen) { authScreen.classList.add('hidden'); authScreen.style.display = 'none'; } } catch (_) {}
+
+  const seq = ++_updateAuthSeq;
 
   if (!user) {
     hideHomeSplash();
@@ -4583,10 +4741,33 @@ async function updateAuthUI(user) {
   }
 
   if (user) {
+    // Re-verify session supaya data = akun yang benar-benar login
+    try {
+      const fresh = await refreshSessionUser();
+      if (fresh && fresh.id) {
+        if (fresh.id !== user.id || String(fresh.email || '').toLowerCase() !== String(user.email || '').toLowerCase()) {
+          console.warn('Session user berbeda dari argumen, pakai session fresh');
+        }
+        user = fresh;
+      }
+    } catch (_) {}
+
+    if (seq !== _updateAuthSeq) return; // ada update lebih baru
+
     hideHomeSplash();
     currentUser = user;
     try { setTimeout(hideHomeSplash, 50); setTimeout(hideHomeSplash, 500); } catch(_){}
     try { setTimeout(function(){ if (typeof startOnboardingTour==='function') startOnboardingTour(false); }, 1200); } catch(_ob) {}
+
+    // Reset UI dulu biar tidak nyampur user lama
+    try {
+      ['homeEmail','profileEmail','homeName','profileName'].forEach(function(id){
+        const el = document.getElementById(id);
+        if (el) el.textContent = '…';
+      });
+      updateBalanceDisplay(0);
+    } catch (_) {}
+
     let profile = null;
     try {
       profile = await Promise.race([
@@ -4595,9 +4776,17 @@ async function updateAuthUI(user) {
       ]);
     } catch (e) {
       console.warn('fetchProfile', e);
+      profile = null;
+    }
+    if (!profile) {
+      profile = { id: user.id, email: user.email, role: 'user', balance: 0 };
+    }
+    // Pastikan profile untuk user ini saja
+    if (profile.id && profile.id !== user.id) {
       profile = { id: user.id, email: user.email, role: 'user', balance: 0 };
     }
     currentProfile = profile;
+    if (seq !== _updateAuthSeq) return;
     if (profile && profile.banned) {
       const until = profile.banned_until ? new Date(profile.banned_until) : null;
       if (until && until < new Date()) { await autoUnbanUser(user.id); currentProfile = await fetchProfile(user.id); }
@@ -4606,9 +4795,36 @@ async function updateAuthUI(user) {
     document.getElementById('banOverlay').classList.remove('show');
     if (banCountdownInterval) clearInterval(banCountdownInterval);
     if (authScreen) authScreen.classList.add('hidden');
-    const email = user.email || '-';
+    const email = String(user.email || '').trim().toLowerCase() || '-';
+
+    // Bind UI email = session email (sumber kebenaran)
+    try {
+      const em = String(user.email || '').trim().toLowerCase();
+      ['homeEmail', 'profileEmail', 'accountEmail', 'gmailDisplay'].forEach(function(id) {
+        const el = document.getElementById(id);
+        if (el && em) el.textContent = em;
+      });
+      document.querySelectorAll('[data-session-email]').forEach(function(el){ el.textContent = em; });
+    } catch (_) {}
+
+    try {
+      if (email && email !== '-') {
+        localStorage.setItem('user_gmail', email);
+        localStorage.setItem('shine_last_login_email', email);
+      }
+    } catch (_) {}
+    // Profile harus milik user session (hindari data nyasar)
+    if (profile && profile.id && user.id && profile.id !== user.id) {
+      console.warn('Profile id mismatch, ignore profile');
+      profile = { id: user.id, email: email, role: 'user', balance: 0 };
+      currentProfile = profile;
+    }
+    if (profile && profile.email && String(profile.email).trim().toLowerCase() !== email && email !== '-') {
+      profile = Object.assign({}, profile, { email: email });
+      currentProfile = profile;
+    }
     const initial = email.charAt(0).toUpperCase();
-    const displayName = user.user_metadata?.full_name || email.split('@')[0] || 'User';
+    const displayName = user.user_metadata?.full_name || (email !== '-' ? email.split('@')[0] : 'User');
     const role = profile?.role || 'user';
     ['homeAvatar', 'profileAvatar'].forEach(id => { const el = document.getElementById(id); if (el) { el.textContent = initial; el.className = 'profile-avatar ' + (role === 'owner' ? 'owner' : role === 'admin' ? 'admin' : role === 'cs' ? 'cs' : ''); } });
     ['homeName', 'profileName'].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = displayName; });
@@ -4634,6 +4850,30 @@ async function updateAuthUI(user) {
     });
     updateBalanceDisplay(profile?.balance || 0);
     startBalanceRealtime();
+    // Sinkron berulang: pastikan data pusat = akun login
+    try { await syncHomeUserData(user, { profile: profile }); } catch (_) {}
+    [400, 1200, 2500, 4500].forEach(function (ms) {
+      setTimeout(async function () {
+        try {
+          if (!currentUser || currentUser.id !== user.id) return;
+          await syncHomeUserData(user, { forceFetch: true });
+        } catch (_) {}
+      }, ms);
+    });
+    // Saat user balik ke tab /home
+    if (!window.__homeDataFocusBound) {
+      window.__homeDataFocusBound = true;
+      document.addEventListener('visibilitychange', function () {
+        if (document.visibilityState === 'visible' && currentUser) {
+          try { window.reloadHomeUserData(); } catch (_) {}
+        }
+      });
+      window.addEventListener('focus', function () {
+        if (currentUser) {
+          try { window.reloadHomeUserData(); } catch (_) {}
+        }
+      });
+    }
     isCS = (role === 'cs');
     isAdminOrOwner = (role === 'admin' || role === 'owner');
     try { applyMaintenanceGate(); } catch(e) {}
@@ -10668,6 +10908,11 @@ async function initAuth() {
     const sub = document.getElementById('homeSplashSub');
     if (sub) sub.textContent = 'Memuat sesi...';
   } catch (_) {}
+  // Reset cache user lama agar tidak nyampur
+  try {
+    currentUser = null;
+    currentProfile = null;
+  } catch (_) {}
 
   // Anti-stuck berlapis
   var splashSafety1 = setTimeout(function () {
@@ -10691,6 +10936,7 @@ async function initAuth() {
   }
   try {
     var session = null;
+    var user = null;
     try {
       var res = await Promise.race([
         supabaseClient.auth.getSession(),
@@ -10702,9 +10948,46 @@ async function initAuth() {
       console.warn('getSession', e1);
       session = null;
     }
+    // Cross-check getUser agar data login akurat
+    try {
+      var gu = await Promise.race([
+        supabaseClient.auth.getUser(),
+        new Promise(function (_, rej) { setTimeout(function () { rej(new Error('getUser timeout')); }, 4000); })
+      ]);
+      if (gu && gu.data && gu.data.user) user = gu.data.user;
+    } catch (e2) {
+      console.warn('getUser', e2);
+    }
+    if (!user && session && session.user) user = session.user;
+
+    // Cocokkan dengan email login terakhir (jika ada)
+    try {
+      var expect = '';
+      try {
+        var q = new URLSearchParams(window.location.search || '');
+        expect = (q.get('u') || '').trim().toLowerCase();
+      } catch (_) {}
+      if (!expect) expect = (localStorage.getItem('shine_last_login_email') || localStorage.getItem('user_gmail') || '').trim().toLowerCase();
+      var got = String(user && user.email || '').trim().toLowerCase();
+      if (user && expect && got && expect !== got) {
+        console.warn('Session email mismatch', expect, got);
+        // session bukan milik login terakhir → logout lokal & minta login ulang
+        try { await supabaseClient.auth.signOut({ scope: 'local' }); } catch (_) {}
+        user = null;
+        session = null;
+      }
+    } catch (_) {}
+
+    // Bersihkan query ?u= dari URL
+    try {
+      if (window.history && window.location.search) {
+        window.history.replaceState({}, '', window.location.pathname);
+      }
+    } catch (_) {}
+
     clearTimeout(splashSafety1);
-    if (session && session.user) {
-      await updateAuthUI(session.user);
+    if (user) {
+      await updateAuthUI(user);
     } else {
       await updateAuthUI(null);
     }
@@ -10720,7 +11003,7 @@ async function initAuth() {
   }
   supabaseClient.auth.onAuthStateChange((event, session) => {
     if (event === 'SIGNED_IN' && session?.user) {
-      updateAuthUI(session.user);
+      Promise.resolve(updateAuthUI(session.user)).catch(function(){});
       try { startDeletedAccountWatcher(); } catch (e) {}
     } else if (event === 'SIGNED_OUT') {
       updateAuthUI(null);
@@ -10729,6 +11012,22 @@ async function initAuth() {
       try { if (window._deletedAccountPoll) clearInterval(window._deletedAccountPoll); } catch(e) {}
     } else if (event === 'TOKEN_REFRESHED' && session?.user) {
       currentUser = session.user;
+      // jangan full reload UI, tapi pastikan email/balance sinkron
+      try {
+        const em = String(session.user.email || '').trim().toLowerCase();
+        if (em) {
+          ['homeEmail', 'profileEmail'].forEach(function(id) {
+            const el = document.getElementById(id);
+            if (el) el.textContent = em;
+          });
+          localStorage.setItem('user_gmail', em);
+        }
+        fetchProfile(session.user.id).then(function(pr) {
+          if (!pr || pr.id !== session.user.id) return;
+          currentProfile = pr;
+          try { updateBalanceDisplay(pr.balance || 0); } catch (_) {}
+        });
+      } catch (_) {}
     } else if (event === 'USER_DELETED') {
       try { handleAccountDeletedLogout('Akun dihapus.'); } catch (e) {}
     }
