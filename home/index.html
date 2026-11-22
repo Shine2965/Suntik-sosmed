@@ -1301,11 +1301,6 @@ body.onboard-required .app .app-icon-btn[title="Chat"]{
 body.onboard-required #onboardCard{pointer-events:auto!important;filter:none!important;z-index:100002}
 body.onboard-required #onboardNext{pointer-events:auto!important}
 
-
-#authScreen, .auth-screen{display:none!important;visibility:hidden!important;pointer-events:none!important;z-index:-1!important}
-#homeSessionSplash.hide, #homeSessionSplash.hidden{opacity:0!important;visibility:hidden!important;pointer-events:none!important;display:none!important}
-#homeSessionSplash{transition:opacity .25s ease}
-
 </style>
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer onload="window.__turnstileReady=true;try{if(typeof initShineTurnstile==='function')initShineTurnstile();}catch(e){}"></script>
 </head>
@@ -1947,9 +1942,9 @@ window.__SHINE_HOME_URL__ = '/home/';
     <button class="nav-item" onclick="switchPage('profile')" data-page="profile"><span class="nav-icon">👤</span><span class="nav-label">Profil</span></button>
   </div>
 
-  <div class="auth-screen hidden" id="authScreen" style="display:none!important" aria-hidden="true">
-    <!-- Login dipindah ke /index.html — jangan tampilkan di /home/ -->
-  </div>
+  <div class="auth-screen" id="authScreen">
+<!-- auth dipindah ke /index.html -->
+span class="sb-icon">🔄</span><div class="sb-text">Sinkronisasi status <span class="sb-count" id="syncCount">0</span></div></div>
 <div class="broadcast-popup-overlay" id="broadcastPopupOverlay"><div class="broadcast-popup" id="broadcastPopup"><button class="broadcast-popup-close" onclick="closeBroadcastPopup()">✕</button><div class="broadcast-popup-icon" id="broadcastPopupIcon">📢</div><div class="broadcast-popup-title" id="broadcastPopupTitle">-</div><div class="broadcast-popup-message" id="broadcastPopupMessage">-</div><div class="broadcast-popup-meta" id="broadcastPopupMeta"></div><div class="broadcast-popup-countdown"><span>⏳ Auto close:</span><div class="bp-bar"><div class="bp-bar-fill" id="broadcastPopupBar" style="width:100%"></div></div><span id="broadcastPopupSeconds">5s</span></div></div></div>
 
 <div class="chat-modal" id="chatHubModal">
@@ -4388,45 +4383,13 @@ function ajukanBanding() {
 // ============================================================
 // UPDATE AUTH UI
 // ============================================================
-function hideHomeSplash() {
-  try {
-    const sp = document.getElementById('homeSessionSplash');
-    if (!sp) return;
-    sp.classList.add('hide');
-    sp.classList.add('hidden');
-    sp.style.display = 'none';
-    setTimeout(() => { try { sp.remove(); } catch (_) {} }, 300);
-  } catch (_) {}
-}
-
 async function updateAuthUI(user) {
   const authScreen = document.getElementById('authScreen');
   const adminSection = document.getElementById('adminSection');
-  // Auth UI ada di /index.html — selalu sembunyikan di /home/
-  try { if (authScreen) { authScreen.classList.add('hidden'); authScreen.style.display = 'none'; } } catch (_) {}
-
-  if (!user) {
-    hideHomeSplash();
-    currentUser = null;
-    currentProfile = null;
-    try { window.location.replace('/'); } catch (_) { window.location.href = '/'; }
-    return;
-  }
-
   if (user) {
-    hideHomeSplash();
-    try { setTimeout(function(){ if (typeof startOnboardingTour==='function') startOnboardingTour(false); }, 1200); } catch(_ob) {}
+    try { const sp = document.getElementById('homeSessionSplash'); if (sp) sp.classList.add('hide'); try { setTimeout(function(){ if (typeof startOnboardingTour==='function') startOnboardingTour(false); }, 1000); } catch(_ob) {}  setTimeout(()=>{ try{sp.remove()}catch(_){} }, 400); } catch(_) {}
     currentUser = user;
-    let profile = null;
-    try {
-      profile = await Promise.race([
-        fetchProfile(user.id),
-        new Promise((_, rej) => setTimeout(() => rej(new Error('profile timeout')), 8000))
-      ]);
-    } catch (e) {
-      console.warn('fetchProfile', e);
-      profile = { id: user.id, email: user.email, role: 'user', balance: 0 };
-    }
+    const profile = await fetchProfile(user.id);
     currentProfile = profile;
     if (profile && profile.banned) {
       const until = profile.banned_until ? new Date(profile.banned_until) : null;
@@ -10493,31 +10456,13 @@ function updateNotifStatusDisplay() { const el = document.getElementById('notifS
 async function initNotifications() { if (!isNotificationSupported()) return; updateNotifStatusDisplay(); }
 
 async function initAuth() {
-  // Safety: jangan stuck loading
-  setTimeout(() => {
-    try {
-      const sp = document.getElementById('homeSessionSplash');
-      if (sp && !sp.classList.contains('hide') && !currentUser) {
-        // masih loading tanpa user → redirect login
-        hideHomeSplash();
-        window.location.replace('/');
-      } else if (sp && currentUser) {
-        hideHomeSplash();
-      }
-    } catch (_) {}
-  }, 5000);
-
-  if (!supabaseClient) { await updateAuthUI(null); return; }
+  if (!supabaseClient) { updateAuthUI(null); return; }
   try {
     const { data: { session }, error } = await supabaseClient.auth.getSession();
     if (error) throw error;
     if (session && session.user) await updateAuthUI(session.user);
-    else await updateAuthUI(null);
-  } catch (err) {
-    console.warn('initAuth', err);
-    try { hideHomeSplash(); } catch (_) {}
-    await updateAuthUI(null);
-  }
+    else updateAuthUI(null);
+  } catch (err) { updateAuthUI(null); }
   supabaseClient.auth.onAuthStateChange((event, session) => {
     if (event === 'SIGNED_IN' && session?.user) {
       updateAuthUI(session.user);
