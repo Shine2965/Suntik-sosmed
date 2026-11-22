@@ -562,7 +562,7 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
 .support-users-list{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:8px}
 .support-user-item{display:flex;align-items:center;gap:10px;padding:12px 14px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.06);border-radius:14px;cursor:pointer;position:relative}
 .support-user-item.unread{background:linear-gradient(135deg,rgba(255,107,157,0.15),rgba(0,198,255,0.1));border-color:rgba(255,107,157,0.4)}
-.support-user-avatar{width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#00c6ff,#0072ff);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;color:#fff;flex-shrink:0;position:relative}
+.support-user-avatar{position:relative;width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#00c6ff,#0072ff);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;color:#fff;flex-shrink:0;position:relative}
 .support-user-info{flex:1;min-width:0}
 .support-user-email{font-size:12px;font-weight:700;color:#f1e6f5;word-break:break-all;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .support-user-preview{font-size:11px;color:#b39ddb;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -1301,6 +1301,11 @@ body.onboard-required .app .app-icon-btn[title="Chat"]{
 body.onboard-required #onboardCard{pointer-events:auto!important;filter:none!important;z-index:100002}
 body.onboard-required #onboardNext{pointer-events:auto!important}
 
+
+#authScreen, .auth-screen{display:none!important;visibility:hidden!important;pointer-events:none!important;z-index:-1!important}
+#homeSessionSplash.hide, #homeSessionSplash.hidden{opacity:0!important;visibility:hidden!important;pointer-events:none!important;display:none!important}
+#homeSessionSplash{transition:opacity .25s ease}
+
 </style>
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer onload="window.__turnstileReady=true;try{if(typeof initShineTurnstile==='function')initShineTurnstile();}catch(e){}"></script>
 </head>
@@ -1942,9 +1947,9 @@ window.__SHINE_HOME_URL__ = '/home/';
     <button class="nav-item" onclick="switchPage('profile')" data-page="profile"><span class="nav-icon">👤</span><span class="nav-label">Profil</span></button>
   </div>
 
-  <div class="auth-screen" id="authScreen">
-<!-- auth dipindah ke /index.html -->
-span class="sb-icon">🔄</span><div class="sb-text">Sinkronisasi status <span class="sb-count" id="syncCount">0</span></div></div>
+  <div class="auth-screen hidden" id="authScreen" style="display:none!important" aria-hidden="true">
+    <!-- Login dipindah ke /index.html — jangan tampilkan di /home/ -->
+  </div>
 <div class="broadcast-popup-overlay" id="broadcastPopupOverlay"><div class="broadcast-popup" id="broadcastPopup"><button class="broadcast-popup-close" onclick="closeBroadcastPopup()">✕</button><div class="broadcast-popup-icon" id="broadcastPopupIcon">📢</div><div class="broadcast-popup-title" id="broadcastPopupTitle">-</div><div class="broadcast-popup-message" id="broadcastPopupMessage">-</div><div class="broadcast-popup-meta" id="broadcastPopupMeta"></div><div class="broadcast-popup-countdown"><span>⏳ Auto close:</span><div class="bp-bar"><div class="bp-bar-fill" id="broadcastPopupBar" style="width:100%"></div></div><span id="broadcastPopupSeconds">5s</span></div></div></div>
 
 <div class="chat-modal" id="chatHubModal">
@@ -4383,13 +4388,45 @@ function ajukanBanding() {
 // ============================================================
 // UPDATE AUTH UI
 // ============================================================
+function hideHomeSplash() {
+  try {
+    const sp = document.getElementById('homeSessionSplash');
+    if (!sp) return;
+    sp.classList.add('hide');
+    sp.classList.add('hidden');
+    sp.style.display = 'none';
+    setTimeout(() => { try { sp.remove(); } catch (_) {} }, 300);
+  } catch (_) {}
+}
+
 async function updateAuthUI(user) {
   const authScreen = document.getElementById('authScreen');
   const adminSection = document.getElementById('adminSection');
+  // Auth UI ada di /index.html — selalu sembunyikan di /home/
+  try { if (authScreen) { authScreen.classList.add('hidden'); authScreen.style.display = 'none'; } } catch (_) {}
+
+  if (!user) {
+    hideHomeSplash();
+    currentUser = null;
+    currentProfile = null;
+    try { window.location.replace('/'); } catch (_) { window.location.href = '/'; }
+    return;
+  }
+
   if (user) {
-    try { const sp = document.getElementById('homeSessionSplash'); if (sp) sp.classList.add('hide'); try { setTimeout(function(){ if (typeof startOnboardingTour==='function') startOnboardingTour(false); }, 1000); } catch(_ob) {}  setTimeout(()=>{ try{sp.remove()}catch(_){} }, 400); } catch(_) {}
+    hideHomeSplash();
+    try { setTimeout(function(){ if (typeof startOnboardingTour==='function') startOnboardingTour(false); }, 1200); } catch(_ob) {}
     currentUser = user;
-    const profile = await fetchProfile(user.id);
+    let profile = null;
+    try {
+      profile = await Promise.race([
+        fetchProfile(user.id),
+        new Promise((_, rej) => setTimeout(() => rej(new Error('profile timeout')), 8000))
+      ]);
+    } catch (e) {
+      console.warn('fetchProfile', e);
+      profile = { id: user.id, email: user.email, role: 'user', balance: 0 };
+    }
     currentProfile = profile;
     if (profile && profile.banned) {
       const until = profile.banned_until ? new Date(profile.banned_until) : null;
@@ -9297,7 +9334,7 @@ async function initChat() {
   startSupportChatAutoCleanup();
   try { startChatBadgePolling(); } catch (_) {}
 }
-async function getChatUserId() {
+async async function getChatUserId() {
   if (chatClient) {
     const { data: { session } } = await chatClient.auth.getSession();
     if (session?.user?.id) { cachedChatUserId = session.user.id; return session.user.id; }
@@ -9313,6 +9350,8 @@ async function getChatUserId() {
   return currentUser?.id || null;
 }
 function openChatHub(tab) {
+  try { if (typeof initPresence === 'function') initPresence(); updateOnlineCounter(); } catch(_) {}
+
   if (!currentUser) return;
   document.getElementById('chatHubModal').classList.add('show');
   document.body.classList.add('chat-open');
@@ -9326,6 +9365,8 @@ function openChatHub(tab) {
 }
 function closeChatHub() { document.getElementById('chatHubModal').classList.remove('show'); document.body.classList.remove('chat-open'); chatHubOpen = false; toggleBubbleVisibility(); }
 function switchChatTab(tab) {
+  try { updateOnlineCounter(); } catch(_) {}
+
   currentChatTab = tab;
   const tabGlobal = document.getElementById('tabChatGlobal');
   const tabSupport = document.getElementById('tabChatSupport');
@@ -9871,7 +9912,7 @@ async function sendSupportReply() {
   }
 }
 
-async function loadSupportUsers() {
+async async function loadSupportUsers() {
   if (!chatClient) return;
   const listEl = document.getElementById('supportUsersList');
   try { await cleanupExpiredSupportChats(true); } catch(e) {}
@@ -10047,11 +10088,16 @@ async function startNewChat() {
   }
 }
 
-async function openSupportChatWith(userId, email) {
+async async function openSupportChatWith(userId, email) {
+  window.__activeSupportUserId = userId;
   currentSupportTarget = { user_id: userId, email };
   document.getElementById('supportUsersView').style.display = 'none';
   document.getElementById('supportChatViewAdmin').style.display = 'flex';
-  document.getElementById('supportAdminTargetEmail').textContent = email;
+  const emailEl = document.getElementById('supportAdminTargetEmail');
+  if (emailEl) {
+    const st = computePresenceStatus(userId);
+    emailEl.innerHTML = escapeHtml(email || '') + ' <span id="supportChatHeaderStatus" class="chat-header-status"><span class="status-indicator ' + (st === 'online' ? 'online' : 'offline') + '" style="position:static;display:inline-block;vertical-align:middle;margin:0 4px"></span>' + (st === 'online' ? 'Online' : 'Offline') + '</span>';
+  }
   document.getElementById('chatHubTitle').textContent = `Chat - ${email}`;
   await loadSupportChatForAdmin(userId);
   subscribeUserSupportChat(userId);
@@ -10138,9 +10184,27 @@ function startCSPolling() {
 }
 function stopCSPolling() { if (csPollingInterval) { clearInterval(csPollingInterval); csPollingInterval = null; } }
 
-async function upsertLastSeen() {
+async async function upsertLastSeen() {
   if (!chatClient || !currentUser) return;
-  try { const chatUserId = await getChatUserId(); if (!chatUserId) return; await chatClient.from('user_last_seen').upsert({ user_id: chatUserId, email: currentUser.email, role: currentProfile?.role || 'user', last_seen: new Date().toISOString() }, { onConflict: 'user_id' }); } catch(e) {}
+  try {
+    const chatUserId = await getChatUserId();
+    if (!chatUserId) return;
+    onlineUsersMap[chatUserId] = true;
+    onlineUsersMap[currentUser.id] = true;
+    presenceUsersCache[chatUserId] = {
+      user_id: chatUserId,
+      email: currentUser.email,
+      role: currentProfile?.role || 'user',
+      is_online: true,
+      last_seen: new Date().toISOString()
+    };
+    await chatClient.from('user_last_seen').upsert({
+      user_id: chatUserId,
+      email: currentUser.email,
+      role: currentProfile?.role || 'user',
+      last_seen: new Date().toISOString()
+    }, { onConflict: 'user_id' });
+  } catch (e) { console.warn('upsertLastSeen', e); }
 }
 function initRealtimePresence() {
   if (!chatClient || !currentUser) return;
@@ -10150,7 +10214,7 @@ function initRealtimePresence() {
     .on('presence', { event: 'sync' }, () => updateOnlineUsersFromPresence(presenceChannelRealtime.presenceState()))
     .on('presence', { event: 'join' }, ({ key, newPresences }) => { newPresences.forEach(p => { onlineUsersMap[p.user_id || key] = true; presenceUsersCache[p.user_id || key] = { ...(presenceUsersCache[p.user_id || key] || {}), user_id: p.user_id || key, email: p.email, role: p.role, is_online: true, last_seen: p.joined_at || new Date().toISOString() }; }); refreshPresenceUI(); updateOnlineCounter(); })
     .on('presence', { event: 'leave' }, ({ key, leftPresences }) => { leftPresences.forEach(p => { const uid = p.user_id || key; delete onlineUsersMap[uid]; if (presenceUsersCache[uid]) { presenceUsersCache[uid].is_online = false; presenceUsersCache[uid].last_seen = new Date().toISOString(); } }); refreshPresenceUI(); updateOnlineCounter(); })
-    .subscribe(async (status) => { if (status === 'SUBSCRIBED') await presenceChannelRealtime.track({ user_id: currentUser.id, email: currentUser.email, role: currentProfile?.role || 'user', joined_at: new Date().toISOString() }); else if (['CHANNEL_ERROR','TIMED_OUT','CLOSED'].includes(status)) setTimeout(initRealtimePresence, 3000); });
+    .subscribe(async (status) => { if (status === 'SUBSCRIBED') onlineUsersMap[currentUser.id] = true; presenceUsersCache[currentUser.id] = { user_id: currentUser.id, email: currentUser.email, role: currentProfile?.role || 'user', is_online: true, last_seen: new Date().toISOString() }; updateOnlineCounter(); await presenceChannelRealtime.track({ user_id: currentUser.id, email: currentUser.email, role: currentProfile?.role || 'user', joined_at: new Date().toISOString() }); else if (['CHANNEL_ERROR','TIMED_OUT','CLOSED'].includes(status)) setTimeout(initRealtimePresence, 3000); });
 }
 function updateOnlineUsersFromPresence(state) {
   onlineUsersMap = {};
@@ -10162,24 +10226,89 @@ async function fetchLastSeenMap(userIds) {
   if (!chatClient || !userIds || userIds.length === 0) return {};
   try { const { data, error } = await chatClient.from('user_last_seen').select('*').in('user_id', userIds); if (error) { if (error.code === '42P01') return {}; throw error; } const map = {}; (data || []).forEach(p => { if (!onlineUsersMap[p.user_id]) presenceUsersCache[p.user_id] = { user_id: p.user_id, email: p.email, role: p.role, is_online: false, last_seen: p.last_seen }; map[p.user_id] = p; }); return map; } catch(e) { return {}; }
 }
-function computePresenceStatus(userId) { if (!userId) return 'offline'; return onlineUsersMap[userId] ? 'online' : 'offline'; }
-function updateOnlineCounter() { const el = document.getElementById('onlineCounterText'); if (el) el.textContent = `${Object.keys(onlineUsersMap).length} Online`; }
+function computePresenceStatus(userId) {
+  if (!userId) return 'offline';
+  if (onlineUsersMap[userId]) return 'online';
+  const cached = presenceUsersCache[userId];
+  if (cached && cached.last_seen) {
+    const age = Date.now() - new Date(cached.last_seen).getTime();
+    if (age >= 0 && age < 120000) return 'online'; // 2 menit
+  }
+  return 'offline';
+}
+function updateOnlineCounter() {
+  const ids = new Set(Object.keys(onlineUsersMap || {}));
+  Object.keys(presenceUsersCache || {}).forEach(uid => {
+    if (computePresenceStatus(uid) === 'online') ids.add(uid);
+  });
+  const n = ids.size;
+  const el = document.getElementById('onlineCounterText');
+  if (el) el.textContent = n + ' Online';
+  // info di subtitle global chat
+  const sub = document.getElementById('chatHubSubText');
+  if (sub && currentChatTab === 'global') {
+    sub.textContent = n + ' pengguna online';
+  }
+  // update titik online di list CS tanpa reload penuh
+  document.querySelectorAll('.support-user-item[data-user-id]').forEach(row => {
+    const uid = row.getAttribute('data-user-id');
+    const av = row.querySelector('.support-user-avatar');
+    if (!av) return;
+    const st = computePresenceStatus(uid);
+    let ind = av.querySelector('.status-indicator');
+    if (!ind) {
+      ind = document.createElement('span');
+      ind.className = 'status-indicator';
+      av.appendChild(ind);
+    }
+    ind.className = 'status-indicator ' + (st === 'online' ? 'online' : 'offline');
+  });
+  // header chat CS yang sedang dibuka
+  const hdr = document.getElementById('supportChatHeaderStatus');
+  if (hdr && window.__activeSupportUserId) {
+    const st = computePresenceStatus(window.__activeSupportUserId);
+    hdr.innerHTML = '<span class="status-indicator ' + (st === 'online' ? 'online' : 'offline') + '" style="position:static;display:inline-block;vertical-align:middle;margin-right:6px"></span>' + (st === 'online' ? 'Online' : 'Offline');
+  }
+}
 function getStatusIndicatorHTML(presence) { if (!presence) return `<span class="status-indicator offline"></span>`; const status = computePresenceStatus(presence.user_id || presence); return `<span class="status-indicator ${status === 'online' ? 'online' : 'offline'}"></span>`; }
 function refreshPresenceUI() {
+  if (currentUser) {
+    onlineUsersMap[currentUser.id] = true;
+    presenceUsersCache[currentUser.id] = {
+      user_id: currentUser.id,
+      email: currentUser.email,
+      role: currentProfile?.role || 'user',
+      is_online: true,
+      last_seen: new Date().toISOString()
+    };
+  }
   updateOnlineCounter();
   if (currentUser) {
     const presence = { user_id: currentUser.id, is_online: true, last_seen: new Date().toISOString() };
-    ['homeAvatar', 'profileAvatar'].forEach(id => { const el = document.getElementById(id); if (el && el.parentElement) { const wrapper = el.parentElement; if (!wrapper.classList.contains('profile-avatar-wrapper')) wrapper.classList.add('profile-avatar-wrapper'); const old = wrapper.querySelector('.status-indicator'); if (old) old.remove(); const tmp = document.createElement('div'); tmp.innerHTML = getStatusIndicatorHTML(presence); const ind = tmp.firstChild; if (ind) wrapper.appendChild(ind); } });
+    ['homeAvatar', 'profileAvatar'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el && el.parentElement) {
+        const wrapper = el.parentElement;
+        if (!wrapper.classList.contains('profile-avatar-wrapper')) wrapper.classList.add('profile-avatar-wrapper');
+        const old = wrapper.querySelector('.status-indicator');
+        if (old) old.remove();
+        const tmp = document.createElement('div');
+        tmp.innerHTML = getStatusIndicatorHTML(presence);
+        const ind = tmp.firstChild;
+        if (ind) wrapper.appendChild(ind);
+      }
+    });
   }
 }
 async function initPresence() {
   if (!chatClient || !currentUser) return;
   initRealtimePresence();
   if (lastSeenInterval) clearInterval(lastSeenInterval);
-  upsertLastSeen();
-  lastSeenInterval = setInterval(upsertLastSeen, 60000);
+  await upsertLastSeen();
+  lastSeenInterval = setInterval(() => { upsertLastSeen(); }, 30000);
   if (presenceRefreshInterval) clearInterval(presenceRefreshInterval);
-  presenceRefreshInterval = setInterval(() => { refreshPresenceUI(); updateOnlineCounter(); }, 5000);
+  presenceRefreshInterval = setInterval(() => { refreshPresenceUI(); updateOnlineCounter(); }, 4000);
+  refreshPresenceUI();
 }
 function cleanupPresence() {
   if (presenceChannelRealtime) { try { presenceChannelRealtime.untrack(); } catch(e) {} try { presenceChannelRealtime.unsubscribe(); } catch(e) {} presenceChannelRealtime = null; }
@@ -10364,13 +10493,31 @@ function updateNotifStatusDisplay() { const el = document.getElementById('notifS
 async function initNotifications() { if (!isNotificationSupported()) return; updateNotifStatusDisplay(); }
 
 async function initAuth() {
-  if (!supabaseClient) { updateAuthUI(null); return; }
+  // Safety: jangan stuck loading
+  setTimeout(() => {
+    try {
+      const sp = document.getElementById('homeSessionSplash');
+      if (sp && !sp.classList.contains('hide') && !currentUser) {
+        // masih loading tanpa user → redirect login
+        hideHomeSplash();
+        window.location.replace('/');
+      } else if (sp && currentUser) {
+        hideHomeSplash();
+      }
+    } catch (_) {}
+  }, 5000);
+
+  if (!supabaseClient) { await updateAuthUI(null); return; }
   try {
     const { data: { session }, error } = await supabaseClient.auth.getSession();
     if (error) throw error;
     if (session && session.user) await updateAuthUI(session.user);
-    else updateAuthUI(null);
-  } catch (err) { updateAuthUI(null); }
+    else await updateAuthUI(null);
+  } catch (err) {
+    console.warn('initAuth', err);
+    try { hideHomeSplash(); } catch (_) {}
+    await updateAuthUI(null);
+  }
   supabaseClient.auth.onAuthStateChange((event, session) => {
     if (event === 'SIGNED_IN' && session?.user) {
       updateAuthUI(session.user);
