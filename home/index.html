@@ -1411,6 +1411,25 @@ body:not(.home-ready) #onboardSpotlight{
   display:none!important;
 }
 
+
+/* ===== ANTI-STUCK SPLASH (final override) ===== */
+#homeSessionSplash.hide,
+#homeSessionSplash.hidden,
+body.home-ready #homeSessionSplash,
+html.home-ready #homeSessionSplash{
+  display:none!important;
+  opacity:0!important;
+  visibility:hidden!important;
+  pointer-events:none!important;
+  z-index:-1!important;
+}
+body.home-ready .app,
+html.home-ready .app{
+  visibility:visible!important;
+  opacity:1!important;
+  pointer-events:auto!important;
+}
+
 </style>
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer onload="window.__turnstileReady=true;try{if(typeof initShineTurnstile==='function')initShineTurnstile();}catch(e){}"></script>
 <style id="boot-splash-critical">
@@ -1447,6 +1466,30 @@ window.__SHINE_HOME_URL__ = '/home/';
   <div class="splash-sub" id="homeSplashSub">Memuat sesi...</div>
   <div class="spinner" role="status"></div>
 </div>
+
+<script>
+(function(){
+  function forceReady(){
+    try{
+      document.documentElement.classList.add('home-ready');
+      document.body.classList.add('home-ready');
+      var sp=document.getElementById('homeSessionSplash');
+      if(sp){ sp.classList.add('hide'); sp.style.display='none'; }
+    }catch(e){}
+  }
+  setTimeout(forceReady, 7000);
+  // jika sudah ada session di storage, jangan biarkan splash > 3dtk tanpa JS auth
+  setTimeout(function(){
+    try{
+      var k=Object.keys(localStorage).some(function(x){ return x.indexOf('shine-shop-auth')>=0; });
+      if(k && !document.body.classList.contains('home-ready')){
+        /* tunggu initAuth; failsafe 7s tetap jalan */
+      }
+    }catch(e){}
+  }, 3000);
+})();
+</script>
+
 
 
 <div id="onboardOverlay" aria-hidden="true"></div>
@@ -4502,22 +4545,27 @@ function ajukanBanding() {
 // ============================================================
 function hideHomeSplash() {
   try {
+    document.documentElement.classList.add('home-ready');
     document.body.classList.add('home-ready');
-    const sp = document.getElementById('homeSessionSplash');
-    if (!sp) return;
-    sp.classList.add('hide');
-    sp.classList.add('hidden');
-    sp.setAttribute('aria-busy', 'false');
-    sp.style.opacity = '0';
-    sp.style.visibility = 'hidden';
-    sp.style.pointerEvents = 'none';
-    setTimeout(function () {
-      try { sp.style.display = 'none'; } catch (_) {}
+  } catch (_) {}
+  try {
+    var sp = document.getElementById('homeSessionSplash');
+    if (sp) {
+      sp.classList.add('hide');
+      sp.classList.add('hidden');
+      sp.setAttribute('aria-busy', 'false');
+      sp.style.cssText = 'display:none!important;opacity:0!important;visibility:hidden!important;pointer-events:none!important;z-index:-1!important';
       try { sp.remove(); } catch (_) {}
-    }, 350);
-  } catch (_) {
-    try { document.body.classList.add('home-ready'); } catch (e2) {}
-  }
+    }
+  } catch (_) {}
+  try {
+    var app = document.querySelector('.app');
+    if (app) {
+      app.style.visibility = 'visible';
+      app.style.opacity = '1';
+      app.style.pointerEvents = 'auto';
+    }
+  } catch (_) {}
 }
 
 async function updateAuthUI(user) {
@@ -4536,8 +4584,9 @@ async function updateAuthUI(user) {
 
   if (user) {
     hideHomeSplash();
-    try { setTimeout(function(){ if (typeof startOnboardingTour==='function') startOnboardingTour(false); }, 1200); } catch(_ob) {}
     currentUser = user;
+    try { setTimeout(hideHomeSplash, 50); setTimeout(hideHomeSplash, 500); } catch(_){}
+    try { setTimeout(function(){ if (typeof startOnboardingTour==='function') startOnboardingTour(false); }, 1200); } catch(_ob) {}
     let profile = null;
     try {
       profile = await Promise.race([
@@ -10616,35 +10665,58 @@ async function initNotifications() { if (!isNotificationSupported()) return; upd
 window.addEventListener('pageshow', function(){ try{ if(typeof currentUser!=='undefined'&&currentUser&&typeof hideHomeSplash==='function') hideHomeSplash(); }catch(_){}});
 async function initAuth() {
   try {
-    document.body.classList.remove('home-ready');
     const sub = document.getElementById('homeSplashSub');
     if (sub) sub.textContent = 'Memuat sesi...';
   } catch (_) {}
 
-  // Safety: jangan stuck loading
-  setTimeout(() => {
+  // Anti-stuck berlapis
+  var splashSafety1 = setTimeout(function () {
     try {
-      const sp = document.getElementById('homeSessionSplash');
-      if (sp && !sp.classList.contains('hide') && !currentUser) {
-        // masih loading tanpa user → redirect login
-        hideHomeSplash();
-        window.location.replace('/');
-      } else if (sp && currentUser) {
-        hideHomeSplash();
+      if (typeof currentUser !== 'undefined' && currentUser) hideHomeSplash();
+    } catch (_) {}
+  }, 2500);
+  var splashSafety2 = setTimeout(function () {
+    try {
+      hideHomeSplash();
+      if (!currentUser) {
+        try { window.location.replace('/'); } catch (_) {}
       }
     } catch (_) {}
-  }, 5000);
+  }, 6000);
 
-  if (!supabaseClient) { await updateAuthUI(null); return; }
+  if (!supabaseClient) {
+    clearTimeout(splashSafety1); clearTimeout(splashSafety2);
+    await updateAuthUI(null);
+    return;
+  }
   try {
-    const { data: { session }, error } = await supabaseClient.auth.getSession();
-    if (error) throw error;
-    if (session && session.user) await updateAuthUI(session.user);
-    else await updateAuthUI(null);
+    var session = null;
+    try {
+      var res = await Promise.race([
+        supabaseClient.auth.getSession(),
+        new Promise(function (_, rej) { setTimeout(function () { rej(new Error('session timeout')); }, 4000); })
+      ]);
+      if (res && res.data) session = res.data.session;
+      if (res && res.error) throw res.error;
+    } catch (e1) {
+      console.warn('getSession', e1);
+      session = null;
+    }
+    clearTimeout(splashSafety1);
+    if (session && session.user) {
+      await updateAuthUI(session.user);
+    } else {
+      await updateAuthUI(null);
+    }
+    clearTimeout(splashSafety2);
   } catch (err) {
     console.warn('initAuth', err);
+    clearTimeout(splashSafety1);
+    clearTimeout(splashSafety2);
     try { hideHomeSplash(); } catch (_) {}
-    await updateAuthUI(null);
+    try { await updateAuthUI(null); } catch (_) {
+      try { window.location.replace('/'); } catch (_) {}
+    }
   }
   supabaseClient.auth.onAuthStateChange((event, session) => {
     if (event === 'SIGNED_IN' && session?.user) {
