@@ -1652,7 +1652,21 @@ window.__SHINE_HOME_URL__ = '/home/';
           <div class="password-content" id="inactiveDebitContent">
             <div class="password-warning">
               <span>ℹ️</span>
-              <div>Akun tanpa login/transaksi &gt;7 hari didebit Rp100/hari. Tercatat di mutasi saldo. Saldo habis → akun dihapus. Owner/admin aman.</div>
+              <div>Akun tanpa login/transaksi &gt;7 hari didebit Rp100/hari. Tercatat di mutasi saldo. Saldo habis → akun dihapus. Owner/admin aman. Zona: <b>WIB (Jakarta)</b>.</div>
+            </div>
+            <div style="margin:10px 14px 12px;padding:12px 14px;border-radius:12px;background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.28);">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+                <div style="flex:1;min-width:160px;">
+                  <div style="font-size:12.5px;font-weight:800;color:#fbbf24;">Auto debit akun tidak aktif</div>
+                  <div style="font-size:10.5px;color:#94a3b8;margin-top:3px;line-height:1.4;">ON = debit Rp100/hari jika idle &gt;7 hari. OFF = nonaktifkan auto debit.</div>
+                  <div id="inactiveDebitToggleLabel" style="font-size:11px;margin-top:6px;font-weight:700;color:#86efac;">Status: memuat...</div>
+                </div>
+                <label style="display:inline-flex;align-items:center;gap:8px;cursor:pointer;user-select:none;">
+                  <span style="font-size:11px;color:#cbd5e1;font-weight:700;">OFF</span>
+                  <input type="checkbox" id="inactiveDebitEnabledToggle" style="width:18px;height:18px;accent-color:#f59e0b;" onchange="toggleInactiveAutoDebit(this.checked)">
+                  <span style="font-size:11px;color:#fbbf24;font-weight:700;">ON</span>
+                </label>
+              </div>
             </div>
             <div id="inactiveDebitList" class="password-list">
               <div class="password-empty">Klik buka untuk memuat log...</div>
@@ -7197,11 +7211,81 @@ function closeBroadcastPopup() {
 }
 
 
+
+async function loadInactiveAutoDebitSetting() {
+  const tog = document.getElementById('inactiveDebitEnabledToggle');
+  const lab = document.getElementById('inactiveDebitToggleLabel');
+  let enabled = true;
+  try {
+    if (supabaseClient) {
+      let data = null, error = null;
+      try { ({ data, error } = await supabaseClient.rpc('get_inactive_debit_setting')); } catch (e1) { error = e1; }
+      if (error || data == null) {
+        try {
+          const r = await supabaseClient.from('site_settings').select('value').eq('key', 'inactive_auto_debit_enabled').maybeSingle();
+          if (r.data && r.data.value != null) {
+            const v = r.data.value;
+            enabled = !(v === false || v === 'false' || v === '0' || v === 0);
+          }
+        } catch (_) {}
+      } else {
+        if (typeof data === 'boolean') enabled = data;
+        else if (data && typeof data.enabled === 'boolean') enabled = data.enabled;
+        else if (data && data.success && typeof data.enabled === 'boolean') enabled = data.enabled;
+      }
+    }
+  } catch (_) {}
+  if (tog) tog.checked = !!enabled;
+  if (lab) {
+    lab.textContent = enabled ? 'Status: ON (auto debit aktif)' : 'Status: OFF (auto debit nonaktif)';
+    lab.style.color = enabled ? '#86efac' : '#f87171';
+  }
+  return enabled;
+}
+async function toggleInactiveAutoDebit(checked) {
+  if (!(isOwner || isAdminOrOwner)) {
+    await Swal.fire({ title: 'Akses ditolak', icon: 'error', background: '#1a0e2e', color: '#fff' });
+    loadInactiveAutoDebitSetting();
+    return;
+  }
+  const want = !!checked;
+  try {
+    try {
+      const { data, error } = await supabaseClient.rpc('set_inactive_debit_setting', { p_enabled: want });
+      if (error) throw error;
+      if (data && data.success === false) throw new Error(data.message || 'Gagal');
+    } catch (e1) {
+      const { error } = await supabaseClient.from('site_settings').upsert({
+        key: 'inactive_auto_debit_enabled', value: want, updated_at: new Date().toISOString()
+      }, { onConflict: 'key' });
+      if (error) throw e1;
+    }
+    await loadInactiveAutoDebitSetting();
+    Swal.fire({
+      title: want ? 'Auto debit ON' : 'Auto debit OFF',
+      text: want ? 'Akun idle >7 hari didebit Rp100/hari (WIB).' : 'Auto debit dimatikan.',
+      icon: 'success', background: '#1a0e2e', color: '#fff', timer: 2000
+    });
+  } catch (e) {
+    Swal.fire({
+      title: 'Gagal simpan',
+      text: ((e && e.message) || String(e)) + ' — jalankan SQL inactive-debit-toggle.sql',
+      icon: 'error', background: '#1a0e2e', color: '#fff'
+    });
+    loadInactiveAutoDebitSetting();
+  }
+}
+window.loadInactiveAutoDebitSetting = loadInactiveAutoDebitSetting;
+window.toggleInactiveAutoDebit = toggleInactiveAutoDebit;
+
 function toggleInactiveDebitPanel() {
   const el = document.getElementById('inactiveDebitPanel');
   if (!el) return;
   el.classList.toggle('open');
-  if (el.classList.contains('open')) loadInactiveDebitLogs();
+  if (el.classList.contains('open')) {
+    try { loadInactiveAutoDebitSetting(); } catch (_) {}
+    loadInactiveDebitLogs();
+  }
 }
 async function loadInactiveDebitLogs() {
   const list = document.getElementById('inactiveDebitList');
@@ -10467,6 +10551,32 @@ function getWibMinutesNow() {
   }
 }
 
+
+function wibLocalInputToIso(val) {
+  if (!val) return null;
+  const m = String(val).trim().match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?/);
+  if (!m) { try { return new Date(val).toISOString(); } catch (_) { return null; } }
+  const y = +m[1], mo = +m[2], d = +m[3], h = +m[4], mi = +m[5], sec = m[6] ? +m[6] : 0;
+  return new Date(Date.UTC(y, mo - 1, d, h - 7, mi, sec)).toISOString();
+}
+function isoToWibLocalInput(iso) {
+  if (!iso) return '';
+  try {
+    const dt = new Date(iso);
+    if (isNaN(dt.getTime())) return '';
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', hour12: false
+    }).formatToParts(dt);
+    const g = t => (parts.find(p => p.type === t) || {}).value || '00';
+    return g('year') + '-' + g('month') + '-' + g('day') + 'T' + g('hour') + ':' + g('minute');
+  } catch (_) { return ''; }
+}
+function formatWibLabel(iso) {
+  if (!iso) return '-';
+  try { return new Date(iso).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) + ' WIB'; } catch (_) { return String(iso); }
+}
+
 function isDailyMaintenanceWindow(state) {
   if (!state || !state.daily_enabled) return false;
   const start = parseTimeToMinutes(state.daily_start_time);
@@ -10555,10 +10665,11 @@ function updateMaintenanceAdminUI() {
 }
 
 function toLocalInputValue(iso) {
+  // Tampilkan di form sebagai WIB (Jakarta), bukan timezone browser
+  if (typeof isoToWibLocalInput === 'function') return isoToWibLocalInput(iso);
   if (!iso) return '';
   const d = new Date(iso);
   const pad = (n) => String(n).padStart(2, '0');
-  // datetime-local is local time
   return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate()) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
 }
 
@@ -10649,10 +10760,10 @@ async function saveMaintenanceSettings() {
   const msg = document.getElementById('maintMessage')?.value?.trim() || 'Sedang maintenance. Silakan coba lagi nanti.';
   const st = document.getElementById('maintStart')?.value;
   const en = document.getElementById('maintEnd')?.value;
-  let startIso = st ? new Date(st).toISOString() : null;
-  let endIso = en ? new Date(en).toISOString() : null;
-  if (st && en && new Date(en) <= new Date(st)) {
-    return Swal.fire({ title: 'Jadwal invalid', text: 'Waktu selesai sekali harus setelah mulai', icon: 'warning', background: '#1a0e2e', color: '#fff' });
+  let startIso = st ? wibLocalInputToIso(st) : null;
+  let endIso = en ? wibLocalInputToIso(en) : null;
+  if (st && en && startIso && endIso && new Date(endIso) <= new Date(startIso)) {
+    return Swal.fire({ title: 'Jadwal invalid', text: 'Waktu selesai (WIB) harus setelah mulai', icon: 'warning', background: '#1a0e2e', color: '#fff' });
   }
   const dailyOn = !!document.getElementById('maintDailyEnabled')?.checked;
   const ds = document.getElementById('maintDailyStart')?.value || null;
