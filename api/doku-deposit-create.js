@@ -1,7 +1,11 @@
 /**
  * POST /api/doku-deposit-create
- * Body: { amount, user_id, email, payment_method? }  // ALL|QRIS|VA|EWALLET
- * Env: DOKU_CLIENT_ID, DOKU_SECRET_KEY, DOKU_API_BASE?, SUPABASE_URL?, SUPABASE_SERVICE_ROLE_KEY?, PUBLIC_SITE_URL?
+ * Env wajib:
+ *   DOKU_CLIENT_ID  (contoh BRN-0220-... atau MCH-...)
+ *   DOKU_SECRET_KEY (Secret Key dari DOKU Back Office, biasanya SK-...)
+ * Opsional:
+ *   DOKU_API_BASE=https://api.doku.com  (sandbox: https://api-sandbox.doku.com)
+ *   PUBLIC_SITE_URL, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
  */
 const crypto = require('crypto');
 
@@ -42,17 +46,38 @@ function makeId() {
   return 'req-' + Date.now() + '-' + crypto.randomBytes(8).toString('hex');
 }
 
-function signature(clientId, requestId, timestamp, target, bodyStr, secret) {
+/** DOKU Non-SNAP signature (Checkout / Jokul) */
+function dokuSignature(clientId, requestId, timestamp, requestTarget, bodyStr, secret) {
   const digest = crypto.createHash('sha256').update(bodyStr, 'utf8').digest('base64');
-  const components = [
-    'Client-Id:' + clientId,
-    'Request-Id:' + requestId,
-    'Request-Timestamp:' + timestamp,
-    'Request-Target:' + target,
-    'Digest:' + digest
-  ].join('\n');
-  const sig = crypto.createHmac('sha256', secret).update(components, 'utf8').digest('base64');
-  return 'HMACSHA256=' + sig;
+  // Penting: urutan baris + \n, TANPA newline di akhir
+  const component =
+    'Client-Id:' + clientId + '\n' +
+    'Request-Id:' + requestId + '\n' +
+    'Request-Timestamp:' + timestamp + '\n' +
+    'Request-Target:' + requestTarget + '\n' +
+    'Digest:' + digest;
+  const hmac = crypto.createHmac('sha256', secret).update(component, 'utf8').digest('base64');
+  return {
+    signature: 'HMACSHA256=' + hmac,
+    digest: digest,
+    component: component
+  };
+}
+
+function extractDokuMessage(json, text, status) {
+  if (!json) return (text || '').slice(0, 300) || ('HTTP ' + status);
+  if (typeof json === 'string') return json;
+  // common shapes
+  const parts = [];
+  if (json.message) parts.push(typeof json.message === 'string' ? json.message : JSON.stringify(json.message));
+  if (json.error_message) parts.push(String(json.error_message));
+  if (json.error && typeof json.error === 'string') parts.push(json.error);
+  if (json.error && typeof json.error === 'object') parts.push(JSON.stringify(json.error));
+  if (json.response && json.response.message) parts.push(String(json.response.message));
+  if (json.errors) parts.push(JSON.stringify(json.errors));
+  if (json.code) parts.push('code=' + json.code);
+  if (!parts.length) parts.push(JSON.stringify(json).slice(0, 400));
+  return parts.join(' | ');
 }
 
 module.exports = async (req, res) => {
@@ -60,8 +85,8 @@ module.exports = async (req, res) => {
     if (req.method === 'OPTIONS') return send(res, 204, {});
     if (req.method !== 'POST') return send(res, 405, { success: false, message: 'POST only' });
 
-    const DOKU_CLIENT_ID = process.env.DOKU_CLIENT_ID || process.env.DOKU_CLIENTID || '';
-    const DOKU_SECRET_KEY = process.env.DOKU_SECRET_KEY || process.env.DOKU_SECRET || '';
+    const DOKU_CLIENT_ID = (process.env.DOKU_CLIENT_ID || process.env.DOKU_CLIENTID || '').trim();
+    const DOKU_SECRET_KEY = (process.env.DOKU_SECRET_KEY || process.env.DOKU_SECRET || '').trim();
     const DOKU_API_BASE = (process.env.DOKU_API_BASE || 'https://api.doku.com').replace(/\/$/, '');
     const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '';
     const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || '';
@@ -70,7 +95,7 @@ module.exports = async (req, res) => {
     if (!DOKU_CLIENT_ID || !DOKU_SECRET_KEY) {
       return send(res, 500, {
         success: false,
-        message: 'ENV DOKU_CLIENT_ID / DOKU_SECRET_KEY belum di-set di Vercel. Settings → Environment Variables → Redeploy.'
+        message: 'ENV DOKU_CLIENT_ID / DOKU_SECRET_KEY belum di-set di Vercel. Isi lalu Redeploy.'
       });
     }
 
@@ -91,6 +116,7 @@ module.exports = async (req, res) => {
     const totalPay = amount + fee;
     const invoice = 'DEP-' + Date.now() + '-' + userId.replace(/-/g, '').slice(0, 8);
     const requestId = makeId();
+    // UTC ISO tanpa ms: 2020-08-11T08:45:42Z
     const timestamp = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
     const target = '/checkout/v1/payment';
 
@@ -108,10 +134,12 @@ module.exports = async (req, res) => {
           quantity: 1
         }]
       },
-      payment: { payment_due_date: 10 },
+      payment: {
+        payment_due_date: 10
+      },
       customer: {
         id: String(userId).slice(0, 50),
-        name: String(email.split('@')[0] || 'User').slice(0, 50),
+        name: String(email.split('@')[0] || 'User').slice(0, 40),
         email: email,
         phone: '081234567890',
         country: 'ID'
@@ -121,11 +149,13 @@ module.exports = async (req, res) => {
       }
     };
 
+    // Body string harus IDENTIK dengan yang dikirim (digest)
     const bodyStr = JSON.stringify(paymentBody);
-    const sig = signature(DOKU_CLIENT_ID, requestId, timestamp, target, bodyStr, DOKU_SECRET_KEY);
+    const sig = dokuSignature(DOKU_CLIENT_ID, requestId, timestamp, target, bodyStr, DOKU_SECRET_KEY);
 
     let dokuJson = null;
     let dokuText = '';
+    let httpStatus = 0;
     try {
       const r = await fetch(DOKU_API_BASE + target, {
         method: 'POST',
@@ -135,17 +165,31 @@ module.exports = async (req, res) => {
           'Client-Id': DOKU_CLIENT_ID,
           'Request-Id': requestId,
           'Request-Timestamp': timestamp,
-          Signature: sig
+          Signature: sig.signature
         },
         body: bodyStr
       });
+      httpStatus = r.status;
       dokuText = await r.text();
       try { dokuJson = JSON.parse(dokuText); } catch (_) { dokuJson = null; }
+
       if (!r.ok) {
+        const msg = extractDokuMessage(dokuJson, dokuText, r.status);
+        let hint = '';
+        if (r.status === 401) {
+          hint =
+            ' | 401 = Client-Id/Secret/Signature salah. ' +
+            'Cek di DOKU Back Office → Settings → Credentials: ' +
+            'Client ID harus sama dengan DOKU_CLIENT_ID, Secret Key sama dengan DOKU_SECRET_KEY. ' +
+            'Jangan pakai API Key (doku_key_...) untuk signature. ' +
+            'Sandbox pakai DOKU_API_BASE=https://api-sandbox.doku.com + kredensial sandbox.';
+        }
         return send(res, 502, {
           success: false,
-          message: 'DOKU HTTP ' + r.status + ': ' + ((dokuJson && (dokuJson.message || dokuJson.error_message || dokuJson.error)) || dokuText.slice(0, 240)),
-          doku_status: r.status
+          message: 'DOKU HTTP ' + r.status + ': ' + msg + hint,
+          doku_status: r.status,
+          client_id_prefix: DOKU_CLIENT_ID.slice(0, 12) + '…',
+          api_base: DOKU_API_BASE
         });
       }
     } catch (e) {
@@ -164,8 +208,8 @@ module.exports = async (req, res) => {
     if (!paymentUrl) {
       return send(res, 502, {
         success: false,
-        message: 'DOKU tidak mengembalikan payment_url. Cek Client ID/Secret & Checkout aktif di dashboard DOKU.',
-        doku: dokuJson || (dokuText && dokuText.slice(0, 300))
+        message: 'DOKU OK tapi payment_url kosong. Response: ' + extractDokuMessage(dokuJson, dokuText, httpStatus),
+        doku: dokuJson
       });
     }
 
@@ -201,7 +245,7 @@ module.exports = async (req, res) => {
         if (Array.isArray(rows) && rows[0]) depositId = rows[0].id;
         else if (rows && rows.id) depositId = rows.id;
       } catch (e) {
-        console.warn('deposit insert fail', e && e.message);
+        console.warn('deposit insert', e && e.message);
       }
     }
 
@@ -214,8 +258,7 @@ module.exports = async (req, res) => {
       total_pay: totalPay,
       payment_url: paymentUrl,
       payment_method: method,
-      deposit_id: depositId,
-      message: 'Pilih metode di halaman DOKU (QRIS / VA / e-wallet / kartu)'
+      deposit_id: depositId
     });
   } catch (e) {
     console.error('doku-deposit-create fatal', e);
