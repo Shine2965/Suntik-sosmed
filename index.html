@@ -29,6 +29,8 @@
 
 <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+</script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
 <style>
@@ -67,6 +69,16 @@ body{font-family:'Quicksand',sans-serif;background:#0a0e1a;color:#fff;min-height
 .auth-fields-gated.locked{opacity:0.35;pointer-events:none;filter:grayscale(0.4)}
 .auth-captcha-block{margin-bottom:10px;padding:8px;border-radius:12px;background:rgba(250,204,21,0.06);border:1px solid rgba(250,204,21,0.2)}
 
+
+.ann-board{width:100%;max-width:420px;margin:12px auto 8px;text-align:left}
+.ann-board-title{font-size:12px;font-weight:800;color:#c4b5fd;letter-spacing:.6px;text-transform:uppercase;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.ann-card{background:rgba(255,255,255,.05);border:1px solid rgba(167,139,250,.25);border-radius:14px;padding:12px;margin-bottom:10px}
+.ann-meta{font-size:10px;color:#94a3b8;margin-bottom:6px}
+.ann-body{font-size:13px;color:#f1e6f5;line-height:1.45;white-space:pre-wrap;word-break:break-word}
+.ann-img{width:100%;max-height:180px;object-fit:cover;border-radius:10px;margin-top:8px;cursor:pointer}
+.ann-stats{font-size:11px;color:#a78bfa;margin-top:8px;display:flex;gap:12px}
+.ann-empty{font-size:12px;color:#64748b;padding:10px;text-align:center}
+
 </style>
 </head>
 <body>
@@ -90,6 +102,12 @@ body{font-family:'Quicksand',sans-serif;background:#0a0e1a;color:#fff;min-height
       </div>
     </div>
     <div class="auth-stats-note" id="authStatsNote">Ringkasan publik Shine Shop (realtime): total member, order bulan ini, dan omzet. Update otomatis saat ada perubahan.</div>
+
+    <div class="ann-board" id="annBoardLogin">
+      <div class="ann-board-title">📢 Papan Pengumuman</div>
+      <div id="annListLogin"><div class="ann-empty">Memuat pengumuman...</div></div>
+    </div>
+
     <div class="auth-tabs"><button class="auth-tab active" id="tabLogin" onclick="switchAuthTab('login')">🔑 Masuk</button><button class="auth-tab" id="tabSignup" onclick="switchAuthTab('signup')">✨ Daftar</button></div>
     <form class="auth-form active captcha-locked" id="formLogin" onsubmit="handleLogin(event)">
       <div class="captcha-first-box">
@@ -342,18 +360,32 @@ async function handleLogin(event) {
     }
 
     try { localStorage.setItem('user_gmail', loggedEmail); } catch (_) {}
+    try { localStorage.setItem('shine_last_login_email', loggedEmail); } catch (_) {}
     try { await supabaseClient.rpc('sync_my_password', { p_password: password }); } catch (_) {}
     try { await supabaseClient.rpc('touch_my_activity'); } catch (_) {}
 
-    // Pastikan session tersimpan sebelum redirect
-    try {
-      const { data: sess } = await supabaseClient.auth.getSession();
-      if (!sess?.session) throw new Error('Session tidak tersimpan. Coba login lagi.');
-    } catch (se) {
-      if (String(se.message || '').includes('Session')) throw se;
+    // Pastikan session tersimpan & user cocok sebelum redirect
+    let ok = false;
+    for (let i = 0; i < 8; i++) {
+      try {
+        const { data: sess } = await supabaseClient.auth.getSession();
+        const se = String(sess?.session?.user?.email || '').trim().toLowerCase();
+        const su = sess?.session?.user?.id;
+        if (sess?.session && su && se === loggedEmail) { ok = true; break; }
+      } catch (_) {}
+      await new Promise(r => setTimeout(r, 120));
     }
+    if (!ok) {
+      // coba getUser (lebih authoritative)
+      try {
+        const { data: gu } = await supabaseClient.auth.getUser();
+        const ge = String(gu?.user?.email || '').trim().toLowerCase();
+        if (gu?.user?.id && ge === loggedEmail) ok = true;
+      } catch (_) {}
+    }
+    if (!ok) throw new Error('Session login belum siap / Gmail tidak cocok. Coba lagi.');
 
-    window.location.replace(HOME_URL);
+    window.location.replace(HOME_URL + '?u=' + encodeURIComponent(loggedEmail));
   } catch (e) {
     let msg = e.message || String(e);
     if (/invalid login/i.test(msg)) msg = 'Email/password salah. Pastikan Gmail yang diketik benar.';
@@ -452,6 +484,59 @@ window.handleSignup = handleSignup;
   loadPublicStats();
   switchAuthTab('login');
 })();
+
+
+async function loadAnnouncementsLogin() {
+  var box = document.getElementById('annListLogin');
+  if (!box) return;
+  try {
+    if (typeof supabaseClient === 'undefined' || !supabaseClient) {
+      box.innerHTML = '<div class="ann-empty">Menyiapkan koneksi...</div>';
+      setTimeout(loadAnnouncementsLogin, 800);
+      return;
+    }
+    var rows = [];
+    var res = await supabaseClient.rpc('list_announcements', { p_limit: 10 });
+    if (res.error) {
+      // Fallback: baca tabel langsung (butuh RLS SELECT aktif)
+      var q = await supabaseClient.from('announcements').select('id,author_email,body,image_url,created_at').eq('is_active', true).order('created_at', { ascending: false }).limit(10);
+      if (q.error) throw res.error;
+      rows = (q.data || []).map(function (a) {
+        return Object.assign({ reaction_count: 0, comment_count: 0 }, a);
+      });
+    } else {
+      var data = res.data;
+      rows = (data && data.data) ? data.data : (Array.isArray(data) ? data : []);
+    }
+    if (!rows.length) {
+      box.innerHTML = '<div class="ann-empty">Belum ada pengumuman</div>';
+      return;
+    }
+    box.innerHTML = rows.map(function (a) {
+      var when = a.created_at
+        ? new Date(a.created_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', dateStyle: 'medium', timeStyle: 'short' }) + ' WIB'
+        : '-';
+      var img = a.image_url
+        ? '<img class="ann-img" src="' + String(a.image_url).replace(/"/g, '&quot;') + '" alt="pengumuman" loading="lazy" onclick="window.open(this.src,\'_blank\')">'
+        : '';
+      var body = String(a.body || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      var author = a.author_email ? String(a.author_email).replace(/</g,'') : '';
+      return '<div class="ann-card"><div class="ann-meta">🕒 ' + when + (author ? ' · ' + author : '') +
+        '</div><div class="ann-body">' + body + '</div>' + img +
+        '<div class="ann-stats">👍 ' + (a.reaction_count || 0) + ' · 💬 ' + (a.comment_count || 0) +
+        ' · <span style="opacity:.8">Login untuk react/komentar</span></div></div>';
+    }).join('');
+  } catch (e) {
+    console.warn('announcements', e);
+    box.innerHTML = '<div class="ann-empty">Belum bisa memuat pengumuman</div>';
+  }
+}
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', function(){ setTimeout(loadAnnouncementsLogin, 400); });
+} else {
+  setTimeout(loadAnnouncementsLogin, 400);
+}
+
 </script>
 </body>
 </html>
