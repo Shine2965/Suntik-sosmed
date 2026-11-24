@@ -1301,6 +1301,32 @@ body.onboard-required .app .app-icon-btn[title="Chat"]{
 body.onboard-required #onboardCard{pointer-events:auto!important;filter:none!important;z-index:100002}
 body.onboard-required #onboardNext{pointer-events:auto!important}
 
+
+.ann-home-wrap{margin:12px 0 18px}
+.ann-home-title{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px}
+.ann-home-title h3{font-size:13px;font-weight:800;color:#c4b5fd;margin:0;letter-spacing:.4px}
+.ann-composer{background:rgba(255,255,255,.04);border:1px solid rgba(167,139,250,.3);border-radius:14px;padding:12px;margin-bottom:12px}
+.ann-composer textarea{width:100%;min-height:72px;border-radius:10px;border:1px solid rgba(255,255,255,.12);background:rgba(0,0,0,.25);color:#fff;padding:10px;font-family:inherit;font-size:13px;resize:vertical}
+.ann-composer .ann-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;align-items:center}
+.ann-composer input[type=file]{font-size:11px;color:#94a3b8;max-width:160px}
+.ann-card-h{background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:14px;margin-bottom:12px}
+.ann-card-h .meta{font-size:10.5px;color:#94a3b8;margin-bottom:6px}
+.ann-card-h .body{font-size:13.5px;line-height:1.5;color:#f8fafc;white-space:pre-wrap;word-break:break-word}
+.ann-card-h img.post{width:100%;max-height:220px;object-fit:cover;border-radius:12px;margin-top:8px;cursor:pointer}
+.ann-react-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;align-items:center}
+.ann-react-btn{border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);color:#fff;border-radius:20px;padding:4px 10px;font-size:12px;cursor:pointer}
+.ann-react-btn:hover{border-color:#a78bfa}
+.ann-cmt{margin-top:10px;border-top:1px solid rgba(255,255,255,.06);padding-top:10px}
+.ann-cmt-item{font-size:12px;margin-bottom:8px;padding:8px;background:rgba(0,0,0,.2);border-radius:10px}
+.ann-cmt-item .who{font-weight:700;color:#c4b5fd;font-size:11px}
+.ann-cmt-item .when{color:#64748b;font-size:10px;margin-left:6px}
+.ann-cmt-item .txt{color:#e2e8f0;margin-top:3px;white-space:pre-wrap}
+.ann-cmt-item.reply{margin-left:16px;border-left:2px solid rgba(167,139,250,.35)}
+.ann-cmt-input{display:flex;gap:6px;margin-top:8px}
+.ann-cmt-input input{flex:1;border-radius:10px;border:1px solid rgba(255,255,255,.12);background:rgba(0,0,0,.25);color:#fff;padding:8px 10px;font-size:12px;font-family:inherit}
+.ann-cmt-input button,.ann-del-btn{border:none;border-radius:10px;padding:8px 12px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit}
+.ann-del-btn{background:rgba(239,68,68,.2);color:#fca5a5}
+
 </style>
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer onload="window.__turnstileReady=true;try{if(typeof initShineTurnstile==='function')initShineTurnstile();}catch(e){}"></script>
 </head>
@@ -1375,7 +1401,23 @@ window.__SHINE_HOME_URL__ = '/home/';
         </div>
       </div>
 
-      <div class="section">
+      
+        <div class="ann-home-wrap" id="annHomeWrap">
+          <div class="ann-home-title">
+            <h3>📢 Papan Pengumuman</h3>
+            <button type="button" class="balance-btn refresh" style="flex:0;padding:6px 10px;font-size:11px" onclick="loadAnnouncementsHome()">🔄</button>
+          </div>
+          <div class="ann-composer" id="annComposer" style="display:none">
+            <textarea id="annBodyInput" placeholder="Tulis pengumuman..."></textarea>
+            <div class="ann-actions">
+              <input type="file" id="annImageInput" accept="image/*">
+              <button type="button" class="balance-btn deposit" style="flex:0;padding:8px 14px;font-size:12px" onclick="submitAnnouncement()">Posting</button>
+            </div>
+            <div style="font-size:10px;color:#94a3b8;margin-top:6px">Owner/admin · waktu post otomatis WIB</div>
+          </div>
+          <div id="annListHome"><div class="password-empty">Memuat...</div></div>
+        </div>
+<div class="section">
         <div class="section-title">🏆 Top 10 Order Bulan Ini<div class="line"></div></div>
         <div style="font-size:10px;color:#94a3b8;margin:-4px 0 10px 4px;" id="lbPeriodLabel">Periode: tanggal 1 – akhir bulan</div>
         <div id="leaderboardList"><div class="mutasi-empty">Memuat...</div></div>
@@ -5164,27 +5206,168 @@ async function openDepositDialog() {
 
 async function createDeposit(amount) {
   amount = Math.floor(Number(amount));
-  if (!amount || amount < 1000) return;
-  const uniqueCode = await generateUniqueCodeForAmount(amount);
-  const totalAmount = amount + uniqueCode;
-  const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+  if (!amount || amount < 1000) {
+    return Swal.fire({ title: 'Minimal Rp1.000', icon: 'warning', background: '#1a0e2e', color: '#fff' });
+  }
+  if (!currentUser || !currentUser.id) {
+    return Swal.fire({ title: 'Login dulu', icon: 'warning', background: '#1a0e2e', color: '#fff' });
+  }
+  const adminFee = amount > 50000 ? Math.ceil(amount * 0.01) : 0;
+  const totalPay = amount + adminFee;
+
+  const pick = await Swal.fire({
+    title: 'Deposit saldo',
+    html: '<div style="text-align:left;font-size:13px;line-height:1.55">' +
+      '<div>Saldo masuk: <b>Rp ' + amount.toLocaleString('id-ID') + '</b></div>' +
+      (adminFee > 0
+        ? '<div>Admin QRIS/payment 1%: <b style="color:#fbbf24">Rp ' + adminFee.toLocaleString('id-ID') + '</b></div>'
+        : '<div style="color:#86efac">Admin: Rp0 (≤ Rp50.000)</div>') +
+      '<div style="margin:8px 0 4px;font-size:15px">Total bayar: <b style="color:#ffd700">Rp ' + totalPay.toLocaleString('id-ID') + '</b></div>' +
+      '<div style="margin-top:12px;font-size:12px;color:#c4b5fd;font-weight:700">Pilih metode pembayaran</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">' +
+      '<button type="button" class="swal2-confirm swal2-styled ann-pay-m" data-m="ALL" style="margin:0;background:#7c3aed">Semua metode</button>' +
+      '<button type="button" class="swal2-confirm swal2-styled ann-pay-m" data-m="QRIS" style="margin:0;background:#0ea5e9">QRIS</button>' +
+      '<button type="button" class="swal2-confirm swal2-styled ann-pay-m" data-m="VA" style="margin:0;background:#22c55e">Virtual Account</button>' +
+      '<button type="button" class="swal2-confirm swal2-styled ann-pay-m" data-m="EWALLET" style="margin:0;background:#f59e0b">E-Wallet</button>' +
+      '</div>' +
+      '<div style="margin-top:10px;font-size:11px;color:#94a3b8">Setelah lanjut, halaman DOKU menampilkan channel aktif merchant Anda (QRIS, VA bank, OVO/DANA/ShopeePay, kartu, dll).</div></div>',
+    showConfirmButton: false,
+    showCancelButton: true,
+    cancelButtonText: 'Batal',
+    background: '#1a0e2e',
+    color: '#fff',
+    didOpen: function () {
+      var root = Swal.getHtmlContainer();
+      if (!root) return;
+      root.querySelectorAll('.ann-pay-m').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          Swal.clickConfirm();
+          Swal.getConfirmButton() && (Swal.getConfirmButton().dataset.method = btn.getAttribute('data-m'));
+          window.__depositPayMethod = btn.getAttribute('data-m') || 'ALL';
+          Swal.close({ isConfirmed: true, value: btn.getAttribute('data-m') });
+        });
+      });
+    },
+    preConfirm: function () { return window.__depositPayMethod || 'ALL'; }
+  });
+
+  // Custom close from buttons
+  var method = window.__depositPayMethod || (pick && pick.value) || null;
+  if (!method && !(pick && pick.isConfirmed)) {
+    // user cancelled
+    if (!pick || pick.isDismissed) return;
+  }
+  method = method || 'ALL';
+  window.__depositPayMethod = null;
+
+  Swal.fire({ title: 'Menyiapkan pembayaran…', allowOutsideClick: false, didOpen: function () { Swal.showLoading(); }, background: '#1a0e2e', color: '#fff' });
+
   try {
-    const { data, error } = await supabaseClient.from('deposits').insert({ user_id: currentUser.id, email: currentUser.email, amount, unique_code: uniqueCode, total_amount: totalAmount, status: 'pending', expires_at: expiresAt.toISOString() }).select().single();
-    if (error) throw error;
-    currentDeposit = data;
-    depositSuccessProcessed = false;
-    isProcessingDeposit = false;
-    document.getElementById('qrisAmount').textContent = 'Rp ' + totalAmount.toLocaleString('id-ID');
-    document.getElementById('qrisAmountDetail').innerHTML = `Nominal: Rp ${amount.toLocaleString('id-ID')} + Kode Unik: <b style="color:#ffd700;">${uniqueCode}</b>`;
-    const stEl = document.getElementById('qrisStatus');
-    if (stEl) { stEl.textContent = '⏳ Menunggu pembayaran… auto-cek aktif'; stEl.className = 'qris-status waiting'; }
-    document.getElementById('qrisModal').classList.add('show');
-    setTimeout(() => renderQrisToCanvas(buildDynamicQris(QRIS_CRC, totalAmount)), 100);
-    startDepositTimer(expiresAt);
-    startDepositRealtime(data.id);
-    startDepositPolling(totalAmount);
-  } catch (err) { Swal.fire({ title: '❌ Gagal', text: err.message, icon: 'error', confirmButtonColor: '#ff4444', background: '#1a0e2e', color: '#fff' }); }
+    var r = await fetch('/api/doku-deposit-create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        amount: amount,
+        user_id: currentUser.id,
+        email: (currentUser.email || '').toLowerCase(),
+        payment_method: method
+      })
+    });
+    var text = await r.text();
+    var data = null;
+    try { data = JSON.parse(text); } catch (_) {
+      throw new Error((text || '').slice(0, 200) || ('HTTP ' + r.status + ' (bukan JSON — cek deploy /api/doku-deposit-create)'));
+    }
+    if (!r.ok || !data.success) {
+      throw new Error((data && data.message) || ('HTTP ' + r.status));
+    }
+    if (!data.payment_url) {
+      throw new Error('payment_url kosong dari DOKU. Cek kredensial & produk Checkout.');
+    }
+
+    currentDeposit = {
+      id: data.deposit_id,
+      amount: data.amount,
+      total_amount: data.total_pay,
+      admin_fee: data.admin_fee,
+      invoice_number: data.invoice_number,
+      payment_url: data.payment_url,
+      status: 'pending'
+    };
+
+    try {
+      var qrisAmount = document.getElementById('qrisAmount');
+      if (qrisAmount) qrisAmount.textContent = 'Rp ' + Number(data.total_pay).toLocaleString('id-ID');
+      var detail = document.getElementById('qrisAmountDetail');
+      if (detail) {
+        detail.innerHTML = 'Saldo: Rp ' + Number(data.amount).toLocaleString('id-ID') +
+          (data.admin_fee > 0 ? ' + Admin 1%: <b style="color:#ffd700">Rp ' + Number(data.admin_fee).toLocaleString('id-ID') + '</b>' : '') +
+          '<br><span style="font-size:11px;color:#94a3b8">Invoice: ' + (data.invoice_number || '-') + ' · Metode: ' + method + '</span>';
+      }
+      var stEl = document.getElementById('qrisStatus');
+      if (stEl) { stEl.textContent = 'Selesaikan bayar di halaman DOKU'; stEl.className = 'qris-status waiting'; }
+      var modal = document.getElementById('qrisModal');
+      if (modal) modal.classList.add('show');
+    } catch (_) {}
+
+    Swal.close();
+
+    var go = await Swal.fire({
+      title: 'Lanjut bayar di DOKU',
+      html: '<div style="font-size:13px">Metode: <b>' + method + '</b><br>Anda bisa memilih channel (QRIS, VA, e-wallet, kartu) di halaman DOKU sesuai yang aktif di merchant.</div>',
+      icon: 'info',
+      showCancelButton: true,
+      confirmButtonText: 'Buka pembayaran',
+      cancelButtonText: 'Nanti',
+      background: '#1a0e2e',
+      color: '#fff',
+      confirmButtonColor: '#22c55e'
+    });
+    if (go.isConfirmed) {
+      window.open(data.payment_url, '_blank');
+    }
+    try {
+      if (data.deposit_id && typeof startDepositStatusPoll === 'function') {
+        startDepositStatusPoll(data.deposit_id, data.amount);
+      }
+    } catch (_) {}
+  } catch (err) {
+    Swal.fire({
+      title: '❌ Gagal deposit',
+      html: '<div style="text-align:left;font-size:12px;word-break:break-word">' +
+        String(err.message || err) +
+        '<br><br><span style="color:#94a3b8">Jika FUNCTION_INVOCATION_FAILED: pastikan file api/doku-deposit-create.js ter-deploy & ENV DOKU_CLIENT_ID + DOKU_SECRET_KEY di Vercel, lalu Redeploy.</span></div>',
+      icon: 'error',
+      background: '#1a0e2e',
+      color: '#fff'
+    });
+  }
 }
+
+function startDepositStatusPoll(depositId, creditAmount) {
+  if (window.__dokuDepPoll) clearInterval(window.__dokuDepPoll);
+  let n = 0;
+  window.__dokuDepPoll = setInterval(async function () {
+    n++;
+    if (n > 60) { clearInterval(window.__dokuDepPoll); return; }
+    try {
+      if (!supabaseClient || !depositId) return;
+      const { data } = await supabaseClient.from('deposits').select('status,amount').eq('id', depositId).maybeSingle();
+      if (data && (data.status === 'paid' || data.status === 'success' || data.status === 'completed')) {
+        clearInterval(window.__dokuDepPoll);
+        try { if (typeof fetchProfile === 'function' && currentUser) {
+          const pr = await fetchProfile(currentUser.id);
+          if (pr && typeof updateBalanceDisplay === 'function') updateBalanceDisplay(pr.balance || 0);
+        }} catch (_) {}
+        Swal.fire({ title: 'Deposit berhasil', text: 'Saldo +Rp ' + Number(creditAmount || data.amount || 0).toLocaleString('id-ID'), icon: 'success', background: '#1a0e2e', color: '#fff' });
+        try { const m = document.getElementById('qrisModal'); if (m) m.classList.remove('show'); } catch (_) {}
+      }
+    } catch (_) {}
+  }, 5000);
+}
+
+
+
 function startDepositTimer(expiresAt) {
   if (depositTimerInterval) clearInterval(depositTimerInterval);
   function tick() {
@@ -11608,6 +11791,309 @@ window.resetOnboardingTour = function () {
   setTimeout(function () { try { clearInterval(boot); } catch (_) {} }, 20000);
 })();
 
+
+
+/* ===== Papan Pengumuman ===== */
+function fmtWibAnn(iso) {
+  try {
+    return new Date(iso).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', dateStyle: 'medium', timeStyle: 'short' }) + ' WIB';
+  } catch (_) { return '-'; }
+}
+function escAnn(t) {
+  return String(t || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+async function loadAnnouncementsHome() {
+  const box = document.getElementById('annListHome');
+  const comp = document.getElementById('annComposer');
+  if (comp) comp.style.display = (isAdminOrOwner || isOwner) ? 'block' : 'none';
+  if (!box || !supabaseClient) return;
+  box.innerHTML = '<div class="password-empty">Memuat pengumuman...</div>';
+  try {
+    let rows = [];
+    const { data, error } = await supabaseClient.rpc('list_announcements', { p_limit: 30 });
+    if (error) {
+      const q = await supabaseClient.from('announcements').select('id,author_email,body,image_url,created_at').eq('is_active', true).order('created_at', { ascending: false }).limit(30);
+      if (q.error) throw error;
+      rows = (q.data || []).map(a => ({ ...a, reaction_count: 0, comment_count: 0, reaction_summary: [] }));
+    } else {
+      rows = (data && data.data) ? data.data : [];
+    }
+    if (!rows.length) {
+      box.innerHTML = '<div class="password-empty">Belum ada pengumuman</div>';
+      return;
+    }
+    box.innerHTML = rows.map(a => renderAnnCard(a)).join('');
+    rows.forEach(a => { try { loadAnnThread(a.id); } catch(_){} });
+  } catch (e) {
+    box.innerHTML = '<div class="password-empty" style="color:#f87171">Gagal muat: ' + escAnn(e.message) + '</div>';
+  }
+}
+
+function renderAnnCard(a) {
+  const id = a.id;
+  const summary = (a.reaction_summary || []).map(function (x) {
+    return '<button type="button" class="ann-react-btn" onclick="toggleAnnReact(\'' + id + '\',\'' + escAnn(x.emoji) + '\')">' + escAnn(x.emoji) + ' ' + x.count + '</button>';
+  }).join('');
+  const del = (isAdminOrOwner || isOwner)
+    ? '<button type="button" class="ann-del-btn" onclick="deleteAnnouncement(\'' + id + '\')">Hapus</button>'
+    : '';
+  const img = a.image_url
+    ? '<img class="post" src="' + escAnn(a.image_url) + '" alt="" onclick="window.open(this.src,\'_blank\')">'
+    : '';
+  return '<div class="ann-card-h" id="ann-' + id + '">' +
+    '<div class="meta">🕒 ' + fmtWibAnn(a.created_at) + (a.author_email ? ' · ' + escAnn(a.author_email) : '') + '</div>' +
+    '<div class="body">' + escAnn(a.body) + '</div>' + img +
+    '<div class="ann-react-row">' +
+      '<button type="button" class="ann-react-btn" onclick="toggleAnnReact(\'' + id + '\',\'👍\')">👍</button>' +
+      '<button type="button" class="ann-react-btn" onclick="toggleAnnReact(\'' + id + '\',\'❤️\')">❤️</button>' +
+      '<button type="button" class="ann-react-btn" onclick="toggleAnnReact(\'' + id + '\',\'🔥\')">🔥</button>' +
+      summary + del +
+    '</div>' +
+    '<div class="ann-cmt" id="ann-cmt-' + id + '"><div style="font-size:11px;color:#64748b">Memuat komentar...</div></div>' +
+    '<div class="ann-cmt-input">' +
+      '<input id="ann-cmt-in-' + id + '" placeholder="Tulis komentar..." maxlength="2000">' +
+      '<button type="button" class="balance-btn deposit" style="flex:0;padding:8px 12px" onclick="sendAnnComment(\'' + id + '\',null)">Kirim</button>' +
+    '</div></div>';
+}
+
+async function loadAnnThread(id) {
+  const box = document.getElementById('ann-cmt-' + id);
+  if (!box || !supabaseClient) return;
+  try {
+    const { data, error } = await supabaseClient.rpc('get_announcement_thread', { p_id: id });
+    if (error) throw error;
+    if (!data || !data.success) throw new Error((data && data.message) || 'Gagal');
+    const comments = data.comments || [];
+    const byParent = {};
+    comments.forEach(c => {
+      const p = c.parent_id || 'root';
+      if (!byParent[p]) byParent[p] = [];
+      byParent[p].push(c);
+    });
+    function renderList(parentKey, depth) {
+      const list = byParent[parentKey] || [];
+      return list.map(c => {
+        const canDel = currentUser && (c.user_email === currentUser.email || isAdminOrOwner || isOwner);
+        const delBtn = canDel
+          ? ' <button type="button" class="ann-del-btn" style="padding:2px 8px;font-size:10px" onclick="deleteAnnComment(\'' + c.id + '\',\'' + id + '\')">Hapus</button>'
+          : '';
+        const replyBtn = currentUser
+          ? ' <button type="button" class="ann-react-btn" style="padding:2px 8px;font-size:10px" onclick="replyAnnComment(\'' + id + '\',\'' + c.id + '\',\'' + escAnn(c.user_email || '') + '\')">Reply</button>'
+          : '';
+        return '<div class="ann-cmt-item' + (depth ? ' reply' : '') + '">' +
+          '<span class="who">' + escAnn(c.user_email || 'user') + '</span>' +
+          '<span class="when">' + fmtWibAnn(c.created_at) + '</span>' + delBtn + replyBtn +
+          '<div class="txt">' + escAnn(c.body) + '</div>' +
+          renderList(c.id, depth + 1) +
+          '</div>';
+      }).join('');
+    }
+    const html = renderList('root', 0);
+    box.innerHTML = html || '<div style="font-size:11px;color:#64748b">Belum ada komentar</div>';
+  } catch (e) {
+    box.innerHTML = '<div style="font-size:11px;color:#f87171">' + escAnn(e.message) + '</div>';
+  }
+}
+
+async function toggleAnnReact(id, emoji) {
+  if (!currentUser) return Swal.fire({ title: 'Login dulu', icon: 'info', background: '#1a0e2e', color: '#fff' });
+  try {
+    const { data, error } = await supabaseClient.rpc('react_announcement', { p_id: id, p_emoji: emoji });
+    if (error) throw error;
+    if (data && data.success === false) throw new Error(data.message);
+    loadAnnouncementsHome();
+  } catch (e) {
+    Swal.fire({ title: 'Gagal', text: e.message, icon: 'error', background: '#1a0e2e', color: '#fff' });
+  }
+}
+
+async function sendAnnComment(annId, parentId) {
+  if (!currentUser) return Swal.fire({ title: 'Login dulu', icon: 'info', background: '#1a0e2e', color: '#fff' });
+  const input = document.getElementById('ann-cmt-in-' + annId);
+  let body = input ? input.value.trim() : '';
+  if (parentId && window.__annReplyDraft && window.__annReplyDraft.id === parentId) {
+    body = body || window.__annReplyDraft.text;
+  }
+  if (!body) return;
+  try {
+    const { data, error } = await supabaseClient.rpc('comment_announcement', {
+      p_id: annId,
+      p_body: body,
+      p_parent_id: parentId || null
+    });
+    if (error) throw error;
+    if (data && data.success === false) throw new Error(data.message);
+    if (input) input.value = '';
+    window.__annReplyDraft = null;
+    loadAnnThread(annId);
+  } catch (e) {
+    Swal.fire({ title: 'Gagal komentar', text: e.message, icon: 'error', background: '#1a0e2e', color: '#fff' });
+  }
+}
+
+function replyAnnComment(annId, parentId, email) {
+  const input = document.getElementById('ann-cmt-in-' + annId);
+  if (input) {
+    input.focus();
+    input.placeholder = 'Reply ke ' + (email || 'user') + '...';
+    input.dataset.parentId = parentId;
+  }
+  window.__annReplyDraft = { id: parentId, text: '' };
+  // Override send to use parent
+  const btn = input && input.parentElement && input.parentElement.querySelector('button');
+  if (btn) {
+    btn.setAttribute('onclick', "sendAnnComment('" + annId + "','" + parentId + "')");
+  }
+}
+
+async function deleteAnnComment(commentId, annId) {
+  const conf = await Swal.fire({ title: 'Hapus komentar?', icon: 'warning', showCancelButton: true, background: '#1a0e2e', color: '#fff', confirmButtonColor: '#ef4444' });
+  if (!conf.isConfirmed) return;
+  try {
+    const { data, error } = await supabaseClient.rpc('delete_announcement_comment', { p_comment_id: commentId });
+    if (error) throw error;
+    loadAnnThread(annId);
+  } catch (e) {
+    Swal.fire({ title: 'Gagal', text: e.message, icon: 'error', background: '#1a0e2e', color: '#fff' });
+  }
+}
+
+async function deleteAnnouncement(id) {
+  const conf = await Swal.fire({ title: 'Hapus pengumuman?', icon: 'warning', showCancelButton: true, background: '#1a0e2e', color: '#fff', confirmButtonColor: '#ef4444' });
+  if (!conf.isConfirmed) return;
+  try {
+    const { data, error } = await supabaseClient.rpc('admin_delete_announcement', { p_id: id });
+    if (error) throw error;
+    if (data && data.success === false) throw new Error(data.message);
+    loadAnnouncementsHome();
+  } catch (e) {
+    Swal.fire({ title: 'Gagal', text: e.message, icon: 'error', background: '#1a0e2e', color: '#fff' });
+  }
+}
+
+async function compressAnnImage(file, maxW, maxKB) {
+  maxW = maxW || 1280;
+  maxKB = maxKB || 900;
+  return new Promise(function (resolve) {
+    try {
+      if (!file || !file.type || file.type.indexOf('image/') !== 0) return resolve(file);
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = function () {
+        try {
+          let w = img.width, h = img.height;
+          if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
+          const canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, w, h);
+          URL.revokeObjectURL(url);
+          let q = 0.85;
+          const tryBlob = function () {
+            canvas.toBlob(function (blob) {
+              if (!blob) return resolve(file);
+              if (blob.size > maxKB * 1024 && q > 0.5) {
+                q -= 0.1;
+                tryBlob();
+                return;
+              }
+              resolve(new File([blob], (file.name || 'ann').replace(/\.[^.]+$/, '') + '.jpg', { type: 'image/jpeg' }));
+            }, 'image/jpeg', q);
+          };
+          tryBlob();
+        } catch (_) { URL.revokeObjectURL(url); resolve(file); }
+      };
+      img.onerror = function () { URL.revokeObjectURL(url); resolve(file); };
+      img.src = url;
+    } catch (_) { resolve(file); }
+  });
+}
+
+async function uploadAnnImage(file) {
+  if (!file || !supabaseClient) return null;
+  file = await compressAnnImage(file, 1280, 900);
+  const ext = ((file.name || 'img.jpg').split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
+  const path = 'posts/' + Date.now() + '-' + Math.random().toString(36).slice(2, 8) + '.' + ext;
+  const buckets = ['announcements', 'public', 'images'];
+  let lastErr = null;
+  for (let i = 0; i < buckets.length; i++) {
+    const b = buckets[i];
+    try {
+      const up = await supabaseClient.storage.from(b).upload(path, file, {
+        upsert: true,
+        contentType: file.type || 'image/jpeg',
+        cacheControl: '3600'
+      });
+      if (up.error) { lastErr = up.error; continue; }
+      const { data } = supabaseClient.storage.from(b).getPublicUrl(path);
+      if (data && data.publicUrl) return data.publicUrl;
+    } catch (e) {
+      lastErr = e;
+    }
+  }
+  // Fallback: data URL (max ~700KB) agar post tetap bisa jalan tanpa bucket
+  if (file.size <= 700 * 1024) {
+    const dataUrl = await new Promise(function (resolve, reject) {
+      const r = new FileReader();
+      r.onload = function () { resolve(r.result); };
+      r.onerror = reject;
+      r.readAsDataURL(file);
+    });
+    return dataUrl;
+  }
+  throw new Error(
+    (lastErr && (lastErr.message || String(lastErr))) ||
+    'Bucket not found — jalankan SQL announcements-storage-bucket.sql di Supabase'
+  );
+}
+
+async function submitAnnouncement() {
+  if (!(isAdminOrOwner || isOwner)) return;
+  const body = (document.getElementById('annBodyInput') || {}).value || '';
+  const fileEl = document.getElementById('annImageInput');
+  const file = fileEl && fileEl.files && fileEl.files[0];
+  let imageUrl = null;
+  try {
+    Swal.fire({ title: 'Mengunggah...', allowOutsideClick: false, didOpen: () => Swal.showLoading(), background: '#1a0e2e', color: '#fff' });
+    if (file) imageUrl = await uploadAnnImage(file);
+    const { data, error } = await supabaseClient.rpc('admin_create_announcement', {
+      p_body: body.trim(),
+      p_image_url: imageUrl
+    });
+    if (error) throw error;
+    if (data && data.success === false) throw new Error(data.message || 'Gagal');
+    if (document.getElementById('annBodyInput')) document.getElementById('annBodyInput').value = '';
+    if (fileEl) fileEl.value = '';
+    Swal.close();
+    loadAnnouncementsHome();
+    Swal.fire({ title: 'Diposting', icon: 'success', timer: 1200, background: '#1a0e2e', color: '#fff' });
+  } catch (e) {
+    Swal.fire({ title: 'Gagal post', html: '<div style="text-align:left;font-size:12px;word-break:break-word">' + String(e.message||e) + '<br><br>Jalankan SQL <b>announcements-storage-bucket.sql</b> di Supabase (buat bucket announcements + policy).</div>', icon: 'error', background: '#1a0e2e', color: '#fff' });
+  }
+}
+
+window.loadAnnouncementsHome = loadAnnouncementsHome;
+window.toggleAnnReact = toggleAnnReact;
+window.sendAnnComment = sendAnnComment;
+window.replyAnnComment = replyAnnComment;
+window.deleteAnnComment = deleteAnnComment;
+window.deleteAnnouncement = deleteAnnouncement;
+window.submitAnnouncement = submitAnnouncement;
+
+// auto load after auth
+(function hookAnnLoad() {
+  const prev = window.updateAuthUI;
+  if (typeof prev === 'function' && !window.__annAuthHooked) {
+    window.__annAuthHooked = true;
+    window.updateAuthUI = async function () {
+      const r = await prev.apply(this, arguments);
+      try { setTimeout(loadAnnouncementsHome, 800); } catch (_) {}
+      return r;
+    };
+  }
+  setTimeout(function () { try { loadAnnouncementsHome(); } catch (_) {} }, 2000);
+})();
 
 </script>
 </body>
