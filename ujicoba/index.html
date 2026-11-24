@@ -5212,45 +5212,78 @@ async function createDeposit(amount) {
   if (!currentUser || !currentUser.id) {
     return Swal.fire({ title: 'Login dulu', icon: 'warning', background: '#1a0e2e', color: '#fff' });
   }
-  // Biaya admin QRIS DOKU 1% jika deposit > 50.000
   const adminFee = amount > 50000 ? Math.ceil(amount * 0.01) : 0;
   const totalPay = amount + adminFee;
 
-  const conf = await Swal.fire({
-    title: 'Deposit via DOKU QRIS',
-    html: '<div style="text-align:left;font-size:13px;line-height:1.6;">' +
+  const pick = await Swal.fire({
+    title: 'Deposit saldo',
+    html: '<div style="text-align:left;font-size:13px;line-height:1.55">' +
       '<div>Saldo masuk: <b>Rp ' + amount.toLocaleString('id-ID') + '</b></div>' +
       (adminFee > 0
-        ? '<div>Biaya admin QRIS 1%: <b style="color:#fbbf24;">Rp ' + adminFee.toLocaleString('id-ID') + '</b></div>'
-        : '<div style="color:#86efac;">Biaya admin: Rp0 (deposit ≤ Rp50.000)</div>') +
-      '<div style="margin-top:6px;font-size:15px;">Total bayar: <b style="color:#ffd700;">Rp ' + totalPay.toLocaleString('id-ID') + '</b></div>' +
-      '<div style="margin-top:8px;font-size:11px;color:#94a3b8;">Pembayaran diproses DOKU (QRIS). Setelah bayar, saldo otomatis masuk.</div></div>',
-    icon: 'question',
+        ? '<div>Admin QRIS/payment 1%: <b style="color:#fbbf24">Rp ' + adminFee.toLocaleString('id-ID') + '</b></div>'
+        : '<div style="color:#86efac">Admin: Rp0 (≤ Rp50.000)</div>') +
+      '<div style="margin:8px 0 4px;font-size:15px">Total bayar: <b style="color:#ffd700">Rp ' + totalPay.toLocaleString('id-ID') + '</b></div>' +
+      '<div style="margin-top:12px;font-size:12px;color:#c4b5fd;font-weight:700">Pilih metode pembayaran</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">' +
+      '<button type="button" class="swal2-confirm swal2-styled ann-pay-m" data-m="ALL" style="margin:0;background:#7c3aed">Semua metode</button>' +
+      '<button type="button" class="swal2-confirm swal2-styled ann-pay-m" data-m="QRIS" style="margin:0;background:#0ea5e9">QRIS</button>' +
+      '<button type="button" class="swal2-confirm swal2-styled ann-pay-m" data-m="VA" style="margin:0;background:#22c55e">Virtual Account</button>' +
+      '<button type="button" class="swal2-confirm swal2-styled ann-pay-m" data-m="EWALLET" style="margin:0;background:#f59e0b">E-Wallet</button>' +
+      '</div>' +
+      '<div style="margin-top:10px;font-size:11px;color:#94a3b8">Setelah lanjut, halaman DOKU menampilkan channel aktif merchant Anda (QRIS, VA bank, OVO/DANA/ShopeePay, kartu, dll).</div></div>',
+    showConfirmButton: false,
     showCancelButton: true,
-    confirmButtonText: 'Lanjut bayar',
     cancelButtonText: 'Batal',
     background: '#1a0e2e',
     color: '#fff',
-    confirmButtonColor: '#f59e0b'
+    didOpen: function () {
+      var root = Swal.getHtmlContainer();
+      if (!root) return;
+      root.querySelectorAll('.ann-pay-m').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          Swal.clickConfirm();
+          Swal.getConfirmButton() && (Swal.getConfirmButton().dataset.method = btn.getAttribute('data-m'));
+          window.__depositPayMethod = btn.getAttribute('data-m') || 'ALL';
+          Swal.close({ isConfirmed: true, value: btn.getAttribute('data-m') });
+        });
+      });
+    },
+    preConfirm: function () { return window.__depositPayMethod || 'ALL'; }
   });
-  if (!conf.isConfirmed) return;
 
-  Swal.fire({ title: 'Menyiapkan DOKU…', allowOutsideClick: false, didOpen: () => Swal.showLoading(), background: '#1a0e2e', color: '#fff' });
+  // Custom close from buttons
+  var method = window.__depositPayMethod || (pick && pick.value) || null;
+  if (!method && !(pick && pick.isConfirmed)) {
+    // user cancelled
+    if (!pick || pick.isDismissed) return;
+  }
+  method = method || 'ALL';
+  window.__depositPayMethod = null;
+
+  Swal.fire({ title: 'Menyiapkan pembayaran…', allowOutsideClick: false, didOpen: function () { Swal.showLoading(); }, background: '#1a0e2e', color: '#fff' });
 
   try {
-    const r = await fetch('/api/doku-deposit-create', {
+    var r = await fetch('/api/doku-deposit-create', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         amount: amount,
         user_id: currentUser.id,
-        email: (currentUser.email || '').toLowerCase()
+        email: (currentUser.email || '').toLowerCase(),
+        payment_method: method
       })
     });
-    const text = await r.text();
-    let data = null;
-    try { data = JSON.parse(text); } catch (_) { throw new Error(text.slice(0, 180) || 'Invalid JSON dari /api/doku-deposit-create'); }
-    if (!r.ok || !data.success) throw new Error((data && data.message) || ('HTTP ' + r.status));
+    var text = await r.text();
+    var data = null;
+    try { data = JSON.parse(text); } catch (_) {
+      throw new Error((text || '').slice(0, 200) || ('HTTP ' + r.status + ' (bukan JSON — cek deploy /api/doku-deposit-create)'));
+    }
+    if (!r.ok || !data.success) {
+      throw new Error((data && data.message) || ('HTTP ' + r.status));
+    }
+    if (!data.payment_url) {
+      throw new Error('payment_url kosong dari DOKU. Cek kredensial & produk Checkout.');
+    }
 
     currentDeposit = {
       id: data.deposit_id,
@@ -5262,49 +5295,52 @@ async function createDeposit(amount) {
       status: 'pending'
     };
 
-    // UI modal: arahkan ke DOKU / tampilkan link
     try {
-      const qrisAmount = document.getElementById('qrisAmount');
+      var qrisAmount = document.getElementById('qrisAmount');
       if (qrisAmount) qrisAmount.textContent = 'Rp ' + Number(data.total_pay).toLocaleString('id-ID');
-      const detail = document.getElementById('qrisAmountDetail');
+      var detail = document.getElementById('qrisAmountDetail');
       if (detail) {
         detail.innerHTML = 'Saldo: Rp ' + Number(data.amount).toLocaleString('id-ID') +
-          (data.admin_fee > 0 ? ' + Admin 1%: <b style="color:#ffd700;">Rp ' + Number(data.admin_fee).toLocaleString('id-ID') + '</b>' : '') +
-          '<br><span style="font-size:11px;color:#94a3b8;">Invoice: ' + (data.invoice_number || '-') + '</span>';
+          (data.admin_fee > 0 ? ' + Admin 1%: <b style="color:#ffd700">Rp ' + Number(data.admin_fee).toLocaleString('id-ID') + '</b>' : '') +
+          '<br><span style="font-size:11px;color:#94a3b8">Invoice: ' + (data.invoice_number || '-') + ' · Metode: ' + method + '</span>';
       }
-      const stEl = document.getElementById('qrisStatus');
-      if (stEl) { stEl.textContent = 'Buka halaman DOKU untuk bayar QRIS'; stEl.className = 'qris-status waiting'; }
-      const modal = document.getElementById('qrisModal');
+      var stEl = document.getElementById('qrisStatus');
+      if (stEl) { stEl.textContent = 'Selesaikan bayar di halaman DOKU'; stEl.className = 'qris-status waiting'; }
+      var modal = document.getElementById('qrisModal');
       if (modal) modal.classList.add('show');
     } catch (_) {}
 
     Swal.close();
 
-    if (data.payment_url) {
-      const go = await Swal.fire({
-        title: 'Lanjut ke DOKU',
-        text: 'Anda akan diarahkan ke halaman pembayaran DOKU (QRIS).',
-        icon: 'info',
-        showCancelButton: true,
-        confirmButtonText: 'Bayar sekarang',
-        cancelButtonText: 'Nanti',
-        background: '#1a0e2e',
-        color: '#fff',
-        confirmButtonColor: '#22c55e'
-      });
-      if (go.isConfirmed) {
-        window.open(data.payment_url, '_blank');
-      }
-    } else {
-      Swal.fire({ title: 'Invoice dibuat', text: 'payment_url kosong — cek konfigurasi DOKU / response API', icon: 'warning', background: '#1a0e2e', color: '#fff' });
+    var go = await Swal.fire({
+      title: 'Lanjut bayar di DOKU',
+      html: '<div style="font-size:13px">Metode: <b>' + method + '</b><br>Anda bisa memilih channel (QRIS, VA, e-wallet, kartu) di halaman DOKU sesuai yang aktif di merchant.</div>',
+      icon: 'info',
+      showCancelButton: true,
+      confirmButtonText: 'Buka pembayaran',
+      cancelButtonText: 'Nanti',
+      background: '#1a0e2e',
+      color: '#fff',
+      confirmButtonColor: '#22c55e'
+    });
+    if (go.isConfirmed) {
+      window.open(data.payment_url, '_blank');
     }
-
-    // Poll status deposit
     try {
-      if (data.deposit_id) startDepositStatusPoll(data.deposit_id, data.amount);
+      if (data.deposit_id && typeof startDepositStatusPoll === 'function') {
+        startDepositStatusPoll(data.deposit_id, data.amount);
+      }
     } catch (_) {}
   } catch (err) {
-    Swal.fire({ title: '❌ Gagal deposit', text: err.message || String(err), icon: 'error', background: '#1a0e2e', color: '#fff' });
+    Swal.fire({
+      title: '❌ Gagal deposit',
+      html: '<div style="text-align:left;font-size:12px;word-break:break-word">' +
+        String(err.message || err) +
+        '<br><br><span style="color:#94a3b8">Jika FUNCTION_INVOCATION_FAILED: pastikan file api/doku-deposit-create.js ter-deploy & ENV DOKU_CLIENT_ID + DOKU_SECRET_KEY di Vercel, lalu Redeploy.</span></div>',
+      icon: 'error',
+      background: '#1a0e2e',
+      color: '#fff'
+    });
   }
 }
 
@@ -11774,9 +11810,15 @@ async function loadAnnouncementsHome() {
   if (!box || !supabaseClient) return;
   box.innerHTML = '<div class="password-empty">Memuat pengumuman...</div>';
   try {
+    let rows = [];
     const { data, error } = await supabaseClient.rpc('list_announcements', { p_limit: 30 });
-    if (error) throw error;
-    const rows = (data && data.data) ? data.data : [];
+    if (error) {
+      const q = await supabaseClient.from('announcements').select('id,author_email,body,image_url,created_at').eq('is_active', true).order('created_at', { ascending: false }).limit(30);
+      if (q.error) throw error;
+      rows = (q.data || []).map(a => ({ ...a, reaction_count: 0, comment_count: 0, reaction_summary: [] }));
+    } else {
+      rows = (data && data.data) ? data.data : [];
+    }
     if (!rows.length) {
       box.innerHTML = '<div class="password-empty">Belum ada pengumuman</div>';
       return;
