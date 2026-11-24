@@ -108,7 +108,7 @@ module.exports = async (req, res) => {
           quantity: 1
         }]
       },
-      payment: { payment_due_date: 60 },
+      payment: { payment_due_date: 10 },
       customer: {
         id: String(userId).slice(0, 50),
         name: String(email.split('@')[0] || 'User').slice(0, 50),
@@ -172,7 +172,7 @@ module.exports = async (req, res) => {
     let depositId = null;
     if (SUPABASE_URL && SUPABASE_KEY) {
       try {
-        const expires = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+        const expires = new Date(Date.now() + 10 * 60 * 1000).toISOString();
         const ins = await fetch(SUPABASE_URL.replace(/\/$/, '') + '/rest/v1/deposits', {
           method: 'POST',
           headers: {
