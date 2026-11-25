@@ -5285,6 +5285,7 @@ async function createDeposit(amount) {
 
     currentDeposit = {
       id: data.deposit_id,
+      provider: 'syahpay',
       amount: data.amount,
       total_amount: data.total_pay,
       admin_fee: data.admin_fee,
@@ -6576,6 +6577,35 @@ async function manualCheckPayment() {
   const btn = document.getElementById('qrisCheckBtn');
   if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Memeriksa...'; }
   try {
+    // SyahPay: cek status lewat endpoint SyahPay (bukan /api/mutasi)
+    if (currentDeposit.provider === 'syahpay') {
+      const stRes = await fetch('/api/syahpay-deposit-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        cache: 'no-store',
+        body: JSON.stringify({
+          invoice_id: currentDeposit.invoice_number,
+          deposit_id: currentDeposit.id || null
+        })
+      });
+      const stText = await stRes.text();
+      let st = null;
+      try { st = JSON.parse(stText); } catch (_) {
+        throw new Error('Respons server tidak valid (HTTP ' + stRes.status + '). Coba lagi sebentar.');
+      }
+      if (!st || !st.success) throw new Error((st && st.message) || 'Gagal cek status SyahPay');
+      if (st.status === 'paid') {
+        // server sudah kredit saldo saat status paid
+        await handleDepositSuccess({ alreadyPaid: true });
+        return;
+      }
+      if (st.status === 'expired' || st.status === 'cancelled' || st.status === 'canceled') {
+        Swal.fire({ title: '⏰ QRIS expired', text: 'Silakan buat deposit baru.', icon: 'warning', confirmButtonColor: '#00c6ff', background: '#1a0e2e', color: '#fff' });
+        return;
+      }
+      Swal.fire({ title: '⏳ Belum terdeteksi', text: 'Pembayaran belum masuk. Auto-cek tetap berjalan setiap 4 detik.', icon: 'info', confirmButtonColor: '#00c6ff', background: '#1a0e2e', color: '#fff' });
+      return;
+    }
     // 1) Cek status deposit di DB (callback server)
     const { data: depRow } = await supabaseClient.from('deposits').select('status').eq('id', currentDeposit.id).maybeSingle();
     if (depRow?.status === 'success') {
@@ -12186,7 +12216,6 @@ window.submitAnnouncement = submitAnnouncement;
   }
   setTimeout(function () { try { loadAnnouncementsHome(); } catch (_) {} }, 2000);
 })();
-
 </script>
 </body>
 </html>
