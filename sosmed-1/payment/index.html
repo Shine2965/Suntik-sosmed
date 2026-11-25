@@ -158,6 +158,23 @@ p.alert-text{color:#fca5a5;font-size:13px;line-height:1.7;margin-top:16px;margin
 .voucher-picker .vp-btn.auto{background:linear-gradient(135deg,#00c6ff,#0072ff);color:#fff}
 .voucher-picker .vp-btn.clear{background:rgba(255,255,255,0.06);color:#94a3b8;border:1px solid rgba(255,255,255,0.1)}
 
+
+/* Payment sosmed: saldo only */
+.method-selector .method-btn.qris { display: none !important; }
+#methodSelector { /* optional single column */
+}
+.method-selector .method-btn.saldo { width: 100%; max-width: 100%; }
+
+#btnMethodQris, .btn-method-qris, [data-method="qris"],
+#qrisSection, .qris-section, #qrisPayBox, .payment-method-qris {
+  display: none !important;
+}
+#btnMethodSaldo, .btn-method-saldo {
+  display: flex !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
 </style>
 </head>
 <body>
@@ -206,12 +223,7 @@ p.alert-text{color:#fca5a5;font-size:13px;line-height:1.7;margin-top:16px;margin
   </div>
 
   <div class="method-selector" id="methodSelector">
-    <button class="method-btn active qris" id="btnMethodQris" onclick="selectPaymentMethod('qris')">
-      <span class="m-icon">📱</span>
-      <span class="m-label">QRIS</span>
-      <span class="m-sub">Scan & bayar</span>
-    </button>
-    <button class="method-btn saldo" id="btnMethodSaldo" onclick="selectPaymentMethod('saldo')">
+    <button class="method-btn active saldo" id="btnMethodSaldo" onclick="selectPaymentMethod('saldo')">
       <span class="m-icon">💰</span>
       <span class="m-label">Saldo</span>
       <span class="m-sub" id="saldoSub">Rp 0</span>
@@ -475,7 +487,7 @@ let total = 0;        // diisi dari Supabase (pending_transactions.total)
 let isMass = false;   // diisi dari Supabase (pending_transactions.is_mass)
 let ordersData = [];
 
-let paymentMethod = 'qris';
+let paymentMethod = 'saldo';
 let userBalance = 0;
 let userEmail = null;
 let userProfileId = null;
@@ -795,7 +807,31 @@ async function saveAllOrdersDetailToDB(method) {
   try {
     const gmail = getStoredGmail();
     const totalPayment = normalizeTotal(finalTotal);
-    const perOrderAmount = Math.ceil(totalPayment / ordersData.length);
+    // Harga per order = nominal aslinya (bukan dibagi rata)
+    const sumLine = ordersData.reduce((s, o) => s + (Number(o.total) || Number(o.amount) || 0), 0);
+    const sumQty = ordersData.reduce((s, o) => s + (parseInt(o.jumlah, 10) || 0), 0);
+    function amountForOrder(o, idx, len) {
+      // Harga sebenarnya per baris order (jangan rata-rata massal)
+      let line = Number(o.total) || Number(o.amount) || Number(o.total_payment) || 0;
+      if (!(line > 0)) {
+        const unit = Number(o.price) || Number(o.harga) || Number(o.rate) || Number(o.harga_satuan) || 0;
+        const q = parseInt(o.jumlah || o.quantity || o.qty || 0, 10) || 0;
+        if (unit > 0 && q > 0) {
+          // rate sering per 1000 (SMM)
+          if (Number(o.rate_per) === 1000 || o.rate_mode === 'per_1000' || (unit < 1000 && q >= 1000 && o.service_id)) {
+            line = (unit / 1000) * q;
+          } else {
+            line = unit * q;
+          }
+        }
+      }
+      if (line > 0) return Math.max(1, Math.floor(line));
+      // fallback proporsional qty HANYA jika line kosong total
+      const q = parseInt(o.jumlah || o.quantity || o.qty || 0, 10) || 0;
+      if (sumQty > 0 && q > 0 && totalPayment > 0) return Math.max(1, Math.floor(totalPayment * (q / sumQty)));
+      // last resort equal
+      return Math.max(1, Math.floor(totalPayment / Math.max(len, 1)));
+    }
     const normalizedMethod = method === 'balance' ? 'saldo' : method;
     const { data: existing } = await supabaseClient.from('orders_detail').select('id').eq('trx_id', trx).limit(1);
     if (existing && existing.length > 0) return true;
@@ -803,7 +839,7 @@ async function saveAllOrdersDetailToDB(method) {
       user_id: userProfileId, email: userEmail || gmail || '-', gmail_target: gmail || '-',
       trx_id: trx, service_id: String(o.serviceId || ''), service_name: o.serviceName || '',
       target: o.target || '', quantity: parseInt(o.jumlah) || 0, comment: o.comment || null,
-      total_payment: perOrderAmount, payment_method: normalizedMethod, sosmed_type: SOSMED_TYPE
+      total_payment: amountForOrder(o, i, ordersData.length), payment_method: normalizedMethod, sosmed_type: SOSMED_TYPE
     }));
     const { data, error } = await supabaseClient.rpc('save_order_details_bulk', { p_orders: ordersArray });
     if (error) throw error;
@@ -1029,6 +1065,17 @@ function updateSaldoDisplay() {
 }
 
 function selectPaymentMethod(method) {
+  /* SALDO_ONLY_GUARD */
+  if (method !== 'saldo') {
+    try {
+      if (window.Swal) Swal.fire({ title: 'Saldo only', text: 'Halaman ini hanya bisa bayar memakai saldo.', icon: 'info', confirmButtonColor: '#00c6ff', background: '#0f0a1e', color: '#fff' });
+      else alert('Hanya pembayaran saldo');
+    } catch (_) {}
+    method = 'saldo';
+  }
+  return selectPaymentMethod_impl(method);
+}
+function selectPaymentMethod_impl(method) {
   if (IS_GMAIL_BLOCKED || IS_URL_PARAMS_INVALID) return;
   if (isPaymentVerified || transactionLocked) {
     Swal.fire({ title: '🔒 Transaksi Terkunci', text: 'Pembayaran sudah terverifikasi.', icon: 'info', confirmButtonColor: '#00c6ff' });
@@ -1126,12 +1173,21 @@ async function payWithBalance() {
       if (ordersData && ordersData.length > 0) {
         const { data: existing } = await supabaseClient.from('order_payments').select('id').eq('trx_id', trx).limit(1);
         if (!existing || existing.length === 0) {
-          const perOrderAmount = Math.ceil(totalBayarSaldo / ordersData.length);
+          const _sumLine2 = ordersData.reduce((s, o) => s + (Number(o.total) || Number(o.amount) || 0), 0);
+          const _sumQty2 = ordersData.reduce((s, o) => s + (parseInt(o.jumlah, 10) || 0), 0);
+          function amountForOrderPay(o, len) {
+            let line = Number(o.total) || Number(o.amount) || 0;
+            if (line > 0) return Math.floor(line);
+            const q = parseInt(o.jumlah, 10) || 0;
+            if (_sumQty2 > 0 && q > 0) return Math.floor(totalBayarSaldo * (q / _sumQty2));
+            return Math.floor(totalBayarSaldo / Math.max(len, 1));
+          }
+          const perOrderAmount = null; // deprecated equal-split
           const orderPaymentRows = ordersData.map((o, i) => ({
             user_id: userProfileId, email: userEmail, trx_id: trx, order_index: i,
             service_id: String(o.serviceId || ''), service_name: o.serviceName || '',
             target: o.target || '', quantity: parseInt(o.jumlah) || 0,
-            amount: perOrderAmount, status: 'paid'
+            amount: amountForOrderPay(o, ordersData.length), status: 'paid'
           }));
           await supabaseClient.from('order_payments').insert(orderPaymentRows);
         }
@@ -1295,7 +1351,7 @@ async function autoRefundOrder(orderIndex, order, errorMessage) {
     
     let refundAmount = orderPayment?.amount;
     if (!refundAmount || refundAmount <= 0) {
-      if (paymentMethod === 'qris') {
+      if (false && paymentMethod === 'qris') /* FORCE_SALDO_BEFORE_QRIS */ {
         const amountRefundable = normalizeTotal(finalTotal);
         refundAmount = Math.ceil(amountRefundable / ordersData.length);
       } else {
@@ -1825,12 +1881,21 @@ async function checkPaymentStatus() {
           const { data: existing } = await supabaseClient.from('order_payments').select('id').eq('trx_id', trx).limit(1);
           if (!existing || existing.length === 0) {
             const amountRefundable = normalizeTotal(finalTotal);
-            const perOrderAmount = Math.ceil(amountRefundable / ordersData.length);
+            const _sumLine3 = ordersData.reduce((s, o) => s + (Number(o.total) || Number(o.amount) || 0), 0);
+            const _sumQty3 = ordersData.reduce((s, o) => s + (parseInt(o.jumlah, 10) || 0), 0);
+            function amountForOrderRef(o, len) {
+              let line = Number(o.total) || Number(o.amount) || 0;
+              if (line > 0) return Math.floor(line);
+              const q = parseInt(o.jumlah, 10) || 0;
+              if (_sumQty3 > 0 && q > 0) return Math.floor(amountRefundable * (q / _sumQty3));
+              return Math.floor(amountRefundable / Math.max(len, 1));
+            }
+            const perOrderAmount = null;
             const orderPaymentRows = ordersData.map((o, i) => ({
               user_id: userProfileId, email: userEmail || gmail, trx_id: trx, order_index: i,
               service_id: String(o.serviceId || ''), service_name: o.serviceName || '',
               target: o.target || '', quantity: parseInt(o.jumlah) || 0,
-              amount: perOrderAmount, status: 'paid'
+              amount: amountForOrderPay(o, ordersData.length), status: 'paid'
             }));
             await supabaseClient.from('order_payments').insert(orderPaymentRows);
           }
@@ -2442,7 +2507,7 @@ window.showRefundHistory = showRefundHistory;
   startQrisTimer();
   
   setTimeout(() => {
-    if (paymentMethod === 'qris') {
+    if (false && paymentMethod === 'qris') /* FORCE_SALDO_BEFORE_QRIS */ {
       checkPaymentStatus();
       verificationInterval = setInterval(checkPaymentStatus, 10000);
     }
@@ -2467,5 +2532,30 @@ console.log(`💰 Mutasi purchase reference: ORDER ID PROVIDER`);
 console.log(`🔄 Auto-refund on provider failure: enabled`);
 console.log(`🚨 Auto-refund on invalid transaction data: enabled`);
 </script>
+
+<script>
+(function forceSaldoOnlySosmed(){
+  try { window.paymentMethod = 'saldo'; } catch(_){}
+  function apply(){
+    try {
+      if (typeof paymentMethod !== 'undefined') paymentMethod = 'saldo';
+      var bq = document.getElementById('btnMethodQris');
+      if (bq) { bq.style.display = 'none'; bq.onclick = function(e){ e.preventDefault(); e.stopPropagation(); return false; }; }
+      var qs = document.getElementById('qrisSection');
+      if (qs) qs.style.display = 'none';
+      var bs = document.getElementById('btnMethodSaldo');
+      if (bs) { bs.classList.add('active','saldo'); bs.style.display = ''; }
+      if (typeof setPaymentMethod === 'function') {
+        try { setPaymentMethod('saldo'); } catch(_){}
+      }
+    } catch(_){}
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', apply);
+  else apply();
+  setTimeout(apply, 300);
+  setTimeout(apply, 1200);
+})();
+</script>
+
 </body>
 </html>
