@@ -1327,6 +1327,12 @@ body.onboard-required #onboardNext{pointer-events:auto!important}
 .ann-cmt-input button,.ann-del-btn{border:none;border-radius:10px;padding:8px 12px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit}
 .ann-del-btn{background:rgba(239,68,68,.2);color:#fca5a5}
 
+
+#qrisModal.qris-blur #syahpayQrisImg, #qrisModal.qris-cancelled #syahpayQrisImg {
+  filter: blur(8px) grayscale(1) !important;
+  opacity: 0.4 !important;
+  pointer-events: none !important;
+}
 </style>
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer onload="window.__turnstileReady=true;try{if(typeof initShineTurnstile==='function')initShineTurnstile();}catch(e){}"></script>
 </head>
@@ -4920,24 +4926,36 @@ async function openTransferDialog() {
 // ============================================================
 async function generateUniqueCodeForAmount(baseAmount) {
   const base = Math.floor(Number(baseAmount) || 0);
-  // Kode unik 1–200 (maks 200), unik per total_amount pending aktif
-  for (let attempt = 0; attempt < 80; attempt++) {
-    const code = Math.floor(Math.random() * 200) + 1;
-    const total = base + code;
-    try {
+  // Kode unik 1–999 berurutan; lock 3 jam WIB per nominal+kode
+  const lockMs = 3 * 60 * 60 * 1000;
+  const sinceIso = new Date(Date.now() - lockMs).toISOString();
+  const used = new Set();
+  try {
+    if (supabaseClient) {
       const { data } = await supabaseClient
         .from('deposits')
-        .select('id, expires_at, status')
-        .eq('status', 'pending')
-        .eq('total_amount', total)
-        .limit(5);
+        .select('unique_code,status,created_at,expires_at')
+        .eq('amount', base)
+        .gte('created_at', sinceIso)
+        .limit(1000);
       const now = Date.now();
-      const conflict = (data || []).some(d => !d.expires_at || new Date(d.expires_at).getTime() > now);
-      if (!conflict) return code;
-    } catch (_) { return code; }
+      (data || []).forEach(function (d) {
+        const code = Math.floor(Number(d.unique_code) || 0);
+        if (code < 1 || code > 999) return;
+        const created = d.created_at ? new Date(d.created_at).getTime() : 0;
+        const exp = d.expires_at ? new Date(d.expires_at).getTime() : 0;
+        const within3h = created && (now - created) < lockMs;
+        const stillPending = d.status === 'pending' && (!exp || exp > now);
+        if (within3h || stillPending) used.add(code);
+      });
+    }
+  } catch (_) {}
+  for (let c = 1; c <= 999; c++) {
+    if (!used.has(c)) return c;
   }
-  return (Date.now() % 200) + 1;
+  throw new Error('Semua kode unik 1–999 untuk nominal ini terkunci 3 jam. Coba nominal lain.');
 }
+
 function generateUniqueCode() { return Math.floor(Math.random() * 200) + 1; }
 function crc16(str) {
   let crc = 0xFFFF;
@@ -5212,137 +5230,211 @@ async function createDeposit(amount) {
   if (!currentUser || !currentUser.id) {
     return Swal.fire({ title: 'Login dulu', icon: 'warning', background: '#1a0e2e', color: '#fff' });
   }
-  const adminFee = amount > 50000 ? Math.ceil(amount * 0.01) : 0;
-  const totalPay = amount + adminFee;
 
-  const pick = await Swal.fire({
-    title: 'Deposit saldo',
-    html: '<div style="text-align:left;font-size:13px;line-height:1.55">' +
+  let uniqueCode;
+  try {
+    uniqueCode = await generateUniqueCodeForAmount(amount);
+  } catch (e) {
+    return Swal.fire({ title: 'Kode unik habis', text: e.message || String(e), icon: 'warning', background: '#1a0e2e', color: '#fff' });
+  }
+  const adminFee = Math.ceil(amount * 0.01);
+  const cashback = Math.floor(uniqueCode * 0.1);
+  const totalPay = amount + adminFee + uniqueCode;
+
+  const conf = await Swal.fire({
+    title: 'Deposit QRIS (SyahPay)',
+    html: '<div style="text-align:left;font-size:13px;line-height:1.65">' +
       '<div>Saldo masuk: <b>Rp ' + amount.toLocaleString('id-ID') + '</b></div>' +
-      (adminFee > 0
-        ? '<div>Admin QRIS/payment 1%: <b style="color:#fbbf24">Rp ' + adminFee.toLocaleString('id-ID') + '</b></div>'
-        : '<div style="color:#86efac">Admin: Rp0 (≤ Rp50.000)</div>') +
-      '<div style="margin:8px 0 4px;font-size:15px">Total bayar: <b style="color:#ffd700">Rp ' + totalPay.toLocaleString('id-ID') + '</b></div>' +
-      '<div style="margin-top:12px;font-size:12px;color:#c4b5fd;font-weight:700">Pilih metode pembayaran</div>' +
-      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">' +
-      '<button type="button" class="swal2-confirm swal2-styled ann-pay-m" data-m="ALL" style="margin:0;background:#7c3aed">Semua metode</button>' +
-      '<button type="button" class="swal2-confirm swal2-styled ann-pay-m" data-m="QRIS" style="margin:0;background:#0ea5e9">QRIS</button>' +
-      '<button type="button" class="swal2-confirm swal2-styled ann-pay-m" data-m="VA" style="margin:0;background:#22c55e">Virtual Account</button>' +
-      '<button type="button" class="swal2-confirm swal2-styled ann-pay-m" data-m="EWALLET" style="margin:0;background:#f59e0b">E-Wallet</button>' +
-      '</div>' +
-      '<div style="margin-top:10px;font-size:11px;color:#94a3b8">Setelah lanjut, halaman DOKU menampilkan channel aktif merchant Anda (QRIS, VA bank, OVO/DANA/ShopeePay, kartu, dll).</div></div>',
-    showConfirmButton: false,
+      '<div>Admin QRIS 1%: <b style="color:#fbbf24">Rp ' + adminFee.toLocaleString('id-ID') + '</b></div>' +
+      '<div>Kode unik: <b style="color:#67e8f9">+' + uniqueCode + '</b> <span style="color:#94a3b8;font-size:11px">(lock 3 jam WIB)</span></div>' +
+      '<div>Cashback 10% kode unik: <b style="color:#86efac">+Rp ' + cashback.toLocaleString('id-ID') + '</b></div>' +
+      '<div style="margin-top:8px;font-size:15px">Total bayar: <b style="color:#ffd700">Rp ' + totalPay.toLocaleString('id-ID') + '</b></div>' +
+      '<div style="margin-top:8px;font-size:11px;color:#94a3b8">QRIS di halaman ini (tanpa pindah ke SyahPay). Expired 30 menit.</div></div>',
+    icon: 'question',
     showCancelButton: true,
+    confirmButtonText: 'Tampilkan QRIS',
     cancelButtonText: 'Batal',
     background: '#1a0e2e',
     color: '#fff',
-    didOpen: function () {
-      var root = Swal.getHtmlContainer();
-      if (!root) return;
-      root.querySelectorAll('.ann-pay-m').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-          Swal.clickConfirm();
-          Swal.getConfirmButton() && (Swal.getConfirmButton().dataset.method = btn.getAttribute('data-m'));
-          window.__depositPayMethod = btn.getAttribute('data-m') || 'ALL';
-          Swal.close({ isConfirmed: true, value: btn.getAttribute('data-m') });
-        });
-      });
-    },
-    preConfirm: function () { return window.__depositPayMethod || 'ALL'; }
+    confirmButtonColor: '#22c55e'
   });
+  if (!conf.isConfirmed) return;
 
-  // Custom close from buttons
-  var method = window.__depositPayMethod || (pick && pick.value) || null;
-  if (!method && !(pick && pick.isConfirmed)) {
-    // user cancelled
-    if (!pick || pick.isDismissed) return;
-  }
-  method = method || 'ALL';
-  window.__depositPayMethod = null;
-
-  Swal.fire({ title: 'Menyiapkan pembayaran…', allowOutsideClick: false, didOpen: function () { Swal.showLoading(); }, background: '#1a0e2e', color: '#fff' });
+  Swal.fire({ title: 'Membuat QRIS…', allowOutsideClick: false, didOpen: () => Swal.showLoading(), background: '#1a0e2e', color: '#fff' });
 
   try {
-    var r = await fetch('/api/doku-deposit-create', {
+    const r = await fetch('/api/syahpay-deposit-create', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         amount: amount,
         user_id: currentUser.id,
         email: (currentUser.email || '').toLowerCase(),
-        payment_method: method
+        unique_code: uniqueCode
       })
     });
-    var text = await r.text();
-    var data = null;
+    const text = await r.text();
+    let data = null;
     try { data = JSON.parse(text); } catch (_) {
-      throw new Error((text || '').slice(0, 200) || ('HTTP ' + r.status + ' (bukan JSON — cek deploy /api/doku-deposit-create)'));
+      throw new Error((text || '').slice(0, 220) || ('HTTP ' + r.status));
     }
-    if (!r.ok || !data.success) {
-      throw new Error((data && data.message) || ('HTTP ' + r.status));
-    }
-    if (!data.payment_url) {
-      throw new Error('payment_url kosong dari DOKU. Cek kredensial & produk Checkout.');
-    }
+    if (!r.ok || !data.success) throw new Error((data && data.message) || ('HTTP ' + r.status));
+
+    // Pakai kode dari server jika beda
+    uniqueCode = data.unique_code || uniqueCode;
 
     currentDeposit = {
       id: data.deposit_id,
       amount: data.amount,
       total_amount: data.total_pay,
       admin_fee: data.admin_fee,
-      invoice_number: data.invoice_number,
-      payment_url: data.payment_url,
-      status: 'pending'
+      unique_code: uniqueCode,
+      cashback_unique: data.cashback_unique || cashback,
+      invoice_number: data.invoice_id,
+      payment_url: data.payment_link,
+      qris_image: data.qris_image,
+      status: 'pending',
+      expires_at: data.expires_at || data.expired_at
     };
 
     try {
-      var qrisAmount = document.getElementById('qrisAmount');
+      const qrisAmount = document.getElementById('qrisAmount');
       if (qrisAmount) qrisAmount.textContent = 'Rp ' + Number(data.total_pay).toLocaleString('id-ID');
-      var detail = document.getElementById('qrisAmountDetail');
+      const detail = document.getElementById('qrisAmountDetail');
       if (detail) {
-        detail.innerHTML = 'Saldo: Rp ' + Number(data.amount).toLocaleString('id-ID') +
-          (data.admin_fee > 0 ? ' + Admin 1%: <b style="color:#ffd700">Rp ' + Number(data.admin_fee).toLocaleString('id-ID') + '</b>' : '') +
-          '<br><span style="font-size:11px;color:#94a3b8">Invoice: ' + (data.invoice_number || '-') + ' · Metode: ' + method + '</span>';
+        detail.innerHTML =
+          'Saldo: Rp ' + Number(data.amount).toLocaleString('id-ID') +
+          ' + Admin 1%: Rp ' + Number(data.admin_fee).toLocaleString('id-ID') +
+          ' + Kode unik: <b style="color:#67e8f9">' + uniqueCode + '</b>' +
+          ' · Cashback: <b style="color:#86efac">Rp ' + Number(data.cashback_unique || cashback).toLocaleString('id-ID') + '</b>' +
+          '<br><span style="font-size:11px;color:#94a3b8">Invoice: ' + (data.invoice_id || '-') + ' · Exp 30 mnt</span>';
       }
-      var stEl = document.getElementById('qrisStatus');
-      if (stEl) { stEl.textContent = 'Selesaikan bayar di halaman DOKU'; stEl.className = 'qris-status waiting'; }
-      var modal = document.getElementById('qrisModal');
-      if (modal) modal.classList.add('show');
+      const stEl = document.getElementById('qrisStatus');
+      if (stEl) { stEl.textContent = '⏳ Scan QRIS di sini · jangan tutup halaman'; stEl.className = 'qris-status waiting'; }
+
+      const canvas = document.getElementById('qrisCanvas');
+      if (canvas) canvas.style.display = 'none';
+      let img = document.getElementById('syahpayQrisImg');
+      if (!img) {
+        img = document.createElement('img');
+        img.id = 'syahpayQrisImg';
+        img.alt = 'QRIS SyahPay';
+        img.style.cssText = 'width:100%;max-width:280px;border-radius:12px;margin:10px auto;display:block;background:#fff;padding:10px';
+        const wrap = (canvas && canvas.parentElement) || document.getElementById('qrisModal');
+        if (wrap) wrap.insertBefore(img, canvas || wrap.firstChild);
+      }
+      if (data.qris_image) {
+        img.src = data.qris_image;
+        img.style.display = 'block';
+        img.style.filter = 'none';
+        img.style.opacity = '1';
+      }
+      const modal = document.getElementById('qrisModal');
+      if (modal) {
+        modal.classList.add('show');
+        modal.classList.remove('qris-cancelled', 'qris-blur');
+      }
     } catch (_) {}
 
     Swal.close();
+    // TIDAK buka payment_link SyahPay — QRIS tetap di modal
 
-    var go = await Swal.fire({
-      title: 'Lanjut bayar di DOKU',
-      html: '<div style="font-size:13px">Metode: <b>' + method + '</b><br>Anda bisa memilih channel (QRIS, VA, e-wallet, kartu) di halaman DOKU sesuai yang aktif di merchant.</div>',
-      icon: 'info',
-      showCancelButton: true,
-      confirmButtonText: 'Buka pembayaran',
-      cancelButtonText: 'Nanti',
-      background: '#1a0e2e',
-      color: '#fff',
-      confirmButtonColor: '#22c55e'
-    });
-    if (go.isConfirmed) {
-      window.open(data.payment_url, '_blank');
-    }
     try {
-      if (data.deposit_id && typeof startDepositStatusPoll === 'function') {
-        startDepositStatusPoll(data.deposit_id, data.amount);
+      startSyahpayDepositPoll(data.invoice_id, data.deposit_id, data.amount, data.expires_at || data.expired_at, data.cashback_unique || cashback);
+    } catch (_) {}
+    try {
+      if (data.expires_at || data.expired_at) {
+        const exp = new Date(data.expires_at || data.expired_at);
+        if (typeof startDepositTimer === 'function') startDepositTimer(exp);
       }
     } catch (_) {}
   } catch (err) {
     Swal.fire({
       title: '❌ Gagal deposit',
-      html: '<div style="text-align:left;font-size:12px;word-break:break-word">' +
-        String(err.message || err) +
-        '<br><br><span style="color:#94a3b8">Jika FUNCTION_INVOCATION_FAILED: pastikan file api/doku-deposit-create.js ter-deploy & ENV DOKU_CLIENT_ID + DOKU_SECRET_KEY di Vercel, lalu Redeploy.</span></div>',
+      html: '<div style="text-align:left;font-size:12px;word-break:break-word">' + String(err.message || err) + '</div>',
       icon: 'error',
       background: '#1a0e2e',
       color: '#fff'
     });
   }
 }
+
+function closeQrisModalCancelled(reason) {
+  try {
+    const modal = document.getElementById('qrisModal');
+    const img = document.getElementById('syahpayQrisImg');
+    if (img) {
+      img.style.filter = 'blur(8px) grayscale(1)';
+      img.style.opacity = '0.45';
+    }
+    if (modal) {
+      modal.classList.add('qris-cancelled', 'qris-blur');
+      setTimeout(function () {
+        try { modal.classList.remove('show'); } catch (_) {}
+      }, 600);
+    }
+    const stEl = document.getElementById('qrisStatus');
+    if (stEl) {
+      stEl.textContent = reason || 'QRIS dibatalkan / expired';
+      stEl.className = 'qris-status error';
+    }
+  } catch (_) {}
+}
+window.closeQrisModalCancelled = closeQrisModalCancelled;
+
+function startSyahpayDepositPoll(invoiceId, depositId, creditAmount, expiresAt, cashback) {
+  if (window.__syahPoll) clearInterval(window.__syahPoll);
+  let n = 0;
+  const expMs = expiresAt ? new Date(expiresAt).getTime() : (Date.now() + 30 * 60 * 1000);
+  cashback = Math.floor(Number(cashback) || 0);
+  window.__syahPoll = setInterval(async function () {
+    n++;
+    if (n > 100 || Date.now() > expMs + 3000) {
+      clearInterval(window.__syahPoll);
+      closeQrisModalCancelled('⏰ QRIS expired');
+      return;
+    }
+    try {
+      const r = await fetch('/api/syahpay-deposit-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ invoice_id: invoiceId, deposit_id: depositId || null })
+      });
+      const data = await r.json().catch(() => null);
+      if (!data || !data.success) return;
+      if (data.status === 'paid') {
+        clearInterval(window.__syahPoll);
+        try {
+          if (typeof fetchProfile === 'function' && currentUser) {
+            const pr = await fetchProfile(currentUser.id);
+            if (pr && typeof updateBalanceDisplay === 'function') updateBalanceDisplay(pr.balance || 0);
+          }
+        } catch (_) {}
+        try {
+          const stEl = document.getElementById('qrisStatus');
+          if (stEl) { stEl.textContent = '✅ Pembayaran berhasil'; stEl.className = 'qris-status success'; }
+        } catch (_) {}
+        const totalCredit = Number(creditAmount || 0) + cashback;
+        Swal.fire({
+          title: 'Deposit berhasil',
+          html: 'Saldo +Rp ' + Number(creditAmount || 0).toLocaleString('id-ID') +
+            (cashback > 0 ? '<br>Cashback kode unik +Rp ' + cashback.toLocaleString('id-ID') : ''),
+          icon: 'success',
+          background: '#1a0e2e',
+          color: '#fff'
+        });
+        try { const m = document.getElementById('qrisModal'); if (m) m.classList.remove('show'); } catch (_) {}
+      } else if (data.status === 'expired' || data.status === 'cancelled' || data.status === 'canceled') {
+        clearInterval(window.__syahPoll);
+        closeQrisModalCancelled('QRIS ' + data.status + ' — ditutup');
+      }
+    } catch (_) {}
+  }, 4000);
+}
+window.startSyahpayDepositPoll = startSyahpayDepositPoll;
+
+
+window.startSyahpayDepositPoll = startSyahpayDepositPoll;
 
 function startDepositStatusPoll(depositId, creditAmount) {
   if (window.__dokuDepPoll) clearInterval(window.__dokuDepPoll);
