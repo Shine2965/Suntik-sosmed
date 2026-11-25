@@ -1,8 +1,8 @@
 /**
  * POST /api/syahpay-deposit-create
- * Body: { amount, user_id, email }
+ * Body: { amount, user_id, email, unique_code?, admin_fee?, total_pay? }
+ * total_pay = amount + admin_fee(1%) + unique_code
  * Env: SYAHPAY_API_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
- * QRIS only, expire 30 menit, admin fee 1%
  */
 const crypto = require('crypto');
 
@@ -34,7 +34,54 @@ function readBody(req) {
 function calcAdminFee(amount) {
   const a = Math.floor(Number(amount) || 0);
   if (a <= 0) return 0;
-  return Math.ceil(a * 0.01); // 1% QRIS admin
+  return Math.ceil(a * 0.01);
+}
+
+/** Cari kode unik 1-999 berurutan untuk nominal amount, lock 3 jam WIB */
+async function pickUniqueCode(supabaseUrl, supabaseKey, amount) {
+  const now = Date.now();
+  const lockMs = 3 * 60 * 60 * 1000; // 3 jam
+  const used = new Set();
+  try {
+    // Ambil deposit 3 jam terakhir dengan amount sama (pending/paid)
+    const since = new Date(now - lockMs).toISOString();
+    const q = await fetch(
+      supabaseUrl +
+        '/rest/v1/deposits?amount=eq.' +
+        encodeURIComponent(String(amount)) +
+        '&created_at=gte.' +
+        encodeURIComponent(since) +
+        '&select=unique_code,status,created_at,expires_at&order=unique_code.asc&limit=1000',
+      {
+        headers: {
+          apikey: supabaseKey,
+          Authorization: 'Bearer ' + supabaseKey
+        }
+      }
+    );
+    const rows = await q.json().catch(() => []);
+    (Array.isArray(rows) ? rows : []).forEach((d) => {
+      const code = Math.floor(Number(d.unique_code) || 0);
+      if (code < 1 || code > 999) return;
+      // lock jika pending belum expired ATAU created dalam 3 jam
+      const created = d.created_at ? new Date(d.created_at).getTime() : 0;
+      const exp = d.expires_at ? new Date(d.expires_at).getTime() : 0;
+      const stillPending = d.status === 'pending' && (!exp || exp > now);
+      const within3h = created && now - created < lockMs;
+      if (stillPending || within3h || d.status === 'paid' || d.status === 'success') {
+        if (within3h || stillPending) used.add(code);
+        // paid juga lock 3 jam dari created
+        if ((d.status === 'paid' || d.status === 'success' || d.status === 'completed') && within3h) {
+          used.add(code);
+        }
+      }
+    });
+  } catch (_) {}
+
+  for (let c = 1; c <= 999; c++) {
+    if (!used.has(c)) return c;
+  }
+  return null;
 }
 
 module.exports = async (req, res) => {
@@ -49,7 +96,7 @@ module.exports = async (req, res) => {
     if (!API_KEY) {
       return send(res, 500, {
         success: false,
-        message: 'ENV SYAHPAY_API_KEY belum di-set di Vercel. Set lalu Redeploy.'
+        message: 'ENV SYAHPAY_API_KEY belum di-set di Vercel'
       });
     }
 
@@ -66,10 +113,26 @@ module.exports = async (req, res) => {
     }
 
     const adminFee = calcAdminFee(amount);
-    const totalPay = amount + adminFee;
-    const idempotency = 'dep-' + userId.slice(0, 8) + '-' + Date.now() + '-' + crypto.randomBytes(4).toString('hex');
+    let uniqueCode = Math.floor(Number(body.unique_code) || 0);
+    if (!uniqueCode || uniqueCode < 1 || uniqueCode > 999) {
+      if (SUPABASE_URL && SUPABASE_KEY) {
+        uniqueCode = await pickUniqueCode(SUPABASE_URL, SUPABASE_KEY, amount);
+      } else {
+        uniqueCode = 1;
+      }
+    }
+    if (!uniqueCode) {
+      return send(res, 409, {
+        success: false,
+        message: 'Semua kode unik 1–999 untuk nominal ini sedang terpakai (lock 3 jam WIB). Coba nominal lain atau nanti.'
+      });
+    }
 
-    // SyahPay: GET /api/invoice?amount=...  (API key via header)
+    const cashback = Math.floor(uniqueCode * 0.1); // 10% kode unik ke pembeli
+    const totalPay = amount + adminFee + uniqueCode;
+    const idempotency =
+      'dep-' + userId.slice(0, 8) + '-' + amount + '-' + uniqueCode + '-' + Date.now();
+
     const url = 'https://syahpay.biz.id/api/invoice?amount=' + encodeURIComponent(String(totalPay));
     let spJson = null;
     let spText = '';
@@ -88,8 +151,7 @@ module.exports = async (req, res) => {
       if (!r.ok) {
         return send(res, 502, {
           success: false,
-          message: 'SyahPay HTTP ' + r.status + ': ' + (spText || '').slice(0, 300),
-          syahpay_status: r.status
+          message: 'SyahPay HTTP ' + r.status + ': ' + (spText || '').slice(0, 300)
         });
       }
     } catch (e) {
@@ -102,21 +164,20 @@ module.exports = async (req, res) => {
     if (!spJson || !spJson.success) {
       return send(res, 502, {
         success: false,
-        message: 'SyahPay gagal buat invoice: ' + JSON.stringify(spJson || spText).slice(0, 300)
+        message: 'SyahPay gagal: ' + JSON.stringify(spJson || spText).slice(0, 300)
       });
     }
 
     const invoiceId = spJson.invoice_id || spJson.id || null;
     const qrisImage = spJson.qris_image || spJson.qr_image || null;
-    const paymentLink = spJson.payment_link || spJson.payment_url || null;
+    const paymentLink = spJson.payment_link || null;
     const expiredAt = spJson.expired_at || null;
-    // expired 30 menit fallback
-    const expiresIso = expiredAt
-      ? (isNaN(Date.parse(expiredAt)) ? new Date(Date.now() + 30 * 60 * 1000).toISOString() : new Date(expiredAt).toISOString())
+    const expiresIso = expiredAt && !isNaN(Date.parse(expiredAt))
+      ? new Date(expiredAt).toISOString()
       : new Date(Date.now() + 30 * 60 * 1000).toISOString();
 
     if (!invoiceId) {
-      return send(res, 502, { success: false, message: 'invoice_id kosong dari SyahPay', raw: spJson });
+      return send(res, 502, { success: false, message: 'invoice_id kosong', raw: spJson });
     }
 
     let depositId = null;
@@ -134,7 +195,7 @@ module.exports = async (req, res) => {
             user_id: userId,
             email: email,
             amount: amount,
-            unique_code: 0,
+            unique_code: uniqueCode,
             total_amount: totalPay,
             status: 'pending',
             expires_at: expiresIso,
@@ -144,7 +205,8 @@ module.exports = async (req, res) => {
             admin_fee: adminFee,
             payment_url: paymentLink,
             payment_method: 'QRIS',
-            qris_image: qrisImage
+            qris_image: qrisImage,
+            cashback_unique: cashback
           })
         });
         const rows = await ins.json().catch(() => null);
@@ -162,13 +224,14 @@ module.exports = async (req, res) => {
       deposit_id: depositId,
       amount: amount,
       admin_fee: adminFee,
+      unique_code: uniqueCode,
+      cashback_unique: cashback,
       total_pay: totalPay,
-      fee_provider: spJson.fee || 0,
       qris_image: qrisImage,
       payment_link: paymentLink,
       expired_at: expiredAt || expiresIso,
       expires_at: expiresIso,
-      message: 'Bayar via QRIS SyahPay (expired 30 menit)'
+      message: 'QRIS in-app · jangan redirect'
     });
   } catch (e) {
     console.error('syahpay-deposit-create', e);
