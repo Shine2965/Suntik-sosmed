@@ -175,6 +175,27 @@ p.warning-text{color:#fca5a5;font-size:13px;line-height:1.7;margin-top:16px;marg
   pointer-events: auto !important;
 }
 
+
+/* FORCE SALDO PAY VISIBLE */
+#saldoInfo, #saldoInfo.show, .saldo-info {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  height: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
+}
+#btnPaySaldo, .btn-saldo {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  width: 100%;
+  margin-top: 14px !important;
+  pointer-events: auto !important;
+}
+#qrisSection, .qris-section { display: none !important; }
+#btnMethodQris { display: none !important; }
+
 </style>
 </head>
 <body>
@@ -1183,31 +1204,46 @@ function selectPaymentMethod(method) {
   return selectPaymentMethod_impl(method);
 }
 function selectPaymentMethod_impl(method) {
-  if (IS_GMAIL_BLOCKED || IS_URL_PARAMS_INVALID) return;
-  if (isPaymentVerified || transactionLocked) {
-    Swal.fire({ title: '🔒 Transaksi Terkunci', text: 'Pembayaran sudah terverifikasi, tidak bisa ubah metode.', icon: 'info', confirmButtonColor: '#00c6ff' });
-    return;
-  }
-  paymentMethod = method;
-  const btnQris = document.getElementById('btnMethodQris');
-  const btnSaldo = document.getElementById('btnMethodSaldo');
-  btnQris.classList.remove('active', 'qris', 'saldo');
-  btnSaldo.classList.remove('active', 'qris', 'saldo');
-  const qrisSection = document.getElementById('qrisSection');
-  const saldoInfo = document.getElementById('saldoInfo');
-  if (method === 'qris') {
-    btnQris.classList.add('active', 'qris');
-    qrisSection.classList.remove('hide');
-    saldoInfo.classList.remove('show');
-    if (!qrisTimerInterval) startQrisTimer();
-  } else {
-    btnSaldo.classList.add('active', 'saldo');
-    qrisSection.classList.add('hide');
-    saldoInfo.classList.add('show');
-    if (qrisTimerInterval) clearInterval(qrisTimerInterval);
-    updateSaldoDisplay();
-  }
+  method = 'saldo'; // forced saldo only
+  if (typeof IS_GMAIL_BLOCKED !== 'undefined' && IS_GMAIL_BLOCKED) return;
+  if (typeof IS_URL_PARAMS_INVALID !== 'undefined' && IS_URL_PARAMS_INVALID) return;
+  if (typeof isPaymentVerified !== 'undefined' && isPaymentVerified) return;
+  if (typeof transactionLocked !== 'undefined' && transactionLocked) return;
+  paymentMethod = 'saldo';
+  try {
+    const btnQris = document.getElementById('btnMethodQris');
+    const btnSaldo = document.getElementById('btnMethodSaldo');
+    if (btnQris) {
+      btnQris.classList.remove('active', 'qris', 'saldo');
+      btnQris.style.display = 'none';
+    }
+    if (btnSaldo) {
+      btnSaldo.classList.remove('active', 'qris', 'saldo');
+      btnSaldo.classList.add('active', 'saldo');
+      btnSaldo.style.display = '';
+    }
+    const qrisSection = document.getElementById('qrisSection');
+    const saldoInfo = document.getElementById('saldoInfo');
+    if (qrisSection) {
+      qrisSection.classList.add('hide');
+      qrisSection.style.display = 'none';
+    }
+    if (saldoInfo) {
+      saldoInfo.classList.add('show');
+      saldoInfo.style.display = 'block';
+      saldoInfo.style.visibility = 'visible';
+      saldoInfo.style.opacity = '1';
+    }
+    const btnPay = document.getElementById('btnPaySaldo');
+    if (btnPay) {
+      btnPay.style.display = 'block';
+      btnPay.style.visibility = 'visible';
+      btnPay.disabled = false;
+      btnPay.classList.remove('hide');
+    }
+  } catch (e) { console.warn('selectPaymentMethod_impl', e); }
 }
+
 
 async function payWithBalance() {
   if (IS_GMAIL_BLOCKED || IS_URL_PARAMS_INVALID) return;
@@ -2638,6 +2674,32 @@ console.log(`🚨 Auto-refund on invalid transaction data: enabled`);
   else apply();
   setTimeout(apply, 300);
   setTimeout(apply, 1200);
+})();
+</script>
+
+
+<script>
+(function forceShowPaySaldo(){
+  function run(){
+    try {
+      if (typeof paymentMethod !== 'undefined') paymentMethod = 'saldo';
+      if (typeof selectPaymentMethod === 'function') selectPaymentMethod('saldo');
+      else if (typeof selectPaymentMethod_impl === 'function') selectPaymentMethod_impl('saldo');
+      var si = document.getElementById('saldoInfo');
+      if (si) { si.classList.add('show'); si.style.display='block'; }
+      var bp = document.getElementById('btnPaySaldo');
+      if (bp) {
+        bp.style.display='block';
+        bp.disabled=false;
+        if (!bp.textContent || !bp.textContent.trim()) bp.textContent = '💰 Bayar dengan Saldo';
+      }
+    } catch(e){}
+  }
+  if (document.readyState==='loading') document.addEventListener('DOMContentLoaded', run);
+  else run();
+  setTimeout(run, 200);
+  setTimeout(run, 800);
+  setTimeout(run, 2000);
 })();
 </script>
 
