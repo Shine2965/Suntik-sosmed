@@ -113,7 +113,7 @@ module.exports = async (req, res) => {
             body: JSON.stringify({
               p_deposit_id: dep.id,
               p_user_id: dep.user_id,
-              p_amount: dep.amount,
+              p_amount: Number(dep.amount || 0) + Number(dep.cashback_unique || Math.floor((dep.unique_code || 0) * 0.1) || 0),
               p_invoice: invoiceId,
               p_provider: 'syahpay'
             })
