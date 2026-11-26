@@ -135,20 +135,26 @@ body.is-owner .admin-only{display:block}
   </div>
 
   <div class="card admin-only">
-    <h3>⚙️ Panel Owner</h3>
+    <h3>⚙️ Panel Owner · Atur Primary</h3>
+    <div class="hint" style="margin-top:0;margin-bottom:10px">Perubahan ini langsung berlaku di papan primary dan pembelian berikutnya.</div>
     <div class="row">
-      <input type="number" id="aTotal" placeholder="Total lembar" style="flex:1">
-      <input type="number" id="aPrice" placeholder="Harga / lembar" style="flex:1">
+      <div style="flex:1"><div class="hint" style="margin:0 0 4px">Jumlah lembar dibagikan</div>
+        <input type="number" id="aTotal" min="1" placeholder="contoh: 1000" oninput="updatePreview()"></div>
+      <div style="flex:1"><div class="hint" style="margin:0 0 4px">Harga jual / lembar (Rp)</div>
+        <input type="number" id="aPrice" min="1" placeholder="contoh: 50000" oninput="updatePreview()"></div>
     </div>
     <div class="row" style="margin-top:8px">
-      <input type="number" id="aMinSh" placeholder="Min lembar" style="flex:1">
-      <input type="number" id="aMinAmt" placeholder="Min nominal Rp" style="flex:1">
+      <div style="flex:1"><div class="hint" style="margin:0 0 4px">Minimal pembelian (Rp)</div>
+        <input type="number" id="aMinAmt" min="0" placeholder="contoh: 100000" oninput="updatePreview()"></div>
+      <div style="flex:1"><div class="hint" style="margin:0 0 4px">% jatah investor</div>
+        <input type="number" id="aPct" min="0" max="100" placeholder="default 30"></div>
     </div>
+    <div class="formula" id="aPreview" style="margin-top:10px">Isi jumlah dan harga untuk melihat nilai primary.</div>
     <div class="row" style="margin-top:8px">
-      <input type="number" id="aPct" placeholder="% jatah investor (default 30)" style="flex:1">
+      <button class="btn btn-cyan" onclick="guard(this, loadOwnerForm)">Muat dari server</button>
       <button class="btn btn-warn" onclick="guard(this, saveSettings)">Simpan setting</button>
     </div>
-    <div class="row" style="margin-top:8px">
+    <div class="row" style="margin-top:12px">
       <input type="number" id="aProfit" placeholder="Laba bersih hari ini (Rp)" style="flex:1.2">
       <button class="btn btn-green" onclick="guard(this, distributeProfit)">Bagi hasil 30%</button>
     </div>
@@ -175,6 +181,7 @@ let state = null;
 let side = 'sell';
 let boardFilter = 'all';
 let chartPoints = [];
+let ownerFormLoaded = false;
 
 function fmt(n){ return 'Rp ' + Math.round(Number(n) || 0).toLocaleString('id-ID'); }
 function $(id){ return document.getElementById(id); }
@@ -238,14 +245,7 @@ async function loadState(){
       ? 'Harga ' + fmt(data.price_per_share) + ' / lembar · min ' + data.min_buy_shares + ' lembar · min ' + fmt(data.min_buy_amount)
       : 'Primary habis/tutup — gunakan pasar sekunder (request beli / jual).';
 
-    if (isOwner) {
-      // isi form owner hanya sekali, supaya tidak menimpa input yang sedang diketik
-      if (!$('aTotal').value) $('aTotal').value = data.total_shares;
-      if (!$('aPrice').value) $('aPrice').value = data.price_per_share;
-      if (!$('aMinSh').value) $('aMinSh').value = data.min_buy_shares;
-      if (!$('aMinAmt').value) $('aMinAmt').value = data.min_buy_amount;
-      if (!$('aPct').value) $('aPct').value = data.investor_profit_pct;
-    }
+    if (isOwner && !ownerFormLoaded) loadOwnerForm();
 
     chartPoints = (data.price_history || []).slice().reverse().map(h => Number(h.price) || 0);
     if (!chartPoints.length) chartPoints = [Number(data.price_per_share) || 1000];
@@ -430,19 +430,57 @@ async function placeOrder(){
   refreshAll();
 }
 
+function loadOwnerForm(){
+  if (!state) return;
+  $('aTotal').value = state.total_shares || '';
+  $('aPrice').value = state.price_per_share || '';
+  $('aMinAmt').value = state.min_buy_amount || '';
+  $('aPct').value = state.investor_profit_pct || '';
+  ownerFormLoaded = true;
+  updatePreview();
+}
+
+function updatePreview(){
+  const sh = parseInt($('aTotal').value || '0', 10) || 0;
+  const pr = parseFloat($('aPrice').value || '0') || 0;
+  const mn = parseFloat($('aMinAmt').value || '0') || 0;
+  const minSh = pr > 0 && mn > 0 ? Math.ceil(mn / pr) : 1;
+  $('aPreview').innerHTML =
+    'Nilai primary: <b>' + fmt(sh * pr) + '</b> · ' +
+    'Minimal beli: <b>' + fmt(mn) + '</b> (≈ ' + minSh + ' lembar)';
+}
+
 async function saveSettings(){
+  const total = parseInt($('aTotal').value || '0', 10);
+  const price = parseFloat($('aPrice').value || '0');
+  const minAmt = parseFloat($('aMinAmt').value || '0') || 0;
+  const pctRaw = $('aPct').value.trim();
+  const pct = pctRaw === '' ? null : parseFloat(pctRaw);
+
+  if (!total || total < 1) return showErr('Jumlah lembar harus lebih dari 0.');
+  if (!price || price < 1) return showErr('Harga jual per lembar harus lebih dari Rp0.');
+  if (minAmt < 0) return showErr('Minimal pembelian tidak boleh negatif.');
+  if (minAmt > total * price) return showErr('Minimal pembelian melebihi nilai total primary.');
+  if (pct !== null && (isNaN(pct) || pct < 0 || pct > 100)) return showErr('% jatah investor harus 0–100.');
+  if (state && total < (state.shares_sold || 0)) {
+    return showErr('Jumlah lembar tidak boleh kurang dari lembar yang sudah terjual (' + state.shares_sold + ').');
+  }
+
+  const minSh = minAmt > 0 ? Math.ceil(minAmt / price) : 1;
+
   const { data, error } = await supabaseClient.rpc('invest_admin_update_settings', {
-    p_total_shares: parseInt($('aTotal').value || '0', 10) || null,
-    p_price_per_share: parseFloat($('aPrice').value || '0') || null,
-    p_min_buy_shares: parseInt($('aMinSh').value || '0', 10) || null,
-    p_min_buy_amount: parseFloat($('aMinAmt').value || '0') || null,
-    p_investor_profit_pct: parseFloat($('aPct').value || '0') || null,
-    // pertahankan status primary saat ini, jangan paksa terbuka
+    p_total_shares: total,
+    p_price_per_share: price,
+    p_min_buy_amount: minAmt,
+    p_min_buy_shares: minSh,
+    p_investor_profit_pct: pct,
     p_primary_open: state ? !!state.primary_open : null
   });
   if (error) return showErr(error.message);
   if (data && data.success === false) return showErr(data.message);
+
   await showOk('Tersimpan', '', 1200);
+  ownerFormLoaded = false; // ambil ulang nilai dari server
   refreshAll();
 }
 
@@ -484,6 +522,8 @@ window.buyPrimary = buyPrimary;
 window.placeOrder = placeOrder;
 window.saveSettings = saveSettings;
 window.distributeProfit = distributeProfit;
+window.loadOwnerForm = loadOwnerForm;
+window.updatePreview = updatePreview;
 
 init();
 </script>
