@@ -124,6 +124,14 @@ async function creditBalance(url, key, userId, creditAmt, invoiceId) {
   return { ok: false, before: before.balance, attempts };
 }
 
+/** Baca role dari JWT key: 'service_role' | 'anon' | null (key format baru sb_secret_ dianggap valid) */
+function keyRole(key) {
+  const k = String(key || '').trim();
+  if (!k) return null;
+  if (k.startsWith('sb_secret_')) return 'service_role';
+  try { return JSON.parse(Buffer.from(k.split('.')[1], 'base64url').toString()).role || null; } catch (_) { return null; }
+}
+
 /** Ambil origin saja: 'https://x.supabase.co/rest/v1/' -> 'https://x.supabase.co' */
 function normalizeSupabaseUrl(raw) {
   const v = String(raw || '').trim();
@@ -140,7 +148,13 @@ module.exports = async (req, res) => {
 
     const API_KEY = (process.env.SYAHPAY_API_KEY || process.env.SYAHPAY_APIKEY || '').trim();
     const SUPABASE_URL = normalizeSupabaseUrl(process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '');
-    const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || '';
+    const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+    if (!SUPABASE_KEY || keyRole(SUPABASE_KEY) !== 'service_role') {
+      return send(res, 500, {
+        success: false,
+        message: 'SUPABASE_SERVICE_ROLE_KEY tidak valid (role terbaca: ' + (keyRole(SUPABASE_KEY) || 'kosong') + '). Isi service_role key di Vercel, bukan anon key.'
+      });
+    }
 
     if (!API_KEY) return send(res, 500, { success: false, message: 'SYAHPAY_API_KEY belum di-set' });
     if (!SUPABASE_URL || !SUPABASE_KEY) {
