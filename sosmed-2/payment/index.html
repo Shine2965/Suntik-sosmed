@@ -971,9 +971,7 @@ async function saveAllOrdersDetailToDB(method) {
           });
         } catch (e2) { console.warn(e2); }
       }
-    } else { /* ok */ }
-    if (error && !(data && data.success)) { /* fallback already ran */ }
-    if (false) throw new Error(data?.message || 'Save failed');
+    }
     return true;
   } catch (err) { console.error('❌ Save all orders error:', err.message); return false; }
 }
@@ -1206,30 +1204,25 @@ function updateSaldoDisplay() {
 }
 
 function selectPaymentMethod(method) {
-  /* SALDO_ONLY_GUARD */
-  if (method !== 'saldo') {
-    try {
-      if (window.Swal) Swal.fire({ title: 'Saldo only', text: 'Halaman ini hanya bisa bayar memakai saldo.', icon: 'info', confirmButtonColor: '#00c6ff', background: '#0f0a1e', color: '#fff' });
-      else alert('Hanya pembayaran saldo');
-    } catch (_) {}
-    method = 'saldo';
-  }
-  return selectPaymentMethod_impl(method);
+  if (method === 'qris') method = 'saldo';
+  try {
+    if (typeof selectPaymentMethod_impl === 'function') return selectPaymentMethod_impl(method);
+  } catch (e) { console.warn(e); }
+  try { paymentMethod = 'saldo'; } catch (_) {}
 }
 function selectPaymentMethod_impl(method) {
-  method = 'saldo'; // forced saldo only
-  if (typeof IS_GMAIL_BLOCKED !== 'undefined' && IS_GMAIL_BLOCKED) return;
-  if (typeof IS_URL_PARAMS_INVALID !== 'undefined' && IS_URL_PARAMS_INVALID) return;
-  if (typeof isPaymentVerified !== 'undefined' && isPaymentVerified) return;
-  if (typeof transactionLocked !== 'undefined' && transactionLocked) return;
-  paymentMethod = 'saldo';
+  method = 'saldo';
+  try {
+    if (typeof IS_GMAIL_BLOCKED !== 'undefined' && IS_GMAIL_BLOCKED) return;
+    if (typeof IS_URL_PARAMS_INVALID !== 'undefined' && IS_URL_PARAMS_INVALID) return;
+    if (typeof isPaymentVerified !== 'undefined' && isPaymentVerified) return;
+    if (typeof transactionLocked !== 'undefined' && transactionLocked) return;
+  } catch (_) {}
+  try { paymentMethod = 'saldo'; } catch (_) {}
   try {
     const btnQris = document.getElementById('btnMethodQris');
     const btnSaldo = document.getElementById('btnMethodSaldo');
-    if (btnQris) {
-      btnQris.classList.remove('active', 'qris', 'saldo');
-      btnQris.style.display = 'none';
-    }
+    if (btnQris) { btnQris.classList.remove('active', 'qris', 'saldo'); btnQris.style.display = 'none'; }
     if (btnSaldo) {
       btnSaldo.classList.remove('active', 'qris', 'saldo');
       btnSaldo.classList.add('active', 'saldo');
@@ -1237,10 +1230,7 @@ function selectPaymentMethod_impl(method) {
     }
     const qrisSection = document.getElementById('qrisSection');
     const saldoInfo = document.getElementById('saldoInfo');
-    if (qrisSection) {
-      qrisSection.classList.add('hide');
-      qrisSection.style.display = 'none';
-    }
+    if (qrisSection) { qrisSection.classList.add('hide'); qrisSection.style.display = 'none'; }
     if (saldoInfo) {
       saldoInfo.classList.add('show');
       saldoInfo.style.display = 'block';
@@ -1250,9 +1240,8 @@ function selectPaymentMethod_impl(method) {
     const btnPay = document.getElementById('btnPaySaldo');
     if (btnPay) {
       btnPay.style.display = 'block';
-      btnPay.style.visibility = 'visible';
       btnPay.disabled = false;
-      btnPay.classList.remove('hide');
+      btnPay.style.visibility = 'visible';
     }
   } catch (e) { console.warn('selectPaymentMethod_impl', e); }
 }
@@ -1301,8 +1290,7 @@ async function payWithBalance() {
   if (!confirm.isConfirmed) return;
   
   const btn = document.getElementById('btnPaySaldo');
-  btn.disabled = true;
-  btn.innerHTML = '⏳ Memproses...';
+  if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Memproses...'; }
   
   const oldBalance = userBalance;
   
