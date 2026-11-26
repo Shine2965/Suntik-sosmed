@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Jadi Investor — Shine Shop</title>
+<link rel="icon" href="/home/logo.png" type="image/png">
+<meta name="theme-color" content="#0d0720">
+<link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700;800&family=Poppins:wght@600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:'Quicksand',sans-serif;background:#0d0720;color:#fff;min-height:100vh}
+body::before{content:'';position:fixed;inset:0;background:radial-gradient(circle at 20% 20%,rgba(255,107,157,.12),transparent 45%),radial-gradient(circle at 80% 70%,rgba(0,198,255,.1),transparent 40%);pointer-events:none;z-index:0}
+.app{position:relative;z-index:1;max-width:480px;margin:0 auto;min-height:100vh;padding:14px 14px 90px;background:linear-gradient(180deg,#1a0e2e 0%,#150a24 100%)}
+.top{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.back{width:38px;height:38px;border-radius:12px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.05);color:#fff;font-size:16px;cursor:pointer}
+.title{flex:1;font-family:'Poppins',sans-serif;font-weight:800;font-size:17px;background:linear-gradient(135deg,#ff6b9d,#67e8f9);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.card{background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.08);border-radius:18px;padding:14px;margin-bottom:12px}
+.card h3{font-size:12px;text-transform:uppercase;letter-spacing:1px;color:#b39ddb;margin-bottom:10px;font-weight:800}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.stat{background:rgba(0,0,0,.22);border-radius:12px;padding:10px}
+.stat .l{font-size:10px;color:#94a3b8;font-weight:700}
+.stat .v{font-size:15px;font-weight:800;margin-top:3px;font-family:'Poppins',sans-serif}
+.stat .v.up{color:#4ade80}.stat .v.down{color:#f87171}.stat .v.gold{color:#fbbf24}
+.chart-wrap{height:160px;position:relative;margin-top:6px}
+.chart-wrap canvas{width:100%!important;height:160px!important}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+input,select{width:100%;background:rgba(0,0,0,.28);border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:11px 12px;color:#fff;font-family:inherit;font-size:13px;outline:none}
+input:focus{border-color:#a78bfa}
+.btn{border:none;border-radius:12px;padding:12px 14px;font-weight:800;font-size:12.5px;cursor:pointer;font-family:inherit;flex:1}
+.btn-primary{background:linear-gradient(135deg,#ff6b9d,#ff4080);color:#fff}
+.btn-cyan{background:linear-gradient(135deg,#06b6d4,#0284c8);color:#fff}
+.btn-green{background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff}
+.btn-ghost{background:rgba(255,255,255,.06);color:#e2e8f0;border:1px solid rgba(255,255,255,.1)}
+.btn-warn{background:linear-gradient(135deg,#f59e0b,#d97706);color:#1a0e2e}
+.hint{font-size:11px;color:#94a3b8;line-height:1.45;margin-top:8px}
+.pill{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:20px;font-size:10px;font-weight:800}
+.pill.on{background:rgba(34,197,94,.15);color:#4ade80;border:1px solid rgba(34,197,94,.3)}
+.pill.off{background:rgba(248,113,113,.12);color:#f87171;border:1px solid rgba(248,113,113,.3)}
+.order{display:flex;justify-content:space-between;gap:8px;padding:10px;border-radius:12px;background:rgba(0,0,0,.2);margin-bottom:6px;font-size:12px}
+.order .side-sell{color:#f87171;font-weight:800}
+.order .side-buy{color:#4ade80;font-weight:800}
+.tabs{display:flex;gap:6px;margin-bottom:10px}
+.tab{flex:1;padding:9px;border-radius:10px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.04);color:#94a3b8;font-weight:800;font-size:11px;cursor:pointer;text-align:center}
+.tab.on{background:rgba(167,139,250,.2);border-color:rgba(167,139,250,.4);color:#fff}
+.admin-only{display:none}
+body.is-owner .admin-only{display:block}
+.formula{font-size:11px;background:rgba(167,139,250,.08);border:1px solid rgba(167,139,250,.2);border-radius:12px;padding:10px;line-height:1.5;color:#e9d5ff}
+.nav{position:fixed;bottom:0;left:0;right:0;max-width:480px;margin:0 auto;display:flex;background:rgba(15,8,28,.95);border-top:1px solid rgba(255,255,255,.08);backdrop-filter:blur(12px);z-index:20;padding:8px 6px calc(8px + env(safe-area-inset-bottom))}
+.nav a{flex:1;text-align:center;color:#94a3b8;text-decoration:none;font-size:10px;font-weight:700;padding:6px}
+.nav a span{display:block;font-size:16px;margin-bottom:2px}
+.nav a.active{color:#ff6b9d}
+
+.board-row{display:flex;align-items:center;gap:8px;padding:10px;border-radius:12px;background:rgba(0,0,0,.22);margin-bottom:6px;border:1px solid rgba(255,255,255,.05)}
+.board-row.primary{border-color:rgba(251,191,36,.35);background:rgba(251,191,36,.08)}
+.board-row .tag{font-size:10px;font-weight:800;padding:2px 7px;border-radius:8px}
+.tag-sell{background:rgba(248,113,113,.15);color:#f87171}
+.tag-buy{background:rgba(74,222,128,.15);color:#4ade80}
+.tag-pri{background:rgba(251,191,36,.2);color:#fbbf24;margin-left:4px}
+.board-row .meta{flex:1;min-width:0;font-size:12px}
+.board-row .meta small{display:block;color:#64748b;font-size:10px;margin-top:2px}
+.board-row .act button{padding:7px 10px;font-size:11px;border-radius:10px;border:none;font-weight:800;cursor:pointer;background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="top">
+    <button class="back" onclick="location.href='/home/'">←</button>
+    <div class="title">📈 Jadi Investor</div>
+    <span class="pill off" id="mktPill">—</span>
+  </div>
+
+  <div class="card formula">
+    <b>Skema bagi hasil:</b> 70% pengelola · 30% kumpulan investor dari laba bersih harian.<br>
+    Rumus investor: <b>(Lembar kamu ÷ Total lembar) × 30% × Laba bersih</b><br>
+    Max kepemilikan <b>50%</b>. Primary dari owner; jika habis → pasar sekunder (harga naik/turun).
+  </div>
+
+  <div class="card">
+    <h3>📊 Pasar · Harga</h3>
+    <div class="chart-wrap"><canvas id="priceChart"></canvas></div>
+    <div class="stats" style="margin-top:10px">
+      <div class="stat"><div class="l">Harga primary</div><div class="v gold" id="sPrice">—</div></div>
+      <div class="stat"><div class="l">Harga pasar terakhir</div><div class="v" id="sLast">—</div></div>
+      <div class="stat"><div class="l">Lembar tersedia (owner)</div><div class="v" id="sAvail">—</div></div>
+      <div class="stat"><div class="l">Terjual / Total</div><div class="v" id="sSold">—</div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>👤 Portofolio kamu</h3>
+    <div class="stats">
+      <div class="stat"><div class="l">Lembar</div><div class="v" id="pShares">0</div></div>
+      <div class="stat"><div class="l">Avg cost</div><div class="v" id="pAvg">Rp0</div></div>
+      <div class="stat"><div class="l">Nilai pasar</div><div class="v" id="pVal">Rp0</div></div>
+      <div class="stat"><div class="l">Unrealized P/L</div><div class="v" id="pUnreal">Rp0</div></div>
+      <div class="stat"><div class="l">Bagi hasil diterima</div><div class="v up" id="pDist">Rp0</div></div>
+      <div class="stat"><div class="l">Ownership</div><div class="v" id="pOwn">0%</div></div>
+    </div>
+    <div class="hint" id="pHint">Login untuk melihat portofolio.</div>
+  </div>
+
+  <div class="card" id="primaryCard">
+    <h3>🛒 Beli dari Owner (Primary)</h3>
+    <div class="row">
+      <input type="number" id="buyShares" placeholder="Jumlah lembar" min="1" style="flex:1.2">
+      <button class="btn btn-primary" style="flex:0.8" onclick="buyPrimary()">Beli (Saldo)</button>
+    </div>
+    <div class="hint" id="buyHint">Saldo Shine Shop akan didebit otomatis. QRIS +1% admin bisa ditambah belakangan.</div>
+  </div>
+
+  <div class="card">
+    <h3>📋 Papan Request Jual / Beli</h3>
+    <div class="tabs" style="margin-bottom:8px">
+      <div class="tab on" id="tabAll" onclick="filterBoard('all')">Semua</div>
+      <div class="tab" id="tabSell" onclick="filterBoard('sell')">Jual</div>
+      <div class="tab" id="tabBuy" onclick="filterBoard('buy')">Beli</div>
+    </div>
+    <div id="boardStats" class="hint" style="margin-bottom:8px">Memuat papan...</div>
+    <div id="orderList"></div>
+  </div>
+
+  <div class="card">
+    <h3>🔁 Pasang request kamu</h3>
+    <div class="tabs">
+      <div class="tab on" data-tab="sell" onclick="switchSide('sell')">Jual lembar</div>
+      <div class="tab" data-tab="buy" onclick="switchSide('buy')">Request beli</div>
+    </div>
+    <div class="row">
+      <input type="number" id="mShares" placeholder="Lembar" min="1" style="flex:1">
+      <input type="number" id="mPrice" placeholder="Harga / lembar" min="1" style="flex:1">
+    </div>
+    <div class="row" style="margin-top:8px">
+      <button class="btn btn-cyan" id="mSubmit" onclick="placeOrder()">Pasang order jual</button>
+    </div>
+    <div class="hint">Lembar dari owner otomatis muncul di papan sebagai <b>JUAL · PRIMARY</b>. Jika primary habis, user bisa pasang request beli/jual (harga mengikuti pasar).</div>
+  </div>
+
+<div class="card admin-only">
+    <h3>⚙️ Panel Owner</h3>
+    <div class="row">
+      <input type="number" id="aTotal" placeholder="Total lembar" style="flex:1">
+      <input type="number" id="aPrice" placeholder="Harga / lembar" style="flex:1">
+    </div>
+    <div class="row" style="margin-top:8px">
+      <input type="number" id="aMinSh" placeholder="Min lembar" style="flex:1">
+      <input type="number" id="aMinAmt" placeholder="Min nominal Rp" style="flex:1">
+    </div>
+    <div class="row" style="margin-top:8px">
+      <input type="number" id="aPct" placeholder="% jatah investor (default 30)" style="flex:1">
+      <button class="btn btn-warn" onclick="saveSettings()">Simpan setting</button>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <input type="number" id="aProfit" placeholder="Laba bersih hari ini (Rp)" style="flex:1.2">
+      <button class="btn btn-green" onclick="distributeProfit()">Bagi hasil 30%</button>
+    </div>
+    <div class="hint">Bagi hasil: 30% dari laba bersih dibagi proporsional ke pemegang lembar.</div>
+  </div>
+</div>
+
+<nav class="nav">
+  <a href="/home/"><span>🏠</span>Home</a>
+  <a href="/invest/" class="active"><span>📈</span>Invest</a>
+  <a href="/account-market.html"><span>🛒</span>Market</a>
+  <a href="/home/#page-profile"><span>👤</span>Akun</a>
+</nav>
+
+<script>
+const SUPABASE_URL = 'https://vvzgpbiesvupuhqqoxrg.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1zIn0.placeholder';
+// Ganti anon key di bawah jika beda project — baca dari window jika ada
+const ANON = (window.SHINE_SUPABASE_ANON) || localStorage.getItem('shine_anon') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ2emdwYmllc3Z1cHVocXFveHJnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk1NTU5NzQsImV4cCI6MjA2NTEzMTk3NH0.placeholder';
+
+let supabaseClient = null;
+let currentUser = null;
+let isOwner = false;
+let state = null;
+let side = 'sell';
+let chartPoints = [];
+
+function fmt(n){ n=Number(n)||0; return 'Rp '+Math.round(n).toLocaleString('id-ID'); }
+function $(id){ return document.getElementById(id); }
+
+async function init(){
+  // Try reuse same key as home if injected
+  let anonKey = ANON;
+  try {
+    if (anonKey.includes('placeholder')) {
+      // common project key pattern - user must set; try from meta
+      const m = document.querySelector('meta[name="supabase-anon"]');
+      if (m) anonKey = m.content;
+    }
+  } catch(_){}
+  // Hardcoded from shine shop conversation project
+  if (anonKey.includes('placeholder')) {
+    anonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ2emdwYmllc3Z1cHVocXFveHJnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk1NTU5NzQsImV4cCI6MjA2NTEzMTk3NH0.8vJqJqJqJqJqJqJqJqJqJqJqJqJqJqJqJqJqJqJqJq';
+  }
+  // Safer: read from parent known key in page config
+  const FIXED = window.__SHINE_ANON_KEY || localStorage.getItem('sb-'+SUPABASE_URL.split('//')[1].split('.')[0]+'-auth-token');
+  try {
+    supabaseClient = window.supabase.createClient('https://vvzgpbiesvupuhqqoxrg.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ2emdwYmllc3Z1cHVocXFveHJnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIwNzE3MTUsImV4cCI6MjEwNzY0NzcxNX0.W3_Ck8B5Q-nEfNlsyeufJsLsTqbM8xPcAeHoAHfGRwY');
+  } catch(e) {
+    console.error(e);
+  }
+
+  // Prefer session from same storage
+  try {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (!session) {
+      location.replace('/?next=/invest/');
+      return;
+    }
+    currentUser = session.user;
+    const { data: prof } = await supabaseClient.from('profiles').select('role,email,balance').eq('id', currentUser.id).maybeSingle();
+    isOwner = prof && (prof.role === 'owner' || prof.role === 'admin');
+    if (isOwner) document.body.classList.add('is-owner');
+  } catch (e) {
+    console.warn(e);
+    location.replace('/');
+    return;
+  }
+  await refreshAll();
+  setInterval(refreshAll, 20000);
+}
+
+async function refreshAll(){
+  await loadState();
+  await loadPortfolio();
+  await loadOrders();
+}
+
+async function loadState(){
+  try {
+    const { data, error } = await supabaseClient.rpc('invest_public_state');
+    if (error) throw error;
+    state = data;
+    if (!data || !data.success) return;
+    $('sPrice').textContent = fmt(data.price_per_share);
+    $('sLast').textContent = fmt(data.last_market_price);
+    $('sAvail').textContent = (data.shares_available||0).toLocaleString('id-ID');
+    $('sSold').textContent = (data.shares_sold||0)+' / '+(data.total_shares||0);
+    const open = !!data.primary_open;
+    $('mktPill').textContent = open ? 'PRIMARY OPEN' : 'SECONDARY ONLY';
+    $('mktPill').className = 'pill '+(open?'on':'off');
+    $('primaryCard').style.opacity = open ? '1' : '0.55';
+    $('buyHint').textContent = open
+      ? ('Harga '+fmt(data.price_per_share)+' / lembar · min '+data.min_buy_shares+' lembar · min '+fmt(data.min_buy_amount))
+      : 'Primary habis/tutup — gunakan pasar sekunder (request beli / jual).';
+    // admin fields
+    if (isOwner) {
+      if (!$('aTotal').value) $('aTotal').value = data.total_shares;
+      if (!$('aPrice').value) $('aPrice').value = data.price_per_share;
+      if (!$('aMinSh').value) $('aMinSh').value = data.min_buy_shares;
+      if (!$('aMinAmt').value) $('aMinAmt').value = data.min_buy_amount;
+      if (!$('aPct').value) $('aPct').value = data.investor_profit_pct;
+    }
+    const hist = (data.price_history || []).slice().reverse();
+    chartPoints = hist.map(h => Number(h.price)||0);
+    if (!chartPoints.length) chartPoints = [Number(data.price_per_share)||1000];
+    drawChart();
+  } catch (e) {
+    console.warn(e);
+  }
+}
+
+async function loadPortfolio(){
+  try {
+    const { data, error } = await supabaseClient.rpc('invest_my_portfolio');
+    if (error) throw error;
+    if (!data || !data.success) return;
+    $('pShares').textContent = (data.shares||0).toLocaleString('id-ID');
+    $('pAvg').textContent = fmt(data.avg_cost);
+    $('pVal').textContent = fmt(data.market_value);
+    const u = Number(data.unrealized||0);
+    const el = $('pUnreal');
+    el.textContent = (u>=0?'+':'')+fmt(u);
+    el.className = 'v '+(u>=0?'up':'down');
+    $('pDist').textContent = fmt(data.distributed_profit);
+    $('pOwn').textContent = (Number(data.ownership_pct||0)).toFixed(2)+'%';
+    $('pHint').textContent = u < 0
+      ? 'Harga pasar di bawah avg cost kamu — unrealized sedang minus.'
+      : 'Profit paper mengikuti harga pasar terakhir + bagi hasil yang sudah dicairkan.';
+  } catch (e) {
+    $('pHint').textContent = e.message || 'Gagal muat portofolio';
+  }
+}
+
+
+let boardFilter = 'all';
+function filterBoard(f) {
+  boardFilter = f;
+  ['All','Sell','Buy'].forEach(function(x) {
+    const el = document.getElementById('tab'+x);
+    if (el) el.classList.toggle('on', (x==='All' && f==='all') || (x==='Sell' && f==='sell') || (x==='Buy' && f==='buy'));
+  });
+  loadOrders();
+}
+
+async function loadOrders() {
+  try {
+    const args = { p_limit: 60, p_side: (boardFilter==='sell'||boardFilter==='buy') ? boardFilter : null };
+    const { data, error } = await supabaseClient.rpc('invest_list_market_orders', args);
+    if (error) throw error;
+    const rows = (data && data.data) || [];
+    const box = document.getElementById('orderList');
+    const st = document.getElementById('boardStats');
+    const sells = rows.filter(o => o.side === 'sell');
+    const buys = rows.filter(o => o.side === 'buy');
+    const pri = rows.filter(o => o.is_primary);
+    if (st) st.textContent = 'Jual: ' + sells.length + ' · Beli: ' + buys.length + ' · Primary owner: ' + pri.length;
+    if (!rows.length) {
+      box.innerHTML = '<div class="hint">Papan kosong. Owner buka lembar primary atau user pasang request.</div>';
+      return;
+    }
+    box.innerHTML = rows.map(function(o) {
+      const left = (o.remaining != null) ? o.remaining : ((o.shares||0) - (o.filled_shares||0));
+      const isPri = !!o.is_primary;
+      const canTake = o.side === 'sell' && left > 0;
+      return '<div class="board-row' + (isPri ? ' primary' : '') + '">' +
+        '<div><span class="tag ' + (o.side==='sell'?'tag-sell':'tag-buy') + '">' + (o.side||'').toUpperCase() + '</span>' +
+        (isPri ? '<span class="tag tag-pri">PRIMARY</span>' : '') + '</div>' +
+        '<div class="meta"><b>' + left + '</b> lembar @ <b>' + fmt(o.price_per_share) + '</b>' +
+        '<small>' + (isPri ? 'Dari owner (lembar resmi)' : (o.email || 'user')) + ' · ' + (o.status||'') + '</small></div>' +
+        (canTake ? '<div class="act"><button type="button" onclick="takeOrder(\'' + o.id + '\',' + left + ')">Beli</button></div>' : '') +
+        '</div>';
+    }).join('');
+  } catch (e) {
+    const box = document.getElementById('orderList');
+    if (box) box.innerHTML = '<div class="hint">' + (e.message||e) + '</div>';
+  }
+}
+
+async function takeOrder(orderId, maxShares) {
+  const { value: sh } = await Swal.fire({
+    title: 'Beli dari papan',
+    input: 'number',
+    inputValue: Math.min(maxShares||1, 10),
+    inputAttributes: { min: 1, max: maxShares||999999 },
+    showCancelButton: true,
+    confirmButtonText: 'Beli (Saldo)',
+    background: '#1a0e2e',
+    color: '#fff',
+    confirmButtonColor: '#22c55e'
+  });
+  if (!sh) return;
+  const shares = parseInt(sh, 10);
+  if (!shares || shares < 1) return;
+  const { data, error } = await supabaseClient.rpc('invest_take_order', {
+    p_order_id: orderId,
+    p_shares: shares
+  });
+  if (error) return Swal.fire({ title:'Gagal', text: error.message, icon:'error', background:'#1a0e2e', color:'#fff' });
+  if (data && data.success === false) return Swal.fire({ title:'Gagal', text: data.message, icon:'error', background:'#1a0e2e', color:'#fff' });
+  Swal.fire({ title:'Berhasil', text: '+' + (data.shares||shares) + ' lembar · ' + fmt(data.amount), icon:'success', background:'#1a0e2e', color:'#fff', timer:1600 });
+  refreshAll();
+}
+window.filterBoard = filterBoard;
+window.takeOrder = takeOrder;
+
+
+
+function drawChart(){
+  const c = $('priceChart');
+  if (!c) return;
+  const ctx = c.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const w = c.clientWidth || 320;
+  const h = 160;
+  c.width = w * dpr; c.height = h * dpr;
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0,0,w,h);
+  const pts = chartPoints.length ? chartPoints : [1000];
+  const min = Math.min.apply(null, pts);
+  const max = Math.max.apply(null, pts);
+  const pad = 12;
+  const span = (max - min) || 1;
+  ctx.beginPath();
+  pts.forEach((p,i) => {
+    const x = pad + (i/(Math.max(pts.length-1,1))) * (w - pad*2);
+    const y = h - pad - ((p - min)/span) * (h - pad*2);
+    if (i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+  });
+  const up = pts[pts.length-1] >= pts[0];
+  ctx.strokeStyle = up ? '#4ade80' : '#f87171';
+  ctx.lineWidth = 2.2;
+  ctx.stroke();
+  // fill
+  const lastX = pad + (w - pad*2);
+  const baseY = h - pad;
+  ctx.lineTo(pad + (w-pad*2), baseY);
+  ctx.lineTo(pad, baseY);
+  ctx.closePath();
+  ctx.fillStyle = up ? 'rgba(74,222,128,.12)' : 'rgba(248,113,113,.12)';
+  ctx.fill();
+}
+
+async function buyPrimary(){
+  const shares = parseInt(($('buyShares').value||'0'),10);
+  if (!shares || shares < 1) return Swal.fire({title:'Isi lembar',icon:'warning',background:'#1a0e2e',color:'#fff'});
+  const conf = await Swal.fire({title:'Beli '+shares+' lembar?',text:'Debit dari saldo Shine Shop',icon:'question',showCancelButton:true,background:'#1a0e2e',color:'#fff',confirmButtonColor:'#ff6b9d'});
+  if (!conf.isConfirmed) return;
+  const { data, error } = await supabaseClient.rpc('invest_buy_primary', { p_shares: shares });
+  if (error) return Swal.fire({title:'Gagal',text:error.message,icon:'error',background:'#1a0e2e',color:'#fff'});
+  if (data && data.success === false) return Swal.fire({title:'Gagal',text:data.message,icon:'error',background:'#1a0e2e',color:'#fff'});
+  Swal.fire({title:'Berhasil',text:'+'+(data.shares||shares)+' lembar · '+fmt(data.amount),icon:'success',background:'#1a0e2e',color:'#fff',timer:1800});
+  $('buyShares').value='';
+  refreshAll();
+}
+
+function switchSide(s){
+  side = s;
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.getAttribute('data-tab')===s));
+  $('mSubmit').textContent = s==='sell' ? 'Pasang order jual' : 'Request beli';
+  $('mSubmit').className = 'btn '+(s==='sell'?'btn-cyan':'btn-green');
+}
+
+async function placeOrder(){
+  const shares = parseInt(($('mShares').value||'0'),10);
+  const price = parseFloat(($('mPrice').value||'0'));
+  if (!shares || !price) return Swal.fire({title:'Lembar & harga wajib',icon:'warning',background:'#1a0e2e',color:'#fff'});
+  const { data, error } = await supabaseClient.rpc('invest_place_market_order', {
+    p_side: side, p_shares: shares, p_price: price
+  });
+  if (error) return Swal.fire({title:'Gagal',text:error.message,icon:'error',background:'#1a0e2e',color:'#fff'});
+  if (data && data.success === false) return Swal.fire({title:'Gagal',text:data.message,icon:'error',background:'#1a0e2e',color:'#fff'});
+  Swal.fire({title:'Order dipasang',icon:'success',background:'#1a0e2e',color:'#fff',timer:1400});
+  $('mShares').value=''; $('mPrice').value='';
+  refreshAll();
+}
+
+async function saveSettings(){
+  const { data, error } = await supabaseClient.rpc('invest_admin_update_settings', {
+    p_total_shares: parseInt($('aTotal').value||'0',10)||null,
+    p_price_per_share: parseFloat($('aPrice').value||'0')||null,
+    p_min_buy_shares: parseInt($('aMinSh').value||'0',10)||null,
+    p_min_buy_amount: parseFloat($('aMinAmt').value||'0')||null,
+    p_investor_profit_pct: parseFloat($('aPct').value||'0')||null,
+    p_primary_open: true
+  });
+  if (error) return Swal.fire({title:'Gagal',text:error.message,icon:'error',background:'#1a0e2e',color:'#fff'});
+  if (data && data.success === false) return Swal.fire({title:'Gagal',text:data.message,icon:'error',background:'#1a0e2e',color:'#fff'});
+  Swal.fire({title:'Tersimpan',icon:'success',background:'#1a0e2e',color:'#fff',timer:1200});
+  refreshAll();
+}
+
+async function distributeProfit(){
+  const profit = parseFloat(($('aProfit').value||'0'));
+  if (!profit || profit <= 0) return Swal.fire({title:'Isi laba bersih',icon:'warning',background:'#1a0e2e',color:'#fff'});
+  const conf = await Swal.fire({title:'Distribusi 30% ke investor?',text:fmt(profit)+' laba bersih',icon:'question',showCancelButton:true,background:'#1a0e2e',color:'#fff',confirmButtonColor:'#22c55e'});
+  if (!conf.isConfirmed) return;
+  const { data, error } = await supabaseClient.rpc('invest_distribute_profit', { p_net_profit: profit, p_note: 'Daily profit' });
+  if (error) return Swal.fire({title:'Gagal',text:error.message,icon:'error',background:'#1a0e2e',color:'#fff'});
+  if (data && data.success === false) return Swal.fire({title:'Gagal',text:data.message,icon:'error',background:'#1a0e2e',color:'#fff'});
+  Swal.fire({title:'Selesai',html:'Pool investor: <b>'+fmt(data.investor_pool)+'</b><br>Terbayar: <b>'+fmt(data.distributed)+'</b>',icon:'success',background:'#1a0e2e',color:'#fff'});
+  $('aProfit').value='';
+  refreshAll();
+}
+
+init();
+</script>
+</body>
+</html>
+
