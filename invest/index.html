@@ -172,7 +172,10 @@ body.is-owner .admin-only{display:block}
 <script>
 // Isi dengan anon key project Supabase (Settings → API). Jangan pakai service role key di frontend.
 const SUPABASE_URL = 'https://vvzgpbiesvupuhqqoxrg.supabase.co';
-const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtsc21wZm9qc29oY2R6ZGJpdnhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIxMDg0ODIsImV4cCI6MjEwNzY4NDQ4Mn0.T6QelXrQsW_gTtMEAmz1OOCeEsqKNSFEj57JPeIvBVk';
+const SUPABASE_ANON = 'PASTE_ANON_KEY_DI_SINI';
+// Harus sama dengan storageKey yang dipakai halaman home (default Supabase: sb-<ref>-auth-token)
+const SUPABASE_STORAGE_KEY = 'sb-vvzgpbiesvupuhqqoxrg-auth-token';
+const AUTH_WAIT_MS = 4000;
 
 const SW = { background: '#1a0e2e', color: '#fff' };
 let supabaseClient = null;
@@ -199,24 +202,67 @@ async function guard(btn, fn){
   try { await fn(); } finally { btn.disabled = false; }
 }
 
+// Tunggu sesi dipulihkan (dari localStorage / refresh token) sebelum memutuskan redirect
+async function waitForSession(){
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  if (session) return session;
+  return new Promise(resolve => {
+    let sub = null;
+    const timer = setTimeout(() => {
+      if (sub) sub.unsubscribe();
+      resolve(null);
+    }, AUTH_WAIT_MS);
+    const res = supabaseClient.auth.onAuthStateChange((event, s) => {
+      if (s) {
+        clearTimeout(timer);
+        if (sub) sub.unsubscribe();
+        resolve(s);
+      }
+    });
+    sub = res.data.subscription;
+  });
+}
+
 async function init(){
   if (SUPABASE_ANON.startsWith('PASTE_')) {
     $('pHint').textContent = 'Anon key Supabase belum diisi di file.';
     return;
   }
-  supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+  supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON, {
+    auth: {
+      storageKey: SUPABASE_STORAGE_KEY,
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true
+    }
+  });
+
+  let session = null;
   try {
-    const { data: { session } } = await supabaseClient.auth.getSession();
-    if (!session) { location.replace('/?next=/invest/'); return; }
-    const { data: prof } = await supabaseClient
-      .from('profiles').select('role').eq('id', session.user.id).maybeSingle();
-    isOwner = !!prof && ['owner', 'admin'].includes(prof.role);
-    if (isOwner) document.body.classList.add('is-owner');
+    session = await waitForSession();
   } catch (e) {
-    console.warn(e);
+    // error teknis bukan berarti belum login: tampilkan, jangan redirect
+    console.error('auth check', e);
+    $('pHint').textContent = 'Gagal memeriksa login: ' + (e.message || e);
+    return;
+  }
+  if (!session) {
+    console.warn('Tidak ada sesi setelah', AUTH_WAIT_MS, 'ms');
     location.replace('/?next=/invest/');
     return;
   }
+
+  // gagal ambil profil tidak boleh menyebabkan redirect
+  try {
+    const { data: prof, error } = await supabaseClient
+      .from('profiles').select('role').eq('id', session.user.id).maybeSingle();
+    if (error) console.warn('profiles', error.message);
+    isOwner = !!prof && ['owner', 'admin'].includes(prof.role);
+    if (isOwner) document.body.classList.add('is-owner');
+  } catch (e) {
+    console.warn('profiles', e);
+  }
+
   await refreshAll();
   setInterval(refreshAll, 20000);
 }
