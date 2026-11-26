@@ -118,6 +118,31 @@ async function deleteDeposit(url, key, id) {
   } catch (_) {}
 }
 
+/**
+ * Insert deposit. Jika database belum punya kolom tertentu (PGRST204),
+ * kolom itu dibuang dari data lalu insert diulang, sehingga deposit tetap tersimpan.
+ */
+async function insertDeposit(url, key, payload) {
+  const data = { ...payload };
+  const dropped = [];
+  for (let i = 0; i < 12; i++) {
+    const r = await sbFetch(url, key, '/rest/v1/deposits', {
+      method: 'POST',
+      headers: { Prefer: 'return=representation' },
+      body: JSON.stringify(data)
+    });
+    if (r.ok && Array.isArray(r.json) && r.json[0]) return { ok: true, row: r.json[0], dropped };
+    const m = /Could not find the '([^']+)' column/i.exec(r.text || '');
+    if (r.status === 400 && m && m[1] in data) {
+      dropped.push(m[1]);
+      delete data[m[1]];
+      continue;
+    }
+    return { ok: false, status: r.status, text: r.text || '' };
+  }
+  return { ok: false, status: 400, text: 'terlalu banyak kolom hilang: ' + dropped.join(', ') };
+}
+
 module.exports = async (req, res) => {
   try {
     if (req.method === 'OPTIONS') return send(res, 204, {});
@@ -196,34 +221,31 @@ module.exports = async (req, res) => {
         : new Date(Date.now() + EXPIRE_MS).toISOString();
 
       // 2) Simpan deposit (baris ini "mengklaim" kode)
-      const ins = await sbFetch(SUPABASE_URL, SUPABASE_KEY, '/rest/v1/deposits', {
-        method: 'POST',
-        headers: { Prefer: 'return=representation' },
-        body: JSON.stringify({
-          user_id: userId,
-          email: email,
-          amount: amount,
-          unique_code: code,
-          total_amount: totalPay,
-          status: 'pending',
-          expires_at: expiresIso,
-          provider: 'syahpay',
-          invoice_number: invoiceId,
-          request_id: idempotency,
-          admin_fee: adminFee,
-          payment_url: paymentLink,
-          payment_method: 'QRIS',
-          qris_image: qrisImage,
-          cashback_unique: cashback
-        })
+      const ins = await insertDeposit(SUPABASE_URL, SUPABASE_KEY, {
+        user_id: userId,
+        email: email,
+        amount: amount,
+        unique_code: code,
+        total_amount: totalPay,
+        status: 'pending',
+        expires_at: expiresIso,
+        provider: 'syahpay',
+        invoice_number: invoiceId,
+        request_id: idempotency,
+        admin_fee: adminFee,
+        payment_url: paymentLink,
+        payment_method: 'QRIS',
+        qris_image: qrisImage,
+        cashback_unique: cashback
       });
-      if (!ins.ok || !Array.isArray(ins.json) || !ins.json[0]) {
+      if (!ins.ok) {
         return send(res, 500, {
           success: false,
           message: 'Simpan deposit gagal (HTTP ' + ins.status + '): ' + (ins.text || '').slice(0, 300)
         });
       }
-      const row = ins.json[0];
+      if (ins.dropped && ins.dropped.length) console.warn('kolom deposits belum ada, dilewati:', ins.dropped.join(','));
+      const row = ins.row;
 
       // 3) Verifikasi pemenang kode
       const won = await isWinner(SUPABASE_URL, SUPABASE_KEY, amount, code, row.id);
