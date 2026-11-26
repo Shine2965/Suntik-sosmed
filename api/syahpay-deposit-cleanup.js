@@ -1,6 +1,6 @@
 /**
  * GET /api/syahpay-deposit-cleanup
- * Menghapus riwayat deposit yang lebih dari 2 jam dan lock kode unik yang sudah kedaluwarsa.
+ * Menghapus riwayat deposit yang lebih dari 2 jam (kunci kode ikut hilang karena dihitung dari riwayat).
  * Deposit paid yang belum dikredit TIDAK dihapus.
  */
 const LOCK_MS = 2 * 60 * 60 * 1000;
@@ -24,6 +24,14 @@ async function del(url, key, path) {
   return { ok: r.ok, status: r.status, count: Array.isArray(json) ? json.length : 0 };
 }
 
+/** Baca role dari JWT key: 'service_role' | 'anon' | null (key format baru sb_secret_ dianggap valid) */
+function keyRole(key) {
+  const k = String(key || '').trim();
+  if (!k) return null;
+  if (k.startsWith('sb_secret_')) return 'service_role';
+  try { return JSON.parse(Buffer.from(k.split('.')[1], 'base64url').toString()).role || null; } catch (_) { return null; }
+}
+
 /** Ambil origin saja: 'https://x.supabase.co/rest/v1/' -> 'https://x.supabase.co' */
 function normalizeSupabaseUrl(raw) {
   const v = String(raw || '').trim();
@@ -38,6 +46,12 @@ module.exports = async (req, res) => {
 
     const SUPABASE_URL = normalizeSupabaseUrl(process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '');
     const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+    if (!SUPABASE_KEY || keyRole(SUPABASE_KEY) !== 'service_role') {
+      return send(res, 500, {
+        success: false,
+        message: 'SUPABASE_SERVICE_ROLE_KEY tidak valid (role terbaca: ' + (keyRole(SUPABASE_KEY) || 'kosong') + '). Isi service_role key di Vercel, bukan anon key.'
+      });
+    }
     if (!SUPABASE_URL || !SUPABASE_KEY) {
       return send(res, 500, { success: false, message: 'SUPABASE env belum di-set' });
     }
@@ -46,8 +60,7 @@ module.exports = async (req, res) => {
     const dep = await del(SUPABASE_URL, SUPABASE_KEY,
       '/rest/v1/deposits?created_at=lt.' + encodeURIComponent(cutoff) +
       '&or=(balance_credited.eq.true,status.neq.paid)');
-    const lock = await del(SUPABASE_URL, SUPABASE_KEY,
-      '/rest/v1/deposit_code_locks?expires_at=lt.' + encodeURIComponent(new Date().toISOString()));
+    const lock = { count: 0 };
 
     return send(res, 200, {
       success: true,
