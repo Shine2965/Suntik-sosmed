@@ -115,13 +115,20 @@ async function releaseUniqueCode(url, key, amount, code) {
   } catch (_) {}
 }
 
+/** Ambil origin saja: 'https://x.supabase.co/rest/v1/' -> 'https://x.supabase.co' */
+function normalizeSupabaseUrl(raw) {
+  const v = String(raw || '').trim();
+  if (!v) return '';
+  try { return new URL(v).origin; } catch (_) { return v.replace(/\/rest\/v1.*$/, '').replace(/\/$/, ''); }
+}
+
 module.exports = async (req, res) => {
   try {
     if (req.method === 'OPTIONS') return send(res, 204, {});
     if (req.method !== 'POST') return send(res, 405, { success: false, message: 'POST only' });
 
     const API_KEY = (process.env.SYAHPAY_API_KEY || process.env.SYAHPAY_APIKEY || '').trim();
-    const SUPABASE_URL = (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '').replace(/\/$/, '');
+    const SUPABASE_URL = normalizeSupabaseUrl(process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '');
     const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || '';
 
     if (!API_KEY) return send(res, 500, { success: false, message: 'ENV SYAHPAY_API_KEY belum di-set di Vercel' });
