@@ -64,6 +64,28 @@ input:focus,select:focus{border-color:#a78bfa}
 .empty{text-align:center;color:#94a3b8;font-size:12px;padding:16px;font-style:italic}
 .admin-only{display:none}
 body.is-owner .admin-only{display:block}
+
+/* ===== Papan Bid / Ask ===== */
+.book-top{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:10px}
+.book-top .stat{padding:8px}
+.book-pressure{height:10px;border-radius:20px;overflow:hidden;display:flex;margin:8px 0 4px;background:rgba(255,255,255,.06)}
+.book-pressure .b{background:linear-gradient(90deg,#16a34a,#4ade80)}
+.book-pressure .a{background:linear-gradient(90deg,#f87171,#dc2626)}
+.book-cols{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.book-head{display:grid;grid-template-columns:.8fr 1fr 1fr;font-size:9.5px;color:#94a3b8;font-weight:800;text-transform:uppercase;padding:0 6px 4px}
+.book-head.r{text-align:right}
+.book-row{position:relative;display:grid;grid-template-columns:.8fr 1fr 1fr;align-items:center;font-size:11.5px;padding:6px;border-radius:8px;cursor:pointer;margin-bottom:3px;overflow:hidden}
+.book-row:hover{outline:1px solid rgba(255,255,255,.18)}
+.book-row .bar{position:absolute;top:0;bottom:0;right:0;opacity:.22;z-index:0}
+.book-row span{position:relative;z-index:1}
+.book-row.bid .bar{background:#22c55e}
+.book-row.ask .bar{background:#ef4444}
+.book-row.bid .px{color:#4ade80;font-weight:800}
+.book-row.ask .px{color:#f87171;font-weight:800}
+.book-row .q{text-align:right}
+.book-row.primary{box-shadow:inset 0 0 0 1px rgba(251,191,36,.5)}
+.book-empty{font-size:11px;color:#64748b;text-align:center;padding:10px}
+@media(max-width:360px){.book-top{grid-template-columns:1fr 1fr}}
 .nav{position:fixed;bottom:0;left:0;right:0;max-width:480px;margin:0 auto;display:flex;background:rgba(15,8,28,.96);border-top:1px solid rgba(255,255,255,.08);backdrop-filter:blur(12px);z-index:20;padding:8px 6px calc(8px + env(safe-area-inset-bottom))}
 .nav a{flex:1;text-align:center;color:#94a3b8;text-decoration:none;font-size:10px;font-weight:700;padding:6px}
 .nav a span{display:block;font-size:16px;margin-bottom:2px}
@@ -120,6 +142,25 @@ body.is-owner .admin-only{display:block}
     </div>
     <div class="own-bar"><div class="own-fill" id="pOwnFill" style="width:0%"></div></div>
     <div class="hint" id="pHint">Memuat portofolio…</div>
+  </div>
+
+  <!-- PAPAN BID / ASK -->
+  <div class="card">
+    <h3>📚 Papan Bid / Ask <span class="pill on" id="bookPill">LIVE</span></h3>
+    <div class="book-top" id="bookTop"></div>
+    <div class="book-pressure" id="bookPressure"><div class="b" style="width:50%"></div><div class="a" style="width:50%"></div></div>
+    <div class="hint" id="bookPressureText" style="margin:0 0 10px">Memuat…</div>
+    <div class="book-cols">
+      <div>
+        <div class="book-head"><span>Antrean</span><span class="q">Qty</span><span class="q">BID</span></div>
+        <div id="bookBids"></div>
+      </div>
+      <div>
+        <div class="book-head r"><span>Antrean</span><span class="q">Qty</span><span class="q">ASK</span></div>
+        <div id="bookAsks"></div>
+      </div>
+    </div>
+    <div class="hint">Klik level untuk langsung mengisi order di antrean paling depan. Harga primary turun otomatis saat ask dari user lebih banyak daripada bid, dan naik saat sebaliknya.</div>
   </div>
 
   <!-- ORDER BOOK -->
@@ -377,7 +418,7 @@ async function loadOrders() {
   try {
     const { data, error } = await sb.rpc('invest_list_market_orders', {
       p_limit: 80,
-      p_side: boardFilter === 'all' ? null : boardFilter
+      p_side: null
     });
     if (error) throw error;
     orders = (data && data.data) || [];
@@ -398,6 +439,81 @@ async function loadMyOrders() {
   }
 }
 
+
+// ---------- papan bid / ask ----------
+function buildLevels(side, openOrders) {
+  const m = new Map();
+  openOrders.filter(o => o.side === side).forEach(o => {
+    const p = Number(o.price_per_share) || 0;
+    if (!m.has(p)) m.set(p, { price: p, qty: 0, count: 0, primary: false, orders: [] });
+    const L = m.get(p);
+    L.qty += orderLeft(o);
+    L.count += 1;
+    if (o.is_primary) L.primary = true;
+    L.orders.push(o);
+  });
+  const arr = [...m.values()];
+  arr.forEach(L => L.orders.sort((a, b) => String(a.created_at || '').localeCompare(String(b.created_at || ''))));
+  return arr.sort((a, b) => side === 'buy' ? b.price - a.price : a.price - b.price);
+}
+
+// posisi order di antrean pada harga yang sama (waktu masuk = prioritas)
+function queuePos(o) {
+  const open = orders.filter(x => x.side === o.side && Number(x.price_per_share) === Number(o.price_per_share) && orderLeft(x) > 0);
+  open.sort((a, b) => String(a.created_at || '').localeCompare(String(b.created_at || '')));
+  const idx = open.findIndex(x => String(x.id) === String(o.id));
+  return idx >= 0 ? idx + 1 : '-';
+}
+
+function renderBook() {
+  const openOrders = orders.filter(o => orderLeft(o) > 0);
+  const bids = buildLevels('buy', openOrders);
+  const asks = buildLevels('sell', openOrders);
+  const top = bids.slice(0, 8), low = asks.slice(0, 8);
+  const maxQty = Math.max(1, ...top.map(L => L.qty), ...low.map(L => L.qty));
+
+  const bestBid = bids[0] ? bids[0].price : null;
+  const bestAsk = asks[0] ? asks[0].price : null;
+  const spread = bestBid != null && bestAsk != null ? bestAsk - bestBid : null;
+  const last = Number(state && (state.last_market_price || state.price_per_share)) || 0;
+  const bidQty = openOrders.filter(o => o.side === 'buy').reduce((a, o) => a + orderLeft(o), 0);
+  const askUserQty = openOrders.filter(o => o.side === 'sell' && !o.is_primary).reduce((a, o) => a + orderLeft(o), 0);
+  const askAllQty = openOrders.filter(o => o.side === 'sell').reduce((a, o) => a + orderLeft(o), 0);
+  const totalP = bidQty + askUserQty;
+  const bidShare = totalP > 0 ? (bidQty / totalP) * 100 : 50;
+
+  $('bookTop').innerHTML =
+    '<div class="stat"><div class="l">Harga terakhir</div><div class="v">' + rp(last) + '</div></div>' +
+    '<div class="stat"><div class="l">Best bid</div><div class="v up">' + (bestBid != null ? rp(bestBid) : '—') + '</div></div>' +
+    '<div class="stat"><div class="l">Best ask</div><div class="v down">' + (bestAsk != null ? rp(bestAsk) : '—') + '</div></div>';
+  $('bookPill').textContent = spread != null ? 'SPREAD ' + rp(spread) : 'LIVE';
+
+  $('bookPressure').innerHTML =
+    '<div class="b" style="width:' + bidShare.toFixed(1) + '%"></div>' +
+    '<div class="a" style="width:' + (100 - bidShare).toFixed(1) + '%"></div>';
+  const tekanan = askUserQty > bidQty ? 'Tekanan JUAL lebih besar: harga primary cenderung turun'
+    : (bidQty > askUserQty ? 'Tekanan BELI lebih besar: harga primary cenderung naik' : 'Seimbang');
+  $('bookPressureText').innerHTML =
+    'Beli ' + fmtShares(bidQty) + ' lembar · Jual (user) ' + fmtShares(askUserQty) + ' lembar' +
+    (askAllQty > askUserQty ? ' · primary ' + fmtShares(askAllQty - askUserQty) : '') + '<br><b>' + tekanan + '</b>';
+
+  const row = (L, side) => {
+    const first = L.orders[0];
+    const w = Math.round((L.qty / maxQty) * 100);
+    const click = side === 'buy'
+      ? `guard(this, () => takeOrder('${esc(first.id)}', ${orderLeft(first)}, ${L.price}, 'sell', false))`
+      : `guard(this, () => takeOrder('${esc(first.id)}', ${orderLeft(first)}, ${L.price}, 'buy', ${!!first.is_primary}))`;
+    return `<div class="book-row ${side === 'buy' ? 'bid' : 'ask'} ${L.primary ? 'primary' : ''}" onclick="${click}">
+      <span class="bar" style="width:${w}%"></span>
+      <span class="q">${L.count}</span>
+      <span class="q">${fmtShares(L.qty)}</span>
+      <span class="px" style="text-align:right">${num(L.price)}${L.primary ? ' <small style="color:#fbbf24">P</small>' : ''}</span>
+    </div>`;
+  };
+  $('bookBids').innerHTML = top.length ? top.map(L => row(L, 'buy')).join('') : '<div class="book-empty">Belum ada bid</div>';
+  $('bookAsks').innerHTML = low.length ? low.map(L => row(L, 'sell')).join('') : '<div class="book-empty">Belum ada ask</div>';
+}
+
 // ---------- render ----------
 function orderLeft(o) {
   if (o.remaining != null) return Number(o.remaining) || 0;
@@ -405,6 +521,7 @@ function orderLeft(o) {
 }
 
 function renderOrders() {
+  renderBook();
   const box = $('orderList');
   const rows = orders.filter(o => boardFilter === 'all' || o.side === boardFilter);
   $('boardStats').textContent =
@@ -451,7 +568,7 @@ function renderMyOrders() {
         <div style="min-width:70px"><span class="tag ${o.side === 'sell' ? 'tag-sell' : 'tag-buy'}">${o.side === 'sell' ? 'JUAL' : 'BELI'}</span></div>
         <div class="meta">
           <b>${fmtShares(left)}</b> / ${fmtShares(o.shares)} lembar @ <b>${rp(o.price_per_share)}</b>
-          <small>${esc(o.status || '')}</small>
+          <small>${esc(o.status || '')}${open ? ' · antrean #' + queuePos(o) : ''}</small>
         </div>
         ${open ? `<button class="btn btn-ghost btn-sm" onclick="guard(this, () => cancelOrder('${esc(o.id)}'))">Batal</button>` : ''}
       </div>`;
