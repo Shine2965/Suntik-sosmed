@@ -207,14 +207,8 @@ body.is-owner .admin-only{display:block}
     <div class="row" style="margin-top:10px">
       <button class="btn btn-ghost" style="flex:1" id="btnTogglePrimary" onclick="guard(this, togglePrimaryOpen)">Buka / tutup primary</button>
     </div>
-    <div class="row" style="margin-top:14px">
-      <div class="col">
-        <div class="field-label">Laba bersih hari ini (Rp)</div>
-        <input type="number" id="aProfit" min="1" placeholder="contoh: 5000000">
-      </div>
-      <button class="btn btn-green" style="flex:1" onclick="guard(this, distributeProfit)">Bagi hasil 30%</button>
-    </div>
-    <div class="hint">Bagi hasil: 30% dari laba bersih dibagi ke pemegang lembar sesuai proporsi kepemilikan. Batas kepemilikan per investor: 50%.</div>
+    <div class="preview" id="autoProfitBox">Memuat bagi hasil otomatis…</div>
+    <div class="hint">Bagi hasil berjalan <b>otomatis setiap hari pukul 00:30 WIB</b> untuk keuntungan toko hari sebelumnya: 30% dibagi ke pemegang lembar sesuai proporsi. Tidak perlu input manual.</div>
   </div>
 </div>
 
@@ -311,7 +305,7 @@ async function waitForSession() {
 }
 
 async function refreshAll() {
-  await Promise.all([loadState(), loadPortfolio(), loadOrders(), loadMyOrders()]);
+  await Promise.all([loadState(), loadPortfolio(), loadOrders(), loadMyOrders(), isOwner ? loadAutoProfit() : Promise.resolve()]);
 }
 
 // ---------- data ----------
@@ -770,25 +764,23 @@ async function togglePrimaryOpen() {
   refreshAll();
 }
 
-async function distributeProfit() {
-  const profit = parseFloat($('aProfit').value || '0');
-  if (!profit || profit <= 0) return toast('warning', 'Isi laba bersih');
-  const conf = await Swal.fire({
-    title: 'Bagi hasil 30% ke investor?',
-    html: 'Laba bersih <b>' + rp(profit) + '</b>. Pool investor = 30%.',
-    icon: 'question', showCancelButton: true, confirmButtonText: 'Bagi sekarang',
-    confirmButtonColor: '#22c55e', background: '#1a0e2e', color: '#fff'
-  });
-  if (!conf.isConfirmed) return;
-  const { data, error } = await sb.rpc('invest_distribute_profit', { p_net_profit: profit, p_note: 'Daily profit' });
-  const err = rpcErr(data, error);
-  if (err) return toast('error', 'Gagal', err);
-  $('aProfit').value = '';
-  Swal.fire({
-    title: 'Selesai', icon: 'success', background: '#1a0e2e', color: '#fff',
-    html: 'Pool investor: <b>' + rp(data.investor_pool) + '</b><br>Terbayar: <b>' + rp(data.distributed) + '</b>'
-  });
-  refreshAll();
+async function loadAutoProfit() {
+  try {
+    const { data, error } = await sb.rpc('invest_auto_status');
+    if (error) throw error;
+    const box = $('autoProfitBox');
+    if (!data || !data.day) {
+      box.innerHTML = 'Belum ada bagi hasil. Pembagian pertama berjalan h+1 setelah keuntungan toko tercatat.';
+      return;
+    }
+    const st = data.status === 'done' ? '✅ Dibagikan' : '⏸ Dilewati (keuntungan ≤ 0)';
+    box.innerHTML =
+      'Bagi hasil terakhir: <b>' + esc(data.day) + '</b> · ' + st + '<br>' +
+      'Keuntungan toko: <b>' + rp(data.store_profit) + '</b><br>' +
+      'Pool investor (30%): <b>' + rp(data.pool) + '</b> · Terbayar: <b>' + rp(data.paid) + '</b>';
+  } catch (e) {
+    $('autoProfitBox').textContent = 'Status bagi hasil belum tersedia: ' + (e.message || e);
+  }
 }
 
 // ---------- mulai ----------
@@ -802,7 +794,7 @@ window.setSide = setSide;
 window.setRange = setRange;
 window.saveSettings = saveSettings;
 window.togglePrimaryOpen = togglePrimaryOpen;
-window.distributeProfit = distributeProfit;
+window.loadAutoProfit = loadAutoProfit;
 window.loadOwnerForm = loadOwnerForm;
 window.updateBuyPreview = updateBuyPreview;
 window.updateOrderPreview = updateOrderPreview;
