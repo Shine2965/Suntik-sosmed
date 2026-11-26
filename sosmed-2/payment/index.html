@@ -678,18 +678,19 @@ function clearPaymentState() {
 
 async function fetchConfigFromEnv() {
   try {
-    const res = await fetch('/api/qris-config');
-    if (res.ok) {
-      const data = await res.json();
-      if (data.qiospay_api_key) QIOSPAY_API_KEY = data.qiospay_api_key;
+    const res = await fetch('/api/qris-config?t=' + Date.now(), { cache: 'no-store' });
+    const text = await res.text();
+    let data = null;
+    try { data = JSON.parse(text); } catch (_) { data = null; }
+    if (res.ok && data && data.success !== false) {
       if (data.fayupedia_api_key) FAYUPEDIA_API_KEY = data.fayupedia_api_key;
-      if (data.fayupedia_api_id) FAYUPEDIA_API_ID = data.fayupedia_api_id;
-      return true;
+      if (data.fayupedia_api_id) FAYUPEDIA_API_ID = parseInt(data.fayupedia_api_id, 10) || FAYUPEDIA_API_ID;
+      if (data.qiospay_api_key) QIOSPAY_API_KEY = data.qiospay_api_key;
+      if (FAYUPEDIA_API_KEY) return true;
     }
-  } catch (e) {}
-  if (!QIOSPAY_API_KEY) QIOSPAY_API_KEY = 'd1370635be9857299bde44b946c938655534efdff7ef5246685b67ef91decb1c';
-  if (!FAYUPEDIA_API_KEY) FAYUPEDIA_API_KEY = '6mnjom-ing8mx-a4csgp-6bwv4c-4zdv1l';
-  return false;
+  } catch (e) { console.warn('fetchConfigFromEnv', e); }
+  // Client tidak lagi hardcode secret. Order via /api/fayupedia-order (server ENV).
+  return !!FAYUPEDIA_API_KEY;
 }
 
 const QIOSPAY_MUTASI_URL = () => `https://qiospay.id/api/mutasi/qris/${MERCHANT_CODE}/${QIOSPAY_API_KEY}`;
@@ -1578,10 +1579,16 @@ async function sendMassOrdersToFayupedia() {
     }
     return false;
   }
+  // Muat config dulu (ENV Vercel via /api/qris-config)
   if (!FAYUPEDIA_API_KEY) {
+    try { await fetchConfigFromEnv(); } catch (_) {}
+  }
+  // Boleh kosong di client: order dikirim lewat proxy /api/fayupedia-order
+  window.__USE_FAYU_PROXY = true;
+  if (!FAYUPEDIA_API_KEY && !window.__USE_FAYU_PROXY) {
     const orderStatus = document.getElementById('orderStatus');
     orderStatus.className = 'order-status failed';
-    orderStatus.textContent = '❌ API Shine Shop tidak ditemukan.';
+    orderStatus.textContent = '❌ API Shine Shop tidak ditemukan. Set FAYUPEDIA_API_KEY di Vercel ENV lalu Redeploy.';
     orderStatus.style.display = 'block';
     return false;
   }
@@ -1611,18 +1618,40 @@ async function sendMassOrdersToFayupedia() {
       if (order.comment && order.comment.trim() !== '') payload.comments = order.comment.trim();
       
       try {
-        const response = await fetchWithTimeout(FAYUPEDIA_URL, {
+        // Proxy server (ENV FAYUPEDIA_*) — fallback direct jika proxy 404
+        let response = await fetchWithTimeout('/api/fayupedia-order', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-          body: JSON.stringify(payload)
-        }, 15000);
-        
-        const rawText = await response.text();
+          body: JSON.stringify({
+            service: payload.service,
+            target: payload.target,
+            quantity: payload.quantity,
+            comments: payload.comments || ''
+          })
+        }, 20000);
+        let rawText = await response.text();
         let result;
-        try { result = JSON.parse(rawText); } catch(e) { result = { error: 'Invalid JSON', status: response.status, raw: rawText }; }
-        
+        try { result = JSON.parse(rawText); } catch(e) { result = null; }
+
+        // Fallback direct hanya jika proxy tidak ada (HTML 404)
+        if (!response.ok && (!result || String(rawText).trim().startsWith('<'))) {
+          if (!FAYUPEDIA_API_KEY) await fetchConfigFromEnv();
+          if (!FAYUPEDIA_API_KEY) throw new Error('API Fayupedia: set FAYUPEDIA_API_KEY di Vercel ENV & deploy /api/fayupedia-order');
+          response = await fetchWithTimeout(FAYUPEDIA_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify(Object.assign({}, payload, { api_id: FAYUPEDIA_API_ID, api_key: FAYUPEDIA_API_KEY }))
+          }, 15000);
+          rawText = await response.text();
+          try { result = JSON.parse(rawText); } catch(e) { result = { error: 'Invalid JSON', status: response.status, raw: rawText }; }
+        }
+
         if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${result.error || result.message || 'Server error'}`);
+          throw new Error('HTTP ' + response.status + ': ' + ((result && (result.message || result.error)) || 'Server error'));
+        }
+        // Normalize proxy response → shape mirip fayupedia
+        if (result && result.order_id && !result.data) {
+          result = { status: result.success !== false, data: { id: result.order_id, order_id: result.order_id }, order_id: result.order_id };
         }
         
         const extractedOrderId = extractOrderIdFromResponse(result);
@@ -2143,6 +2172,7 @@ function updateGmailUI(email) {
 
 async function bootPaymentPage() {
   try {
+    try { await fetchConfigFromEnv(); } catch (_) {}
     // Session
     if (!supabaseClient) {
       updateGmailUI(null);
