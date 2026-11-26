@@ -2,7 +2,7 @@
 <html lang="id">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Jadi Investor — Shine Shop</title>
 <link rel="icon" href="/home/logo.png" type="image/png">
 <meta name="theme-color" content="#0d0720">
@@ -27,21 +27,18 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(circle
 .chart-wrap{height:160px;position:relative;margin-top:6px}
 .chart-wrap canvas{width:100%!important;height:160px!important}
 .row{display:flex;gap:8px;flex-wrap:wrap}
-input,select{width:100%;background:rgba(0,0,0,.28);border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:11px 12px;color:#fff;font-family:inherit;font-size:13px;outline:none}
+input{width:100%;background:rgba(0,0,0,.28);border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:11px 12px;color:#fff;font-family:inherit;font-size:13px;outline:none}
 input:focus{border-color:#a78bfa}
 .btn{border:none;border-radius:12px;padding:12px 14px;font-weight:800;font-size:12.5px;cursor:pointer;font-family:inherit;flex:1}
+.btn:disabled{opacity:.55;cursor:not-allowed}
 .btn-primary{background:linear-gradient(135deg,#ff6b9d,#ff4080);color:#fff}
 .btn-cyan{background:linear-gradient(135deg,#06b6d4,#0284c8);color:#fff}
 .btn-green{background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff}
-.btn-ghost{background:rgba(255,255,255,.06);color:#e2e8f0;border:1px solid rgba(255,255,255,.1)}
 .btn-warn{background:linear-gradient(135deg,#f59e0b,#d97706);color:#1a0e2e}
 .hint{font-size:11px;color:#94a3b8;line-height:1.45;margin-top:8px}
 .pill{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:20px;font-size:10px;font-weight:800}
 .pill.on{background:rgba(34,197,94,.15);color:#4ade80;border:1px solid rgba(34,197,94,.3)}
 .pill.off{background:rgba(248,113,113,.12);color:#f87171;border:1px solid rgba(248,113,113,.3)}
-.order{display:flex;justify-content:space-between;gap:8px;padding:10px;border-radius:12px;background:rgba(0,0,0,.2);margin-bottom:6px;font-size:12px}
-.order .side-sell{color:#f87171;font-weight:800}
-.order .side-buy{color:#4ade80;font-weight:800}
 .tabs{display:flex;gap:6px;margin-bottom:10px}
 .tab{flex:1;padding:9px;border-radius:10px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.04);color:#94a3b8;font-weight:800;font-size:11px;cursor:pointer;text-align:center}
 .tab.on{background:rgba(167,139,250,.2);border-color:rgba(167,139,250,.4);color:#fff}
@@ -52,7 +49,6 @@ body.is-owner .admin-only{display:block}
 .nav a{flex:1;text-align:center;color:#94a3b8;text-decoration:none;font-size:10px;font-weight:700;padding:6px}
 .nav a span{display:block;font-size:16px;margin-bottom:2px}
 .nav a.active{color:#ff6b9d}
-
 .board-row{display:flex;align-items:center;gap:8px;padding:10px;border-radius:12px;background:rgba(0,0,0,.22);margin-bottom:6px;border:1px solid rgba(255,255,255,.05)}
 .board-row.primary{border-color:rgba(251,191,36,.35);background:rgba(251,191,36,.08)}
 .board-row .tag{font-size:10px;font-weight:800;padding:2px 7px;border-radius:8px}
@@ -99,16 +95,16 @@ body.is-owner .admin-only{display:block}
       <div class="stat"><div class="l">Bagi hasil diterima</div><div class="v up" id="pDist">Rp0</div></div>
       <div class="stat"><div class="l">Ownership</div><div class="v" id="pOwn">0%</div></div>
     </div>
-    <div class="hint" id="pHint">Login untuk melihat portofolio.</div>
+    <div class="hint" id="pHint">Memuat portofolio...</div>
   </div>
 
   <div class="card" id="primaryCard">
     <h3>🛒 Beli dari Owner (Primary)</h3>
     <div class="row">
       <input type="number" id="buyShares" placeholder="Jumlah lembar" min="1" style="flex:1.2">
-      <button class="btn btn-primary" style="flex:0.8" onclick="buyPrimary()">Beli (Saldo)</button>
+      <button class="btn btn-primary" style="flex:0.8" onclick="guard(this, buyPrimary)">Beli (Saldo)</button>
     </div>
-    <div class="hint" id="buyHint">Saldo Shine Shop akan didebit otomatis. QRIS +1% admin bisa ditambah belakangan.</div>
+    <div class="hint" id="buyHint">Saldo Shine Shop akan didebit otomatis.</div>
   </div>
 
   <div class="card">
@@ -133,12 +129,12 @@ body.is-owner .admin-only{display:block}
       <input type="number" id="mPrice" placeholder="Harga / lembar" min="1" style="flex:1">
     </div>
     <div class="row" style="margin-top:8px">
-      <button class="btn btn-cyan" id="mSubmit" onclick="placeOrder()">Pasang order jual</button>
+      <button class="btn btn-cyan" id="mSubmit" onclick="guard(this, placeOrder)">Pasang order jual</button>
     </div>
-    <div class="hint">Lembar dari owner otomatis muncul di papan sebagai <b>JUAL · PRIMARY</b>. Jika primary habis, user bisa pasang request beli/jual (harga mengikuti pasar).</div>
+    <div class="hint">Lembar dari owner otomatis muncul di papan sebagai <b>JUAL · PRIMARY</b>.</div>
   </div>
 
-<div class="card admin-only">
+  <div class="card admin-only">
     <h3>⚙️ Panel Owner</h3>
     <div class="row">
       <input type="number" id="aTotal" placeholder="Total lembar" style="flex:1">
@@ -150,11 +146,11 @@ body.is-owner .admin-only{display:block}
     </div>
     <div class="row" style="margin-top:8px">
       <input type="number" id="aPct" placeholder="% jatah investor (default 30)" style="flex:1">
-      <button class="btn btn-warn" onclick="saveSettings()">Simpan setting</button>
+      <button class="btn btn-warn" onclick="guard(this, saveSettings)">Simpan setting</button>
     </div>
     <div class="row" style="margin-top:8px">
       <input type="number" id="aProfit" placeholder="Laba bersih hari ini (Rp)" style="flex:1.2">
-      <button class="btn btn-green" onclick="distributeProfit()">Bagi hasil 30%</button>
+      <button class="btn btn-green" onclick="guard(this, distributeProfit)">Bagi hasil 30%</button>
     </div>
     <div class="hint">Bagi hasil: 30% dari laba bersih dibagi proporsional ke pemegang lembar.</div>
   </div>
@@ -168,57 +164,50 @@ body.is-owner .admin-only{display:block}
 </nav>
 
 <script>
+// Isi dengan anon key project Supabase (Settings → API). Jangan pakai service role key di frontend.
 const SUPABASE_URL = 'https://vvzgpbiesvupuhqqoxrg.supabase.co';
-const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1zIn0.placeholder';
-// Ganti anon key di bawah jika beda project — baca dari window jika ada
-const ANON = (window.SHINE_SUPABASE_ANON) || localStorage.getItem('shine_anon') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ2emdwYmllc3Z1cHVocXFveHJnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk1NTU5NzQsImV4cCI6MjA2NTEzMTk3NH0.placeholder';
+const SUPABASE_ANON = 'PASTE_ANON_KEY_DI_SINI';
 
+const SW = { background: '#1a0e2e', color: '#fff' };
 let supabaseClient = null;
-let currentUser = null;
 let isOwner = false;
 let state = null;
 let side = 'sell';
+let boardFilter = 'all';
 let chartPoints = [];
 
-function fmt(n){ n=Number(n)||0; return 'Rp '+Math.round(n).toLocaleString('id-ID'); }
+function fmt(n){ return 'Rp ' + Math.round(Number(n) || 0).toLocaleString('id-ID'); }
 function $(id){ return document.getElementById(id); }
+function esc(s){
+  return String(s ?? '').replace(/[&<>"']/g, c =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function showErr(msg){ return Swal.fire({ title: 'Gagal', text: msg, icon: 'error', ...SW }); }
+function showOk(title, text, timer = 1600){ return Swal.fire({ title, text, icon: 'success', timer, showConfirmButton: false, ...SW }); }
+
+// Cegah double-click: nonaktifkan tombol selama aksi berjalan
+async function guard(btn, fn){
+  if (!btn || btn.disabled) return;
+  btn.disabled = true;
+  try { await fn(); } finally { btn.disabled = false; }
+}
 
 async function init(){
-  // Try reuse same key as home if injected
-  let anonKey = ANON;
-  try {
-    if (anonKey.includes('placeholder')) {
-      // common project key pattern - user must set; try from meta
-      const m = document.querySelector('meta[name="supabase-anon"]');
-      if (m) anonKey = m.content;
-    }
-  } catch(_){}
-  // Hardcoded from shine shop conversation project
-  if (anonKey.includes('placeholder')) {
-    anonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ2emdwYmllc3Z1cHVocXFveHJnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk1NTU5NzQsImV4cCI6MjA2NTEzMTk3NH0.8vJqJqJqJqJqJqJqJqJqJqJqJqJqJqJqJqJqJqJqJq';
+  if (SUPABASE_ANON.startsWith('PASTE_')) {
+    $('pHint').textContent = 'Anon key Supabase belum diisi di file.';
+    return;
   }
-  // Safer: read from parent known key in page config
-  const FIXED = window.__SHINE_ANON_KEY || localStorage.getItem('sb-'+SUPABASE_URL.split('//')[1].split('.')[0]+'-auth-token');
-  try {
-    supabaseClient = window.supabase.createClient('https://vvzgpbiesvupuhqqoxrg.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ2emdwYmllc3Z1cHVocXFveHJnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIwNzE3MTUsImV4cCI6MjEwNzY0NzcxNX0.W3_Ck8B5Q-nEfNlsyeufJsLsTqbM8xPcAeHoAHfGRwY');
-  } catch(e) {
-    console.error(e);
-  }
-
-  // Prefer session from same storage
+  supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
   try {
     const { data: { session } } = await supabaseClient.auth.getSession();
-    if (!session) {
-      location.replace('/?next=/invest/');
-      return;
-    }
-    currentUser = session.user;
-    const { data: prof } = await supabaseClient.from('profiles').select('role,email,balance').eq('id', currentUser.id).maybeSingle();
-    isOwner = prof && (prof.role === 'owner' || prof.role === 'admin');
+    if (!session) { location.replace('/?next=/invest/'); return; }
+    const { data: prof } = await supabaseClient
+      .from('profiles').select('role').eq('id', session.user.id).maybeSingle();
+    isOwner = !!prof && ['owner', 'admin'].includes(prof.role);
     if (isOwner) document.body.classList.add('is-owner');
   } catch (e) {
     console.warn(e);
-    location.replace('/');
+    location.replace('/?next=/invest/');
     return;
   }
   await refreshAll();
@@ -226,42 +215,43 @@ async function init(){
 }
 
 async function refreshAll(){
-  await loadState();
-  await loadPortfolio();
-  await loadOrders();
+  await Promise.all([loadState(), loadPortfolio(), loadOrders()]);
 }
 
 async function loadState(){
   try {
     const { data, error } = await supabaseClient.rpc('invest_public_state');
     if (error) throw error;
-    state = data;
     if (!data || !data.success) return;
+    state = data;
+
     $('sPrice').textContent = fmt(data.price_per_share);
     $('sLast').textContent = fmt(data.last_market_price);
-    $('sAvail').textContent = (data.shares_available||0).toLocaleString('id-ID');
-    $('sSold').textContent = (data.shares_sold||0)+' / '+(data.total_shares||0);
+    $('sAvail').textContent = (data.shares_available || 0).toLocaleString('id-ID');
+    $('sSold').textContent = (data.shares_sold || 0) + ' / ' + (data.total_shares || 0);
+
     const open = !!data.primary_open;
     $('mktPill').textContent = open ? 'PRIMARY OPEN' : 'SECONDARY ONLY';
-    $('mktPill').className = 'pill '+(open?'on':'off');
+    $('mktPill').className = 'pill ' + (open ? 'on' : 'off');
     $('primaryCard').style.opacity = open ? '1' : '0.55';
     $('buyHint').textContent = open
-      ? ('Harga '+fmt(data.price_per_share)+' / lembar · min '+data.min_buy_shares+' lembar · min '+fmt(data.min_buy_amount))
+      ? 'Harga ' + fmt(data.price_per_share) + ' / lembar · min ' + data.min_buy_shares + ' lembar · min ' + fmt(data.min_buy_amount)
       : 'Primary habis/tutup — gunakan pasar sekunder (request beli / jual).';
-    // admin fields
+
     if (isOwner) {
+      // isi form owner hanya sekali, supaya tidak menimpa input yang sedang diketik
       if (!$('aTotal').value) $('aTotal').value = data.total_shares;
       if (!$('aPrice').value) $('aPrice').value = data.price_per_share;
       if (!$('aMinSh').value) $('aMinSh').value = data.min_buy_shares;
       if (!$('aMinAmt').value) $('aMinAmt').value = data.min_buy_amount;
       if (!$('aPct').value) $('aPct').value = data.investor_profit_pct;
     }
-    const hist = (data.price_history || []).slice().reverse();
-    chartPoints = hist.map(h => Number(h.price)||0);
-    if (!chartPoints.length) chartPoints = [Number(data.price_per_share)||1000];
+
+    chartPoints = (data.price_history || []).slice().reverse().map(h => Number(h.price) || 0);
+    if (!chartPoints.length) chartPoints = [Number(data.price_per_share) || 1000];
     drawChart();
   } catch (e) {
-    console.warn(e);
+    console.warn('loadState', e);
   }
 }
 
@@ -270,15 +260,15 @@ async function loadPortfolio(){
     const { data, error } = await supabaseClient.rpc('invest_my_portfolio');
     if (error) throw error;
     if (!data || !data.success) return;
-    $('pShares').textContent = (data.shares||0).toLocaleString('id-ID');
+    $('pShares').textContent = (data.shares || 0).toLocaleString('id-ID');
     $('pAvg').textContent = fmt(data.avg_cost);
     $('pVal').textContent = fmt(data.market_value);
-    const u = Number(data.unrealized||0);
+    const u = Number(data.unrealized || 0);
     const el = $('pUnreal');
-    el.textContent = (u>=0?'+':'')+fmt(u);
-    el.className = 'v '+(u>=0?'up':'down');
+    el.textContent = (u >= 0 ? '+' : '') + fmt(u);
+    el.className = 'v ' + (u >= 0 ? 'up' : 'down');
     $('pDist').textContent = fmt(data.distributed_profit);
-    $('pOwn').textContent = (Number(data.ownership_pct||0)).toFixed(2)+'%';
+    $('pOwn').textContent = Number(data.ownership_pct || 0).toFixed(2) + '%';
     $('pHint').textContent = u < 0
       ? 'Harga pasar di bawah avg cost kamu — unrealized sedang minus.'
       : 'Profit paper mengikuti harga pasar terakhir + bagi hasil yang sudah dicairkan.';
@@ -287,179 +277,215 @@ async function loadPortfolio(){
   }
 }
 
-
-let boardFilter = 'all';
-function filterBoard(f) {
+function filterBoard(f){
   boardFilter = f;
-  ['All','Sell','Buy'].forEach(function(x) {
-    const el = document.getElementById('tab'+x);
-    if (el) el.classList.toggle('on', (x==='All' && f==='all') || (x==='Sell' && f==='sell') || (x==='Buy' && f==='buy'));
+  ['All', 'Sell', 'Buy'].forEach(x => {
+    const el = $('tab' + x);
+    if (el) el.classList.toggle('on', x.toLowerCase() === f || (x === 'All' && f === 'all'));
   });
   loadOrders();
 }
 
-async function loadOrders() {
+async function loadOrders(){
+  const box = $('orderList');
   try {
-    const args = { p_limit: 60, p_side: (boardFilter==='sell'||boardFilter==='buy') ? boardFilter : null };
-    const { data, error } = await supabaseClient.rpc('invest_list_market_orders', args);
+    const { data, error } = await supabaseClient.rpc('invest_list_market_orders', {
+      p_limit: 60,
+      p_side: boardFilter === 'sell' || boardFilter === 'buy' ? boardFilter : null
+    });
     if (error) throw error;
     const rows = (data && data.data) || [];
-    const box = document.getElementById('orderList');
-    const st = document.getElementById('boardStats');
-    const sells = rows.filter(o => o.side === 'sell');
-    const buys = rows.filter(o => o.side === 'buy');
-    const pri = rows.filter(o => o.is_primary);
-    if (st) st.textContent = 'Jual: ' + sells.length + ' · Beli: ' + buys.length + ' · Primary owner: ' + pri.length;
+
+    $('boardStats').textContent =
+      'Jual: ' + rows.filter(o => o.side === 'sell').length +
+      ' · Beli: ' + rows.filter(o => o.side === 'buy').length +
+      ' · Primary owner: ' + rows.filter(o => o.is_primary).length;
+
     if (!rows.length) {
       box.innerHTML = '<div class="hint">Papan kosong. Owner buka lembar primary atau user pasang request.</div>';
       return;
     }
-    box.innerHTML = rows.map(function(o) {
-      const left = (o.remaining != null) ? o.remaining : ((o.shares||0) - (o.filled_shares||0));
+
+    box.innerHTML = rows.map(o => {
+      const left = o.remaining != null ? o.remaining : (o.shares || 0) - (o.filled_shares || 0);
       const isPri = !!o.is_primary;
-      const canTake = o.side === 'sell' && left > 0;
-      return '<div class="board-row' + (isPri ? ' primary' : '') + '">' +
-        '<div><span class="tag ' + (o.side==='sell'?'tag-sell':'tag-buy') + '">' + (o.side||'').toUpperCase() + '</span>' +
-        (isPri ? '<span class="tag tag-pri">PRIMARY</span>' : '') + '</div>' +
-        '<div class="meta"><b>' + left + '</b> lembar @ <b>' + fmt(o.price_per_share) + '</b>' +
-        '<small>' + (isPri ? 'Dari owner (lembar resmi)' : (o.email || 'user')) + ' · ' + (o.status||'') + '</small></div>' +
-        (canTake ? '<div class="act"><button type="button" onclick="takeOrder(\'' + o.id + '\',' + left + ')">Beli</button></div>' : '') +
-        '</div>';
+      const side = o.side === 'sell' ? 'sell' : 'buy';
+      const canTake = side === 'sell' && left > 0;
+      return `
+        <div class="board-row ${isPri ? 'primary' : ''}">
+          <div>
+            <span class="tag tag-${side}">${esc(side.toUpperCase())}</span>
+            ${isPri ? '<span class="tag tag-pri">PRIMARY</span>' : ''}
+          </div>
+          <div class="meta">
+            <b>${esc(left)}</b> lembar @ <b>${fmt(o.price_per_share)}</b>
+            <small>${isPri ? 'Dari owner (lembar resmi)' : esc(o.email || 'user')} · ${esc(o.status || '')}</small>
+          </div>
+          ${canTake ? `<div class="act"><button type="button" onclick="takeOrder('${esc(o.id)}', ${Number(left) || 0})">Beli</button></div>` : ''}
+        </div>`;
     }).join('');
   } catch (e) {
-    const box = document.getElementById('orderList');
-    if (box) box.innerHTML = '<div class="hint">' + (e.message||e) + '</div>';
+    box.innerHTML = '<div class="hint">' + esc(e.message || e) + '</div>';
   }
 }
 
-async function takeOrder(orderId, maxShares) {
+async function takeOrder(orderId, maxShares){
   const { value: sh } = await Swal.fire({
     title: 'Beli dari papan',
     input: 'number',
-    inputValue: Math.min(maxShares||1, 10),
-    inputAttributes: { min: 1, max: maxShares||999999 },
+    inputValue: Math.min(maxShares || 1, 10),
+    inputAttributes: { min: 1, max: maxShares || 999999 },
     showCancelButton: true,
     confirmButtonText: 'Beli (Saldo)',
-    background: '#1a0e2e',
-    color: '#fff',
-    confirmButtonColor: '#22c55e'
+    confirmButtonColor: '#22c55e',
+    ...SW
   });
-  if (!sh) return;
   const shares = parseInt(sh, 10);
   if (!shares || shares < 1) return;
-  const { data, error } = await supabaseClient.rpc('invest_take_order', {
-    p_order_id: orderId,
-    p_shares: shares
-  });
-  if (error) return Swal.fire({ title:'Gagal', text: error.message, icon:'error', background:'#1a0e2e', color:'#fff' });
-  if (data && data.success === false) return Swal.fire({ title:'Gagal', text: data.message, icon:'error', background:'#1a0e2e', color:'#fff' });
-  Swal.fire({ title:'Berhasil', text: '+' + (data.shares||shares) + ' lembar · ' + fmt(data.amount), icon:'success', background:'#1a0e2e', color:'#fff', timer:1600 });
+
+  const { data, error } = await supabaseClient.rpc('invest_take_order', { p_order_id: orderId, p_shares: shares });
+  if (error) return showErr(error.message);
+  if (data && data.success === false) return showErr(data.message);
+  await showOk('Berhasil', '+' + (data.shares || shares) + ' lembar · ' + fmt(data.amount));
   refreshAll();
 }
-window.filterBoard = filterBoard;
-window.takeOrder = takeOrder;
-
-
 
 function drawChart(){
   const c = $('priceChart');
-  if (!c) return;
+  if (!c || !c.clientWidth) return; // tab tersembunyi: tunda sampai terlihat
   const ctx = c.getContext('2d');
   const dpr = window.devicePixelRatio || 1;
-  const w = c.clientWidth || 320;
-  const h = 160;
+  const w = c.clientWidth, h = 160, pad = 12;
   c.width = w * dpr; c.height = h * dpr;
-  ctx.scale(dpr, dpr);
-  ctx.clearRect(0,0,w,h);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+
   const pts = chartPoints.length ? chartPoints : [1000];
-  const min = Math.min.apply(null, pts);
-  const max = Math.max.apply(null, pts);
-  const pad = 12;
-  const span = (max - min) || 1;
+  const min = Math.min(...pts), max = Math.max(...pts);
+  const span = max - min || 1;
+  const up = pts[pts.length - 1] >= pts[0];
+
+  const xy = (p, i) => [
+    pad + (i / Math.max(pts.length - 1, 1)) * (w - pad * 2),
+    h - pad - ((p - min) / span) * (h - pad * 2)
+  ];
+
   ctx.beginPath();
-  pts.forEach((p,i) => {
-    const x = pad + (i/(Math.max(pts.length-1,1))) * (w - pad*2);
-    const y = h - pad - ((p - min)/span) * (h - pad*2);
-    if (i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
-  });
-  const up = pts[pts.length-1] >= pts[0];
+  pts.forEach((p, i) => { const [x, y] = xy(p, i); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); });
   ctx.strokeStyle = up ? '#4ade80' : '#f87171';
   ctx.lineWidth = 2.2;
   ctx.stroke();
-  // fill
-  const lastX = pad + (w - pad*2);
-  const baseY = h - pad;
-  ctx.lineTo(pad + (w-pad*2), baseY);
-  ctx.lineTo(pad, baseY);
+
+  // area di bawah garis
+  ctx.lineTo(w - pad, h - pad);
+  ctx.lineTo(pad, h - pad);
   ctx.closePath();
   ctx.fillStyle = up ? 'rgba(74,222,128,.12)' : 'rgba(248,113,113,.12)';
   ctx.fill();
 }
 
 async function buyPrimary(){
-  const shares = parseInt(($('buyShares').value||'0'),10);
-  if (!shares || shares < 1) return Swal.fire({title:'Isi lembar',icon:'warning',background:'#1a0e2e',color:'#fff'});
-  const conf = await Swal.fire({title:'Beli '+shares+' lembar?',text:'Debit dari saldo Shine Shop',icon:'question',showCancelButton:true,background:'#1a0e2e',color:'#fff',confirmButtonColor:'#ff6b9d'});
+  const shares = parseInt($('buyShares').value || '0', 10);
+  if (!shares || shares < 1) return Swal.fire({ title: 'Isi lembar', icon: 'warning', ...SW });
+
+  const conf = await Swal.fire({
+    title: 'Beli ' + shares + ' lembar?',
+    text: 'Debit dari saldo Shine Shop',
+    icon: 'question',
+    showCancelButton: true,
+    confirmButtonColor: '#ff6b9d',
+    ...SW
+  });
   if (!conf.isConfirmed) return;
+
   const { data, error } = await supabaseClient.rpc('invest_buy_primary', { p_shares: shares });
-  if (error) return Swal.fire({title:'Gagal',text:error.message,icon:'error',background:'#1a0e2e',color:'#fff'});
-  if (data && data.success === false) return Swal.fire({title:'Gagal',text:data.message,icon:'error',background:'#1a0e2e',color:'#fff'});
-  Swal.fire({title:'Berhasil',text:'+'+(data.shares||shares)+' lembar · '+fmt(data.amount),icon:'success',background:'#1a0e2e',color:'#fff',timer:1800});
-  $('buyShares').value='';
+  if (error) return showErr(error.message);
+  if (data && data.success === false) return showErr(data.message);
+  await showOk('Berhasil', '+' + (data.shares || shares) + ' lembar · ' + fmt(data.amount), 1800);
+  $('buyShares').value = '';
   refreshAll();
 }
 
 function switchSide(s){
   side = s;
-  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.getAttribute('data-tab')===s));
-  $('mSubmit').textContent = s==='sell' ? 'Pasang order jual' : 'Request beli';
-  $('mSubmit').className = 'btn '+(s==='sell'?'btn-cyan':'btn-green');
+  document.querySelectorAll('[data-tab]').forEach(t =>
+    t.classList.toggle('on', t.getAttribute('data-tab') === s));
+  $('mSubmit').textContent = s === 'sell' ? 'Pasang order jual' : 'Request beli';
+  $('mSubmit').className = 'btn ' + (s === 'sell' ? 'btn-cyan' : 'btn-green');
 }
 
 async function placeOrder(){
-  const shares = parseInt(($('mShares').value||'0'),10);
-  const price = parseFloat(($('mPrice').value||'0'));
-  if (!shares || !price) return Swal.fire({title:'Lembar & harga wajib',icon:'warning',background:'#1a0e2e',color:'#fff'});
+  const shares = parseInt($('mShares').value || '0', 10);
+  const price = parseFloat($('mPrice').value || '0');
+  if (!shares || !price) return Swal.fire({ title: 'Lembar & harga wajib', icon: 'warning', ...SW });
+
   const { data, error } = await supabaseClient.rpc('invest_place_market_order', {
     p_side: side, p_shares: shares, p_price: price
   });
-  if (error) return Swal.fire({title:'Gagal',text:error.message,icon:'error',background:'#1a0e2e',color:'#fff'});
-  if (data && data.success === false) return Swal.fire({title:'Gagal',text:data.message,icon:'error',background:'#1a0e2e',color:'#fff'});
-  Swal.fire({title:'Order dipasang',icon:'success',background:'#1a0e2e',color:'#fff',timer:1400});
-  $('mShares').value=''; $('mPrice').value='';
+  if (error) return showErr(error.message);
+  if (data && data.success === false) return showErr(data.message);
+  await showOk('Order dipasang', '', 1400);
+  $('mShares').value = '';
+  $('mPrice').value = '';
   refreshAll();
 }
 
 async function saveSettings(){
   const { data, error } = await supabaseClient.rpc('invest_admin_update_settings', {
-    p_total_shares: parseInt($('aTotal').value||'0',10)||null,
-    p_price_per_share: parseFloat($('aPrice').value||'0')||null,
-    p_min_buy_shares: parseInt($('aMinSh').value||'0',10)||null,
-    p_min_buy_amount: parseFloat($('aMinAmt').value||'0')||null,
-    p_investor_profit_pct: parseFloat($('aPct').value||'0')||null,
-    p_primary_open: true
+    p_total_shares: parseInt($('aTotal').value || '0', 10) || null,
+    p_price_per_share: parseFloat($('aPrice').value || '0') || null,
+    p_min_buy_shares: parseInt($('aMinSh').value || '0', 10) || null,
+    p_min_buy_amount: parseFloat($('aMinAmt').value || '0') || null,
+    p_investor_profit_pct: parseFloat($('aPct').value || '0') || null,
+    // pertahankan status primary saat ini, jangan paksa terbuka
+    p_primary_open: state ? !!state.primary_open : null
   });
-  if (error) return Swal.fire({title:'Gagal',text:error.message,icon:'error',background:'#1a0e2e',color:'#fff'});
-  if (data && data.success === false) return Swal.fire({title:'Gagal',text:data.message,icon:'error',background:'#1a0e2e',color:'#fff'});
-  Swal.fire({title:'Tersimpan',icon:'success',background:'#1a0e2e',color:'#fff',timer:1200});
+  if (error) return showErr(error.message);
+  if (data && data.success === false) return showErr(data.message);
+  await showOk('Tersimpan', '', 1200);
   refreshAll();
 }
 
 async function distributeProfit(){
-  const profit = parseFloat(($('aProfit').value||'0'));
-  if (!profit || profit <= 0) return Swal.fire({title:'Isi laba bersih',icon:'warning',background:'#1a0e2e',color:'#fff'});
-  const conf = await Swal.fire({title:'Distribusi 30% ke investor?',text:fmt(profit)+' laba bersih',icon:'question',showCancelButton:true,background:'#1a0e2e',color:'#fff',confirmButtonColor:'#22c55e'});
+  const profit = parseFloat($('aProfit').value || '0');
+  if (!profit || profit <= 0) return Swal.fire({ title: 'Isi laba bersih', icon: 'warning', ...SW });
+
+  const conf = await Swal.fire({
+    title: 'Distribusi 30% ke investor?',
+    text: fmt(profit) + ' laba bersih',
+    icon: 'question',
+    showCancelButton: true,
+    confirmButtonColor: '#22c55e',
+    ...SW
+  });
   if (!conf.isConfirmed) return;
-  const { data, error } = await supabaseClient.rpc('invest_distribute_profit', { p_net_profit: profit, p_note: 'Daily profit' });
-  if (error) return Swal.fire({title:'Gagal',text:error.message,icon:'error',background:'#1a0e2e',color:'#fff'});
-  if (data && data.success === false) return Swal.fire({title:'Gagal',text:data.message,icon:'error',background:'#1a0e2e',color:'#fff'});
-  Swal.fire({title:'Selesai',html:'Pool investor: <b>'+fmt(data.investor_pool)+'</b><br>Terbayar: <b>'+fmt(data.distributed)+'</b>',icon:'success',background:'#1a0e2e',color:'#fff'});
-  $('aProfit').value='';
+
+  const { data, error } = await supabaseClient.rpc('invest_distribute_profit', {
+    p_net_profit: profit, p_note: 'Daily profit'
+  });
+  if (error) return showErr(error.message);
+  if (data && data.success === false) return showErr(data.message);
+
+  Swal.fire({
+    title: 'Selesai',
+    html: 'Pool investor: <b>' + fmt(data.investor_pool) + '</b><br>Terbayar: <b>' + fmt(data.distributed) + '</b>',
+    icon: 'success',
+    ...SW
+  });
+  $('aProfit').value = '';
   refreshAll();
 }
+
+window.filterBoard = filterBoard;
+window.takeOrder = takeOrder;
+window.switchSide = switchSide;
+window.guard = guard;
+window.buyPrimary = buyPrimary;
+window.placeOrder = placeOrder;
+window.saveSettings = saveSettings;
+window.distributeProfit = distributeProfit;
 
 init();
 </script>
 </body>
 </html>
-
