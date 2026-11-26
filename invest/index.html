@@ -235,8 +235,8 @@ body{background:radial-gradient(1200px 500px at 50% -10%,rgba(124,58,237,.25),tr
         <div class="ord-input"><span>Rp</span><input type="number" id="oAmount" inputmode="decimal" placeholder="90000" oninput="onOrderInput('amount')"></div>
       </div>
       <div class="ord-field">
-        <label>Harga / lembar</label>
-        <div class="ord-input"><span>Rp</span><input type="number" id="oPrice" inputmode="decimal" placeholder="1000" oninput="onOrderInput('price')"></div>
+        <label>Harga (ikut primary)</label>
+        <div class="ord-input"><span>Rp</span><input type="number" id="oPrice" readonly tabindex="-1" placeholder="—"></div>
       </div>
       <div class="ord-field full">
         <label>Jumlah lembar</label>
@@ -245,7 +245,7 @@ body{background:radial-gradient(1200px 500px at 50% -10%,rgba(124,58,237,.25),tr
     </div>
     <div class="ord-calc" id="orderCalc">Isi dua kolom, sisanya terisi otomatis.</div>
     <button class="cta sell" id="mSubmit" onclick="guard(this, placeOrder)">Pasang order jual</button>
-    <div class="hint">Lembar pecahan bisa dipesan (contoh 2,5 lembar). Harga primary dari owner tetap, sedangkan harga pasar mengikuti order yang masuk.</div>
+    <div class="hint">Lembar pecahan bisa dipesan (contoh 2,5 lembar). Harga per lembar selalu mengikuti harga primary owner.</div>
   </div>
 
   <!-- MY ORDERS -->
@@ -399,6 +399,7 @@ async function loadState() {
 
 function renderState() {
   const s = state;
+  if (s && $('oPrice')) { const pp = Math.round(Number(s.price_per_share) || 0); $('oPrice').value = pp ? String(pp) : ''; }
   const open = !!s.primary_open;
   const total = Number(s.total_shares) || 0;
   const sold = Number(s.shares_sold) || 0;
@@ -719,42 +720,39 @@ function setSide(s) {
 }
 
 function onOrderInput(field) {
+  if (field !== 'amount' && field !== 'shares') return;
   ordTouched = ordTouched.filter(k => k !== field);
   ordTouched.push(field);
   updateOrderPreview();
 }
 
-// Hitung kolom ketiga dari dua kolom yang paling baru diisi user
+// Harga kertas = harga primary owner (terkunci). Nominal & lembar saling terhitung.
 function solveOrder() {
-  const raw = {
-    amount: parseFloat($('oAmount').value || '0') || 0,
-    price: parseFloat($('oPrice').value || '0') || 0,
-    shares: parseFloat($('oShares').value || '0') || 0
-  };
-  const filled = ['amount', 'price', 'shares'].filter(k => raw[k] > 0);
-  const recent = ordTouched.filter(k => filled.includes(k)).slice(-2);
-  if (recent.length < 2) return { ok: false, ...raw };
+  const price = Math.round(Number(state && state.price_per_share) || 0);
+  if ($('oPrice').value !== String(price)) $('oPrice').value = price ? String(price) : '';
 
-  const third = ['amount', 'price', 'shares'].find(k => !recent.includes(k));
-  let { amount, price, shares } = raw;
-  if (third === 'shares') shares = Math.floor((amount / price) * 10000) / 10000;
-  if (third === 'price') price = shares > 0 ? Math.round(amount / shares) : 0;
-  if (third === 'amount') amount = Math.round(price * shares);
+  let amount = parseFloat($('oAmount').value || '0') || 0;
+  let shares = parseFloat($('oShares').value || '0') || 0;
+  const last = ordTouched.filter(k => k === 'amount' || k === 'shares').slice(-1)[0];
 
-  // tulis hasil ke kolom ketiga (tanpa mencatatnya sebagai input user)
-  const el = { amount: 'oAmount', price: 'oPrice', shares: 'oShares' }[third];
-  const val = third === 'shares' ? String(shares) : String(third === 'amount' ? amount : price);
-  if ($(el).value !== val) $(el).value = val;
-
-  return { ok: amount > 0 && price > 0 && shares > 0, amount, price, shares, third };
+  if (price > 0 && last === 'amount' && amount > 0) {
+    shares = Math.floor((amount / price) * 10000) / 10000;
+    if ($('oShares').value !== String(shares)) $('oShares').value = String(shares);
+  } else if (price > 0 && last === 'shares' && shares > 0) {
+    amount = Math.round(shares * price);
+    if ($('oAmount').value !== String(amount)) $('oAmount').value = String(amount);
+  }
+  return { ok: price > 0 && amount > 0 && shares > 0, amount, price, shares };
 }
 
 function updateOrderPreview() {
   const s = solveOrder();
   const have = Number(portfolio && portfolio.shares) || 0;
   let msg;
-  if (!s.ok) {
-    msg = 'Isi dua kolom, sisanya terisi otomatis.';
+  if (!s.price) {
+    msg = 'Harga primary belum tersedia.';
+  } else if (!s.ok) {
+    msg = 'Isi nominal atau jumlah lembar, sisanya terisi otomatis.';
   } else {
     msg = rp(s.amount) + ' ÷ ' + rp(s.price) + ' = <b>' + fmtShares(s.shares) + ' lembar</b>';
     if (side === 'sell' && s.shares > have) msg += '<br><span class="down">Lembar kamu hanya ' + fmtShares(have) + '</span>';
