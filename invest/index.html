@@ -127,11 +127,11 @@ body.is-owner .admin-only{display:block}
     <h3>🛒 Beli dari Owner (Primary) <span class="pill off" id="primaryPill">—</span></h3>
     <div class="row">
       <div class="col">
-        <div class="field-label">Jumlah lembar</div>
-        <input type="number" id="buyShares" min="1" step="1" placeholder="contoh: 10" oninput="updateBuyPreview()">
+        <div class="field-label">Jumlah uang (Rp)</div>
+        <input type="number" id="buyAmount" min="1" step="1" placeholder="contoh: 100000" oninput="updateBuyPreview()">
       </div>
     </div>
-    <div class="preview" id="buyPreview">Isi jumlah lembar untuk melihat total.</div>
+    <div class="preview" id="buyPreview">Isi jumlah uang untuk melihat lembar yang didapat.</div>
     <div class="hint">Dibayar dari <b>saldo Shine Shop</b>. Pembayaran QRIS (+1% biaya admin) akan tersedia setelah fitur deposit terhubung.</div>
     <button class="btn btn-primary btn-block" style="margin-top:10px" id="btnBuyPrimary" onclick="guard(this, buyPrimary)">Beli lembar primary</button>
   </div>
@@ -253,6 +253,9 @@ const $ = (id) => document.getElementById(id);
 const rp = (n) => 'Rp ' + Math.round(Number(n) || 0).toLocaleString('id-ID');
 const num = (n) => (Number(n) || 0).toLocaleString('id-ID');
 const pct = (n, d = 2) => (Number(n) || 0).toFixed(d) + '%';
+const fmtShares = (n) => (Number(n) || 0).toLocaleString('id-ID', { maximumFractionDigits: 4 });
+// lembar dari nominal rupiah: dibulatkan ke bawah 4 desimal
+const sharesFromAmount = (amt, price) => price > 0 ? Math.floor((amt / price) * 10000) / 10000 : 0;
 function esc(s) {
   return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
 }
@@ -337,7 +340,7 @@ function renderState() {
 
   $('sPrimaryPrice').textContent = rp(s.price_per_share);
   $('sLast').textContent = rp(s.last_market_price || s.price_per_share);
-  $('sAvail').textContent = num(avail);
+  $('sAvail').textContent = fmtShares(avail);
   $('sSold').textContent = num(sold) + ' / ' + num(total);
 
   const last = Number(s.last_market_price || s.price_per_share) || 0;
@@ -369,7 +372,7 @@ async function loadPortfolio() {
     const dist = Number(data.distributed_profit) || 0;
     const own = Number(data.ownership_pct) || 0;
 
-    $('pShares').textContent = num(shares);
+    $('pShares').textContent = fmtShares(shares);
     $('pAvg').textContent = rp(data.avg_cost);
     $('pVal').textContent = rp(data.market_value);
     $('pUnreal').textContent = (unreal >= 0 ? '+' : '') + rp(unreal);
@@ -451,7 +454,7 @@ function renderOrders() {
           ${isPri ? '<span class="tag tag-pri">PRIMARY</span>' : ''}
         </div>
         <div class="meta">
-          <b>${num(left)}</b> lembar @ <b>${rp(o.price_per_share)}</b>
+          <b>${fmtShares(left)}</b> lembar @ <b>${rp(o.price_per_share)}</b>
           <small>${isPri ? 'Dari owner' : esc(o.email || 'user')}${isMine ? ' · (order kamu)' : ''}</small>
         </div>
         ${action}
@@ -469,7 +472,7 @@ function renderMyOrders() {
       <div class="order">
         <div style="min-width:70px"><span class="tag ${o.side === 'sell' ? 'tag-sell' : 'tag-buy'}">${o.side === 'sell' ? 'JUAL' : 'BELI'}</span></div>
         <div class="meta">
-          <b>${num(left)}</b> / ${num(o.shares)} lembar @ <b>${rp(o.price_per_share)}</b>
+          <b>${fmtShares(left)}</b> / ${fmtShares(o.shares)} lembar @ <b>${rp(o.price_per_share)}</b>
           <small>${esc(o.status || '')}</small>
         </div>
         ${open ? `<button class="btn btn-ghost btn-sm" onclick="guard(this, () => cancelOrder('${esc(o.id)}'))">Batal</button>` : ''}
@@ -559,25 +562,24 @@ function drawChart() {
 
 // ---------- pratinjau ----------
 function updateBuyPreview() {
-  const shares = parseInt($('buyShares').value || '0', 10) || 0;
+  const amount = Math.floor(parseFloat($('buyAmount').value || '0') || 0);
   const price = Number(state && state.price_per_share) || 0;
-  const total = shares * price;
+  const shares = sharesFromAmount(amount, price);
   const minAmt = Number(state && state.min_buy_amount) || 0;
-  const minSh = Number(state && state.min_buy_shares) || 0;
   const totalShares = Number(state && state.total_shares) || 0;
   const have = Number(portfolio && portfolio.shares) || 0;
-  const after = have + shares;
-  const ownAfter = totalShares ? (after / totalShares) * 100 : 0;
-  const qrisFee = Math.ceil(total * ADMIN_FEE_QRIS);
+  const ownAfter = totalShares ? ((have + shares) / totalShares) * 100 : 0;
+  const qrisFee = Math.ceil(amount * ADMIN_FEE_QRIS);
 
   let warn = '';
-  if (shares > 0 && total < minAmt) warn += '<br><span class="down">Minimal pembelian ' + rp(minAmt) + '</span>';
-  if (shares > 0 && shares < minSh) warn += '<br><span class="down">Minimal ' + num(minSh) + ' lembar</span>';
-  if (shares > 0 && ownAfter > MAX_OWNERSHIP_PCT) warn += '<br><span class="down">Melewati batas kepemilikan ' + MAX_OWNERSHIP_PCT + '%</span>';
+  if (amount > 0 && amount < minAmt) warn += '<br><span class="down">Minimal pembelian ' + rp(minAmt) + '</span>';
+  if (amount > 0 && shares <= 0) warn += '<br><span class="down">Nominal terlalu kecil untuk harga ini</span>';
+  if (amount > 0 && ownAfter > MAX_OWNERSHIP_PCT) warn += '<br><span class="down">Melewati batas kepemilikan ' + MAX_OWNERSHIP_PCT + '%</span>';
 
   $('buyPreview').innerHTML =
-    'Total dari saldo: <b>' + rp(total) + '</b><br>' +
-    'Estimasi jika bayar QRIS (+1%): <b>' + rp(total + qrisFee) + '</b><br>' +
+    'Dapat: <b>' + fmtShares(shares) + ' lembar</b> @ ' + rp(price) + '<br>' +
+    'Dibayar dari saldo: <b>' + rp(amount) + '</b><br>' +
+    'Estimasi jika bayar QRIS (+1%): <b>' + rp(amount + qrisFee) + '</b><br>' +
     'Kepemilikan setelah beli: <b>' + pct(ownAfter) + '</b>' + warn;
 }
 
@@ -604,35 +606,37 @@ function updateOrderPreview() {
 // ---------- aksi user ----------
 async function buyPrimary() {
   if (!state || !state.primary_open) return toast('info', 'Primary tutup', 'Gunakan papan jual/beli.');
-  const shares = parseInt($('buyShares').value || '0', 10);
-  if (!shares || shares < 1) return toast('warning', 'Isi jumlah lembar');
+  const amount = Math.floor(parseFloat($('buyAmount').value || '0') || 0);
+  if (!amount || amount < 1) return toast('warning', 'Isi jumlah uang');
 
   const price = Number(state.price_per_share) || 0;
-  const total = shares * price;
+  const shares = sharesFromAmount(amount, price);
   const minAmt = Number(state.min_buy_amount) || 0;
-  const minSh = Number(state.min_buy_shares) || 0;
   const totalShares = Number(state.total_shares) || 0;
   const have = Number(portfolio && portfolio.shares) || 0;
+  const avail = Number(state.shares_available) || 0;
 
-  if (total < minAmt) return toast('warning', 'Di bawah minimal', 'Minimal pembelian ' + rp(minAmt));
-  if (shares < minSh) return toast('warning', 'Di bawah minimal lembar', 'Minimal ' + num(minSh) + ' lembar');
+  if (amount < minAmt) return toast('warning', 'Di bawah minimal', 'Minimal pembelian ' + rp(minAmt));
+  if (shares <= 0) return toast('warning', 'Nominal terlalu kecil', 'Tidak cukup untuk 0,0001 lembar.');
+  if (shares > avail) return toast('error', 'Lembar primary tidak cukup', 'Sisa primary ' + fmtShares(avail) + ' lembar.');
   if (totalShares && ((have + shares) / totalShares) * 100 > MAX_OWNERSHIP_PCT) {
     return toast('error', 'Melewati batas 50%', 'Kepemilikan maksimal ' + MAX_OWNERSHIP_PCT + '% per investor.');
   }
 
   const conf = await Swal.fire({
-    title: 'Beli ' + num(shares) + ' lembar?',
-    html: 'Total <b>' + rp(total) + '</b> akan didebit dari saldo Shine Shop.',
+    title: 'Beli dengan ' + rp(amount) + '?',
+    html: 'Kamu mendapat <b>' + fmtShares(shares) + ' lembar</b> @ ' + rp(price) + '.<br>Didebit dari saldo Shine Shop.',
     icon: 'question', showCancelButton: true, confirmButtonText: 'Beli',
     confirmButtonColor: '#ff6b9d', background: '#1a0e2e', color: '#fff'
   });
   if (!conf.isConfirmed) return;
 
-  const { data, error } = await sb.rpc('invest_buy_primary', { p_shares: shares });
+  // server menghitung ulang lembar dari amount; shares dikirim sebagai pembanding
+  const { data, error } = await sb.rpc('invest_buy_primary', { p_amount: amount, p_shares: shares });
   const err = rpcErr(data, error);
   if (err) return toast('error', 'Gagal', err);
-  await toast('success', 'Berhasil', '+' + num(data.shares || shares) + ' lembar · ' + rp(data.amount || total));
-  $('buyShares').value = '';
+  await toast('success', 'Berhasil', '+' + fmtShares(data.shares || shares) + ' lembar · ' + rp(data.amount || amount));
+  $('buyAmount').value = '';
   updateBuyPreview();
   refreshAll();
 }
