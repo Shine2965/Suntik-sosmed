@@ -2080,4 +2080,148 @@ function markVoucherUsed(code) {
 function isVoucherUsed(code) { return getUsedVouchers().includes(code); }
 
 function crc16(s){
- 
+  let c=0xFFFF;
+  for(let i=0;i<s.length;i++){
+    c^=s.charCodeAt(i)<<8;
+    for(let j=0;j<8;j++){ c=c&0x8000?(c<<1)^0x1021:c<<1; }
+  }
+  return (c&0xFFFF).toString(16).toUpperCase().padStart(4,'0');
+}
+
+function buildQR(a){
+  const str=String(parseInt(a, 10));
+  const tag="54"+String(str.length).padStart(2,"0")+str;
+  const base="00020101021126670016COM.NOBUBANK.WWW01189360050300000907180214260818000016290303UMI51440014ID.CO.QRIS.WWW0215ID10265728797100303UMI5204481253033605802ID5918SHINE SHOP ID CELL6008SURABAYA61056011162070703A016304743A";
+  return base+tag+"6304"+crc16(base+tag+"6304");
+}
+
+function updateDisplay(){
+  try {
+    finalTotal = normalizeTotal(finalTotal || total || 0);
+    originalTotal = normalizeTotal(originalTotal || finalTotal || 0);
+    adminFee = 0; // saldo only — no QRIS admin
+    const totalBayarSaldo = normalizeTotal(finalTotal);
+
+    const od = document.getElementById('orderDetails');
+    if (od) {
+      let html = '<strong>ID Transaksi:</strong> ' + (trx || '-') + '<br>';
+      html += '<strong>Tipe:</strong> ' + (isMass ? ('📦 MASSAL (' + (ordersData||[]).length + ' pesanan)') : '📋 Single') + '<br>';
+      html += '<strong>Total:</strong> Rp ' + totalBayarSaldo.toLocaleString('id-ID') + '<br>';
+      if (ordersData && ordersData.length) {
+        html += '<strong>📋 Detail:</strong><br>';
+        ordersData.forEach(function(o, i) {
+          html += '<div class="order-item-detail">' + (i+1) + '. ' + (o.serviceName||o.service_name||'-') +
+            ' x' + (o.jumlah||o.quantity||0) + ' → ' + (o.target||'-') + '</div>';
+        });
+      }
+      html += '<strong style="color:#facc15;">Total Bayar (Saldo):</strong> Rp ' + totalBayarSaldo.toLocaleString('id-ID');
+      od.innerHTML = html;
+    }
+
+    if (typeof updateSaldoDisplay === 'function') updateSaldoDisplay();
+    else {
+      const el = document.getElementById('saldoTotalBayar');
+      if (el) el.textContent = 'Rp ' + totalBayarSaldo.toLocaleString('id-ID');
+      const sisa = document.getElementById('saldoSisa');
+      if (sisa) sisa.textContent = 'Rp ' + Math.max(0, (userBalance||0) - totalBayarSaldo).toLocaleString('id-ID');
+    }
+  } catch (e) { console.warn('updateDisplay', e); }
+}
+
+function updateGmailUI(email) {
+  const el = document.getElementById('gmailDisplay');
+  if (!el) return;
+  if (email && String(email).indexOf('@') > 0) {
+    el.textContent = email;
+    el.className = 'value';
+    try { localStorage.setItem('user_gmail', email); } catch (_) {}
+  } else {
+    el.textContent = '⚠️ Belum login';
+    el.className = 'value not-set';
+  }
+}
+
+async function bootPaymentPage() {
+  try {
+    // Session
+    if (!supabaseClient) {
+      updateGmailUI(null);
+      return;
+    }
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (!session || !session.user) {
+      updateGmailUI(null);
+      try {
+        if (window.Swal) {
+          Swal.fire({
+            title: 'Login dulu',
+            text: 'Sesi tidak ditemukan. Kembali ke beranda untuk login.',
+            icon: 'warning',
+            confirmButtonColor: '#00c6ff',
+            background: '#0a0e1a',
+            color: '#fff'
+          }).then(function(){ location.href = '/'; });
+        }
+      } catch (_) {}
+      return;
+    }
+
+    userProfileId = session.user.id;
+    userEmail = session.user.email || null;
+    updateGmailUI(userEmail);
+
+    // Balance
+    try {
+      const { data: pr } = await supabaseClient.from('profiles').select('balance,email').eq('id', userProfileId).maybeSingle();
+      if (pr) {
+        userBalance = parseInt(pr.balance, 10) || 0;
+        if (pr.email) { userEmail = pr.email; updateGmailUI(userEmail); }
+      }
+    } catch (e) { console.warn('balance', e); }
+
+    // Orders from Supabase by trx
+    if (typeof loadOrdersFromSupabase === 'function') {
+      const loaded = await loadOrdersFromSupabase();
+      if (loaded && loaded.length) ordersData = loaded;
+    }
+
+    if (typeof normalizeTotal === 'function') {
+      finalTotal = normalizeTotal(finalTotal || total || 0);
+      originalTotal = normalizeTotal(originalTotal || finalTotal);
+    }
+
+    // Force saldo UI
+    try {
+      paymentMethod = 'saldo';
+      if (typeof selectPaymentMethod === 'function') selectPaymentMethod('saldo');
+    } catch (_) {}
+
+    updateDisplay();
+    if (typeof updateSaldoDisplay === 'function') updateSaldoDisplay();
+    if (typeof loadAvailableVouchers === 'function') {
+      try { await loadAvailableVouchers(); } catch (_) {}
+    }
+
+    // Ban check soft
+    try {
+      if (typeof checkAndHandleBan === 'function') await checkAndHandleBan();
+    } catch (_) {}
+
+  } catch (e) {
+    console.error('bootPaymentPage', e);
+    updateGmailUI(userEmail || null);
+  }
+}
+
+// Start
+(function () {
+  function run() { bootPaymentPage(); }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', run);
+  else run();
+  // retry session after storage sync
+  setTimeout(run, 600);
+  setTimeout(run, 1800);
+})();
+</script>
+</body>
+</html>
