@@ -89,7 +89,7 @@ async function claimUniqueCode(url, key, amount, depositTag) {
   const active = await sbFetch(url, key,
     '/rest/v1/deposit_code_locks?amount=eq.' + amount + '&expires_at=gte.' + encodeURIComponent(nowIso) +
     '&select=unique_code&limit=1000', { method: 'GET' });
-  if (!active.ok) throw new Error('baca lock kode gagal (HTTP ' + active.status + ')');
+  if (!active.ok) throw new Error('baca lock kode gagal (HTTP ' + active.status + '): ' + (active.text || '').slice(0, 300));
   const used = new Set((active.json || []).map((r) => Number(r.unique_code)));
 
   const expiresAt = new Date(Date.now() + LOCK_MS).toISOString();
