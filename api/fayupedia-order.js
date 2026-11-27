@@ -15,7 +15,8 @@ function send(res, status, body) {
 function readBody(req) {
   return new Promise((resolve) => {
     if (req.body && typeof req.body === 'object' && !Buffer.isBuffer(req.body)) {
-      resolve(req.body); return;
+      resolve(req.body);
+      return;
     }
     if (typeof req.body === 'string') {
       try { resolve(JSON.parse(req.body || '{}')); } catch (_) { resolve({}); }
@@ -37,6 +38,7 @@ module.exports = async function handler(req, res) {
     const API_ID = parseInt(process.env.FAYUPEDIA_API_ID || '0', 10) || 0;
     if (!API_KEY || !API_ID) {
       return send(res, 500, {
+        status: false,
         success: false,
         message: 'ENV FAYUPEDIA_API_KEY / FAYUPEDIA_API_ID belum di-set di Vercel'
       });
@@ -49,7 +51,7 @@ module.exports = async function handler(req, res) {
     const comments = body.custom_comments || body.comments || body.comment || '';
 
     if (!service || !target || quantity <= 0) {
-      return send(res, 400, { success: false, message: 'service, target, quantity wajib' });
+      return send(res, 400, { status: false, success: false, message: 'service, target, quantity wajib' });
     }
 
     const payload = {
@@ -66,23 +68,42 @@ module.exports = async function handler(req, res) {
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify(payload)
     });
+
     const text = await r.text();
     let json = null;
     try { json = JSON.parse(text); } catch (_) {}
+
     if (!r.ok) {
-      return send(res, 502, { success: false, message: 'Fayupedia HTTP ' + r.status, raw: text.slice(0, 300) });
+      return send(res, 502, {
+        status: false,
+        success: false,
+        message: 'Fayupedia HTTP ' + r.status,
+        raw: text.slice(0, 300)
+      });
     }
-    // normalize
+
+    // Fayupedia mengembalikan { status: true, msg: "...", order: 1107 }
     const orderId =
-      (json && (json.order_id || json.id || (json.data && (json.data.order_id || json.data.id)))) || null;
-    const ok = !!(json && (json.status === true || json.status === 'success' || orderId));
+      (json && (
+        json.order ||
+        json.order_id ||
+        json.id ||
+        (json.data && (json.data.order || json.data.order_id || json.data.id))
+      )) || null;
+
+    const providerOk = !!(json && (json.status === true || json.status === 'true' || json.success === true));
+    const ok = !!(providerOk && orderId);
+
     return send(res, 200, {
+      status: ok,
       success: ok,
-      order_id: orderId,
+      order: orderId ? String(orderId) : null,
+      order_id: orderId ? String(orderId) : null,
+      msg: (json && (json.msg || json.message)) || null,
       provider: 'fayupedia',
       raw: json || { text: text.slice(0, 500) }
     });
   } catch (e) {
-    return send(res, 500, { success: false, message: e.message || String(e) });
+    return send(res, 500, { status: false, success: false, message: e.message || String(e) });
   }
 };
