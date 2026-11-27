@@ -223,11 +223,15 @@ module.exports = async function handler(req, res) {
       }
 
       const newStatus = normalizeStatus(result.status);
+      const chargeVal = Number(result.charge) || 0;
       const updatePayload = {
         order_status: newStatus,
         start_count: result.start_count || order.start_count,
         remains: result.remains || order.remains,
-        last_checked_at: new Date().toISOString()
+        last_checked_at: new Date().toISOString(),
+        charge: chargeVal,
+        provider_charge: chargeVal,
+        provider_cost: chargeVal
       };
 
       // update di orders_detail dulu
@@ -266,11 +270,15 @@ module.exports = async function handler(req, res) {
           try {
             const r = await checkProviderStatus(order);
             if (!r.ok) return;
+            const ch = Number(r.charge) || 0;
             const payload = {
               order_status: normalizeStatus(r.status),
               start_count: r.start_count || order.start_count,
               remains: r.remains || order.remains,
-              last_checked_at: new Date().toISOString()
+              last_checked_at: new Date().toISOString(),
+              charge: ch,
+              provider_charge: ch,
+              provider_cost: ch
             };
             await supabase.from('orders_detail').update(payload).eq('trx_id', order.trx_id);
             await supabase.from('orders').update(payload).eq('trx_id', order.trx_id);
