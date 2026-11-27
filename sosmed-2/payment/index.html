@@ -925,58 +925,60 @@ async function saveAllOrdersDetailToDB(method) {
   try {
     const gmail = getStoredGmail();
     const totalPayment = normalizeTotal(finalTotal);
-    // Harga per order = nominal aslinya (bukan dibagi rata)
-    const sumLine = ordersData.reduce((s, o) => s + (Number(o.total) || Number(o.amount) || 0), 0);
     const sumQty = ordersData.reduce((s, o) => s + (parseInt(o.jumlah, 10) || 0), 0);
-    function amountForOrder(o, idx, len) {
-      // Harga sebenarnya per baris order (jangan rata-rata massal)
+    const normalizedMethod = method === 'balance' ? 'saldo' : method;
+
+    // Harga per baris order (tanpa variabel index yang tidak terdefinisi)
+    function amountForOrder(o, len) {
       let line = Number(o.total) || Number(o.amount) || Number(o.total_payment) || 0;
-      if (!(line > 0)) {
-        const unit = Number(o.price) || Number(o.harga) || Number(o.rate) || Number(o.harga_satuan) || 0;
-        const q = parseInt(o.jumlah || o.quantity || o.qty || 0, 10) || 0;
-        if (unit > 0 && q > 0) {
-          // rate sering per 1000 (SMM)
-          if (Number(o.rate_per) === 1000 || o.rate_mode === 'per_1000' || (unit < 1000 && q >= 1000 && o.service_id)) {
-            line = (unit / 1000) * q;
-          } else {
-            line = unit * q;
-          }
-        }
-      }
       if (line > 0) return Math.max(1, Math.floor(line));
-      // fallback proporsional qty HANYA jika line kosong total
+
       const q = parseInt(o.jumlah || o.quantity || o.qty || 0, 10) || 0;
-      if (sumQty > 0 && q > 0 && totalPayment > 0) return Math.max(1, Math.floor(totalPayment * (q / sumQty)));
-      // last resort equal
+      if (sumQty > 0 && q > 0 && totalPayment > 0) {
+        return Math.max(1, Math.floor(totalPayment * (q / sumQty)));
+      }
       return Math.max(1, Math.floor(totalPayment / Math.max(len, 1)));
     }
-    const normalizedMethod = method === 'balance' ? 'saldo' : method;
-    const { data: existing } = await supabaseClient.from('orders_detail').select('id').eq('trx_id', trx).limit(1);
-    if (existing && existing.length > 0) return true;
-    const ordersArray = ordersData.map(o => ({
-      user_id: userProfileId, email: userEmail || gmail || '-', gmail_target: gmail || '-',
-      trx_id: trx, service_id: String(o.serviceId || ''), service_name: o.serviceName || '',
-      target: o.target || '', quantity: parseInt(o.jumlah) || 0, comment: o.comment || null,
-      total_payment: amountForOrder(o, i, ordersData.length), payment_method: normalizedMethod, sosmed_type: SOSMED_TYPE
-    }));
-    const { data, error } = await supabaseClient.rpc('save_order_details_bulk', { p_orders: ordersArray });
-    // FALLBACK_ORDERS_DETAIL
-    if (error || !data || !data.success) {
-      console.warn('bulk rpc fail, fallback insert', error || data);
-      for (const row of ordersArray) {
-        try {
-          await supabaseClient.from('orders_detail').insert({
-            ...row,
-            order_status: 'processing',
-            status: 'paid'
-          });
-        } catch (e2) { console.warn(e2); }
-      }
-    }
-    return true;
-  } catch (err) { console.error('❌ Save all orders error:', err.message); return false; }
-}
 
+    // Cegah duplikat jika sudah pernah tersimpan
+    const { data: existing } = await supabaseClient
+      .from('orders_detail')
+      .select('id')
+      .eq('trx_id', trx)
+      .limit(1);
+    if (existing && existing.length > 0) return true;
+
+    const ordersArray = ordersData.map((o) => ({
+      user_id: userProfileId,
+      email: userEmail || gmail || '-',
+      gmail_target: gmail || '-',
+      trx_id: trx,
+      service_id: String(o.serviceId || ''),
+      service_name: o.serviceName || '',
+      target: o.target || '',
+      quantity: parseInt(o.jumlah, 10) || 0,
+      comment: o.comment || null,
+      total_payment: amountForOrder(o, ordersData.length),
+      payment_method: normalizedMethod,
+      sosmed_type: SOSMED_TYPE,
+      order_status: 'processing',
+      status: 'paid'
+    }));
+
+    // 1) Coba RPC
+    const { data, error } = await supabaseClient.rpc('save_order_details_bulk', { p_orders: ordersArray });
+    if (!error && data && data.success) return true;
+
+    // 2) Fallback: insert bulk langsung (hanya jika RPC gagal)
+    console.warn('save_order_details_bulk gagal, fallback insert:', error || data);
+    const { error: insErr } = await supabaseClient.from('orders_detail').insert(ordersArray);
+    if (insErr) throw insErr;
+    return true;
+  } catch (err) {
+    console.error('❌ Save all orders error:', err.message || err);
+    return false;
+  }
+}
 async function updateOrderStatusInDB(order, status, providerOrderId, failReason) {
   if (!supabaseClient) return false;
   try {
