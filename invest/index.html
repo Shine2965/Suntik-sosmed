@@ -151,7 +151,7 @@ body{background:radial-gradient(1200px 500px at 50% -10%,rgba(124,58,237,.25),tr
   <div class="card formula">
     <b>Skema bagi hasil:</b> 70% untuk pengelola · <b>30% untuk kumpulan investor</b> dari laba bersih harian.<br>
     Rumus investor: <b>(Lembar kamu ÷ Total lembar dijual) × 30% × Laba bersih</b><br>
-    Kepemilikan maksimal <b>50%</b> per investor. Lembar primary dari owner; jika habis, jual-beli di pasar (harga naik/turun sesuai permintaan).
+    Kepemilikan maksimal <b>50%</b> per investor. Lembar primary dari owner; jika habis, jual-beli di pasar. Harga request bid/ask ditentukan sendiri oleh user.
   </div>
 
   <!-- GRAFIK HARGA -->
@@ -231,21 +231,21 @@ body{background:radial-gradient(1200px 500px at 50% -10%,rgba(124,58,237,.25),tr
     </div>
     <div class="ord-grid">
       <div class="ord-field">
-        <label>Nominal</label>
-        <div class="ord-input"><span>Rp</span><input type="number" id="oAmount" inputmode="decimal" placeholder="90000" oninput="onOrderInput('amount')"></div>
+        <label>Harga / lembar (Rp)</label>
+        <div class="ord-input"><span>Rp</span><input type="number" id="oPrice" inputmode="decimal" placeholder="contoh: 1000" oninput="onOrderInput('price')"></div>
       </div>
       <div class="ord-field">
-        <label>Harga (ikut primary)</label>
-        <div class="ord-input"><span>Rp</span><input type="number" id="oPrice" readonly tabindex="-1" placeholder="—"></div>
+        <label>Nominal (Rp)</label>
+        <div class="ord-input"><span>Rp</span><input type="number" id="oAmount" inputmode="decimal" placeholder="contoh: 90000" oninput="onOrderInput('amount')"></div>
       </div>
       <div class="ord-field full">
         <label>Jumlah lembar</label>
         <div class="ord-input"><input type="number" id="oShares" inputmode="decimal" placeholder="0" oninput="onOrderInput('shares')"><span>lembar</span></div>
       </div>
     </div>
-    <div class="ord-calc" id="orderCalc">Isi dua kolom, sisanya terisi otomatis.</div>
+    <div class="ord-calc" id="orderCalc">Isi harga dan dua kolom lain, sisanya terisi otomatis.</div>
     <button class="cta sell" id="mSubmit" onclick="guard(this, placeOrder)">Pasang order jual</button>
-    <div class="hint">Lembar pecahan bisa dipesan (contoh 2,5 lembar). Harga per lembar selalu mengikuti harga primary owner.</div>
+    <div class="hint">Lembar pecahan bisa dipesan (contoh 2,5 lembar). Harga per lembar ditentukan sendiri, boleh di atas atau di bawah harga primary.</div>
   </div>
 
   <!-- MY ORDERS -->
@@ -303,11 +303,10 @@ const SUPABASE_URL = 'https://vvzgpbiesvupuhqqoxrg.supabase.co';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ2emdwYmllc3Z1cHVocXFveHJnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIwNzE3MTUsImV4cCI6MjEwNzY0NzcxNX0.W3_Ck8B5Q-nEfNlsyeufJsLsTqbM8xPcAeHoAHfGRwY';
 const STORAGE_KEY = 'shine-shop-auth';     // harus sama dengan halaman Home (sesi bersama)
 const MAX_OWNERSHIP_PCT = 50;              // batas kepemilikan per investor
-const ADMIN_FEE_QRIS = 0.01;               // biaya admin QRIS 1% (untuk pembayaran QRIS)
 const REFRESH_MS = 15000;
 
 let sb = null;
-let me = null;               // { id, email, role }
+let me = null;               // { id, email }
 let isOwner = false;
 let state = null;            // hasil invest_public_state
 let portfolio = null;        // hasil invest_my_portfolio
@@ -319,6 +318,7 @@ let range = 'all';
 let chartPts = [];           // [{t, p}]
 let ownerFormLoaded = false;
 let refreshTimer = null;
+let ordTouched = [];         // urutan kolom yang diisi user (terakhir = paling baru)
 
 // ---------- helpers ----------
 const $ = (id) => document.getElementById(id);
@@ -343,6 +343,10 @@ function rpcErr(data, error) {
   if (error) return error.message || 'Gagal';
   if (data && data.success === false) return data.message || 'Gagal';
   return null;
+}
+function orderLeft(o) {
+  if (o.remaining != null) return Number(o.remaining) || 0;
+  return (Number(o.shares) || 0) - (Number(o.filled_shares) || 0);
 }
 
 // ---------- init & sesi ----------
@@ -399,7 +403,6 @@ async function loadState() {
 
 function renderState() {
   const s = state;
-  if (s && $('oPrice')) { const pp = Math.round(Number(s.price_per_share) || 0); $('oPrice').value = pp ? String(pp) : ''; }
   const open = !!s.primary_open;
   const total = Number(s.total_shares) || 0;
   const sold = Number(s.shares_sold) || 0;
@@ -427,7 +430,7 @@ function renderState() {
   hist.sort((a, b) => (a.t || 0) - (b.t || 0));
   chartPts = hist.length ? hist : [{ t: Date.now(), p: first || 1 }];
   drawChart();
-
+  updateOrderPreview();
 }
 
 async function loadPortfolio() {
@@ -461,7 +464,7 @@ async function loadPortfolio() {
       : (unreal < 0
         ? 'Harga pasar di bawah harga beli rata-rata. Untung/rugi bisa berubah mengikuti harga pasar.'
         : 'Untung/rugi mengikuti harga pasar terakhir. Bagi hasil sudah diterima secara terpisah.');
-    } catch (e) {
+  } catch (e) {
     $('pHint').textContent = e.message || 'Gagal memuat portofolio';
   }
 }
@@ -490,7 +493,6 @@ async function loadMyOrders() {
     $('myOrders').innerHTML = '<div class="empty">' + esc(e.message || e) + '</div>';
   }
 }
-
 
 // ---------- papan bid / ask ----------
 function buildLevels(side, openOrders) {
@@ -567,11 +569,6 @@ function renderBook() {
 }
 
 // ---------- render ----------
-function orderLeft(o) {
-  if (o.remaining != null) return Number(o.remaining) || 0;
-  return (Number(o.shares) || 0) - (Number(o.filled_shares) || 0);
-}
-
 function renderOrders() {
   renderBook();
   const box = $('orderList');
@@ -707,9 +704,7 @@ function drawChart() {
   }
 }
 
-// ---------- pratinjau ----------
-let ordTouched = [];   // urutan kolom yang diisi user (terakhir = paling baru)
-
+// ---------- pratinjau order ----------
 function setSide(s) {
   side = s;
   document.querySelectorAll('.seg-btn').forEach(b => b.classList.toggle('on', b.dataset.side === s));
@@ -720,41 +715,48 @@ function setSide(s) {
 }
 
 function onOrderInput(field) {
-  if (field !== 'amount' && field !== 'shares') return;
+  if (field !== 'amount' && field !== 'shares' && field !== 'price') return;
   ordTouched = ordTouched.filter(k => k !== field);
   ordTouched.push(field);
   updateOrderPreview();
 }
 
-// Harga kertas = harga primary owner (terkunci). Nominal & lembar saling terhitung.
+// Harga, nominal, dan lembar saling terhitung. Harga ditentukan user (bebas).
 function solveOrder() {
-  const price = Math.round(Number(state && state.price_per_share) || 0);
-  if ($('oPrice').value !== String(price)) $('oPrice').value = price ? String(price) : '';
-
+  let price = parseFloat($('oPrice').value || '0') || 0;
   let amount = parseFloat($('oAmount').value || '0') || 0;
   let shares = parseFloat($('oShares').value || '0') || 0;
-  const last = ordTouched.filter(k => k === 'amount' || k === 'shares').slice(-1)[0];
 
-  if (price > 0 && last === 'amount' && amount > 0) {
+  // kolom yang diisi user; yang terakhir diisi dianggap sumber, kolom lain dihitung
+  const used = ordTouched.filter(k => k === 'price' || k === 'amount' || k === 'shares');
+  const last = used[used.length - 1];
+
+  if (price > 0 && last !== 'shares' && amount > 0) {
+    // harga & nominal → hitung lembar
     shares = Math.floor((amount / price) * 10000) / 10000;
-    if ($('oShares').value !== String(shares)) $('oShares').value = String(shares);
-  } else if (price > 0 && last === 'shares' && shares > 0) {
+    $('oShares').value = shares > 0 ? String(shares) : '';
+  } else if (price > 0 && shares > 0) {
+    // harga & lembar → hitung nominal
     amount = Math.round(shares * price);
-    if ($('oAmount').value !== String(amount)) $('oAmount').value = String(amount);
+    $('oAmount').value = amount > 0 ? String(amount) : '';
   }
-  return { ok: price > 0 && amount > 0 && shares > 0, amount, price, shares };
+
+  return { ok: price > 0 && amount > 0 && shares > 0, price: Math.round(price), amount, shares };
 }
 
 function updateOrderPreview() {
   const s = solveOrder();
   const have = Number(portfolio && portfolio.shares) || 0;
+  const primary = Math.round(Number(state && state.price_per_share) || 0);
   let msg;
-  if (!s.price) {
-    msg = 'Harga primary belum tersedia.';
-  } else if (!s.ok) {
-    msg = 'Isi nominal atau jumlah lembar, sisanya terisi otomatis.';
+  if (!s.ok) {
+    msg = 'Isi harga per lembar, lalu nominal atau jumlah lembar.';
   } else {
     msg = rp(s.amount) + ' ÷ ' + rp(s.price) + ' = <b>' + fmtShares(s.shares) + ' lembar</b>';
+    if (primary) {
+      const diff = ((s.price - primary) / primary) * 100;
+      msg += '<br><small style="color:#94a3b8">Harga primary ' + rp(primary) + ' (' + (diff >= 0 ? '+' : '') + diff.toFixed(1) + '%)</small>';
+    }
     if (side === 'sell' && s.shares > have) msg += '<br><span class="down">Lembar kamu hanya ' + fmtShares(have) + '</span>';
   }
   $('orderCalc').innerHTML = msg;
@@ -827,7 +829,7 @@ async function takeOrder(orderId, maxShares, price, mode, isPrimary) {
 
 async function placeOrder() {
   const s = solveOrder();
-  if (!s.ok) return toast('warning', 'Lengkapi dua kolom', 'Isi nominal & harga, atau harga & lembar.');
+  if (!s.ok) return toast('warning', 'Lengkapi form', 'Isi harga dan nominal atau jumlah lembar.');
 
   if (side === 'sell') {
     const have = Number(portfolio && portfolio.shares) || 0;
@@ -965,7 +967,6 @@ window.loadAutoProfit = loadAutoProfit;
 window.loadOwnerForm = loadOwnerForm;
 window.updateOrderPreview = updateOrderPreview;
 window.onOrderInput = onOrderInput;
-window.placeOrder = placeOrder;
 window.updateOwnerPreview = updateOwnerPreview;
 
 init().catch(e => {
