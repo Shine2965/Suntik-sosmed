@@ -41,6 +41,7 @@ input:focus,select:focus{border-color:#a78bfa}
 .btn-green{background:linear-gradient(135deg,#22c55e,#16a34a)}
 .btn-warn{background:linear-gradient(135deg,#f59e0b,#d97706);color:#1a0e2e}
 .btn-ghost{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:#e2e8f0}
+.btn-danger{background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.35);color:#fca5a5}
 .btn-sm{padding:7px 10px;font-size:11px;border-radius:10px}
 .btn-block{width:100%}
 .tabs{display:flex;gap:6px;margin-bottom:10px}
@@ -57,6 +58,7 @@ input:focus,select:focus{border-color:#a78bfa}
 .tag-sell{background:rgba(248,113,113,.15);color:#f87171}
 .tag-buy{background:rgba(74,222,128,.15);color:#4ade80}
 .tag-pri{background:rgba(251,191,36,.2);color:#fbbf24;margin-left:4px}
+.tag-mine{background:rgba(167,139,250,.2);color:#c4b5fd;margin-left:4px}
 .own-bar{height:8px;border-radius:20px;background:rgba(255,255,255,.08);overflow:hidden;margin-top:8px}
 .own-fill{height:100%;background:linear-gradient(90deg,#a78bfa,#67e8f9);border-radius:20px;transition:width .4s}
 .own-fill.warn{background:linear-gradient(90deg,#f59e0b,#f87171)}
@@ -131,6 +133,7 @@ body{background:radial-gradient(1200px 500px at 50% -10%,rgba(124,58,237,.25),tr
 .book-top .stat .v{font-size:15px!important}
 .book-pressure{height:12px!important;border-radius:999px!important}
 .order{border-radius:16px!important;background:rgba(0,0,0,.25)!important;border:1px solid var(--line)!important}
+.order.mine{border-color:rgba(167,139,250,.35)!important;background:rgba(167,139,250,.07)!important}
 .btn{border-radius:14px!important}
 .btn-cyan{background:linear-gradient(135deg,#7c3aed,#06b6d4)!important}
 .btn-green{background:linear-gradient(135deg,#22c55e,#15803d)!important}
@@ -347,6 +350,9 @@ function orderLeft(o) {
   if (o.remaining != null) return Number(o.remaining) || 0;
   return (Number(o.shares) || 0) - (Number(o.filled_shares) || 0);
 }
+function isOpenStatus(o) {
+  return ['open', 'active', 'partial'].includes(String(o.status || '').toLowerCase()) && orderLeft(o) > 0;
+}
 
 // Persentase jatah investor dari database (fallback 30)
 function investorPct() {
@@ -354,7 +360,6 @@ function investorPct() {
   return isNaN(v) ? 30 : v;
 }
 
-// Isi semua teks yang menampilkan persentase jatah
 function renderPctLabels() {
   const inv = investorPct();
   const own = Math.max(0, 100 - inv);
@@ -412,15 +417,13 @@ async function loadState() {
     if (!data || data.success === false) return;
     state = data;
     renderState();
-    // isi ulang form owner jika belum diedit user
     if (isOwner && !ownerFormDirty()) loadOwnerForm(true);
   } catch (e) { console.warn('state', e); }
 }
 
-// form dianggap kotor jika user sedang mengisinya (fokus pada input)
 function ownerFormDirty() {
   const a = document.activeElement;
-  return !!(a && a.closest && a.closest('.admin-only') && (a.tagName === 'INPUT'));
+  return !!(a && a.closest && a.closest('.admin-only') && a.tagName === 'INPUT');
 }
 
 function renderState() {
@@ -606,19 +609,22 @@ function renderOrders() {
     const isMine = o.user_id === me.id;
     const canTake = !isMine && o.side === 'sell' && left > 0;
     const canFill = !isMine && o.side === 'buy' && left > 0;
-    let action = '';
+    const canCancel = isMine && !isPri && isOpenStatus(o);
     const pr = Number(o.price_per_share) || 0;
+    let action = '';
     if (canTake) action = `<button class="btn btn-green btn-sm" onclick="guard(this, () => takeOrder('${esc(o.id)}', ${left}, ${pr}, 'buy', ${isPri}))">Beli</button>`;
     if (canFill) action = `<button class="btn btn-cyan btn-sm" onclick="guard(this, () => takeOrder('${esc(o.id)}', ${left}, ${pr}, 'sell', false))">Jual ke sini</button>`;
+    if (canCancel) action = `<button class="btn btn-danger btn-sm" onclick="guard(this, () => cancelOrder('${esc(o.id)}'))">Batalkan</button>`;
     return `
-      <div class="order ${isPri ? 'primary' : ''}">
+      <div class="order ${isPri ? 'primary' : ''} ${isMine ? 'mine' : ''}">
         <div style="min-width:70px">
           <span class="tag ${o.side === 'sell' ? 'tag-sell' : 'tag-buy'}">${o.side === 'sell' ? 'JUAL' : 'BELI'}</span>
           ${isPri ? '<span class="tag tag-pri">PRIMARY</span>' : ''}
+          ${isMine ? '<span class="tag tag-mine">KAMU</span>' : ''}
         </div>
         <div class="meta">
           <b>${fmtShares(left)}</b> lembar @ <b>${rp(o.price_per_share)}</b>
-          <small>${isPri ? 'Dari owner' : esc(o.email || 'user')}${isMine ? ' · (order kamu)' : ''}</small>
+          <small>${isPri ? 'Dari owner' : (isMine ? 'Order kamu' : esc(o.email || 'user'))}</small>
         </div>
         ${action}
       </div>`;
@@ -630,7 +636,7 @@ function renderMyOrders() {
   if (!myOrderRows.length) { box.innerHTML = '<div class="empty">Belum ada order.</div>'; return; }
   box.innerHTML = myOrderRows.map(o => {
     const left = orderLeft(o);
-    const open = ['open', 'active', 'partial'].includes(String(o.status || '').toLowerCase()) && left > 0;
+    const open = isOpenStatus(o) && !o.is_primary;
     return `
       <div class="order">
         <div style="min-width:70px"><span class="tag ${o.side === 'sell' ? 'tag-sell' : 'tag-buy'}">${o.side === 'sell' ? 'JUAL' : 'BELI'}</span></div>
@@ -638,7 +644,7 @@ function renderMyOrders() {
           <b>${fmtShares(left)}</b> / ${fmtShares(o.shares)} lembar @ <b>${rp(o.price_per_share)}</b>
           <small>${esc(o.status || '')}${open ? ' · antrean #' + queuePos(o) : ''}</small>
         </div>
-        ${open ? `<button class="btn btn-ghost btn-sm" onclick="guard(this, () => cancelOrder('${esc(o.id)}'))">Batal</button>` : ''}
+        ${open ? `<button class="btn btn-danger btn-sm" onclick="guard(this, () => cancelOrder('${esc(o.id)}'))">Batalkan</button>` : ''}
       </div>`;
   }).join('');
 }
@@ -857,11 +863,24 @@ async function placeOrder() {
 }
 
 async function cancelOrder(orderId) {
-  const conf = await Swal.fire({ title: 'Batalkan order?', icon: 'question', showCancelButton: true, confirmButtonText: 'Ya', background: '#1a0e2e', color: '#fff' });
+  const conf = await Swal.fire({
+    title: 'Batalkan request ini?',
+    text: 'Sisa lembar yang belum terisi akan dibatalkan.',
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonText: 'Ya, batalkan',
+    cancelButtonText: 'Tidak',
+    confirmButtonColor: '#ef4444',
+    background: '#1a0e2e',
+    color: '#fff'
+  });
   if (!conf.isConfirmed) return;
+
   const { data, error } = await sb.rpc('invest_cancel_order', { p_order_id: orderId });
   const err = rpcErr(data, error);
-  if (err) return toast('error', 'Gagal', err);
+  if (err) return toast('error', 'Gagal membatalkan', err);
+
+  await toast('success', 'Request dibatalkan', '');
   refreshAll();
 }
 
@@ -889,7 +908,7 @@ function updateOwnerPreview() {
   const sh = parseInt($('aTotal').value || '0', 10) || 0;
   const pr = parseFloat($('aPrice').value || '0') || 0;
   const mn = parseFloat($('aMinAmt').value || '0') || 0;
-  const pc = parseFloat($('aPct').value || '') ;
+  const pc = parseFloat($('aPct').value || '');
   const minSh = pr > 0 && mn > 0 ? Math.ceil(mn / pr) : 1;
   $('ownerPreview').innerHTML =
     'Nilai primary: <b>' + rp(sh * pr) + '</b><br>' +
