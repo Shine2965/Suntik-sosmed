@@ -54,6 +54,7 @@ input:focus,select:focus{border-color:#a78bfa}
 .order.primary{border-color:rgba(251,191,36,.35);background:rgba(251,191,36,.08)}
 .order .meta{flex:1;min-width:0;font-size:12px}
 .order .meta small{display:block;color:#64748b;font-size:10px;margin-top:2px;word-break:break-all}
+.order.done{opacity:.6}
 .tag{font-size:10px;font-weight:800;padding:2px 7px;border-radius:8px;display:inline-block}
 .tag-sell{background:rgba(248,113,113,.15);color:#f87171}
 .tag-buy{background:rgba(74,222,128,.15);color:#4ade80}
@@ -67,7 +68,7 @@ input:focus,select:focus{border-color:#a78bfa}
 .admin-only{display:none}
 body.is-owner .admin-only{display:block}
 
-/* ===== Grafik pool ===== */
+/* ===== Grafik pool (candlestick) ===== */
 .pool-box{position:relative;height:200px;margin-top:4px}
 .pool-box canvas{width:100%;height:100%;display:block}
 .pool-tip{position:absolute;top:4px;left:4px;font-size:11px;background:rgba(0,0,0,.7);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:4px 8px;pointer-events:none;display:none;white-space:nowrap}
@@ -184,7 +185,7 @@ body{background:radial-gradient(1200px 500px at 50% -10%,rgba(124,58,237,.25),tr
     </div>
   </div>
 
-  <!-- GRAFIK POOL INVESTOR -->
+  <!-- GRAFIK POOL INVESTOR (CANDLESTICK) -->
   <div class="card">
     <h3>💰 Pool Investor per Hari <span class="pill on" id="poolPill">—</span></h3>
     <div style="display:flex;gap:6px;margin-bottom:8px">
@@ -197,8 +198,8 @@ body{background:radial-gradient(1200px 500px at 50% -10%,rgba(124,58,237,.25),tr
       <div class="pool-tip" id="poolTip"></div>
     </div>
     <div class="pool-legend">
-      <span><i style="background:#a78bfa"></i>Pool investor (30%)</span>
-      <span><i style="background:#4ade80"></i>Terbayar</span>
+      <span><i style="background:#26a69a"></i>Pool naik</span>
+      <span><i style="background:#ef5350"></i>Pool turun</span>
     </div>
     <div class="hint" id="poolSummary">Memuat data pool…</div>
   </div>
@@ -303,7 +304,7 @@ body{background:radial-gradient(1200px 500px at 50% -10%,rgba(124,58,237,.25),tr
       </div>
       <div class="col">
         <div class="field-label">% jatah investor</div>
-        <input type="number" id="aPct" min="0" max="100" step="0.01" placeholder="30">
+        <input type="number" id="aPct" min="0" max="100" step="0.01" placeholder="30" oninput="updateOwnerPreview()">
       </div>
     </div>
     <div class="preview" id="ownerPreview">Isi form untuk melihat ringkasan.</div>
@@ -333,6 +334,8 @@ const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFz
 const STORAGE_KEY = 'shine-shop-auth';
 const MAX_OWNERSHIP_PCT = 50;
 const REFRESH_MS = 15000;
+const HISTORY_TTL_MS = 10 * 60 * 1000;   // riwayat order selesai tampil 10 menit
+const SEEN_KEY = 'invest-order-seen';
 
 let sb = null;
 let me = null;
@@ -490,7 +493,7 @@ function renderState() {
   updateOrderPreview();
 }
 
-// ---------- pool investor ----------
+// ---------- pool investor (candlestick) ----------
 async function loadPoolHistory() {
   try {
     const { data, error } = await sb.rpc('invest_pool_history', { p_days: 30 });
@@ -510,10 +513,9 @@ function setPoolRange(d, el) {
   drawPoolChart();
 }
 
-// Ambil baris sesuai rentang hari yang dipilih, urut dari lama ke baru
+// Ambil baris sesuai rentang hari, urut dari lama ke baru
 function visiblePoolRows() {
-  const rows = poolRows.slice(0, poolDays).slice().reverse();
-  return rows;
+  return poolRows.slice(0, poolDays).slice().reverse();
 }
 
 function renderPoolSummary() {
@@ -532,7 +534,9 @@ function drawPoolChart() {
   if (!c || !c.clientWidth) return;
   const dpr = window.devicePixelRatio || 1;
   const w = c.clientWidth, h = c.clientHeight || 200;
-  const padL = 40, padR = 10, padT = 14, padB = 26;
+  const padL = 8, padR = 56, padT = 10, padB = 22;
+  const plotW = w - padL - padR;
+  const plotH = h - padT - padB;
   c.width = w * dpr; c.height = h * dpr;
   const ctx = c.getContext('2d');
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -540,7 +544,7 @@ function drawPoolChart() {
 
   const rows = visiblePoolRows();
   if (!rows.length) {
-    ctx.fillStyle = '#64748b';
+    ctx.fillStyle = '#787b86';
     ctx.font = '12px Quicksand, sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText('Belum ada data', w / 2, h / 2);
@@ -548,52 +552,87 @@ function drawPoolChart() {
     return;
   }
 
-  const maxVal = Math.max(1, ...rows.map(r => Math.max(Number(r.pool) || 0, Number(r.paid) || 0)));
-  const plotW = w - padL - padR;
-  const plotH = h - padT - padB;
-  const groupW = plotW / rows.length;
-  const barW = Math.max(4, Math.min(18, groupW * 0.32));
+  // bentuk candle dari pool harian
+  let prevClose = null;
+  const candles = rows.map(r => {
+    const close = Number(r.pool) || 0;
+    const open = prevClose != null ? prevClose : close;
+    const paid = Number(r.paid) || 0;
+    const high = Math.max(open, close, paid);
+    const low = Math.min(open, close, paid);
+    prevClose = close;
+    return { day: r.day, open, high, low, close, paid, status: r.status };
+  });
 
-  // sumbu Y & grid
+  // skala harga
+  const hi = Math.max(...candles.map(k => k.high));
+  const lo = Math.min(...candles.map(k => k.low));
+  const margin = (hi - lo) * 0.1 || hi * 0.1 || 1;
+  const top = hi + margin;
+  const bot = Math.max(0, lo - margin);
+  const range = (top - bot) || 1;
+  const yOf = v => padT + (1 - (v - bot) / range) * plotH;
+
+  // grid & label harga di kanan
   ctx.strokeStyle = 'rgba(255,255,255,0.06)';
-  ctx.fillStyle = '#64748b';
+  ctx.fillStyle = '#787b86';
   ctx.font = '10px Quicksand, sans-serif';
-  ctx.textAlign = 'right';
+  ctx.textAlign = 'left';
   ctx.lineWidth = 1;
   for (let g = 0; g <= 4; g++) {
-    const val = (maxVal / 4) * g;
-    const y = padT + plotH - (val / maxVal) * plotH;
+    const val = bot + (range / 4) * g;
+    const y = yOf(val);
     ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(w - padR, y); ctx.stroke();
-    ctx.fillText(shortRp(val), padL - 4, y + 3);
+    ctx.fillText(shortRp(val), w - padR + 6, y + 3);
   }
 
+  // candle
+  const groupW = plotW / candles.length;
+  const bodyW = Math.max(3, Math.min(14, groupW * 0.6));
+  const UP = '#26a69a', DN = '#ef5350';
   const bars = [];
-  rows.forEach((r, i) => {
+
+  candles.forEach((k, i) => {
     const cx = padL + groupW * i + groupW / 2;
-    const poolV = Number(r.pool) || 0;
-    const paidV = Number(r.paid) || 0;
-    const hPool = (poolV / maxVal) * plotH;
-    const hPaid = (paidV / maxVal) * plotH;
+    const isUp = k.close >= k.open;
+    const col = isUp ? UP : DN;
 
-    // batang pool (ungu)
-    const xPool = cx - barW - 1;
-    ctx.fillStyle = '#a78bfa';
-    roundRect(ctx, xPool, padT + plotH - hPool, barW, hPool, 3);
-    ctx.fill();
+    // sumbu
+    ctx.strokeStyle = col;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(cx, yOf(k.high));
+    ctx.lineTo(cx, yOf(k.low));
+    ctx.stroke();
 
-    // batang terbayar (hijau)
-    const xPaid = cx + 1;
-    ctx.fillStyle = '#4ade80';
-    roundRect(ctx, xPaid, padT + plotH - hPaid, barW, hPaid, 3);
-    ctx.fill();
+    // badan
+    const yTop = yOf(Math.max(k.open, k.close));
+    const yBot = yOf(Math.min(k.open, k.close));
+    ctx.fillStyle = col;
+    ctx.fillRect(cx - bodyW / 2, yTop, bodyW, Math.max(1, yBot - yTop));
 
-    // label tanggal
-    ctx.fillStyle = '#94a3b8';
-    ctx.textAlign = 'center';
-    ctx.font = '9.5px Quicksand, sans-serif';
-    ctx.fillText(shortDate(r.day), cx, h - 8);
+    bars.push({ x: cx, day: k.day, pool: k.close, paid: k.paid, status: k.status });
+  });
 
-    bars.push({ x: cx, day: r.day, pool: poolV, paid: paidV, status: r.status, store: Number(r.store_profit) || 0, gw: groupW });
+  // label harga terakhir di sumbu kanan
+  const last = candles[candles.length - 1];
+  const yLast = yOf(last.close);
+  const lastCol = last.close >= last.open ? UP : DN;
+  ctx.fillStyle = lastCol;
+  ctx.fillRect(w - padR + 2, yLast - 8, padR - 4, 16);
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 10px Quicksand, sans-serif';
+  ctx.fillText(shortRp(last.close), w - padR + 6, yLast + 3);
+
+  // label tanggal (dibatasi agar tidak tumpang tindih)
+  ctx.fillStyle = '#787b86';
+  ctx.font = '9.5px Quicksand, sans-serif';
+  ctx.textAlign = 'center';
+  const step = Math.ceil(candles.length / 6);
+  candles.forEach((k, i) => {
+    if (i % step !== 0 && i !== candles.length - 1) return;
+    const cx = padL + groupW * i + groupW / 2;
+    ctx.fillText(shortDate(k.day), cx, h - 6);
   });
 
   c._bars = bars;
@@ -616,20 +655,6 @@ function drawPoolChart() {
     c.addEventListener('touchmove', e => show(e.touches[0].clientX), { passive: true });
     c.addEventListener('mouseleave', () => { tip.style.display = 'none'; });
   }
-}
-
-function roundRect(ctx, x, y, w, h, r) {
-  if (h <= 0) return;
-  const rr = Math.min(r, h / 2, w / 2);
-  ctx.beginPath();
-  ctx.moveTo(x + rr, y);
-  ctx.lineTo(x + w - rr, y);
-  ctx.quadraticCurveTo(x + w, y, x + w, y + rr);
-  ctx.lineTo(x + w, y + h);
-  ctx.lineTo(x, y + h);
-  ctx.lineTo(x, y + rr);
-  ctx.quadraticCurveTo(x, y, x + rr, y);
-  ctx.closePath();
 }
 
 function shortRp(v) {
@@ -693,8 +718,11 @@ async function loadOrders() {
   }
 }
 
+// ---------- order saya (riwayat selesai hilang otomatis 10 menit) ----------
 async function loadMyOrders() {
   try {
+    // hapus riwayat selesai yang sudah >10 menit di database (gagal diam-diam jika fungsi belum ada)
+    await sb.rpc('invest_purge_my_finished_orders').catch(() => {});
     const { data, error } = await sb.rpc('invest_my_orders', { p_limit: 50 });
     if (error) throw error;
     myOrderRows = (data && data.data) || [];
@@ -702,6 +730,48 @@ async function loadMyOrders() {
   } catch (e) {
     $('myOrders').innerHTML = '<div class="empty">' + esc(e.message || e) + '</div>';
   }
+}
+
+// Waktu order selesai (cancel / terisi). Pakai kolom server jika ada,
+// jika tidak, catat waktu pertama kali order terlihat berstatus selesai.
+function finishedAt(o) {
+  const ts = o.updated_at || o.cancelled_at || o.filled_at || o.matched_at;
+  if (ts) return new Date(ts).getTime();
+  let seen = {};
+  try { seen = JSON.parse(localStorage.getItem(SEEN_KEY) || '{}'); } catch (_) {}
+  if (!seen[o.id]) {
+    seen[o.id] = Date.now();
+    try { localStorage.setItem(SEEN_KEY, JSON.stringify(seen)); } catch (_) {}
+  }
+  return seen[o.id];
+}
+
+// Order aktif selalu tampil. Order selesai hanya tampil 10 menit.
+function visibleMyOrders() {
+  return myOrderRows.filter(o => isOpenStatus(o) || (Date.now() - finishedAt(o) < HISTORY_TTL_MS));
+}
+
+function renderMyOrders() {
+  const box = $('myOrders');
+  const rows = visibleMyOrders();
+  if (!rows.length) { box.innerHTML = '<div class="empty">Belum ada order.</div>'; return; }
+  box.innerHTML = rows.map(o => {
+    const left = orderLeft(o);
+    const open = isOpenStatus(o) && !o.is_primary;
+    const done = !isOpenStatus(o);
+    const label = done
+      ? (String(o.status || '').toLowerCase().includes('cancel') ? 'dibatalkan' : 'terisi') + ' · hilang otomatis dalam 10 menit'
+      : 'antrean #' + queuePos(o);
+    return `
+      <div class="order ${done ? 'done' : ''}">
+        <div style="min-width:70px"><span class="tag ${o.side === 'sell' ? 'tag-sell' : 'tag-buy'}">${o.side === 'sell' ? 'JUAL' : 'BELI'}</span></div>
+        <div class="meta">
+          <b>${fmtShares(left)}</b> / ${fmtShares(o.shares)} lembar @ <b>${rp(o.price_per_share)}</b>
+          <small>${esc(label)}</small>
+        </div>
+        ${open ? `<button class="btn btn-danger btn-sm" onclick="guard(this, () => cancelOrder('${esc(o.id)}'))">Batalkan</button>` : ''}
+      </div>`;
+  }).join('');
 }
 
 // ---------- papan bid / ask ----------
@@ -777,7 +847,7 @@ function renderBook() {
   $('bookAsks').innerHTML = low.length ? low.map(L => row(L, 'sell')).join('') : '<div class="book-empty">Belum ada ask</div>';
 }
 
-// ---------- render ----------
+// ---------- render papan jual/beli ----------
 function renderOrders() {
   renderBook();
   const box = $('orderList');
@@ -814,24 +884,6 @@ function renderOrders() {
           <small>${isPri ? 'Dari owner' : (isMine ? 'Order kamu' : esc(o.email || 'user'))}</small>
         </div>
         ${action}
-      </div>`;
-  }).join('');
-}
-
-function renderMyOrders() {
-  const box = $('myOrders');
-  if (!myOrderRows.length) { box.innerHTML = '<div class="empty">Belum ada order.</div>'; return; }
-  box.innerHTML = myOrderRows.map(o => {
-    const left = orderLeft(o);
-    const open = isOpenStatus(o) && !o.is_primary;
-    return `
-      <div class="order">
-        <div style="min-width:70px"><span class="tag ${o.side === 'sell' ? 'tag-sell' : 'tag-buy'}">${o.side === 'sell' ? 'JUAL' : 'BELI'}</span></div>
-        <div class="meta">
-          <b>${fmtShares(left)}</b> / ${fmtShares(o.shares)} lembar @ <b>${rp(o.price_per_share)}</b>
-          <small>${esc(o.status || '')}${open ? ' · antrean #' + queuePos(o) : ''}</small>
-        </div>
-        ${open ? `<button class="btn btn-danger btn-sm" onclick="guard(this, () => cancelOrder('${esc(o.id)}'))">Batalkan</button>` : ''}
       </div>`;
   }).join('');
 }
