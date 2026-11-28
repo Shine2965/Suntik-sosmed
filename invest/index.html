@@ -149,8 +149,8 @@ body{background:radial-gradient(1200px 500px at 50% -10%,rgba(124,58,237,.25),tr
   </div>
 
   <div class="card formula">
-    <b>Skema bagi hasil:</b> 70% untuk pengelola · <b>30% untuk kumpulan investor</b> dari laba bersih harian.<br>
-    Rumus investor: <b>(Lembar kamu ÷ Total lembar dijual) × 30% × Laba bersih</b><br>
+    <b>Skema bagi hasil:</b> <span id="fPctOwner">70</span>% untuk pengelola · <b><span id="fPctInv">30</span>% untuk kumpulan investor</b> dari laba bersih harian.<br>
+    Rumus investor: <b>(Lembar kamu ÷ Total lembar dijual) × <span id="fPctInv2">30</span>% × Laba bersih</b><br>
     Kepemilikan maksimal <b>50%</b> per investor. Lembar primary dari owner; jika habis, jual-beli di pasar. Harga request bid/ask ditentukan sendiri oleh user.
   </div>
 
@@ -274,7 +274,7 @@ body{background:radial-gradient(1200px 500px at 50% -10%,rgba(124,58,237,.25),tr
       </div>
       <div class="col">
         <div class="field-label">% jatah investor</div>
-        <input type="number" id="aPct" min="0" max="100" placeholder="30">
+        <input type="number" id="aPct" min="0" max="100" step="0.01" placeholder="30">
       </div>
     </div>
     <div class="preview" id="ownerPreview">Isi form untuk melihat ringkasan.</div>
@@ -286,7 +286,7 @@ body{background:radial-gradient(1200px 500px at 50% -10%,rgba(124,58,237,.25),tr
       <button class="btn btn-ghost" style="flex:1" id="btnTogglePrimary" onclick="guard(this, togglePrimaryOpen)">Buka / tutup primary</button>
     </div>
     <div class="preview" id="autoProfitBox">Memuat bagi hasil otomatis…</div>
-    <div class="hint">Bagi hasil berjalan <b>otomatis setiap hari pukul 00:30 WIB</b> untuk keuntungan toko hari sebelumnya: 30% dibagi ke pemegang lembar sesuai proporsi. Tidak perlu input manual.</div>
+    <div class="hint">Bagi hasil berjalan <b>otomatis setiap hari pukul 00:30 WIB</b> untuk keuntungan toko hari sebelumnya: <span id="hPctInv">30</span>% dibagi ke pemegang lembar sesuai proporsi. Tidak perlu input manual.</div>
   </div>
 </div>
 
@@ -301,24 +301,24 @@ body{background:radial-gradient(1200px 500px at 50% -10%,rgba(124,58,237,.25),tr
 // Konfigurasi (sama dengan halaman Home)
 const SUPABASE_URL = 'https://vvzgpbiesvupuhqqoxrg.supabase.co';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ2emdwYmllc3Z1cHVocXFveHJnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIwNzE3MTUsImV4cCI6MjEwNzY0NzcxNX0.W3_Ck8B5Q-nEfNlsyeufJsLsTqbM8xPcAeHoAHfGRwY';
-const STORAGE_KEY = 'shine-shop-auth';     // harus sama dengan halaman Home (sesi bersama)
-const MAX_OWNERSHIP_PCT = 50;              // batas kepemilikan per investor
+const STORAGE_KEY = 'shine-shop-auth';
+const MAX_OWNERSHIP_PCT = 50;
 const REFRESH_MS = 15000;
 
 let sb = null;
-let me = null;               // { id, email }
+let me = null;
 let isOwner = false;
-let state = null;            // hasil invest_public_state
-let portfolio = null;        // hasil invest_my_portfolio
-let orders = [];             // order book
+let state = null;
+let portfolio = null;
+let orders = [];
 let myOrderRows = [];
 let boardFilter = 'all';
 let side = 'sell';
 let range = 'all';
-let chartPts = [];           // [{t, p}]
+let chartPts = [];
 let ownerFormLoaded = false;
 let refreshTimer = null;
-let ordTouched = [];         // urutan kolom yang diisi user (terakhir = paling baru)
+let ordTouched = [];
 
 // ---------- helpers ----------
 const $ = (id) => document.getElementById(id);
@@ -326,7 +326,6 @@ const rp = (n) => 'Rp ' + Math.round(Number(n) || 0).toLocaleString('id-ID');
 const num = (n) => (Number(n) || 0).toLocaleString('id-ID');
 const pct = (n, d = 2) => (Number(n) || 0).toFixed(d) + '%';
 const fmtShares = (n) => (Number(n) || 0).toLocaleString('id-ID', { maximumFractionDigits: 4 });
-// lembar dari nominal rupiah: dibulatkan ke bawah 4 desimal
 const sharesFromAmount = (amt, price) => price > 0 ? Math.floor((amt / price) * 10000) / 10000 : 0;
 function esc(s) {
   return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
@@ -347,6 +346,22 @@ function rpcErr(data, error) {
 function orderLeft(o) {
   if (o.remaining != null) return Number(o.remaining) || 0;
   return (Number(o.shares) || 0) - (Number(o.filled_shares) || 0);
+}
+
+// Persentase jatah investor dari database (fallback 30)
+function investorPct() {
+  const v = parseFloat(state && state.investor_profit_pct);
+  return isNaN(v) ? 30 : v;
+}
+
+// Isi semua teks yang menampilkan persentase jatah
+function renderPctLabels() {
+  const inv = investorPct();
+  const own = Math.max(0, 100 - inv);
+  $('fPctInv').textContent = String(inv);
+  $('fPctInv2').textContent = String(inv);
+  $('fPctOwner').textContent = String(own);
+  $('hPctInv').textContent = String(inv);
 }
 
 // ---------- init & sesi ----------
@@ -372,7 +387,6 @@ async function init() {
   window.addEventListener('resize', () => drawChart());
 }
 
-// Tunggu sesi dipulihkan dari localStorage / refresh token sebelum redirect
 async function waitForSession() {
   const { data: { session } } = await sb.auth.getSession();
   if (session) return session;
@@ -398,7 +412,15 @@ async function loadState() {
     if (!data || data.success === false) return;
     state = data;
     renderState();
+    // isi ulang form owner jika belum diedit user
+    if (isOwner && !ownerFormDirty()) loadOwnerForm(true);
   } catch (e) { console.warn('state', e); }
+}
+
+// form dianggap kotor jika user sedang mengisinya (fokus pada input)
+function ownerFormDirty() {
+  const a = document.activeElement;
+  return !!(a && a.closest && a.closest('.admin-only') && (a.tagName === 'INPUT'));
 }
 
 function renderState() {
@@ -422,7 +444,6 @@ function renderState() {
   $('chgPill').textContent = (chg >= 0 ? '▲ +' : '▼ ') + chg.toFixed(2) + '%';
   $('chgPill').className = 'pill ' + (chg >= 0 ? 'on' : 'off');
 
-  // grafik dari riwayat harga
   const hist = (s.price_history || []).map(h => ({
     t: h.created_at ? new Date(h.created_at).getTime() : null,
     p: Number(h.price) || 0
@@ -430,6 +451,8 @@ function renderState() {
   hist.sort((a, b) => (a.t || 0) - (b.t || 0));
   chartPts = hist.length ? hist : [{ t: Date.now(), p: first || 1 }];
   drawChart();
+
+  renderPctLabels();
   updateOrderPreview();
 }
 
@@ -471,10 +494,7 @@ async function loadPortfolio() {
 
 async function loadOrders() {
   try {
-    const { data, error } = await sb.rpc('invest_list_market_orders', {
-      p_limit: 80,
-      p_side: null
-    });
+    const { data, error } = await sb.rpc('invest_list_market_orders', { p_limit: 80, p_side: null });
     if (error) throw error;
     orders = (data && data.data) || [];
     renderOrders();
@@ -511,7 +531,6 @@ function buildLevels(side, openOrders) {
   return arr.sort((a, b) => side === 'buy' ? b.price - a.price : a.price - b.price);
 }
 
-// posisi order di antrean pada harga yang sama (waktu masuk = prioritas)
 function queuePos(o) {
   const open = orders.filter(x => x.side === o.side && Number(x.price_per_share) === Number(o.price_per_share) && orderLeft(x) > 0);
   open.sort((a, b) => String(a.created_at || '').localeCompare(String(b.created_at || '')));
@@ -659,7 +678,6 @@ function drawChart() {
     h - pad - ((p.p - min) / span) * (h - pad * 2)
   ];
 
-  // garis grid
   ctx.strokeStyle = 'rgba(255,255,255,0.06)';
   ctx.lineWidth = 1;
   for (let g = 1; g < 4; g++) {
@@ -674,14 +692,12 @@ function drawChart() {
   pts.forEach((p, i) => { const [x, y] = xy(p, i); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); });
   ctx.strokeStyle = col; ctx.lineWidth = 2.2; ctx.stroke();
 
-  // area
   const [lx] = xy(pts[n - 1], n - 1);
   const [fx] = xy(pts[0], 0);
   ctx.lineTo(lx, h - pad); ctx.lineTo(fx, h - pad); ctx.closePath();
   ctx.fillStyle = up ? 'rgba(74,222,128,0.12)' : 'rgba(248,113,113,0.12)';
   ctx.fill();
 
-  // titik terakhir
   const [ex, ey] = xy(pts[n - 1], n - 1);
   ctx.beginPath(); ctx.arc(ex, ey, 3.5, 0, Math.PI * 2); ctx.fillStyle = col; ctx.fill();
 
@@ -721,22 +737,18 @@ function onOrderInput(field) {
   updateOrderPreview();
 }
 
-// Harga, nominal, dan lembar saling terhitung. Harga ditentukan user (bebas).
 function solveOrder() {
   let price = parseFloat($('oPrice').value || '0') || 0;
   let amount = parseFloat($('oAmount').value || '0') || 0;
   let shares = parseFloat($('oShares').value || '0') || 0;
 
-  // kolom yang diisi user; yang terakhir diisi dianggap sumber, kolom lain dihitung
   const used = ordTouched.filter(k => k === 'price' || k === 'amount' || k === 'shares');
   const last = used[used.length - 1];
 
   if (price > 0 && last !== 'shares' && amount > 0) {
-    // harga & nominal → hitung lembar
     shares = Math.floor((amount / price) * 10000) / 10000;
     $('oShares').value = shares > 0 ? String(shares) : '';
   } else if (price > 0 && shares > 0) {
-    // harga & lembar → hitung nominal
     amount = Math.round(shares * price);
     $('oAmount').value = amount > 0 ? String(amount) : '';
   }
@@ -766,7 +778,6 @@ function updateOrderPreview() {
 async function takeOrder(orderId, maxShares, price, mode, isPrimary) {
   price = Number(price) || 0;
   if (mode === 'buy') {
-    // beli dari order jual (termasuk primary): input dalam rupiah
     const maxRp = Math.floor(maxShares * price);
     const minAmt = isPrimary ? (Number(state && state.min_buy_amount) || 0) : 0;
     const { value: v } = await Swal.fire({
@@ -808,7 +819,6 @@ async function takeOrder(orderId, maxShares, price, mode, isPrimary) {
     return;
   }
 
-  // jual ke order beli: input lembar
   const { value: sh } = await Swal.fire({
     title: 'Jual berapa lembar?',
     input: 'number',
@@ -868,7 +878,7 @@ function loadOwnerForm(force) {
   $('aTotal').value = state.total_shares || '';
   $('aPrice').value = state.price_per_share || '';
   $('aMinAmt').value = state.min_buy_amount || '';
-  $('aPct').value = state.investor_profit_pct || '';
+  $('aPct').value = state.investor_profit_pct != null ? state.investor_profit_pct : '';
   ownerFormLoaded = true;
   updateOwnerPreview();
   const b = $('btnTogglePrimary');
@@ -879,10 +889,12 @@ function updateOwnerPreview() {
   const sh = parseInt($('aTotal').value || '0', 10) || 0;
   const pr = parseFloat($('aPrice').value || '0') || 0;
   const mn = parseFloat($('aMinAmt').value || '0') || 0;
+  const pc = parseFloat($('aPct').value || '') ;
   const minSh = pr > 0 && mn > 0 ? Math.ceil(mn / pr) : 1;
   $('ownerPreview').innerHTML =
     'Nilai primary: <b>' + rp(sh * pr) + '</b><br>' +
     'Minimal beli: <b>' + rp(mn) + '</b> (≈ ' + num(minSh) + ' lembar)<br>' +
+    'Jatah investor: <b>' + (isNaN(pc) ? investorPct() : pc) + '%</b> · Owner: <b>' + (isNaN(pc) ? (100 - investorPct()) : (100 - pc)) + '%</b><br>' +
     'Batas kepemilikan per investor: <b>' + MAX_OWNERSHIP_PCT + '%</b>';
 }
 
@@ -915,7 +927,8 @@ async function saveSettings() {
   if (err) return toast('error', 'Gagal', err);
   await toast('success', 'Tersimpan', '');
   ownerFormLoaded = false;
-  refreshAll();
+  await refreshAll();
+  renderPctLabels();
 }
 
 async function togglePrimaryOpen() {
@@ -947,7 +960,7 @@ async function loadAutoProfit() {
     box.innerHTML =
       'Bagi hasil terakhir: <b>' + esc(data.day) + '</b> · ' + st + '<br>' +
       'Keuntungan toko: <b>' + rp(data.store_profit) + '</b><br>' +
-      'Pool investor (30%): <b>' + rp(data.pool) + '</b> · Terbayar: <b>' + rp(data.paid) + '</b>';
+      'Pool investor (' + investorPct() + '%): <b>' + rp(data.pool) + '</b> · Terbayar: <b>' + rp(data.paid) + '</b>';
   } catch (e) {
     $('autoProfitBox').textContent = 'Status bagi hasil belum tersedia: ' + (e.message || e);
   }
