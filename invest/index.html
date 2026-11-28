@@ -67,6 +67,13 @@ input:focus,select:focus{border-color:#a78bfa}
 .admin-only{display:none}
 body.is-owner .admin-only{display:block}
 
+/* ===== Grafik pool ===== */
+.pool-box{position:relative;height:200px;margin-top:4px}
+.pool-box canvas{width:100%;height:100%;display:block}
+.pool-tip{position:absolute;top:4px;left:4px;font-size:11px;background:rgba(0,0,0,.7);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:4px 8px;pointer-events:none;display:none;white-space:nowrap}
+.pool-legend{display:flex;gap:12px;font-size:10.5px;color:#94a3b8;margin-top:8px;flex-wrap:wrap}
+.pool-legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:middle}
+
 /* ===== Papan Bid / Ask ===== */
 .book-top{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:10px}
 .book-top .stat{padding:8px}
@@ -175,6 +182,25 @@ body{background:radial-gradient(1200px 500px at 50% -10%,rgba(124,58,237,.25),tr
       <div class="stat"><div class="l">Lembar primary tersisa</div><div class="v" id="sAvail">—</div></div>
       <div class="stat"><div class="l">Terjual / dibagikan</div><div class="v" id="sSold">—</div></div>
     </div>
+  </div>
+
+  <!-- GRAFIK POOL INVESTOR -->
+  <div class="card">
+    <h3>💰 Pool Investor per Hari <span class="pill on" id="poolPill">—</span></h3>
+    <div style="display:flex;gap:6px;margin-bottom:8px">
+      <div class="tab on" data-pool="7" onclick="setPoolRange(7,this)">7 hari</div>
+      <div class="tab" data-pool="14" onclick="setPoolRange(14,this)">14 hari</div>
+      <div class="tab" data-pool="30" onclick="setPoolRange(30,this)">30 hari</div>
+    </div>
+    <div class="pool-box" id="poolBox">
+      <canvas id="poolChart"></canvas>
+      <div class="pool-tip" id="poolTip"></div>
+    </div>
+    <div class="pool-legend">
+      <span><i style="background:#a78bfa"></i>Pool investor (30%)</span>
+      <span><i style="background:#4ade80"></i>Terbayar</span>
+    </div>
+    <div class="hint" id="poolSummary">Memuat data pool…</div>
   </div>
 
   <!-- PORTOFOLIO -->
@@ -322,6 +348,8 @@ let chartPts = [];
 let ownerFormLoaded = false;
 let refreshTimer = null;
 let ordTouched = [];
+let poolDays = 7;
+let poolRows = [];
 
 // ---------- helpers ----------
 const $ = (id) => document.getElementById(id);
@@ -354,7 +382,6 @@ function isOpenStatus(o) {
   return ['open', 'active', 'partial'].includes(String(o.status || '').toLowerCase()) && orderLeft(o) > 0;
 }
 
-// Persentase jatah investor dari database (fallback 30)
 function investorPct() {
   const v = parseFloat(state && state.investor_profit_pct);
   return isNaN(v) ? 30 : v;
@@ -389,7 +416,7 @@ async function init() {
   if (isOwner) loadOwnerForm(false);
   refreshTimer = setInterval(() => { if (!document.hidden) refreshAll(); }, REFRESH_MS);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshAll(); });
-  window.addEventListener('resize', () => drawChart());
+  window.addEventListener('resize', () => { drawChart(); drawPoolChart(); });
 }
 
 async function waitForSession() {
@@ -406,7 +433,11 @@ async function waitForSession() {
 }
 
 async function refreshAll() {
-  await Promise.all([loadState(), loadPortfolio(), loadOrders(), loadMyOrders(), isOwner ? loadAutoProfit() : Promise.resolve()]);
+  await Promise.all([
+    loadState(), loadPortfolio(), loadOrders(), loadMyOrders(),
+    loadPoolHistory(),
+    isOwner ? loadAutoProfit() : Promise.resolve()
+  ]);
 }
 
 // ---------- data ----------
@@ -459,6 +490,162 @@ function renderState() {
   updateOrderPreview();
 }
 
+// ---------- pool investor ----------
+async function loadPoolHistory() {
+  try {
+    const { data, error } = await sb.rpc('invest_pool_history', { p_days: 30 });
+    if (error) throw error;
+    poolRows = Array.isArray(data) ? data : [];
+    renderPoolSummary();
+    drawPoolChart();
+  } catch (e) {
+    $('poolSummary').textContent = 'Riwayat pool belum tersedia: ' + (e.message || e);
+  }
+}
+
+function setPoolRange(d, el) {
+  poolDays = d;
+  document.querySelectorAll('[data-pool]').forEach(t => t.classList.toggle('on', t === el));
+  renderPoolSummary();
+  drawPoolChart();
+}
+
+// Ambil baris sesuai rentang hari yang dipilih, urut dari lama ke baru
+function visiblePoolRows() {
+  const rows = poolRows.slice(0, poolDays).slice().reverse();
+  return rows;
+}
+
+function renderPoolSummary() {
+  const rows = visiblePoolRows();
+  const totalPool = rows.reduce((a, r) => a + (Number(r.pool) || 0), 0);
+  const totalPaid = rows.reduce((a, r) => a + (Number(r.paid) || 0), 0);
+  $('poolPill').textContent = rows.length ? rp(totalPool) : '—';
+  $('poolPill').className = 'pill ' + (totalPool > 0 ? 'on' : 'off');
+  $('poolSummary').innerHTML = rows.length
+    ? 'Total pool ' + rows.length + ' hari: <b>' + rp(totalPool) + '</b> · Terbayar: <b>' + rp(totalPaid) + '</b>'
+    : 'Belum ada data pool untuk rentang ini.';
+}
+
+function drawPoolChart() {
+  const c = $('poolChart');
+  if (!c || !c.clientWidth) return;
+  const dpr = window.devicePixelRatio || 1;
+  const w = c.clientWidth, h = c.clientHeight || 200;
+  const padL = 40, padR = 10, padT = 14, padB = 26;
+  c.width = w * dpr; c.height = h * dpr;
+  const ctx = c.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+
+  const rows = visiblePoolRows();
+  if (!rows.length) {
+    ctx.fillStyle = '#64748b';
+    ctx.font = '12px Quicksand, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Belum ada data', w / 2, h / 2);
+    c._bars = [];
+    return;
+  }
+
+  const maxVal = Math.max(1, ...rows.map(r => Math.max(Number(r.pool) || 0, Number(r.paid) || 0)));
+  const plotW = w - padL - padR;
+  const plotH = h - padT - padB;
+  const groupW = plotW / rows.length;
+  const barW = Math.max(4, Math.min(18, groupW * 0.32));
+
+  // sumbu Y & grid
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+  ctx.fillStyle = '#64748b';
+  ctx.font = '10px Quicksand, sans-serif';
+  ctx.textAlign = 'right';
+  ctx.lineWidth = 1;
+  for (let g = 0; g <= 4; g++) {
+    const val = (maxVal / 4) * g;
+    const y = padT + plotH - (val / maxVal) * plotH;
+    ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(w - padR, y); ctx.stroke();
+    ctx.fillText(shortRp(val), padL - 4, y + 3);
+  }
+
+  const bars = [];
+  rows.forEach((r, i) => {
+    const cx = padL + groupW * i + groupW / 2;
+    const poolV = Number(r.pool) || 0;
+    const paidV = Number(r.paid) || 0;
+    const hPool = (poolV / maxVal) * plotH;
+    const hPaid = (paidV / maxVal) * plotH;
+
+    // batang pool (ungu)
+    const xPool = cx - barW - 1;
+    ctx.fillStyle = '#a78bfa';
+    roundRect(ctx, xPool, padT + plotH - hPool, barW, hPool, 3);
+    ctx.fill();
+
+    // batang terbayar (hijau)
+    const xPaid = cx + 1;
+    ctx.fillStyle = '#4ade80';
+    roundRect(ctx, xPaid, padT + plotH - hPaid, barW, hPaid, 3);
+    ctx.fill();
+
+    // label tanggal
+    ctx.fillStyle = '#94a3b8';
+    ctx.textAlign = 'center';
+    ctx.font = '9.5px Quicksand, sans-serif';
+    ctx.fillText(shortDate(r.day), cx, h - 8);
+
+    bars.push({ x: cx, day: r.day, pool: poolV, paid: paidV, status: r.status, store: Number(r.store_profit) || 0, gw: groupW });
+  });
+
+  c._bars = bars;
+  if (!c._tipBound) {
+    c._tipBound = true;
+    const tip = $('poolTip');
+    const show = (clientX) => {
+      const rect = c.getBoundingClientRect();
+      const x = clientX - rect.left;
+      let best = null, bd = Infinity;
+      (c._bars || []).forEach(b => { const d = Math.abs(b.x - x); if (d < bd) { bd = d; best = b; } });
+      if (!best) { tip.style.display = 'none'; return; }
+      tip.style.display = 'block';
+      tip.innerHTML = '<b>' + esc(best.day) + '</b><br>Pool: ' + rp(best.pool) + '<br>Terbayar: ' + rp(best.paid) +
+        (best.status ? '<br><span style="color:#94a3b8">' + esc(best.status) + '</span>' : '');
+      const left = Math.min(Math.max(4, best.x - 60), rect.width - 130);
+      tip.style.left = left + 'px';
+    };
+    c.addEventListener('mousemove', e => show(e.clientX));
+    c.addEventListener('touchmove', e => show(e.touches[0].clientX), { passive: true });
+    c.addEventListener('mouseleave', () => { tip.style.display = 'none'; });
+  }
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  if (h <= 0) return;
+  const rr = Math.min(r, h / 2, w / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + rr, y);
+  ctx.lineTo(x + w - rr, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + rr);
+  ctx.lineTo(x + w, y + h);
+  ctx.lineTo(x, y + h);
+  ctx.lineTo(x, y + rr);
+  ctx.quadraticCurveTo(x, y, x + rr, y);
+  ctx.closePath();
+}
+
+function shortRp(v) {
+  if (v >= 1e6) return (v / 1e6).toFixed(1).replace(/\.0$/, '') + 'jt';
+  if (v >= 1e3) return (v / 1e3).toFixed(0) + 'rb';
+  return String(Math.round(v));
+}
+
+function shortDate(d) {
+  if (!d) return '';
+  const dt = new Date(String(d).length <= 10 ? d + 'T00:00:00+07:00' : d);
+  if (isNaN(dt.getTime())) return String(d).slice(5);
+  return dt.toLocaleDateString('id-ID', { timeZone: 'Asia/Jakarta', day: '2-digit', month: 'short' });
+}
+
+// ---------- portofolio ----------
 async function loadPortfolio() {
   try {
     const { data, error } = await sb.rpc('invest_my_portfolio');
@@ -649,7 +836,7 @@ function renderMyOrders() {
   }).join('');
 }
 
-// ---------- grafik ----------
+// ---------- grafik harga ----------
 function setRange(r, el) {
   range = r;
   document.querySelectorAll('[data-range]').forEach(t => t.classList.toggle('on', t === el));
@@ -993,6 +1180,7 @@ window.cancelOrder = cancelOrder;
 window.setBoard = setBoard;
 window.setSide = setSide;
 window.setRange = setRange;
+window.setPoolRange = setPoolRange;
 window.saveSettings = saveSettings;
 window.togglePrimaryOpen = togglePrimaryOpen;
 window.loadAutoProfit = loadAutoProfit;
