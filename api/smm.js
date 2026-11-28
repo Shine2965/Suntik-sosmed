@@ -12,11 +12,6 @@
  *   refill    — request refill (order)
  *
  * Env Vercel:
- *   SUPABASE_URL
- *   SUPABASE_SERVICE_ROLE_KEY   (wajib — debet saldo + catat order)
- *   FAYUPEDIA_API_KEY
- *   FAYUPEDIA_API_ID
- *   SMM_MARKUP_PCT=8            (opsional, default 8)
  */
 
 const { createClient } = require('@supabase/supabase-js');
@@ -181,11 +176,9 @@ function mapService(s) {
     type: s.type || s.category || '',
     category: s.category || s.type || s.category_name || '',
     rate: markupPrice(rate),
-    rate_original: rate,
     min: parseInt(s.min, 10) || 0,
     max: parseInt(s.max, 10) || 0,
-    refill: !!(s.refill === true || s.refill === 1 || s.refill === 'true'),
-    markup_pct: MARKUP * 100
+    refill: !!(s.refill === true || s.refill === 1 || s.refill === 'true')
   };
 }
 
@@ -221,7 +214,6 @@ module.exports = async function handler(req, res) {
       return send(res, 200, {
         status: true,
         service: 'shine-smm-api',
-        markup_pct: MARKUP * 100,
         actions: ['services', 'add', 'status', 'balance', 'refill']
       });
     }
@@ -269,7 +261,6 @@ module.exports = async function handler(req, res) {
       const mapped = list.map(mapService);
       return send(res, 200, {
         status: true,
-        markup_pct: MARKUP * 100,
         count: mapped.length,
         data: mapped
       });
